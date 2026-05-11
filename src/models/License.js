@@ -1,13 +1,12 @@
 const mongoose = require('mongoose');
 
 const LicenseSchema = new mongoose.Schema({
-    licenseKey: { type: String, required: true, unique: true },
     schoolName: { type: String, required: true },
-    tier: { type: String, enum: ['trial', 'basic', 'pro'], default: 'basic' },
-    status: { type: String, enum: ['unused', 'active', 'expired'], default: 'unused' },
+    licenseKey: { type: String, required: true, unique: true },
     expiryDate: { type: Date, required: true },
-    activatedAt: { type: Date },
-    vpsIp: { type: String, default: '185.143.228.182' }
-}, { timestamps: true });
+    maxStudents: { type: Number, default: 100 },
+    status: { type: String, enum: ['active', 'expired', 'suspended'], default: 'active' },
+    createdAt: { type: Date, default: Date.now }
+});
 
 module.exports = mongoose.model('License', LicenseSchema);
