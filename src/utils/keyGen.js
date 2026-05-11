@@ -1,11 +1,17 @@
 const crypto = require('crypto');
 
-const generateLicenseKey = () => {
-    // Generates a key like SAMS-XXXX-XXXX-XXXX
-    const part1 = crypto.randomBytes(2).toString('hex').toUpperCase();
-    const part2 = crypto.randomBytes(2).toString('hex').toUpperCase();
-    const part3 = crypto.randomBytes(2).toString('hex').toUpperCase();
-    return `SAMS-${part1}-${part2}-${part3}`;
+/**
+ * SAMS License Key Generator
+ * Creates secure, branded keys for Techworld clients
+ */
+exports.generate = (schoolName) => {
+    const salt = "SAMS_2026_KENYA_TECHWORLD";
+    const rawData = `${schoolName}_${Date.now()}_${salt}`;
+    
+    return crypto
+        .createHash('sha256')
+        .update(rawData)
+        .digest('hex')
+        .substring(0, 16)
+        .toUpperCase();
 };
-
-module.exports = { generateLicenseKey };

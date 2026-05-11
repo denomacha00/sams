@@ -1,48 +1,51 @@
-// 1. GLOBAL FIXES & IMPORTS
-global.crypto = require("crypto"); // The fix that got us the Green Check!
+// 1. GLOBAL FIX: Ensure crypto is available for the key generator on VPS
+global.crypto = require('crypto');
+
 const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors');
-require('dotenv').config();
+const dotenv = require('dotenv');
 
-// Import Routes
+// 2. IMPORT ROUTES
 const licenseRoutes = require('./routes/licenseRoutes');
+const attendanceRoutes = require('./routes/attendanceRoutes');
 
+// 3. INITIALIZE APP
+dotenv.config();
 const app = express();
+const PORT = process.env.PORT || 3000;
 
-// 2. MIDDLEWARE
+// 4. MIDDLEWARE
 app.use(cors());
 app.use(express.json());
 
-// 3. DATABASE CONNECTION
-const connectOptions = {
-    serverSelectionTimeoutMS: 5000,
-};
+// 5. DATABASE CONNECTION (Using your existing db.js logic)
+const connectDB = require('./configs/db');
+connectDB();
 
-mongoose.connect(process.env.MONGODB_URI, connectOptions)
-    .then(() => console.log('✅ SAMS Production Engine: Connected to Atlas'))
-    .catch(err => {
-        console.error('❌ SAMS Connection Failed!');
-        console.error(`Reason: ${err.message}`);
-        process.exit(1);
-    });
-
-// 4. SYSTEM ROUTES
+// 6. API ROUTES
 app.use('/api/licenses', licenseRoutes);
+app.use('/api/attendance', attendanceRoutes);
 
-// Health Check / Root Route
+// 7. BASE STATUS ROUTE
 app.get('/', (req, res) => {
     res.json({
-        system: "Smart Attendance Management System",
-        owner: "denomacha00",
-        status: "Live & Functional",
-        environment: "Production VPS"
+        system: "SAMS Production Engine",
+        status: "Online",
+        database: "Connected to Atlas",
+        domain: "https://api.smart-managment.com"
     });
 });
 
-// 5. START SERVER
-const PORT = process.env.PORT || 3000;
+// 8. ERROR HANDLING (Prevents server from crashing)
+app.use((err, req, res, next) => {
+    console.error(err.stack);
+    res.status(500).send('❌ SAMS Internal Engine Error');
+});
+
+// 9. START SERVER
 app.listen(PORT, () => {
-    console.log(`📡 SAMS Engine running on port ${PORT}`);
+    console.log(`\n📡 SAMS Engine running on port ${PORT}`);
     console.log(`🌍 Domain: https://api.smart-managment.com`);
+    console.log(`✅ SAMS Production Engine: Connected to Atlas\n`);
 });
