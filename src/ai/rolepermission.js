@@ -1,14 +1,14 @@
 /**
- * SAMS Role-Based Access Control (RBAC)
- * Maps user roles to system permissions
+ * SAMS RBAC (Role-Based Access Control)
+ * Ensures only authorized users can access specific school data.
  */
 const roles = {
-    superadmin: ['MANAGE_SCHOOLS', 'MANAGE_LICENSES', 'VIEW_ALL_REPORTS'],
-    admin: ['ADD_STUDENT', 'EDIT_STUDENT', 'VIEW_SCHOOL_REPORTS'],
-    teacher: ['MARK_ATTENDANCE', 'VIEW_CLASS_STATS'],
-    student: ['VIEW_OWN_ATTENDANCE']
+    ADMIN: ['generate_license', 'delete_student', 'view_all_reports'],
+    HOD: ['view_class_reports', 'edit_student_info', 'mark_attendance'],
+    TEACHER: ['mark_attendance', 'view_own_class']
 };
 
 exports.checkPermission = (role, action) => {
-    return roles[role]?.includes(action) || false;
+    if (!roles[role]) return false;
+    return roles[role].includes(action);
 };

@@ -3,9 +3,9 @@ const mongoose = require('mongoose');
 const LicenseSchema = new mongoose.Schema({
     schoolName: { type: String, required: true },
     licenseKey: { type: String, required: true, unique: true },
+    status: { type: String, enum: ['Active', 'Expired', 'Suspended'], default: 'Active' },
+    studentLimit: { type: Number, default: 500 },
     expiryDate: { type: Date, required: true },
-    maxStudents: { type: Number, default: 100 },
-    status: { type: String, enum: ['active', 'expired', 'suspended'], default: 'active' },
     createdAt: { type: Date, default: Date.now }
 });
 

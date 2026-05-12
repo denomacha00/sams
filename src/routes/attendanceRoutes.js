@@ -1,34 +1,28 @@
-const express = require('express');
-const router = express.Router();
-const Student = require('../models/Student');
-
-// Route to register a new student (First-time scan)
-router.post('/register', async (req, res) => {
+// Biometric mark (Teacher Scans Student)
+router.post('/biometric', async (req, res) => {
     try {
-        const newStudent = new Student(req.body);
-        await newStudent.save();
-        res.status(201).json({ message: "✅ Student Registered in SAMS" });
-    } catch (err) {
-        res.status(400).json({ error: err.message });
-    }
-});
+        const { studentID, liveFaceData } = req.body;
+        const student = await User.findOne({ admissionNumber: studentID, role: 'student' });
 
-// Route to mark attendance (Daily scan)
-router.post('/mark', async (req, res) => {
-    try {
-        const { studentID } = req.body;
-        const student = await Student.findOneAndUpdate(
-            { studentID },
-            { lastSeen: Date.now() },
-            { new: true }
-        );
-        
-        if (!student) return res.status(404).json({ message: "❌ Student Not Found" });
-        
-        res.json({ message: `Welcome, ${student.name}! Attendance marked.` });
+        if (!student || !student.biometrics.faceData) {
+            return res.status(404).json({ message: "Student or Biometric data not found" });
+        }
+
+        // Compare using our engine
+        const matchResult = compareFace(liveFaceData, student.biometrics.faceData);
+
+        if (matchResult.isMatch) {
+            student.lastSeen = Date.now();
+            await student.save();
+            return res.json({ 
+                success: true, 
+                message: `✓ Match Found: ${student.firstName}`, 
+                confidence: matchResult.confidence 
+            });
+        } else {
+            return res.status(401).json({ message: "No match found. Try again." });
+        }
     } catch (err) {
         res.status(500).json({ error: err.message });
     }
 });
-
-module.exports = router;

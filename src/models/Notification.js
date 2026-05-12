@@ -1,10 +1,11 @@
-// Update your existing model with this 'sender' field
+const mongoose = require('mongoose');
+
 const NotificationSchema = new mongoose.Schema({
-    recipient: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
-    sender: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true }, // Added this
-    title: { type: String, required: true },
+    recipient: { type: String, required: true }, // Email or ID
     message: { type: String, required: true },
-    type: { type: String, enum: ['Timetable', 'Attendance', 'Request', 'Urgent'], default: 'Request' },
+    type: { type: String, enum: ['Attendance', 'System', 'Alert'], default: 'Attendance' },
     isRead: { type: Boolean, default: false },
     createdAt: { type: Date, default: Date.now }
 });
+
+module.exports = mongoose.model('Notification', NotificationSchema);

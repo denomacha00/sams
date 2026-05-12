@@ -1,16 +1,15 @@
-const intentClassifier = require('./intentClassifier');
+const { classifyIntent } = require('./intentClassifier');
+const { checkPermission } = require('./rolepermission');
 
-/**
- * Core Engine for AI Processing
- * Handles voice and text commands for the SAMS system
- */
-exports.processCommand = async (userInput, userRole) => {
-    const intent = await intentClassifier.classify(userInput);
+exports.processRequest = async (userRole, userText) => {
+    const intent = classifyIntent(userText);
     
-    // Logic for marking attendance or checking system status
-    return {
-        action: intent.action,
-        timestamp: new Date(),
-        authorized: true
-    };
+    // Example logic: Checking if the user has permission for the detected intent
+    const canAccess = checkPermission(userRole, intent.toLowerCase());
+    
+    if (!canAccess && intent !== "GENERAL_INQUIRY") {
+        return { status: "DENIED", message: "Unauthorized role for this action." };
+    }
+
+    return { status: "SUCCESS", intent: intent };
 };
