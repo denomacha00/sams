@@ -4,6 +4,7 @@ import { UserRole } from '@sams/shared';
 import { requirePermission } from '../middleware/rbac';
 import { userService } from '../services/userService';
 import { registrationLinkService } from '../services/registrationLinkService';
+import { prisma } from '../index';
 import { AppError } from '../middleware/errors';
 
 // ─── Validation Schemas ───────────────────────────────────────────────────────
@@ -142,6 +143,28 @@ usersRouter.delete('/:id', requirePermission('manage:users'), async (req: Reques
 // ─── Registration Links ───────────────────────────────────────────────────────
 
 export const registrationLinksRouter = Router();
+
+/**
+ * GET /api/v1/registration-links
+ * List all registration links for the school.
+ */
+registrationLinksRouter.get('/', async (req: Request, res: Response): Promise<void> => {
+  // This route is under PUBLIC_PATHS so req.user might not be set
+  // If no user (public access), return empty
+  if (!req.user || !req.schoolId) {
+    res.json([]);
+    return;
+  }
+  try {
+    const links = await prisma.registrationLink.findMany({
+      where: { schoolId: req.schoolId },
+      orderBy: { createdAt: 'desc' },
+    });
+    res.json(links);
+  } catch (err) {
+    res.json([]);
+  }
+});
 
 /**
  * POST /api/v1/registration-links
