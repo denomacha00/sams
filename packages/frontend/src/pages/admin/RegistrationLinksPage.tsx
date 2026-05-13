@@ -7,47 +7,64 @@ interface RegistrationLink {
   token: string;
   targetRole: string;
   classId?: string;
+  schoolId: string;
   useCount: number;
   maxUses: number;
   expiresAt: string;
   createdAt: string;
 }
 
-interface LinkFormData {
-  classId: string;
-  expiryDays: number;
-  maxUses: number;
-  targetRole: string;
+interface Department {
+  id: string;
+  name: string;
+  classes?: ClassItem[];
+}
+
+interface ClassItem {
+  id: string;
+  name: string;
 }
 
 const RegistrationLinksPage: React.FC = () => {
   const [links, setLinks] = useState<RegistrationLink[]>([]);
+  const [departments, setDepartments] = useState<Department[]>([]);
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
-  const [formData, setFormData] = useState<LinkFormData>({
-    classId: '',
-    expiryDays: 7,
-    maxUses: 50,
-    targetRole: 'STUDENT',
-  });
+  const [targetRole, setTargetRole] = useState('STUDENT');
+  const [selectedDept, setSelectedDept] = useState('');
+  const [selectedClass, setSelectedClass] = useState('');
+  const [expiryDays, setExpiryDays] = useState(30);
+  const [maxUses, setMaxUses] = useState(50);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
   const [copiedId, setCopiedId] = useState<string | null>(null);
 
   useEffect(() => {
     fetchLinks();
+    fetchDepartments();
   }, []);
 
   const fetchLinks = async () => {
     try {
       const { data } = await apiClient.get('/registration-links');
-      setLinks(data.links || data || []);
+      setLinks(Array.isArray(data) ? data : (data.links || []));
     } catch (err) {
       console.error('Failed to fetch links:', err);
     } finally {
       setLoading(false);
     }
   };
+
+  const fetchDepartments = async () => {
+    try {
+      const { data } = await apiClient.get('/departments');
+      setDepartments(Array.isArray(data) ? data : (data.departments || []));
+    } catch (err) {
+      console.error('Failed to fetch departments:', err);
+    }
+  };
+
+  const classesForSelectedDept = departments.find(d => d.id === selectedDept)?.classes || [];
 
   const handleGenerate = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -56,15 +73,18 @@ const RegistrationLinksPage: React.FC = () => {
 
     try {
       await apiClient.post('/registration-links', {
-        classId: formData.classId || undefined,
-        expiryDays: formData.expiryDays,
-        maxUses: formData.maxUses,
-        targetRole: formData.targetRole,
+        classId: targetRole === 'STUDENT' ? (selectedClass || undefined) : undefined,
+        expiryDays,
+        maxUses,
+        targetRole,
       });
       setShowModal(false);
+      setTargetRole('STUDENT');
+      setSelectedDept('');
+      setSelectedClass('');
       fetchLinks();
     } catch (err: any) {
-      setError(err.response?.data?.error || err.response?.data?.message || 'Failed to generate link');
+      setError(err.response?.data?.error || 'Failed to generate link');
     } finally {
       setSubmitting(false);
     }
@@ -95,15 +115,22 @@ const RegistrationLinksPage: React.FC = () => {
     return { label: 'Active', color: 'bg-green-500/20 text-green-300' };
   };
 
+  const getRoleBadge = (role: string) => {
+    switch (role) {
+      case 'STUDENT': return 'bg-blue-500/20 text-blue-300';
+      case 'TEACHER': return 'bg-green-500/20 text-green-300';
+      case 'HOD': return 'bg-orange-500/20 text-orange-300';
+      default: return 'bg-gray-500/20 text-gray-300';
+    }
+  };
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900">
       {/* Header */}
       <header className="border-b border-white/10 backdrop-blur-sm bg-white/5">
         <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <Link to="/admin" className="text-gray-400 hover:text-cyan-400 transition-colors">
-              ← Admin
-            </Link>
+            <Link to="/admin" className="text-gray-400 hover:text-cyan-400 transition-colors">← Admin</Link>
             <h1 className="text-lg font-bold text-white">Registration Links</h1>
           </div>
           <button
@@ -116,13 +143,14 @@ const RegistrationLinksPage: React.FC = () => {
       </header>
 
       <main className="max-w-7xl mx-auto px-6 py-8">
+        {/* Links Table */}
         <div className="backdrop-blur-xl bg-white/5 border border-white/10 rounded-2xl overflow-hidden">
           <div className="overflow-x-auto">
             <table className="w-full">
               <thead>
                 <tr className="border-b border-white/10">
-                  <th className="text-left px-6 py-4 text-sm font-semibold text-white">Token</th>
-                  <th className="text-left px-6 py-4 text-sm font-semibold text-white">Target Role</th>
+                  <th className="text-left px-6 py-4 text-sm font-semibold text-white">Link</th>
+                  <th className="text-left px-6 py-4 text-sm font-semibold text-white">For</th>
                   <th className="text-left px-6 py-4 text-sm font-semibold text-white">Uses</th>
                   <th className="text-left px-6 py-4 text-sm font-semibold text-white">Expires</th>
                   <th className="text-left px-6 py-4 text-sm font-semibold text-white">Status</th>
@@ -131,48 +159,32 @@ const RegistrationLinksPage: React.FC = () => {
               </thead>
               <tbody>
                 {loading ? (
-                  <tr>
-                    <td colSpan={6} className="px-6 py-12 text-center text-gray-400">Loading...</td>
-                  </tr>
+                  <tr><td colSpan={6} className="px-6 py-12 text-center text-gray-400">Loading...</td></tr>
                 ) : links.length === 0 ? (
-                  <tr>
-                    <td colSpan={6} className="px-6 py-12 text-center text-gray-400">No registration links yet</td>
-                  </tr>
+                  <tr><td colSpan={6} className="px-6 py-12 text-center text-gray-400">No registration links yet. Click "Generate Link" to create one.</td></tr>
                 ) : (
                   links.map((link) => {
                     const status = getLinkStatus(link);
                     return (
                       <tr key={link.id} className="border-b border-white/5 hover:bg-white/5 transition-colors">
-                        <td className="px-6 py-4 text-sm text-gray-300 font-mono">
-                          {link.token.substring(0, 12)}...
+                        <td className="px-6 py-4">
+                          <p className="text-sm text-gray-300 font-mono">{link.token.substring(0, 8)}...</p>
                         </td>
                         <td className="px-6 py-4">
-                          <span className="inline-flex px-2 py-1 rounded-full text-xs font-medium bg-blue-500/20 text-blue-300">
+                          <span className={`inline-flex px-2.5 py-1 rounded-full text-xs font-semibold ${getRoleBadge(link.targetRole)}`}>
                             {link.targetRole}
                           </span>
                         </td>
-                        <td className="px-6 py-4 text-sm text-gray-300">
-                          {link.useCount} / {link.maxUses}
-                        </td>
-                        <td className="px-6 py-4 text-sm text-gray-400">
-                          {new Date(link.expiresAt).toLocaleDateString()}
-                        </td>
+                        <td className="px-6 py-4 text-sm text-gray-300">{link.useCount} / {link.maxUses}</td>
+                        <td className="px-6 py-4 text-sm text-gray-400">{new Date(link.expiresAt).toLocaleDateString()}</td>
                         <td className="px-6 py-4">
-                          <span className={`inline-flex px-2 py-1 rounded-full text-xs font-medium ${status.color}`}>
-                            {status.label}
-                          </span>
+                          <span className={`inline-flex px-2 py-1 rounded-full text-xs font-medium ${status.color}`}>{status.label}</span>
                         </td>
                         <td className="px-6 py-4 text-right">
-                          <button
-                            onClick={() => copyLink(link.token, link.id)}
-                            className="text-cyan-400 hover:text-cyan-300 text-sm transition-colors mr-3"
-                          >
-                            {copiedId === link.id ? '✓ Copied' : 'Copy Link'}
+                          <button onClick={() => copyLink(link.token, link.id)} className="text-cyan-400 hover:text-cyan-300 text-sm transition-colors mr-3">
+                            {copiedId === link.id ? '✓ Copied' : 'Copy'}
                           </button>
-                          <button
-                            onClick={() => handleDelete(link.id)}
-                            className="text-red-400 hover:text-red-300 text-sm transition-colors"
-                          >
+                          <button onClick={() => handleDelete(link.id)} className="text-red-400 hover:text-red-300 text-sm transition-colors">
                             Delete
                           </button>
                         </td>
@@ -193,59 +205,93 @@ const RegistrationLinksPage: React.FC = () => {
             <h3 className="text-xl font-bold text-white mb-6">Generate Registration Link</h3>
 
             {error && (
-              <div className="mb-4 p-3 rounded-lg bg-red-500/10 border border-red-500/20 text-red-300 text-sm">
-                {error}
-              </div>
+              <div className="mb-4 p-3 rounded-lg bg-red-500/10 border border-red-500/20 text-red-300 text-sm">{error}</div>
             )}
 
             <form onSubmit={handleGenerate} className="space-y-4">
+              {/* Target Role */}
               <div>
-                <label className="block text-sm text-gray-300 mb-1">Target Role *</label>
+                <label className="block text-sm text-gray-300 mb-1">Who is this link for? *</label>
                 <select
-                  value={formData.targetRole}
-                  onChange={(e) => setFormData({ ...formData, targetRole: e.target.value })}
+                  value={targetRole}
+                  onChange={(e) => { setTargetRole(e.target.value); setSelectedDept(''); setSelectedClass(''); }}
                   className="w-full px-4 py-2.5 rounded-xl bg-white/5 border border-white/10 text-white focus:outline-none focus:border-cyan-500/50 transition-colors"
                 >
-                  <option value="STUDENT" className="bg-slate-800">Student</option>
-                  <option value="TEACHER" className="bg-slate-800">Teacher</option>
-                  <option value="HOD" className="bg-slate-800">HOD</option>
+                  <option value="STUDENT" className="bg-slate-800">Students</option>
+                  <option value="TEACHER" className="bg-slate-800">Teachers</option>
+                  <option value="HOD" className="bg-slate-800">HODs (Heads of Department)</option>
                 </select>
               </div>
 
-              <div>
-                <label className="block text-sm text-gray-300 mb-1">Class ID (optional)</label>
-                <input
-                  type="text"
-                  value={formData.classId}
-                  onChange={(e) => setFormData({ ...formData, classId: e.target.value })}
-                  className="w-full px-4 py-2.5 rounded-xl bg-white/5 border border-white/10 text-white placeholder-gray-500 focus:outline-none focus:border-cyan-500/50 transition-colors"
-                  placeholder="Class ID for students"
-                />
-              </div>
+              {/* Department (for Students and Teachers) */}
+              {(targetRole === 'STUDENT' || targetRole === 'TEACHER') && (
+                <div>
+                  <label className="block text-sm text-gray-300 mb-1">Department {targetRole === 'STUDENT' ? '*' : '(optional)'}</label>
+                  <select
+                    value={selectedDept}
+                    onChange={(e) => { setSelectedDept(e.target.value); setSelectedClass(''); }}
+                    className="w-full px-4 py-2.5 rounded-xl bg-white/5 border border-white/10 text-white focus:outline-none focus:border-cyan-500/50 transition-colors"
+                  >
+                    <option value="" className="bg-slate-800">-- Select Department --</option>
+                    {departments.map(d => (
+                      <option key={d.id} value={d.id} className="bg-slate-800">{d.name}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
 
+              {/* Class (only for Students) */}
+              {targetRole === 'STUDENT' && selectedDept && (
+                <div>
+                  <label className="block text-sm text-gray-300 mb-1">Class *</label>
+                  <select
+                    value={selectedClass}
+                    onChange={(e) => setSelectedClass(e.target.value)}
+                    className="w-full px-4 py-2.5 rounded-xl bg-white/5 border border-white/10 text-white focus:outline-none focus:border-cyan-500/50 transition-colors"
+                  >
+                    <option value="" className="bg-slate-800">-- Select Class --</option>
+                    {classesForSelectedDept.map(c => (
+                      <option key={c.id} value={c.id} className="bg-slate-800">{c.name}</option>
+                    ))}
+                  </select>
+                  {classesForSelectedDept.length === 0 && (
+                    <p className="text-xs text-yellow-400 mt-1">No classes in this department. Create one first.</p>
+                  )}
+                </div>
+              )}
+
+              {/* Expiry & Max Uses */}
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm text-gray-300 mb-1">Expiry (days) *</label>
+                  <label className="block text-sm text-gray-300 mb-1">Expires in (days)</label>
                   <input
                     type="number"
-                    required
-                    min={1}
-                    value={formData.expiryDays}
-                    onChange={(e) => setFormData({ ...formData, expiryDays: parseInt(e.target.value) || 7 })}
+                    min={7}
+                    max={365}
+                    value={expiryDays}
+                    onChange={(e) => setExpiryDays(parseInt(e.target.value) || 30)}
                     className="w-full px-4 py-2.5 rounded-xl bg-white/5 border border-white/10 text-white focus:outline-none focus:border-cyan-500/50 transition-colors"
                   />
                 </div>
                 <div>
-                  <label className="block text-sm text-gray-300 mb-1">Max Uses *</label>
+                  <label className="block text-sm text-gray-300 mb-1">Max registrations</label>
                   <input
                     type="number"
-                    required
                     min={1}
-                    value={formData.maxUses}
-                    onChange={(e) => setFormData({ ...formData, maxUses: parseInt(e.target.value) || 50 })}
+                    value={maxUses}
+                    onChange={(e) => setMaxUses(parseInt(e.target.value) || 50)}
                     className="w-full px-4 py-2.5 rounded-xl bg-white/5 border border-white/10 text-white focus:outline-none focus:border-cyan-500/50 transition-colors"
                   />
                 </div>
+              </div>
+
+              {/* Info box */}
+              <div className="p-3 rounded-xl bg-teal-500/10 border border-teal-500/20">
+                <p className="text-xs text-teal-300">
+                  This link will allow up to <strong>{maxUses}</strong> {targetRole.toLowerCase()}s to self-register.
+                  {targetRole === 'STUDENT' && selectedClass && ' They will be assigned to the selected class.'}
+                  {targetRole !== 'STUDENT' && ' They will need to provide their Work ID and phone number.'}
+                </p>
               </div>
 
               <div className="flex gap-3 pt-4">
