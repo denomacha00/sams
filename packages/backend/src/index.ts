@@ -9,6 +9,14 @@ import { enforceSchoolScope } from './middleware/rbac';
 import { errorHandler } from './middleware/errors';
 import { authRouter } from './routes/auth';
 import { activationRouter } from './routes/activation';
+import { usersRouter, registrationLinksRouter } from './routes/users';
+import { timetableRouter } from './routes/timetable';
+import { sessionsRouter } from './routes/sessions';
+import { attendanceRouter } from './routes/attendance';
+import { paymentsRouter } from './routes/payments';
+import { reportsRouter } from './routes/reports';
+import { riskScoresRouter } from './routes/riskScores';
+import { setupAttendanceSocket } from './sockets/attendanceSocket';
 
 // ─── App & HTTP Server ────────────────────────────────────────────────────────
 
@@ -48,10 +56,12 @@ const PUBLIC_PATHS = [
   '/api/v1/auth/login',
   '/api/v1/auth/refresh',
   '/api/v1/activate',
+  '/api/v1/registration-links/',
+  '/api/v1/payments/callback',
 ];
 
 function isPublicPath(path: string): boolean {
-  return PUBLIC_PATHS.some((pub) => path === pub || path.startsWith(pub + '/'));
+  return PUBLIC_PATHS.some((pub) => path === pub || path.startsWith(pub + '/') || path.startsWith(pub));
 }
 
 app.use('/api/v1', (req: Request, res: Response, next: NextFunction) => {
@@ -66,6 +76,14 @@ app.use('/api/v1', (req: Request, res: Response, next: NextFunction) => {
 
 app.use('/api/v1/auth', authRouter);
 app.use('/api/v1/activate', activationRouter);
+app.use('/api/v1/users', usersRouter);
+app.use('/api/v1/registration-links', registrationLinksRouter);
+app.use('/api/v1/timetable', timetableRouter);
+app.use('/api/v1/sessions', sessionsRouter);
+app.use('/api/v1/attendance', attendanceRouter);
+app.use('/api/v1/payments', paymentsRouter);
+app.use('/api/v1/reports', reportsRouter);
+app.use('/api/v1/risk-scores', riskScoresRouter);
 
 // ─── Socket.io ────────────────────────────────────────────────────────────────
 
@@ -76,13 +94,8 @@ const io = new SocketIOServer(httpServer, {
   },
 });
 
-io.on('connection', (socket) => {
-  console.log(`[Socket.io] Client connected: ${socket.id}`);
-
-  socket.on('disconnect', () => {
-    console.log(`[Socket.io] Client disconnected: ${socket.id}`);
-  });
-});
+// Set up attendance socket handlers (auth, session:join, qr:subscribe)
+setupAttendanceSocket(io);
 
 // ─── Redis Client ─────────────────────────────────────────────────────────────
 
