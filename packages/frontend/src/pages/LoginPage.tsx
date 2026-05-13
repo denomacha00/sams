@@ -13,16 +13,11 @@ const LoginPage: React.FC = () => {
 
   const getRoleRedirect = (role: UserRole): string => {
     switch (role) {
-      case UserRole.SCHOOL_ADMIN:
-        return '/dashboard';
-      case UserRole.HOD:
-        return '/reports';
-      case UserRole.TEACHER:
-        return '/sessions';
-      case UserRole.STUDENT:
-        return '/sessions/scan';
-      default:
-        return '/dashboard';
+      case UserRole.SCHOOL_ADMIN: return '/dashboard';
+      case UserRole.HOD: return '/reports';
+      case UserRole.TEACHER: return '/sessions';
+      case UserRole.STUDENT: return '/sessions/scan';
+      default: return '/dashboard';
     }
   };
 
@@ -32,156 +27,164 @@ const LoginPage: React.FC = () => {
     try {
       await login(schoolCode, identifier, password);
       const user = useAuthStore.getState().user;
-      if (user) {
-        navigate(getRoleRedirect(user.role), { replace: true });
-      }
-    } catch {
-      // error is set in store
-    }
+      if (user) navigate(getRoleRedirect(user.role), { replace: true });
+    } catch { /* error in store */ }
   };
 
   return (
-    <div className="min-h-screen relative overflow-hidden flex items-center justify-center px-4">
-      {/* Animated gradient background */}
-      <div className="absolute inset-0 bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900" />
-      <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjAiIGhlaWdodD0iNjAiIHZpZXdCb3g9IjAgMCA2MCA2MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48ZyBmaWxsPSJub25lIiBmaWxsLXJ1bGU9ImV2ZW5vZGQiPjxnIGZpbGw9IiNmZmYiIGZpbGwtb3BhY2l0eT0iMC4wMyI+PHBhdGggZD0iTTM2IDM0djItSDI0di0yaDEyem0wLTRWMjhIMjR2Mmgxem0tMi0ydi0ySDE0djJoMjB6Ii8+PC9nPjwvZz48L3N2Zz4=')] opacity-40" />
-      
-      {/* Floating orbs */}
-      <div className="absolute top-20 left-20 w-72 h-72 bg-purple-500/20 rounded-full blur-3xl animate-pulse" />
-      <div className="absolute bottom-20 right-20 w-96 h-96 bg-blue-500/20 rounded-full blur-3xl animate-pulse" style={{ animationDelay: '1s' }} />
-      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-indigo-500/10 rounded-full blur-3xl" />
+    <div className="min-h-screen flex">
+      {/* Left panel — branding */}
+      <div className="hidden lg:flex lg:w-1/2 relative overflow-hidden bg-gradient-to-br from-[#0f2027] via-[#203a43] to-[#2c5364] items-center justify-center">
+        {/* Decorative circles */}
+        <div className="absolute -top-20 -left-20 w-80 h-80 bg-teal-400/10 rounded-full blur-3xl" />
+        <div className="absolute -bottom-32 -right-32 w-96 h-96 bg-cyan-400/10 rounded-full blur-3xl" />
+        <div className="absolute top-1/3 right-10 w-40 h-40 bg-emerald-400/10 rounded-full blur-2xl" />
 
-      {/* Login card */}
-      <div className="relative z-10 w-full max-w-md">
-        {/* Glass card */}
-        <div className="backdrop-blur-xl bg-white/5 border border-white/10 rounded-2xl shadow-2xl p-8">
-          {/* BIG Logo & branding */}
-          <div className="text-center mb-10">
-            {/* Large Shield SVG Icon */}
-            <div className="inline-flex items-center justify-center w-24 h-24 rounded-3xl bg-gradient-to-br from-blue-500 via-purple-600 to-indigo-700 shadow-2xl shadow-purple-500/40 mb-6 animate-[pulse_3s_ease-in-out_infinite]">
-              <svg className="w-12 h-12 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+        {/* 3D Logo */}
+        <div className="relative z-10 text-center px-12">
+          {/* 3D Shield Logo */}
+          <div className="relative inline-block mb-8">
+            {/* Shadow layer */}
+            <div className="absolute inset-0 translate-x-2 translate-y-2 rounded-3xl bg-black/30 blur-xl" />
+            {/* Back layer */}
+            <div className="absolute inset-0 translate-x-1 translate-y-1 rounded-3xl bg-gradient-to-br from-teal-700 to-cyan-900" />
+            {/* Main logo container */}
+            <div className="relative w-32 h-32 rounded-3xl bg-gradient-to-br from-teal-400 via-cyan-500 to-blue-600 flex items-center justify-center shadow-2xl shadow-teal-500/30 border border-white/20">
+              {/* Inner shield */}
+              <svg className="w-16 h-16 text-white drop-shadow-lg" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+              </svg>
+              {/* Shine effect */}
+              <div className="absolute top-2 left-2 w-8 h-8 bg-white/30 rounded-full blur-md" />
+            </div>
+          </div>
+
+          {/* 3D Text */}
+          <h1 className="text-6xl font-black text-white tracking-tight mb-3" style={{ textShadow: '0 4px 8px rgba(0,0,0,0.4), 0 2px 4px rgba(0,0,0,0.3)' }}>
+            SAMS
+          </h1>
+          <p className="text-lg text-teal-200/80 font-medium tracking-wide">
+            Smart Attendance Management System
+          </p>
+          <p className="text-sm text-teal-300/50 mt-4 max-w-sm mx-auto leading-relaxed">
+            Multi-school enterprise platform with QR, GPS, and biometric attendance verification for Kenyan institutions.
+          </p>
+        </div>
+      </div>
+
+      {/* Right panel — login form */}
+      <div className="flex-1 flex items-center justify-center bg-[#f0f4f8] px-6 py-12">
+        <div className="w-full max-w-md">
+          {/* Mobile logo (shown on small screens) */}
+          <div className="lg:hidden text-center mb-8">
+            <div className="inline-flex items-center justify-center w-20 h-20 rounded-2xl bg-gradient-to-br from-teal-400 via-cyan-500 to-blue-600 shadow-xl shadow-teal-500/30 mb-4">
+              <svg className="w-10 h-10 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
               </svg>
             </div>
-            {/* SAMS text with gradient */}
-            <h1 className="text-4xl font-black bg-gradient-to-r from-blue-400 via-purple-400 to-indigo-400 bg-clip-text text-transparent tracking-tight mb-2">
-              SAMS
-            </h1>
-            {/* Tagline with subtle animation */}
-            <p className="text-sm text-gray-400 font-medium tracking-wide animate-[fadeIn_1.5s_ease-in-out]">
-              Smart Attendance Management System
+            <h1 className="text-3xl font-black text-gray-800">SAMS</h1>
+            <p className="text-sm text-gray-500">Smart Attendance Management System</p>
+          </div>
+
+          {/* Form card */}
+          <div className="bg-white rounded-2xl shadow-xl shadow-gray-200/50 p-8 border border-gray-100">
+            <h2 className="text-2xl font-bold text-gray-800 mb-1">Welcome back</h2>
+            <p className="text-gray-500 text-sm mb-8">Sign in to your school account</p>
+
+            {error && (
+              <div className="mb-6 p-3 bg-red-50 border border-red-200 rounded-xl">
+                <p className="text-sm text-red-600 text-center font-medium">{error}</p>
+              </div>
+            )}
+
+            <form onSubmit={handleSubmit} className="space-y-5">
+              <div>
+                <label htmlFor="schoolCode" className="block text-sm font-semibold text-gray-700 mb-1.5">
+                  School Code
+                </label>
+                <input
+                  id="schoolCode"
+                  type="text"
+                  value={schoolCode}
+                  onChange={(e) => setSchoolCode(e.target.value.toUpperCase())}
+                  required
+                  className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-gray-800 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-teal-500/40 focus:border-teal-400 transition-all duration-200"
+                  placeholder="e.g. KHS2024"
+                />
+              </div>
+
+              <div>
+                <label htmlFor="identifier" className="block text-sm font-semibold text-gray-700 mb-1.5">
+                  Email or Admission Number
+                </label>
+                <input
+                  id="identifier"
+                  type="text"
+                  value={identifier}
+                  onChange={(e) => setIdentifier(e.target.value)}
+                  required
+                  className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-gray-800 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-teal-500/40 focus:border-teal-400 transition-all duration-200"
+                  placeholder="Enter email or admission number"
+                />
+              </div>
+
+              <div>
+                <label htmlFor="password" className="block text-sm font-semibold text-gray-700 mb-1.5">
+                  Password
+                </label>
+                <div className="relative">
+                  <input
+                    id="password"
+                    type={showPassword ? 'text' : 'password'}
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    required
+                    className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-gray-800 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-teal-500/40 focus:border-teal-400 transition-all duration-200 pr-12"
+                    placeholder="Enter password"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors"
+                  >
+                    {showPassword ? (
+                      <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21" /></svg>
+                    ) : (
+                      <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>
+                    )}
+                  </button>
+                </div>
+              </div>
+
+              <button
+                type="submit"
+                disabled={loading}
+                className="w-full bg-gradient-to-r from-teal-500 to-cyan-600 text-white font-bold py-3.5 px-4 rounded-xl hover:from-teal-400 hover:to-cyan-500 focus:outline-none focus:ring-2 focus:ring-teal-500/50 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 shadow-lg shadow-teal-500/30 hover:shadow-teal-500/50 hover:scale-[1.01] active:scale-[0.99]"
+              >
+                {loading ? (
+                  <span className="flex items-center justify-center gap-2">
+                    <svg className="animate-spin h-5 w-5" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" /><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" /></svg>
+                    Signing in...
+                  </span>
+                ) : 'Sign In'}
+              </button>
+            </form>
+
+            <div className="mt-6 pt-6 border-t border-gray-100 text-center">
+              <Link to="/activate" className="text-sm text-teal-600 hover:text-teal-500 font-semibold transition-colors">
+                Activate a new school →
+              </Link>
+            </div>
+          </div>
+
+          {/* Footer */}
+          <div className="text-center mt-6">
+            <p className="text-xs text-gray-400">© 2025 SAMS · Smart Attendance Management System</p>
+            <p className="text-xs text-gray-400 mt-1">
+              Developed by <span className="text-teal-600 font-medium">Denis Macharia</span> · <a href="tel:+254703285246" className="text-teal-600 hover:text-teal-500">+254 703 285 246</a>
             </p>
           </div>
-
-          {/* Error message */}
-          {error && (
-            <div className="mb-6 p-3 bg-red-500/20 border border-red-400/30 rounded-xl backdrop-blur-sm">
-              <p className="text-sm text-red-200 text-center">{error}</p>
-            </div>
-          )}
-
-          {/* Form */}
-          <form onSubmit={handleSubmit} className="space-y-5">
-            <div>
-              <label htmlFor="schoolCode" className="block text-xs font-semibold text-gray-300 uppercase tracking-wider mb-2">
-                School Code
-              </label>
-              <input
-                id="schoolCode"
-                type="text"
-                value={schoolCode}
-                onChange={(e) => setSchoolCode(e.target.value.toUpperCase())}
-                required
-                className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-purple-500/50 focus:border-purple-400/50 transition-all duration-200"
-                placeholder="e.g. KHS2024"
-              />
-            </div>
-
-            <div>
-              <label htmlFor="identifier" className="block text-xs font-semibold text-gray-300 uppercase tracking-wider mb-2">
-                Email or Admission Number
-              </label>
-              <input
-                id="identifier"
-                type="text"
-                value={identifier}
-                onChange={(e) => setIdentifier(e.target.value)}
-                required
-                className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-purple-500/50 focus:border-purple-400/50 transition-all duration-200"
-                placeholder="Enter email or admission number"
-              />
-            </div>
-
-            <div>
-              <label htmlFor="password" className="block text-xs font-semibold text-gray-300 uppercase tracking-wider mb-2">
-                Password
-              </label>
-              <div className="relative">
-                <input
-                  id="password"
-                  type={showPassword ? 'text' : 'password'}
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  required
-                  className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-purple-500/50 focus:border-purple-400/50 transition-all duration-200 pr-12"
-                  placeholder="Enter password"
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-white transition-colors"
-                >
-                  {showPassword ? (
-                    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21" />
-                    </svg>
-                  ) : (
-                    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-                    </svg>
-                  )}
-                </button>
-              </div>
-            </div>
-
-            <button
-              type="submit"
-              disabled={loading}
-              className="w-full relative overflow-hidden bg-gradient-to-r from-blue-600 to-purple-600 text-white font-semibold py-3.5 px-4 rounded-xl hover:from-blue-500 hover:to-purple-500 focus:outline-none focus:ring-2 focus:ring-purple-500/50 focus:ring-offset-2 focus:ring-offset-transparent disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 shadow-lg shadow-purple-500/25 hover:shadow-purple-500/40 hover:scale-[1.02] active:scale-[0.98]"
-            >
-              {loading ? (
-                <span className="flex items-center justify-center gap-2">
-                  <svg className="animate-spin h-5 w-5" viewBox="0 0 24 24">
-                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
-                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-                  </svg>
-                  Signing in...
-                </span>
-              ) : (
-                'Sign In'
-              )}
-            </button>
-          </form>
-
-          {/* Footer links */}
-          <div className="mt-6 pt-6 border-t border-white/10 text-center">
-            <Link
-              to="/activate"
-              className="text-sm text-purple-300 hover:text-purple-200 transition-colors font-medium"
-            >
-              Activate a new school →
-            </Link>
-          </div>
         </div>
-
-        {/* Bottom text */}
-        <p className="text-center text-xs text-gray-500 mt-6">
-          © 2025 SAMS · Developed by Denis Macharia
-        </p>
-        <p className="text-center text-xs text-gray-600 mt-1">
-          <a href="tel:+254703285246" className="text-purple-400 hover:text-purple-300 transition-colors">+254 703 285 246</a>
-        </p>
       </div>
     </div>
   );
