@@ -17,6 +17,7 @@ import { paymentsRouter } from './routes/payments';
 import { reportsRouter } from './routes/reports';
 import { riskScoresRouter } from './routes/riskScores';
 import { superAdminRouter } from './routes/superAdmin';
+import { departmentsRouter, classesRouter } from './routes/departments';
 import { setupAttendanceSocket } from './sockets/attendanceSocket';
 
 // ─── App & HTTP Server ────────────────────────────────────────────────────────
@@ -85,6 +86,8 @@ app.use('/api/v1/attendance', attendanceRouter);
 app.use('/api/v1/payments', paymentsRouter);
 app.use('/api/v1/reports', reportsRouter);
 app.use('/api/v1/risk-scores', riskScoresRouter);
+app.use('/api/v1/departments', departmentsRouter);
+app.use('/api/v1/classes', classesRouter);
 app.use('/api/v1/super', superAdminRouter);
 
 // ─── Socket.io ────────────────────────────────────────────────────────────────
