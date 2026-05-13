@@ -159,12 +159,12 @@ This plan converts the SAMS design into incremental coding tasks for a React + T
     - Student A attempts to read student B's records; assert 403
 
 - [ ] 7. Implement user management and registration link service
-  - [ ] 7.1 Implement `UserService` CRUD in `packages/backend/src/services/userService.ts`
+  - [x] 7.1 Implement `UserService` CRUD in `packages/backend/src/services/userService.ts`
     - `createUser`, `updateUser`, `deleteUser`, `listUsers` — all scoped to `schoolId`
     - Hash passwords with bcrypt (cost 12) on create/update
     - Enforce plan tier student count limits via `LicenseService.checkStudentLimit`
     - _Requirements: 3.2, 4.9, 12.1, 12.6, 19.2_
-  - [ ] 7.2 Implement `RegistrationLinkService` in `packages/backend/src/services/registrationLinkService.ts`
+  - [x] 7.2 Implement `RegistrationLinkService` in `packages/backend/src/services/registrationLinkService.ts`
     - `generateLink(creatorId, role)`: embed correct scope IDs based on creator role; set expiry (7–365 days) and maxUses (classSize + 10%)
     - `resolveLink(token)`: return metadata; reject if expired or at max uses
     - `registerViaLink(token, fullName, admissionNumber)`: validate link, check duplicate admission number, create Student user
@@ -186,7 +186,7 @@ This plan converts the SAMS design into incremental coding tasks for a React + T
     - Register student with admission number X; attempt second registration with same X in same school; assert rejection
 
 - [ ] 8. Implement timetable service
-  - [ ] 8.1 Implement `TimetableService` in `packages/backend/src/services/timetableService.ts`
+  - [x] 8.1 Implement `TimetableService` in `packages/backend/src/services/timetableService.ts`
     - `createEntry`: validate required fields, detect overlaps for same teacher/class/room on same day+time, reject with `TIMETABLE_CONFLICT`
     - `updateEntry`, `deleteEntry` (soft-delete: do not cascade to historical sessions)
     - `listEntries`: scoped to `schoolId`, filterable by teacher/class/day
@@ -196,7 +196,7 @@ This plan converts the SAMS design into incremental coding tasks for a React + T
     - _Requirements: 17.4_
 
 - [ ] 9. Implement attendance session and QR code service
-  - [ ] 9.1 Implement `SessionService` in `packages/backend/src/services/sessionService.ts`
+  - [x] 9.1 Implement `SessionService` in `packages/backend/src/services/sessionService.ts`
     - `startSession(teacherId, timetableEntryId, location)`: validate timetable entry belongs to teacher at current time, create `AttendanceSession`, generate initial QR token (JWT, 30 s expiry, random nonce), store in session record
     - `endSession(sessionId, teacherId)`: set `isActive=false`, `endedAt`, broadcast `session:ended` via Socket.io
     - `generateQRCode(sessionId)`: sign JWT `{sessionId, nonce, iat, exp: iat+30}` with `QR_SECRET`
@@ -214,22 +214,22 @@ This plan converts the SAMS design into incremental coding tasks for a React + T
     - Generate N concurrent sessions; assert all N QR tokens are distinct strings
 
 - [ ] 10. Implement attendance recording service
-  - [ ] 10.1 Implement `AttendanceService.recordQRScan` in `packages/backend/src/services/attendanceService.ts`
+  - [x] 10.1 Implement `AttendanceService.recordQRScan` in `packages/backend/src/services/attendanceService.ts`
     - Verify QR JWT signature and expiry (reject if >30 s old with `QR_EXPIRED`)
     - Validate GPS coordinates within session radius using `haversineDistance` (reject with `GPS_OUT_OF_RANGE`)
     - Check for duplicate scan (`DUPLICATE_SCAN`)
     - Classify status using `classifyAttendanceStatus`
     - Insert `AttendanceRecord`, broadcast via Socket.io, trigger risk score recomputation
     - _Requirements: 5.3, 5.4, 5.5, 5.6, 5.7, 5.8, 5.10_
-  - [ ] 10.2 Implement `AttendanceService.recordManual`
+  - [x] 10.2 Implement `AttendanceService.recordManual`
     - Validate status is one of `PRESENT | LATE | EXCUSED | ABSENT`; reject others with 400
     - Accept optional note ≤500 chars; reject longer notes with validation error
     - Check for duplicate; if updating existing record, overwrite and log to AuditLog
     - _Requirements: 6.1, 6.2, 6.3, 6.5_
-  - [ ] 10.3 Implement `AttendanceService.recordBiometric`
+  - [x] 10.3 Implement `AttendanceService.recordBiometric`
     - Accept `{sessionId, studentId, confidence}`; check confidence ≥ threshold; mark PRESENT or reject
     - _Requirements: 7.5, 7.6_
-  - [ ] 10.4 Implement `AttendanceService.updateRecord`
+  - [x] 10.4 Implement `AttendanceService.updateRecord`
     - Overwrite status and note; write AuditLog entry with previous and new status, actorId, timestamp
     - _Requirements: 6.5_
   - [ ] 10.5 Wire attendance routes: `POST /api/v1/attendance/qr`, `POST /api/v1/attendance/manual`, `POST /api/v1/attendance/biometric`, `PUT /api/v1/attendance/:id`, `GET /api/v1/attendance`
@@ -256,7 +256,7 @@ This plan converts the SAMS design into incremental coding tasks for a React + T
     - Update a record; assert AuditLog entry contains previous status, new status, actorId, and timestamp
 
 - [ ] 11. Implement offline sync service (backend)
-  - [ ] 11.1 Implement `AttendanceService.syncOfflineRecords` in `packages/backend/src/services/attendanceService.ts`
+  - [x] 11.1 Implement `AttendanceService.syncOfflineRecords` in `packages/backend/src/services/attendanceService.ts`
     - Accept batch of `OfflineAttendanceRecord[]`
     - For each record, check if server record exists for same `sessionId + studentId`
     - Apply conflict resolution: retain record with newer `scannedAt` timestamp
@@ -312,7 +312,7 @@ This plan converts the SAMS design into incremental coding tasks for a React + T
   - [ ] 14.3 Wire risk score routes: `GET /api/v1/risk-scores`, `GET /api/v1/risk-scores/:studentId`
     - _Requirements: 11.3_
 
-- [ ] 15. Implement plan tier feature gating (license service)
+- [x] 15. Implement plan tier feature gating (license service)
   - [x] 15.1 Implement `LicenseService` in `packages/backend/src/services/licenseService.ts`
     - `checkStudentLimit(schoolId)`: query student count; compare against tier limits (Trial:50, Basic:500, Pro:2000, Enterprise:∞); throw `PLAN_LIMIT_REACHED` if at limit
     - `checkFeatureAccess(schoolId, feature)`: return boolean based on plan tier (biometric/AI gated to Pro+, custom branding to Enterprise)
@@ -320,7 +320,7 @@ This plan converts the SAMS design into incremental coding tasks for a React + T
     - `suspendSchool(schoolId)`: set `isSuspended=true`, revoke all active sessions
     - `extendLicense(schoolId, newExpiry)`: update `licenseExpiresAt`, clear `isReadOnly`
     - _Requirements: 12.1, 12.2, 12.3, 12.4, 12.5, 12.6, 12.7, 15.3, 15.4_
-  - [ ] 15.2 Add `licenseGuard` middleware that checks `isSuspended` and `isReadOnly` on every authenticated request
+  - [x] 15.2 Add `licenseGuard` middleware that checks `isSuspended` and `isReadOnly` on every authenticated request
     - _Requirements: 12.7, 15.3_
   - [ ]* 15.3 Write property test for plan tier student count enforcement (Property 30)
     - **Property 30: Plan Tier Student Count Enforcement**
@@ -328,7 +328,7 @@ This plan converts the SAMS design into incremental coding tasks for a React + T
     - For each tier limit N, register N students successfully; assert N+1th registration is rejected
 
 - [ ] 16. Implement M-Pesa payment service
-  - [ ] 16.1 Implement `PaymentService` in `packages/backend/src/services/paymentService.ts`
+  - [x] 16.1 Implement `PaymentService` in `packages/backend/src/services/paymentService.ts`
     - `initiateSTKPush(schoolId, phone, amount, planTier)`: generate Daraja password (base64 of shortCode+passKey+timestamp), POST to Daraja STK push endpoint, insert `Payment` record with `status=PENDING`, log `PAYMENT_INITIATED` to AuditLog
     - `handleCallback(callbackData)`: parse `Body.stkCallback`; on `ResultCode===0` update Payment to SUCCESS, update School planTier and licenseExpiresAt, generate invoice, send email receipt; on failure update to FAILED, send failure email
     - `getInvoice(paymentId)`: return invoice record
