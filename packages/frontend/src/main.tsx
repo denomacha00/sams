@@ -17,6 +17,14 @@ import ReportsPage from './pages/ReportsPage';
 import RiskScorePage from './pages/RiskScorePage';
 import AIAssistantPage from './pages/AIAssistantPage';
 import SettingsPage from './pages/SettingsPage';
+
+// Admin pages
+import AdminDashboardPage from './pages/admin/AdminDashboardPage';
+import UserManagementPage from './pages/admin/UserManagementPage';
+import RegistrationLinksPage from './pages/admin/RegistrationLinksPage';
+import TimetablePage from './pages/admin/TimetablePage';
+import DepartmentsPage from './pages/admin/DepartmentsPage';
+
 import { registerServiceWorker } from './workers/swRegistration';
 
 // Register service worker
@@ -43,6 +51,13 @@ ReactDOM.createRoot(document.getElementById('root') as HTMLElement).render(
           <Route path="/risk-scores" element={<RiskScorePage />} />
           <Route path="/ai" element={<AIAssistantPage />} />
           <Route path="/settings" element={<SettingsPage />} />
+
+          {/* Admin routes */}
+          <Route path="/admin" element={<AdminDashboardPage />} />
+          <Route path="/admin/users" element={<UserManagementPage />} />
+          <Route path="/admin/links" element={<RegistrationLinksPage />} />
+          <Route path="/admin/timetable" element={<TimetablePage />} />
+          <Route path="/admin/departments" element={<DepartmentsPage />} />
         </Route>
 
         {/* Default redirect */}
