@@ -78,8 +78,8 @@ export class UserService {
         phone: data.phone ?? null,
         admissionNumber: data.admissionNumber ?? null,
         passwordHash,
-        departmentId: data.departmentId ?? null,
-        classId: data.classId ?? null,
+        departmentId: data.departmentId || null,
+        classId: data.classId || null,
       },
     });
 
