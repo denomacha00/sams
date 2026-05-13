@@ -188,7 +188,7 @@ registrationLinksRouter.post('/', requirePermission('manage:users'), async (req:
       req.schoolId,
       req.user.departmentId,
       parsed.data.classId || undefined,
-      { expiryDays: parsed.data.expiryDays, maxUses: parsed.data.maxUses },
+      { expiryDays: parsed.data.expiryDays, maxUses: parsed.data.maxUses, targetRole: (req.body as any).targetRole || undefined },
     );
     res.status(201).json(link);
   } catch (err) {

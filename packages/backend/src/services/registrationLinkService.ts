@@ -57,21 +57,25 @@ export class RegistrationLinkService {
     classId?: string,
     options?: GenerateLinkOptions,
   ) {
-    // Determine target role based on creator role
+    // Determine target role — use provided targetRole or derive from creator role
     let targetRole: UserRole;
 
-    switch (creatorRole) {
-      case UserRole.SCHOOL_ADMIN:
-        targetRole = UserRole.HOD;
-        break;
-      case UserRole.HOD:
-        targetRole = UserRole.TEACHER;
-        break;
-      case UserRole.TEACHER:
-        targetRole = UserRole.STUDENT;
-        break;
-      default:
-        throw new AppError(403, 'FORBIDDEN', 'Your role cannot generate registration links');
+    if (options && (options as any).targetRole) {
+      targetRole = (options as any).targetRole as UserRole;
+    } else {
+      switch (creatorRole) {
+        case UserRole.SCHOOL_ADMIN:
+          targetRole = UserRole.HOD;
+          break;
+        case UserRole.HOD:
+          targetRole = UserRole.TEACHER;
+          break;
+        case UserRole.TEACHER:
+          targetRole = UserRole.STUDENT;
+          break;
+        default:
+          throw new AppError(403, 'FORBIDDEN', 'Your role cannot generate registration links');
+      }
     }
 
     // Clamp expiryDays

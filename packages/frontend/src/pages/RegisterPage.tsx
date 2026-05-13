@@ -63,30 +63,30 @@ const RegisterPage: React.FC = () => {
 
   if (resolving) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <p className="text-gray-600">Verifying registration link...</p>
+      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 flex items-center justify-center">
+        <p className="text-gray-400">Verifying registration link...</p>
       </div>
     );
   }
 
   if (!linkMeta && error) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center px-4">
-        <div className="max-w-md w-full bg-white rounded-lg shadow-md p-8 text-center">
-          <h1 className="text-xl font-bold text-red-600 mb-2">Invalid Link</h1>
-          <p className="text-gray-600">{error}</p>
+      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 flex items-center justify-center px-4">
+        <div className="max-w-md w-full backdrop-blur-xl bg-white/5 border border-white/10 rounded-2xl p-8 text-center">
+          <h1 className="text-xl font-bold text-red-400 mb-2">Invalid Link</h1>
+          <p className="text-gray-400">{error}</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 flex items-center justify-center px-4">
-      <div className="max-w-md w-full bg-white rounded-lg shadow-md p-8">
+    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 flex items-center justify-center px-4">
+      <div className="max-w-md w-full backdrop-blur-xl bg-white/5 border border-white/10 rounded-2xl p-8">
         <div className="text-center mb-8">
-          <h1 className="text-2xl font-bold text-gray-900">Register</h1>
+          <h1 className="text-2xl font-bold text-white">Register</h1>
           {linkMeta && (
-            <p className="text-gray-600 mt-1">
+            <p className="text-gray-400 mt-1">
               {linkMeta.schoolName}
               {linkMeta.className && ` — ${linkMeta.className}`}
             </p>
@@ -109,7 +109,7 @@ const RegisterPage: React.FC = () => {
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <label htmlFor="fullName" className="block text-sm font-medium text-gray-700">
+            <label htmlFor="fullName" className="block text-sm font-medium text-gray-300">
               Full Name
             </label>
             <input
@@ -118,13 +118,13 @@ const RegisterPage: React.FC = () => {
               value={fullName}
               onChange={(e) => setFullName(e.target.value)}
               required
-              className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+              className="mt-1 block w-full rounded-md border border-white/10 px-3 py-2 shadow-sm focus:border-teal-400 focus:outline-none focus:ring-1 focus:ring-teal-500/50"
               placeholder="Your full name"
             />
           </div>
 
           <div>
-            <label htmlFor="admissionNumber" className="block text-sm font-medium text-gray-700">
+            <label htmlFor="admissionNumber" className="block text-sm font-medium text-gray-300">
               Admission Number
             </label>
             <input
@@ -133,13 +133,13 @@ const RegisterPage: React.FC = () => {
               value={admissionNumber}
               onChange={(e) => setAdmissionNumber(e.target.value)}
               required
-              className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+              className="mt-1 block w-full rounded-md border border-white/10 px-3 py-2 shadow-sm focus:border-teal-400 focus:outline-none focus:ring-1 focus:ring-teal-500/50"
               placeholder="e.g. ADM/2024/001"
             />
           </div>
 
           <div>
-            <label htmlFor="password" className="block text-sm font-medium text-gray-700">
+            <label htmlFor="password" className="block text-sm font-medium text-gray-300">
               Password
             </label>
             <input
@@ -149,7 +149,7 @@ const RegisterPage: React.FC = () => {
               onChange={(e) => setPassword(e.target.value)}
               required
               minLength={8}
-              className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+              className="mt-1 block w-full rounded-md border border-white/10 px-3 py-2 shadow-sm focus:border-teal-400 focus:outline-none focus:ring-1 focus:ring-teal-500/50"
               placeholder="Minimum 8 characters"
             />
           </div>
@@ -157,7 +157,7 @@ const RegisterPage: React.FC = () => {
           <button
             type="submit"
             disabled={loading || success}
-            className="w-full bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed"
+            className="w-full bg-gradient-to-r from-teal-500 to-cyan-500 text-white py-2 px-4 rounded-md hover:from-teal-400 hover:to-cyan-400 focus:outline-none focus:ring-2 focus:ring-teal-500/50 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {loading ? 'Registering...' : 'Register'}
           </button>
