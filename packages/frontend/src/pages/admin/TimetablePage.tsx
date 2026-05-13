@@ -56,17 +56,25 @@ const TimetablePage: React.FC = () => {
   const fetchEntries = async () => {
     try {
       const { data } = await apiClient.get('/timetable');
-      setEntries(data.entries || data || []);
+      const entries = Array.isArray(data) ? data : (data.entries || data || []);
+      setEntries(entries);
     } catch (err) {
       console.error('Failed to fetch timetable:', err);
+      setEntries([]);
     } finally {
       setLoading(false);
     }
   };
 
   const filteredEntries = entries.filter((e) => {
-    if (filterClass && e.classId !== filterClass && e.class?.name?.toLowerCase().indexOf(filterClass.toLowerCase()) === -1) return false;
-    if (filterTeacher && e.teacherId !== filterTeacher && e.teacher?.fullName?.toLowerCase().indexOf(filterTeacher.toLowerCase()) === -1) return false;
+    if (filterClass) {
+      const classMatch = e.classId === filterClass || (e.class?.name || '').toLowerCase().includes(filterClass.toLowerCase());
+      if (!classMatch) return false;
+    }
+    if (filterTeacher) {
+      const teacherMatch = e.teacherId === filterTeacher || (e.teacher?.fullName || '').toLowerCase().includes(filterTeacher.toLowerCase());
+      if (!teacherMatch) return false;
+    }
     return true;
   });
 
