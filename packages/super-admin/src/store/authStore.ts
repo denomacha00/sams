@@ -41,14 +41,17 @@ export const useAuthStore = create<AuthState>()(
             password,
           });
 
+          // Decode the JWT to get user info
+          const tokenPayload = JSON.parse(atob(data.accessToken.split('.')[1]));
+
           // Verify the user is actually a SUPER_ADMIN
-          if (data.user?.role !== 'SUPER_ADMIN') {
+          if (tokenPayload.role !== 'SUPER_ADMIN') {
             set({ loading: false, error: 'Access denied. Super Admin role required.' });
             return;
           }
 
           set({
-            user: data.user,
+            user: { id: tokenPayload.sub, fullName: 'Super Admin', email: identifier, role: tokenPayload.role, schoolId: tokenPayload.schoolId },
             accessToken: data.accessToken,
             refreshToken: data.refreshToken,
             isAuthenticated: true,
