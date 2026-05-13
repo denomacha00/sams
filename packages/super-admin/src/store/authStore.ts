@@ -34,9 +34,9 @@ export const useAuthStore = create<AuthState>()(
       login: async (identifier: string, password: string) => {
         set({ loading: true, error: null });
         try {
-          // Super Admin uses a special schoolCode identifier "SUPER_ADMIN"
+          // Super Admin uses a special schoolCode identifier "SUPERADMIN"
           const { data } = await apiClient.post('/auth/login', {
-            schoolCode: 'SUPER_ADMIN',
+            schoolCode: 'SUPERADMIN',
             identifier,
             password,
           });
