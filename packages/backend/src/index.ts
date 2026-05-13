@@ -18,6 +18,7 @@ import { reportsRouter } from './routes/reports';
 import { riskScoresRouter } from './routes/riskScores';
 import { superAdminRouter } from './routes/superAdmin';
 import { departmentsRouter, classesRouter } from './routes/departments';
+import { aiRouter } from './routes/ai';
 import { setupAttendanceSocket } from './sockets/attendanceSocket';
 
 // ─── App & HTTP Server ────────────────────────────────────────────────────────
@@ -88,6 +89,7 @@ app.use('/api/v1/reports', reportsRouter);
 app.use('/api/v1/risk-scores', riskScoresRouter);
 app.use('/api/v1/departments', departmentsRouter);
 app.use('/api/v1/classes', classesRouter);
+app.use('/api/v1/ai', aiRouter);
 app.use('/api/v1/super', superAdminRouter);
 
 // ─── Socket.io ────────────────────────────────────────────────────────────────
