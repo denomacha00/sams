@@ -23,19 +23,13 @@ declare global {
 // can be imported independently of the main Redis instance in index.ts.
 
 const rateLimitRedis = new Redis(process.env.REDIS_URL ?? 'redis://localhost:6379', {
-  lazyConnect: true,
+  lazyConnect: false,
   maxRetriesPerRequest: 3,
-  enableOfflineQueue: true,
-  retryStrategy: (times) => Math.min(times * 200, 5000),
+  enableOfflineQueue: false,
 });
 
 rateLimitRedis.on('error', (err) => {
-  console.error('[RateLimitRedis] Error:', err.message);
-});
-
-// Connect Redis (non-blocking — app starts even if Redis is slow)
-rateLimitRedis.connect().catch((err) => {
-  console.warn('[RateLimitRedis] Initial connection failed, will retry:', err.message);
+  console.error('[RateLimitRedis] Error:', err);
 });
 
 // ─── Global Rate Limiter ──────────────────────────────────────────────────────
@@ -85,11 +79,12 @@ function requestIdMiddleware(req: Request, res: Response, next: NextFunction): v
 }
 
 // ─── HTTPS Redirect Middleware ────────────────────────────────────────────────
-// Only active in production. Trusts the `x-forwarded-proto` header set by NGINX.
+// Only active when FORCE_HTTPS=true. Disabled by default when behind Cloudflare
+// (Cloudflare handles HTTPS at the edge).
 
 function httpsRedirect(req: Request, res: Response, next: NextFunction): void {
   if (
-    process.env.NODE_ENV === 'production' &&
+    process.env.FORCE_HTTPS === 'true' &&
     req.headers['x-forwarded-proto'] !== 'https'
   ) {
     const httpsUrl = `https://${req.headers.host ?? ''}${req.originalUrl}`;
