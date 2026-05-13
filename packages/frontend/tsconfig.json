@@ -6,7 +6,6 @@
     "lib": ["ES2022", "DOM", "DOM.Iterable"],
     "jsx": "react-jsx",
     "outDir": "./dist",
-    "rootDir": "./src",
     "strict": true,
     "esModuleInterop": true,
     "allowSyntheticDefaultImports": true,
@@ -17,12 +16,14 @@
     "declarationMap": true,
     "sourceMap": true,
     "noEmit": true,
+    "composite": false,
     "baseUrl": ".",
+    "types": ["vite/client"],
     "paths": {
-      "@sams/shared": ["../shared/src/index.ts"],
+      "@sams/shared": ["../shared/src/types/index.ts"],
       "@/*": ["./src/*"]
     }
   },
-  "include": ["src/**/*"],
+  "include": ["src/**/*", "../shared/src/types/**/*"],
   "exclude": ["node_modules", "dist", "**/*.test.ts", "**/*.test.tsx"]
 }
