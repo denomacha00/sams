@@ -1,3 +1,4 @@
+import { createHash } from 'crypto';
 import bcrypt from 'bcrypt';
 import { decodeLicenseKey } from '@sams/shared';
 import { prisma } from '../index';
@@ -46,7 +47,7 @@ export class ActivationService {
    *  1. Validate key format with regex
    *  2. Decode key (HMAC verification)
    *  3. Check expiry
-   *  4. Hash raw key and look up LicenseKey record; check usedAt
+   *  4. Compute SHA-256 hash of the key and look up LicenseKey record directly
    *  5. Check schoolCode uniqueness
    *  6. Transactionally create School, User (SCHOOL_ADMIN), and mark LicenseKey used
    *  7. Log LICENSE_ACTIVATION audit event
@@ -90,42 +91,14 @@ export class ActivationService {
       );
     }
 
-    // ── Step 4: Hash raw key and look up LicenseKey record ───────────────────
-    // We must find the matching LicenseKey by comparing bcrypt hashes.
-    // Fetch all unused license keys and compare — bcrypt.compare is the only
-    // safe way since we only store hashes (raw key is never stored).
-    const unusedLicenseKeys = await prisma.licenseKey.findMany({
-      where: { usedAt: null },
+    // ── Step 4: SHA-256 hash lookup (single query, no loop) ──────────────────
+    const keyHash = createHash('sha256').update(licenseKey).digest('hex');
+
+    const matchedLicenseKey = await prisma.licenseKey.findFirst({
+      where: { keyHash },
     });
 
-    let matchedLicenseKey: (typeof unusedLicenseKeys)[number] | null = null;
-    for (const lk of unusedLicenseKeys) {
-      const matches = await bcrypt.compare(licenseKey, lk.keyHash);
-      if (matches) {
-        matchedLicenseKey = lk;
-        break;
-      }
-    }
-
-    if (matchedLicenseKey === null) {
-      // Either the key was already used (usedAt is set) or it doesn't exist in DB.
-      // Check if it exists but is already used.
-      const allLicenseKeys = await prisma.licenseKey.findMany({
-        where: { usedAt: { not: null } },
-      });
-
-      for (const lk of allLicenseKeys) {
-        const matches = await bcrypt.compare(licenseKey, lk.keyHash);
-        if (matches) {
-          throw new ActivationError(
-            'LICENSE_USED',
-            'This license key has already been used.',
-            409,
-          );
-        }
-      }
-
-      // Key not found at all — treat as invalid
+    if (!matchedLicenseKey) {
       throw new ActivationError(
         'INVALID_LICENSE',
         'The license key is invalid or has been tampered with.',
@@ -133,7 +106,6 @@ export class ActivationService {
       );
     }
 
-    // Double-check usedAt on the matched record (race condition guard)
     if (matchedLicenseKey.usedAt !== null) {
       throw new ActivationError(
         'LICENSE_USED',
@@ -182,7 +154,7 @@ export class ActivationService {
 
       // Mark LicenseKey as used
       await tx.licenseKey.update({
-        where: { id: matchedLicenseKey!.id },
+        where: { id: matchedLicenseKey.id },
         data: {
           usedAt: now,
           usedBySchoolId: school.id,

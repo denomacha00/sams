@@ -1,4 +1,4 @@
-import { createHmac } from 'crypto';
+import { createHmac, randomBytes } from 'crypto';
 import { PlanTier, LicensePayload } from '../types/index';
 
 // ─── License Key Codec ────────────────────────────────────────────────────────
@@ -15,7 +15,7 @@ import { PlanTier, LicensePayload } from '../types/index';
 // the allowed alphanumeric character set.
 //
 // Encoding steps:
-//   1. Serialize payload as compact JSON: {n, p, e}
+//   1. Serialize payload as compact JSON: {n, p, e, r} (r = random nonce)
 //   2. Hex-encode the JSON bytes (uppercase)
 //   3. Compute HMAC-SHA256(hexPayload, secret), take first 8 hex chars (uppercase)
 //   4. Concatenate hexPayload + hmac → rawToken
@@ -35,16 +35,21 @@ const PAD_CHAR = '0';
 
 /**
  * Encodes a license payload into a dash-grouped uppercase key.
+ * Each call produces a unique key due to a random nonce in the payload.
  *
  * @param payload - The license data to encode.
  * @param secret  - HMAC secret (keep server-side only).
  * @returns       A key in the form XXXX-YYYY-XXXX-XXXX (groups of 4).
  */
 export function encodeLicenseKey(payload: LicensePayload, secret: string): string {
+  // Generate 8 random hex characters as a nonce for uniqueness
+  const nonce = randomBytes(4).toString('hex').toUpperCase();
+
   const json = JSON.stringify({
     n: payload.schoolName.slice(0, 20),
     p: payload.planTier,
     e: Math.floor(payload.expiresAt.getTime() / 1000),
+    r: nonce,
   });
 
   // Hex-encode the JSON (produces only 0-9, a-f characters)
@@ -118,7 +123,7 @@ export function decodeLicenseKey(key: string, secret: string): LicensePayload | 
     }
 
     const json = Buffer.from(hexPayload, 'hex').toString('utf8');
-    const data = JSON.parse(json) as { n: string; p: string; e: number };
+    const data = JSON.parse(json) as { n: string; p: string; e: number; r?: string };
 
     if (
       typeof data.n !== 'string' ||

@@ -1,6 +1,6 @@
 import { Router, type Request, type Response } from 'express';
 import { z } from 'zod';
-import bcrypt from 'bcryptjs';
+import { createHash } from 'crypto';
 import { PlanTier } from '@prisma/client';
 import { encodeLicenseKey } from '@sams/shared';
 import { prisma } from '../index';
@@ -51,8 +51,8 @@ superAdminRouter.post('/licenses', async (req: Request, res: Response): Promise<
     secret,
   );
 
-  // Store bcrypt hash of the key (raw key is never stored)
-  const keyHash = await bcrypt.hash(rawKey, 10);
+  // Store SHA-256 hash of the key (raw key is never stored)
+  const keyHash = createHash('sha256').update(rawKey).digest('hex');
 
   await prisma.licenseKey.create({
     data: {
