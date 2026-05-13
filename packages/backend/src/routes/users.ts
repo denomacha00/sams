@@ -170,7 +170,13 @@ registrationLinksRouter.get('/', async (req: Request, res: Response): Promise<vo
  * POST /api/v1/registration-links
  * Generate a registration link. Requires manage:users permission.
  */
-registrationLinksRouter.post('/', requirePermission('manage:users'), async (req: Request, res: Response): Promise<void> => {
+registrationLinksRouter.post('/', async (req: Request, res: Response): Promise<void> => {
+  // Allow SCHOOL_ADMIN, HOD, and TEACHER to generate links
+  const allowedRoles = ['SCHOOL_ADMIN', 'HOD', 'TEACHER'];
+  if (!req.user || !allowedRoles.includes(req.user.role)) {
+    res.status(403).json({ error: 'Forbidden', code: 'FORBIDDEN' });
+    return;
+  }
   const parsed = generateLinkSchema.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({
