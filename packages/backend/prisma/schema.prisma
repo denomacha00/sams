@@ -1,0 +1,322 @@
+// prisma/schema.prisma
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─── Enums ───────────────────────────────────────────────────────────────────
+
+enum PlanTier {
+  TRIAL
+  BASIC
+  PROFESSIONAL
+  ENTERPRISE
+}
+
+enum UserRole {
+  SUPER_ADMIN
+  SCHOOL_ADMIN
+  HOD
+  TEACHER
+  STUDENT
+}
+
+enum AttendanceStatus {
+  PRESENT
+  LATE
+  EXCUSED
+  ABSENT
+}
+
+enum RiskLevel {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+enum AuditEventType {
+  USER_LOGIN
+  USER_LOGOUT
+  LICENSE_ACTIVATION
+  ATTENDANCE_CREATED
+  ATTENDANCE_UPDATED
+  PAYMENT_INITIATED
+  PAYMENT_SUCCESS
+  PAYMENT_FAILED
+  SCHOOL_SUSPENDED
+  ROLE_CHANGED
+  CONFLICT_RESOLVED
+  SMS_RETRY
+}
+
+enum PaymentStatus {
+  PENDING
+  SUCCESS
+  FAILED
+  CANCELLED
+}
+
+// ─── Core Entities ────────────────────────────────────────────────────────────
+
+model LicenseKey {
+  id             String    @id @default(cuid())
+  keyHash        String    @unique // bcrypt hash of raw key — raw key never stored
+  planTier       PlanTier
+  schoolName     String
+  expiresAt      DateTime
+  usedAt         DateTime?
+  usedBySchoolId String?   @unique
+  school         School?   @relation(fields: [usedBySchoolId], references: [id])
+  createdAt      DateTime  @default(now())
+}
+
+model School {
+  id               String    @id @default(cuid())
+  name             String
+  schoolCode       String    @unique // short memorable code, e.g. "KHS2024"
+  planTier         PlanTier  @default(TRIAL)
+  licenseExpiresAt DateTime
+  isSuspended      Boolean   @default(false)
+  isReadOnly       Boolean   @default(false)
+  logoUrl          String? // Enterprise: custom branding
+  primaryColor     String?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  licenseKey        LicenseKey?
+  users             User[]
+  departments       Department[]
+  classes           Class[]
+  timetableEntries  TimetableEntry[]
+  sessions          AttendanceSession[]
+  registrationLinks RegistrationLink[]
+  auditLogs         AuditLog[]
+  payments          Payment[]
+  riskScores        RiskScore[]
+}
+
+model User {
+  id                     String    @id @default(cuid())
+  schoolId               String
+  school                 School    @relation(fields: [schoolId], references: [id])
+  role                   UserRole
+  fullName               String
+  email                  String?
+  phone                  String?
+  admissionNumber        String? // Students only
+  passwordHash           String
+  departmentId           String?
+  department             Department? @relation(fields: [departmentId], references: [id])
+  classId                String?
+  class                  Class?      @relation(fields: [classId], references: [id])
+  isLocked               Boolean   @default(false)
+  failedLoginCount       Int       @default(0)
+  failedLoginWindowStart DateTime?
+  lastLoginAt            DateTime?
+  createdAt              DateTime  @default(now())
+  updatedAt              DateTime  @updatedAt
+
+  refreshTokens     RefreshToken[]
+  biometricTemplate BiometricTemplate?
+  attendanceRecords AttendanceRecord[]
+  sessionsStarted   AttendanceSession[] @relation("SessionTeacher")
+  auditLogsActed    AuditLog[]          @relation("AuditActor")
+  timetableEntries  TimetableEntry[]
+
+  @@unique([schoolId, admissionNumber])
+  @@index([schoolId, role])
+}
+
+model RefreshToken {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tokenHash String   @unique
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+}
+
+model Department {
+  id        String   @id @default(cuid())
+  schoolId  String
+  school    School   @relation(fields: [schoolId], references: [id])
+  name      String
+  createdAt DateTime @default(now())
+
+  users   User[]
+  classes Class[]
+
+  @@unique([schoolId, name])
+}
+
+model Class {
+  id           String   @id @default(cuid())
+  schoolId     String
+  school       School   @relation(fields: [schoolId], references: [id])
+  departmentId String
+  department   Department @relation(fields: [departmentId], references: [id])
+  name         String
+  capacity     Int      @default(50)
+  createdAt    DateTime @default(now())
+
+  users             User[]
+  timetableEntries  TimetableEntry[]
+  sessions          AttendanceSession[]
+  registrationLinks RegistrationLink[]
+
+  @@unique([schoolId, name])
+}
+
+model TimetableEntry {
+  id         String @id @default(cuid())
+  schoolId   String
+  school     School @relation(fields: [schoolId], references: [id])
+  classId    String
+  class      Class  @relation(fields: [classId], references: [id])
+  teacherId  String
+  teacher    User   @relation(fields: [teacherId], references: [id])
+  subject    String
+  dayOfWeek  Int // 0=Monday … 6=Sunday
+  startTime  String // "HH:MM" 24-hour
+  endTime    String
+  room       String?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  sessions AttendanceSession[]
+
+  @@index([schoolId, teacherId, dayOfWeek])
+  @@index([schoolId, classId, dayOfWeek])
+}
+
+model AttendanceSession {
+  id               String   @id @default(cuid())
+  schoolId         String
+  school           School   @relation(fields: [schoolId], references: [id])
+  classId          String
+  class            Class    @relation(fields: [classId], references: [id])
+  teacherId        String
+  teacher          User     @relation("SessionTeacher", fields: [teacherId], references: [id])
+  timetableEntryId String?
+  timetableEntry   TimetableEntry? @relation(fields: [timetableEntryId], references: [id])
+  subject          String
+  lateThresholdMin Int      @default(15)
+  locationLat      Float?
+  locationLng      Float?
+  locationRadiusM  Int      @default(100)
+  currentQRToken   String?
+  qrRefreshedAt    DateTime?
+  startedAt        DateTime @default(now())
+  endedAt          DateTime?
+  isActive         Boolean  @default(true)
+
+  records AttendanceRecord[]
+
+  @@index([schoolId, classId, isActive])
+  @@index([schoolId, teacherId, isActive])
+}
+
+model AttendanceRecord {
+  id        String           @id @default(cuid())
+  schoolId  String
+  sessionId String
+  session   AttendanceSession @relation(fields: [sessionId], references: [id])
+  studentId String
+  student   User             @relation(fields: [studentId], references: [id])
+  status    AttendanceStatus
+  method    String // "QR" | "MANUAL" | "BIOMETRIC" | "OFFLINE_QR" | "OFFLINE_MANUAL"
+  note      String?          @db.VarChar(500)
+  scannedAt DateTime
+  syncedAt  DateTime?
+  createdAt DateTime         @default(now())
+  updatedAt DateTime         @updatedAt
+
+  @@unique([sessionId, studentId])
+  @@index([schoolId, studentId])
+  @@index([sessionId])
+}
+
+model RegistrationLink {
+  id          String   @id @default(cuid())
+  schoolId    String
+  school      School   @relation(fields: [schoolId], references: [id])
+  classId     String?
+  class       Class?   @relation(fields: [classId], references: [id])
+  targetRole  UserRole
+  token       String   @unique @default(cuid())
+  expiresAt   DateTime
+  maxUses     Int
+  useCount    Int      @default(0)
+  createdById String
+  createdAt   DateTime @default(now())
+
+  @@index([schoolId])
+}
+
+model BiometricTemplate {
+  id            String   @id @default(cuid())
+  schoolId      String
+  studentId     String   @unique
+  student       User     @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  encryptedData Bytes // AES-256-GCM encrypted Float32Array descriptor
+  iv            Bytes // AES-256-GCM initialization vector
+  authTag       Bytes // AES-256-GCM authentication tag
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}
+
+model RiskScore {
+  id               String    @id @default(cuid())
+  schoolId         String
+  school           School    @relation(fields: [schoolId], references: [id])
+  studentId        String    @unique
+  attendanceWeight Float // 0–100 normalized
+  gradeWeight      Float
+  patternWeight    Float
+  score            Float // composite 0–100
+  riskLevel        RiskLevel
+  computedAt       DateTime  @default(now())
+
+  @@index([schoolId, riskLevel])
+}
+
+model AuditLog {
+  id               String         @id @default(cuid())
+  sequenceNum      BigInt         @default(autoincrement())
+  schoolId         String?
+  school           School?        @relation(fields: [schoolId], references: [id])
+  actorId          String?
+  actor            User?          @relation("AuditActor", fields: [actorId], references: [id])
+  actorRole        UserRole?
+  eventType        AuditEventType
+  resourceSnapshot Json // JSON snapshot of affected resource
+  createdAt        DateTime       @default(now())
+
+  @@index([schoolId, eventType])
+  @@index([schoolId, createdAt])
+}
+
+model Payment {
+  id                 String        @id @default(cuid())
+  schoolId           String
+  school             School        @relation(fields: [schoolId], references: [id])
+  mpesaCheckoutId    String?       @unique
+  mpesaReceiptNumber String?
+  phone              String
+  amount             Float
+  planTier           PlanTier
+  status             PaymentStatus @default(PENDING)
+  invoiceUrl         String?
+  initiatedAt        DateTime      @default(now())
+  completedAt        DateTime?
+
+  @@index([schoolId])
+}
