@@ -44,8 +44,19 @@ export const useAuthStore = create<AuthState>()(
             identifier,
             password,
           });
+          // Decode user info from JWT
+          const tokenPayload = JSON.parse(atob(data.accessToken.split('.')[1]));
+          const user = {
+            id: tokenPayload.sub,
+            fullName: identifier,
+            email: identifier.includes('@') ? identifier : undefined,
+            role: tokenPayload.role,
+            schoolId: tokenPayload.schoolId,
+            departmentId: tokenPayload.departmentId,
+            classId: tokenPayload.classId,
+          };
           set({
-            user: data.user,
+            user,
             accessToken: data.accessToken,
             refreshToken: data.refreshToken,
             isAuthenticated: true,
