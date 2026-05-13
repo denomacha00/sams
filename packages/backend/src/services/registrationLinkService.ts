@@ -90,7 +90,7 @@ export class RegistrationLinkService {
     const link = await prisma.registrationLink.create({
       data: {
         schoolId,
-        classId: classId ?? null,
+        classId: classId || null,
         targetRole,
         token,
         expiresAt,
