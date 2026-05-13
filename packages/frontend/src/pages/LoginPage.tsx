@@ -172,6 +172,9 @@ const LoginPage: React.FC = () => {
         <p className="text-center text-xs text-gray-500 mt-6">
           © 2025 SAMS · Smart Attendance Management System
         </p>
+        <p className="text-center text-xs text-gray-600 mt-2">
+          Developed by <span className="text-purple-400">Denis Macharia</span> · <a href="tel:+254703285246" className="text-purple-400 hover:text-purple-300 transition-colors">+254 703 285 246</a>
+        </p>
       </div>
     </div>
   );
