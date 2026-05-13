@@ -70,7 +70,8 @@ timetableRouter.post('/', requirePermission('manage:timetable'), async (req: Req
     res.status(201).json(entry);
   } catch (err) {
     if (err instanceof AppError) throw err;
-    throw new AppError(500, 'INTERNAL_ERROR', 'Failed to create timetable entry');
+    console.error('[Timetable] Create error:', err);
+    throw new AppError(500, 'INTERNAL_ERROR', 'Failed to create timetable entry. Make sure the teacher and class exist.');
   }
 });
 

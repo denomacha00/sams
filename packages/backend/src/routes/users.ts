@@ -164,12 +164,13 @@ registrationLinksRouter.post('/', requirePermission('manage:users'), async (req:
       req.user.role,
       req.schoolId,
       req.user.departmentId,
-      parsed.data.classId,
+      parsed.data.classId || undefined,
       { expiryDays: parsed.data.expiryDays, maxUses: parsed.data.maxUses },
     );
     res.status(201).json(link);
   } catch (err) {
     if (err instanceof AppError) throw err;
+    console.error('[RegistrationLinks] Error:', err);
     throw new AppError(500, 'INTERNAL_ERROR', 'Failed to generate registration link');
   }
 });
