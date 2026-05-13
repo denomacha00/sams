@@ -20,10 +20,10 @@ const ActivationPage: React.FC = () => {
 
     try {
       await apiClient.post('/activate', {
-        licenseKey,
-        schoolCode,
-        adminFullName,
-        adminEmail,
+        licenseKey: licenseKey.trim().toUpperCase(),
+        schoolCode: schoolCode.trim().toUpperCase(),
+        adminFullName: adminFullName.trim(),
+        adminEmail: adminEmail.trim(),
         adminPassword,
       });
       setSuccess(true);
