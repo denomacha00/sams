@@ -248,6 +248,51 @@ superAdminRouter.post('/schools/:id/extend', async (req: Request, res: Response)
   });
 });
 
+// ─── DELETE /super/schools/:id — Delete a school and all its data ─────────────
+
+superAdminRouter.delete('/schools/:id', async (req: Request, res: Response): Promise<void> => {
+  const schoolId = req.params.id as string;
+
+  const school = await prisma.school.findUnique({ where: { id: schoolId } });
+  if (!school) {
+    res.status(404).json({ error: 'School not found', code: 'NOT_FOUND' });
+    return;
+  }
+
+  // Delete all related data in order (respecting foreign keys)
+  await prisma.$transaction(async (tx) => {
+    await tx.attendanceRecord.deleteMany({ where: { schoolId } });
+    await tx.attendanceSession.deleteMany({ where: { schoolId } });
+    await tx.registrationLink.deleteMany({ where: { schoolId } });
+    await tx.timetableEntry.deleteMany({ where: { schoolId } });
+    await tx.riskScore.deleteMany({ where: { schoolId } });
+    await tx.payment.deleteMany({ where: { schoolId } });
+    await tx.auditLog.deleteMany({ where: { schoolId } });
+    await tx.refreshToken.deleteMany({ where: { user: { schoolId } } });
+    await tx.biometricTemplate.deleteMany({ where: { schoolId } });
+    await tx.user.deleteMany({ where: { schoolId } });
+    await tx.class.deleteMany({ where: { schoolId } });
+    await tx.department.deleteMany({ where: { schoolId } });
+    await tx.licenseKey.updateMany({ where: { usedBySchoolId: schoolId }, data: { usedBySchoolId: null, usedAt: null } });
+    await tx.school.delete({ where: { id: schoolId } });
+  });
+
+  // Audit log
+  await auditService.log({
+    eventType: 'SCHOOL_SUSPENDED',
+    actorId: req.user?.sub,
+    actorRole: req.user?.role,
+    resourceSnapshot: {
+      schoolId,
+      schoolName: school.name,
+      action: 'SCHOOL_DELETED',
+      deletedAt: new Date().toISOString(),
+    },
+  });
+
+  res.json({ message: 'School deleted successfully', schoolId });
+});
+
 // ─── GET /super/revenue — Aggregate payment totals by plan tier ───────────────
 
 superAdminRouter.get('/revenue', async (_req: Request, res: Response): Promise<void> => {

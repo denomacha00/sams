@@ -62,6 +62,21 @@ const SchoolsListPage: React.FC = () => {
     }
   };
 
+  const handleDelete = async (schoolId: string, schoolName: string) => {
+    if (!confirm(`Are you sure you want to DELETE "${schoolName}"? This will permanently remove ALL data for this school including users, attendance records, and payments. This cannot be undone.`)) return;
+    if (!confirm(`FINAL WARNING: Type the school name to confirm deletion. This is "${schoolName}". Proceed?`)) return;
+    setActionLoading(schoolId);
+    try {
+      await apiClient.delete(`/super/schools/${schoolId}`);
+      await fetchSchools();
+    } catch (err) {
+      console.error('Failed to delete school:', err);
+      alert('Failed to delete school. Check console for details.');
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
   const handleExtend = async () => {
     if (!extendModal || !newExpiry) return;
     setActionLoading(extendModal.schoolId);
@@ -158,6 +173,13 @@ const SchoolsListPage: React.FC = () => {
                       className="px-3 py-1 text-xs bg-blue-700 hover:bg-blue-600 disabled:opacity-50 text-white rounded transition-colors"
                     >
                       Extend
+                    </button>
+                    <button
+                      onClick={() => handleDelete(school.id, school.name)}
+                      disabled={actionLoading === school.id}
+                      className="px-3 py-1 text-xs bg-red-900 hover:bg-red-800 disabled:opacity-50 text-red-200 rounded transition-colors border border-red-700"
+                    >
+                      Delete
                     </button>
                   </div>
                 </td>
