@@ -51,7 +51,7 @@ export const useAuthStore = create<AuthState>()(
           }
 
           set({
-            user: { id: tokenPayload.sub, fullName: 'Super Admin', email: identifier, role: tokenPayload.role, schoolId: tokenPayload.schoolId },
+            user: { id: tokenPayload.sub, fullName: 'Super Admin', email: identifier, role: tokenPayload.role },
             accessToken: data.accessToken,
             refreshToken: data.refreshToken,
             isAuthenticated: true,
