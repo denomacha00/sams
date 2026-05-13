@@ -36,3 +36,13 @@
     @apply backdrop-blur-xl bg-black/20 border border-white/10;
   }
 }
+
+@keyframes scan {
+  0%, 100% { top: 15%; }
+  50% { top: 85%; }
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: translateY(0); }
+}

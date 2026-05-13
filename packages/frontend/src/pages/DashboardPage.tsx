@@ -132,11 +132,8 @@ const DashboardPage: React.FC = () => {
 
       {/* Footer */}
       <footer className="border-t border-white/5 mt-20 py-6">
-        <div className="max-w-6xl mx-auto px-6 flex items-center justify-between">
-          <p className="text-xs text-gray-600">© 2025 SAMS · Smart Attendance Management System</p>
-          <p className="text-xs text-gray-600">
-            Developed by <span className="text-purple-400">Denis Macharia</span>
-          </p>
+        <div className="max-w-6xl mx-auto px-6 text-center">
+          <p className="text-xs text-gray-500">© 2025 SAMS · Developed by Denis Macharia</p>
         </div>
       </footer>
     </div>

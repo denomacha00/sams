@@ -100,23 +100,28 @@ const ReportsPage: React.FC = () => {
     }
   };
 
+  const atRiskCount = report?.students?.filter((s) => s.attendancePercentage < 60).length || 0;
+
   return (
-    <div className="min-h-screen bg-gray-50 p-6">
-      <div className="max-w-4xl mx-auto">
-        <h1 className="text-2xl font-bold text-gray-900 mb-2">Attendance Reports</h1>
-        <p className="text-gray-600 mb-6">{getRoleLabel()}</p>
+    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 p-6">
+      <div className="max-w-5xl mx-auto">
+        {/* Header */}
+        <div className="mb-8">
+          <h1 className="text-2xl font-bold text-white">Attendance Reports</h1>
+          <p className="text-gray-400 text-sm mt-1">{getRoleLabel()}</p>
+        </div>
 
         {error && (
-          <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-md">
-            <p className="text-sm text-red-700">{error}</p>
+          <div className="mb-4 p-3 bg-red-500/20 border border-red-400/30 rounded-xl backdrop-blur-sm">
+            <p className="text-sm text-red-200 text-center">{error}</p>
           </div>
         )}
 
         {/* Date range picker */}
-        <div className="bg-white rounded-lg shadow-md p-6 mb-6">
+        <div className="backdrop-blur-xl bg-white/5 border border-white/10 rounded-2xl p-6 mb-6">
           <div className="flex flex-col sm:flex-row gap-4 items-end">
             <div className="flex-1">
-              <label htmlFor="dateFrom" className="block text-sm font-medium text-gray-700">
+              <label htmlFor="dateFrom" className="block text-xs font-semibold text-gray-300 uppercase tracking-wider mb-2">
                 From
               </label>
               <input
@@ -124,11 +129,11 @@ const ReportsPage: React.FC = () => {
                 type="date"
                 value={dateFrom}
                 onChange={(e) => setDateFrom(e.target.value)}
-                className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:outline-none"
+                className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:ring-2 focus:ring-purple-500/50 transition-all duration-200 [color-scheme:dark]"
               />
             </div>
             <div className="flex-1">
-              <label htmlFor="dateTo" className="block text-sm font-medium text-gray-700">
+              <label htmlFor="dateTo" className="block text-xs font-semibold text-gray-300 uppercase tracking-wider mb-2">
                 To
               </label>
               <input
@@ -136,64 +141,89 @@ const ReportsPage: React.FC = () => {
                 type="date"
                 value={dateTo}
                 onChange={(e) => setDateTo(e.target.value)}
-                className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-blue-500 focus:outline-none"
+                className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:ring-2 focus:ring-purple-500/50 transition-all duration-200 [color-scheme:dark]"
               />
             </div>
             <button
               onClick={fetchReport}
               disabled={loading}
-              className="bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700 disabled:opacity-50"
+              className="bg-gradient-to-r from-blue-600 to-purple-600 text-white font-semibold py-3 px-6 rounded-xl shadow-lg shadow-purple-500/25 hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50 transition-all duration-200"
             >
               {loading ? 'Loading...' : 'Generate'}
             </button>
           </div>
         </div>
 
-        {/* Report summary */}
+        {/* Stats cards */}
         {report && (
           <>
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-6">
-              <div className="bg-white rounded-lg shadow-md p-4 text-center">
-                <p className="text-2xl font-bold text-green-600">
+              <div className="backdrop-blur-xl bg-white/5 border border-white/10 rounded-2xl p-5 text-center">
+                <p className="text-3xl font-bold text-emerald-400">
                   {report.attendancePercentage.toFixed(1)}%
                 </p>
-                <p className="text-sm text-gray-600">Attendance</p>
+                <p className="text-xs text-gray-400 mt-1 uppercase tracking-wider">Avg Attendance</p>
               </div>
-              <div className="bg-white rounded-lg shadow-md p-4 text-center">
-                <p className="text-2xl font-bold text-blue-600">{report.totalPresent}</p>
-                <p className="text-sm text-gray-600">Present</p>
+              <div className="backdrop-blur-xl bg-white/5 border border-white/10 rounded-2xl p-5 text-center">
+                <p className="text-3xl font-bold text-blue-400">{report.totalPresent + report.totalLate + report.totalAbsent + report.totalExcused}</p>
+                <p className="text-xs text-gray-400 mt-1 uppercase tracking-wider">Total Sessions</p>
               </div>
-              <div className="bg-white rounded-lg shadow-md p-4 text-center">
-                <p className="text-2xl font-bold text-yellow-600">{report.totalLate}</p>
-                <p className="text-sm text-gray-600">Late</p>
+              <div className="backdrop-blur-xl bg-white/5 border border-white/10 rounded-2xl p-5 text-center">
+                <p className="text-3xl font-bold text-purple-400">{report.totalPresent}</p>
+                <p className="text-xs text-gray-400 mt-1 uppercase tracking-wider">Present</p>
               </div>
-              <div className="bg-white rounded-lg shadow-md p-4 text-center">
-                <p className="text-2xl font-bold text-red-600">{report.totalAbsent}</p>
-                <p className="text-sm text-gray-600">Absent</p>
+              <div className="backdrop-blur-xl bg-white/5 border border-white/10 rounded-2xl p-5 text-center">
+                <p className="text-3xl font-bold text-red-400">{atRiskCount}</p>
+                <p className="text-xs text-gray-400 mt-1 uppercase tracking-wider">At-Risk</p>
               </div>
             </div>
 
-            {/* Student breakdown (for Teacher/HOD/Admin) */}
+            {/* Student breakdown table */}
             {report.students && report.students.length > 0 && (
-              <div className="bg-white rounded-lg shadow-md p-6 mb-6">
-                <h2 className="text-lg font-semibold text-gray-800 mb-4">Student Breakdown</h2>
-                <div className="space-y-2">
-                  {report.students.map((s) => (
-                    <div key={s.studentId} className="flex items-center justify-between p-3 bg-gray-50 rounded-md">
-                      <span className="font-medium text-gray-900">{s.fullName}</span>
-                      <span
-                        className={`font-semibold ${
-                          s.attendancePercentage >= 80
-                            ? 'text-green-600'
-                            : s.attendancePercentage >= 60
-                            ? 'text-yellow-600'
-                            : 'text-red-600'
-                        }`}
-                      >
-                        {s.attendancePercentage.toFixed(1)}%
-                      </span>
-                    </div>
-                  ))}
+              <div className="backdrop-blur-xl bg-white/5 border border-white/10 rounded-2xl p-6 mb-6">
+                <h2 className="text-lg font-semibold text-white mb-4">Student Breakdown</h2>
+                <div className="overflow-x-auto">
+                  <table className="w-full">
+                    <thead>
+                      <tr className="border-b border-white/10">
+                        <th className="text-left text-xs font-semibold text-gray-400 uppercase tracking-wider py-3 px-2">Student</th>
+                        <th className="text-right text-xs font-semibold text-gray-400 uppercase tracking-wider py-3 px-2">Attendance</th>
+                        <th className="text-right text-xs font-semibold text-gray-400 uppercase tracking-wider py-3 px-2">Status</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-white/5">
+                      {report.students.map((s) => (
+                        <tr key={s.studentId} className="hover:bg-white/5 transition-colors">
+                          <td className="py-3 px-2">
+                            <div className="flex items-center gap-3">
+                              <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-xs font-bold text-white">
+                                {s.fullName.charAt(0)}
+                              </div>
+                              <span className="font-medium text-white text-sm">{s.fullName}</span>
+                            </div>
+                          </td>
+                          <td className="py-3 px-2 text-right">
+                            <span className={`font-semibold text-sm ${
+                              s.attendancePercentage >= 80 ? 'text-emerald-400' :
+                              s.attendancePercentage >= 60 ? 'text-yellow-400' :
+                              'text-red-400'
+                            }`}>
+                              {s.attendancePercentage.toFixed(1)}%
+                            </span>
+                          </td>
+                          <td className="py-3 px-2 text-right">
+                            <span className={`px-2 py-1 text-xs font-medium rounded-full ${
+                              s.attendancePercentage >= 80 ? 'bg-emerald-500/20 text-emerald-300' :
+                              s.attendancePercentage >= 60 ? 'bg-yellow-500/20 text-yellow-300' :
+                              'bg-red-500/20 text-red-300'
+                            }`}>
+                              {s.attendancePercentage >= 80 ? 'Good' : s.attendancePercentage >= 60 ? 'Warning' : 'At Risk'}
+                            </span>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
                 </div>
               </div>
             )}
@@ -203,20 +233,31 @@ const ReportsPage: React.FC = () => {
               <button
                 onClick={() => handleExport('pdf')}
                 disabled={exporting}
-                className="bg-red-600 text-white py-2 px-4 rounded-md hover:bg-red-700 disabled:opacity-50"
+                className="flex items-center gap-2 bg-white/10 border border-red-500/30 text-red-300 py-2.5 px-5 rounded-xl hover:bg-red-500/20 disabled:opacity-50 transition-all duration-200"
               >
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                </svg>
                 Export PDF
               </button>
               <button
                 onClick={() => handleExport('excel')}
                 disabled={exporting}
-                className="bg-green-600 text-white py-2 px-4 rounded-md hover:bg-green-700 disabled:opacity-50"
+                className="flex items-center gap-2 bg-white/10 border border-emerald-500/30 text-emerald-300 py-2.5 px-5 rounded-xl hover:bg-emerald-500/20 disabled:opacity-50 transition-all duration-200"
               >
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                </svg>
                 Export Excel
               </button>
             </div>
           </>
         )}
+
+        {/* Footer */}
+        <p className="text-center text-xs text-gray-500 mt-8">
+          © 2025 SAMS · Developed by Denis Macharia
+        </p>
       </div>
     </div>
   );

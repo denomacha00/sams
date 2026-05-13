@@ -43,7 +43,7 @@ const LoginPage: React.FC = () => {
   return (
     <div className="min-h-screen relative overflow-hidden flex items-center justify-center px-4">
       {/* Animated gradient background */}
-      <div className="absolute inset-0 bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900" />
+      <div className="absolute inset-0 bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900" />
       <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjAiIGhlaWdodD0iNjAiIHZpZXdCb3g9IjAgMCA2MCA2MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48ZyBmaWxsPSJub25lIiBmaWxsLXJ1bGU9ImV2ZW5vZGQiPjxnIGZpbGw9IiNmZmYiIGZpbGwtb3BhY2l0eT0iMC4wMyI+PHBhdGggZD0iTTM2IDM0djItSDI0di0yaDEyem0wLTRWMjhIMjR2Mmgxem0tMi0ydi0ySDE0djJoMjB6Ii8+PC9nPjwvZz48L3N2Zz4=')] opacity-40" />
       
       {/* Floating orbs */}
@@ -54,16 +54,23 @@ const LoginPage: React.FC = () => {
       {/* Login card */}
       <div className="relative z-10 w-full max-w-md">
         {/* Glass card */}
-        <div className="backdrop-blur-xl bg-white/10 border border-white/20 rounded-2xl shadow-2xl p-8">
-          {/* Logo & branding */}
-          <div className="text-center mb-8">
-            <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-gradient-to-br from-blue-500 to-purple-600 shadow-lg shadow-purple-500/25 mb-4">
-              <svg className="w-8 h-8 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+        <div className="backdrop-blur-xl bg-white/5 border border-white/10 rounded-2xl shadow-2xl p-8">
+          {/* BIG Logo & branding */}
+          <div className="text-center mb-10">
+            {/* Large Shield SVG Icon */}
+            <div className="inline-flex items-center justify-center w-24 h-24 rounded-3xl bg-gradient-to-br from-blue-500 via-purple-600 to-indigo-700 shadow-2xl shadow-purple-500/40 mb-6 animate-[pulse_3s_ease-in-out_infinite]">
+              <svg className="w-12 h-12 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
               </svg>
             </div>
-            <h1 className="text-2xl font-bold text-white tracking-tight">SAMS</h1>
-            <p className="text-sm text-gray-300 mt-1">Smart Attendance Management System</p>
+            {/* SAMS text with gradient */}
+            <h1 className="text-4xl font-black bg-gradient-to-r from-blue-400 via-purple-400 to-indigo-400 bg-clip-text text-transparent tracking-tight mb-2">
+              SAMS
+            </h1>
+            {/* Tagline with subtle animation */}
+            <p className="text-sm text-gray-400 font-medium tracking-wide animate-[fadeIn_1.5s_ease-in-out]">
+              Smart Attendance Management System
+            </p>
           </div>
 
           {/* Error message */}
@@ -170,10 +177,10 @@ const LoginPage: React.FC = () => {
 
         {/* Bottom text */}
         <p className="text-center text-xs text-gray-500 mt-6">
-          © 2025 SAMS · Smart Attendance Management System
+          © 2025 SAMS · Developed by Denis Macharia
         </p>
-        <p className="text-center text-xs text-gray-600 mt-2">
-          Developed by <span className="text-purple-400">Denis Macharia</span> · <a href="tel:+254703285246" className="text-purple-400 hover:text-purple-300 transition-colors">+254 703 285 246</a>
+        <p className="text-center text-xs text-gray-600 mt-1">
+          <a href="tel:+254703285246" className="text-purple-400 hover:text-purple-300 transition-colors">+254 703 285 246</a>
         </p>
       </div>
     </div>
