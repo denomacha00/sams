@@ -23,13 +23,19 @@ declare global {
 // can be imported independently of the main Redis instance in index.ts.
 
 const rateLimitRedis = new Redis(process.env.REDIS_URL ?? 'redis://localhost:6379', {
-  lazyConnect: false,
+  lazyConnect: true,
   maxRetriesPerRequest: 3,
-  enableOfflineQueue: false,
+  enableOfflineQueue: true,
+  retryStrategy: (times) => Math.min(times * 200, 5000),
 });
 
 rateLimitRedis.on('error', (err) => {
-  console.error('[RateLimitRedis] Error:', err);
+  console.error('[RateLimitRedis] Error:', err.message);
+});
+
+// Connect Redis (non-blocking — app starts even if Redis is slow)
+rateLimitRedis.connect().catch((err) => {
+  console.warn('[RateLimitRedis] Initial connection failed, will retry:', err.message);
 });
 
 // ─── Global Rate Limiter ──────────────────────────────────────────────────────
