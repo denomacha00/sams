@@ -213,6 +213,28 @@ registrationLinksRouter.get('/:token', async (req: Request, res: Response): Prom
 });
 
 /**
+ * DELETE /api/v1/registration-links/:id
+ * Delete a registration link.
+ */
+registrationLinksRouter.delete('/:id', async (req: Request, res: Response): Promise<void> => {
+  if (!req.user || !req.schoolId) {
+    res.status(401).json({ error: 'Unauthorized', code: 'UNAUTHORIZED' });
+    return;
+  }
+  try {
+    const link = await prisma.registrationLink.findUnique({ where: { id: req.params.id } });
+    if (!link || link.schoolId !== req.schoolId) {
+      res.status(404).json({ error: 'Link not found', code: 'NOT_FOUND' });
+      return;
+    }
+    await prisma.registrationLink.delete({ where: { id: req.params.id } });
+    res.status(204).send();
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to delete link', code: 'INTERNAL_ERROR' });
+  }
+});
+
+/**
  * POST /api/v1/registration-links/:token/register
  * Self-register via a registration link (public, no auth).
  */

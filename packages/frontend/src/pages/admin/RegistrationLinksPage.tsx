@@ -77,6 +77,16 @@ const RegistrationLinksPage: React.FC = () => {
     setTimeout(() => setCopiedId(null), 2000);
   };
 
+  const handleDelete = async (id: string) => {
+    if (!confirm('Delete this registration link?')) return;
+    try {
+      await apiClient.delete(`/registration-links/${id}`);
+      fetchLinks();
+    } catch (err) {
+      alert('Failed to delete link');
+    }
+  };
+
   const getLinkStatus = (link: RegistrationLink) => {
     const now = new Date();
     const expires = new Date(link.expiresAt);
@@ -155,9 +165,15 @@ const RegistrationLinksPage: React.FC = () => {
                         <td className="px-6 py-4 text-right">
                           <button
                             onClick={() => copyLink(link.token, link.id)}
-                            className="text-cyan-400 hover:text-cyan-300 text-sm transition-colors"
+                            className="text-cyan-400 hover:text-cyan-300 text-sm transition-colors mr-3"
                           >
                             {copiedId === link.id ? '✓ Copied' : 'Copy Link'}
+                          </button>
+                          <button
+                            onClick={() => handleDelete(link.id)}
+                            className="text-red-400 hover:text-red-300 text-sm transition-colors"
+                          >
+                            Delete
                           </button>
                         </td>
                       </tr>
