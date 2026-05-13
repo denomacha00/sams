@@ -9,14 +9,17 @@ import Redis from 'ioredis';
 // client so this module can be imported independently.
 
 const loginRateLimitRedis = new Redis(process.env.REDIS_URL ?? 'redis://localhost:6379', {
-  lazyConnect: false,
+  lazyConnect: true,
   maxRetriesPerRequest: 3,
-  enableOfflineQueue: false,
+  enableOfflineQueue: true,
+  retryStrategy: (times: number) => Math.min(times * 200, 5000),
 });
 
 loginRateLimitRedis.on('error', (err) => {
-  console.error('[LoginRateLimitRedis] Error:', err);
+  console.error('[LoginRateLimitRedis] Error:', err.message);
 });
+
+loginRateLimitRedis.connect().catch(() => {});
 
 // ─── loginRateLimiter ─────────────────────────────────────────────────────────
 // 5 failed login attempts per 15 minutes per IP, backed by Redis.
