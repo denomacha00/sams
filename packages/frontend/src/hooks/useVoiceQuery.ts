@@ -1,4 +1,5 @@
 import { useState, useRef, useCallback } from 'react';
+import apiClient from '../services/apiClient';
 
 interface SpeechRecognitionEvent {
   results: SpeechRecognitionResultList;
@@ -14,6 +15,7 @@ interface SpeechRecognitionErrorEvent {
  * Hook for voice input using Web Speech API.
  * Uses Kenyan English locale (en-KE).
  * On result, calls the provided submitQuery callback with the transcript.
+ * Optionally sends the transcription to /api/v1/ai/voice for server-side processing.
  */
 export function useVoiceQuery(submitQuery: (transcript: string) => void) {
   const [isListening, setIsListening] = useState(false);
@@ -70,5 +72,23 @@ export function useVoiceQuery(submitQuery: (transcript: string) => void) {
     setIsListening(false);
   }, []);
 
-  return { isListening, error, startListening, stopListening };
+  /**
+   * Send a voice transcription directly to the /api/v1/ai/voice endpoint.
+   * This is an alternative to the local speech-to-text approach.
+   */
+  const sendVoiceQuery = useCallback(async (audioBlob: Blob): Promise<string | null> => {
+    try {
+      const formData = new FormData();
+      formData.append('audio', audioBlob, 'voice-query.webm');
+      const { data } = await apiClient.post('/ai/voice', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      });
+      return data.answer || null;
+    } catch {
+      setError('Failed to process voice query.');
+      return null;
+    }
+  }, []);
+
+  return { isListening, error, startListening, stopListening, sendVoiceQuery };
 }

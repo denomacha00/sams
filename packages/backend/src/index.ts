@@ -19,7 +19,10 @@ import { riskScoresRouter } from './routes/riskScores';
 import { superAdminRouter } from './routes/superAdmin';
 import { departmentsRouter, classesRouter } from './routes/departments';
 import { aiRouter } from './routes/ai';
+import { biometricRouter } from './routes/biometric';
 import { setupAttendanceSocket } from './sockets/attendanceSocket';
+import { startQRRefreshJob, stopQRRefreshJob } from './jobs/qrRefresh';
+import { startNotificationJob, stopNotificationJob } from './jobs/notifications';
 
 // ─── App & HTTP Server ────────────────────────────────────────────────────────
 
@@ -90,6 +93,7 @@ app.use('/api/v1/risk-scores', riskScoresRouter);
 app.use('/api/v1/departments', departmentsRouter);
 app.use('/api/v1/classes', classesRouter);
 app.use('/api/v1/ai', aiRouter);
+app.use('/api/v1/biometric', biometricRouter);
 app.use('/api/v1/super', superAdminRouter);
 
 // ─── Socket.io ────────────────────────────────────────────────────────────────
@@ -131,6 +135,8 @@ async function start(): Promise<void> {
 
     httpServer.listen(PORT, () => {
       console.log(`[SAMS] API listening on port ${PORT}`);
+      startQRRefreshJob();
+      startNotificationJob();
     });
   } catch (err) {
     console.error('[SAMS] Failed to start server:', err);
@@ -142,6 +148,10 @@ async function start(): Promise<void> {
 
 async function shutdown(signal: string): Promise<void> {
   console.log(`[SAMS] Received ${signal}. Shutting down gracefully...`);
+
+  // Stop cron jobs
+  stopQRRefreshJob();
+  stopNotificationJob();
 
   // Stop accepting new connections
   httpServer.close(async () => {

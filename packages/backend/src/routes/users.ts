@@ -211,7 +211,32 @@ registrationLinksRouter.post('/', async (req: Request, res: Response): Promise<v
 registrationLinksRouter.get('/:token', async (req: Request, res: Response): Promise<void> => {
   try {
     const link = await registrationLinkService.resolveLink(req.params.token as string);
-    res.status(200).json(link);
+    
+    // Fetch school and class names for the frontend display
+    const school = await prisma.school.findUnique({
+      where: { id: link.schoolId },
+      select: { name: true, schoolCode: true },
+    });
+    
+    let className: string | undefined;
+    let departmentName: string | undefined;
+    
+    if (link.classId) {
+      const classRecord = await prisma.class.findUnique({
+        where: { id: link.classId },
+        select: { name: true, department: { select: { name: true } } },
+      });
+      className = classRecord?.name;
+      departmentName = classRecord?.department?.name;
+    }
+    
+    res.status(200).json({
+      ...link,
+      schoolName: school?.name,
+      schoolCode: school?.schoolCode,
+      className,
+      departmentName,
+    });
   } catch (err) {
     if (err instanceof AppError) throw err;
     throw new AppError(500, 'INTERNAL_ERROR', 'Failed to resolve registration link');
@@ -228,12 +253,13 @@ registrationLinksRouter.delete('/:id', async (req: Request, res: Response): Prom
     return;
   }
   try {
-    const link = await prisma.registrationLink.findUnique({ where: { id: req.params.id } });
+    const id = req.params.id as string;
+    const link = await prisma.registrationLink.findUnique({ where: { id } });
     if (!link || link.schoolId !== req.schoolId) {
       res.status(404).json({ error: 'Link not found', code: 'NOT_FOUND' });
       return;
     }
-    await prisma.registrationLink.delete({ where: { id: req.params.id } });
+    await prisma.registrationLink.delete({ where: { id } });
     res.status(204).send();
   } catch (err) {
     res.status(500).json({ error: 'Failed to delete link', code: 'INTERNAL_ERROR' });

@@ -8,9 +8,11 @@ const ActivationPage: React.FC = () => {
   const [adminFullName, setAdminFullName] = useState('');
   const [adminEmail, setAdminEmail] = useState('');
   const [adminPassword, setAdminPassword] = useState('');
+  const [schoolName, setSchoolName] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
+  const [activatedSchoolCode, setActivatedSchoolCode] = useState('');
   const navigate = useNavigate();
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -19,15 +21,17 @@ const ActivationPage: React.FC = () => {
     setError(null);
 
     try {
-      await apiClient.post('/activate', {
+      const { data } = await apiClient.post('/activate', {
         licenseKey: licenseKey.trim().toUpperCase(),
+        schoolName: schoolName.trim(),
         schoolCode: schoolCode.trim().toUpperCase(),
         adminFullName: adminFullName.trim(),
         adminEmail: adminEmail.trim(),
         adminPassword,
       });
+      setActivatedSchoolCode(data.schoolCode || schoolCode.trim().toUpperCase());
       setSuccess(true);
-      setTimeout(() => navigate('/login', { replace: true }), 2000);
+      setTimeout(() => navigate('/login', { replace: true }), 4000);
     } catch (err: any) {
       const message =
         err.response?.data?.error ||
@@ -68,8 +72,15 @@ const ActivationPage: React.FC = () => {
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                 </svg>
               </div>
-              <p className="text-sm text-emerald-200 font-medium">
-                School activated successfully! Redirecting to login...
+              <p className="text-sm text-emerald-200 font-medium mb-2">
+                School activated successfully!
+              </p>
+              <div className="bg-emerald-500/10 border border-emerald-400/20 rounded-lg px-3 py-2 inline-block">
+                <p className="text-xs text-emerald-300/70 uppercase tracking-wider">Your School Code</p>
+                <p className="text-lg font-bold text-emerald-100 tracking-widest">{activatedSchoolCode}</p>
+              </div>
+              <p className="text-xs text-emerald-300/60 mt-2">
+                Share this code with your staff and students to log in. Redirecting...
               </p>
             </div>
           )}
@@ -96,6 +107,21 @@ const ActivationPage: React.FC = () => {
                   required
                   className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-purple-500/50 focus:border-purple-400/50 transition-all duration-200"
                   placeholder="XXXX-XXXX-XXXX-XXXX"
+                />
+              </div>
+
+              <div>
+                <label htmlFor="schoolName" className="block text-xs font-semibold text-gray-300 uppercase tracking-wider mb-2">
+                  School Name
+                </label>
+                <input
+                  id="schoolName"
+                  type="text"
+                  value={schoolName}
+                  onChange={(e) => setSchoolName(e.target.value)}
+                  required
+                  className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-purple-500/50 focus:border-purple-400/50 transition-all duration-200"
+                  placeholder="e.g. Kenyatta High School"
                 />
               </div>
 

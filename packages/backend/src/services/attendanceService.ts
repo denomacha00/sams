@@ -3,6 +3,8 @@ import { createId } from '@paralleldrive/cuid2';
 import { prisma } from '../index';
 import { AppError } from '../middleware/errors';
 import { auditService } from './auditService';
+import { riskService } from './riskService';
+import { broadcastAttendanceNew, broadcastAttendanceUpdated } from '../sockets/attendanceSocket';
 import {
   haversineDistance,
   classifyAttendanceStatus,
@@ -119,6 +121,12 @@ export class AttendanceService {
       },
     });
 
+    // Broadcast new attendance to session room
+    broadcastAttendanceNew(session.id, record);
+
+    // Fire-and-forget: recompute student risk score
+    riskService.computeRiskScore(schoolId, studentId).catch(() => {});
+
     return record;
   }
 
@@ -199,6 +207,12 @@ export class AttendanceService {
         },
       });
 
+      // Broadcast updated attendance to session room
+      broadcastAttendanceUpdated(sessionId, updated);
+
+      // Fire-and-forget: recompute student risk score
+      riskService.computeRiskScore(schoolId, studentId).catch(() => {});
+
       return updated;
     }
 
@@ -215,6 +229,12 @@ export class AttendanceService {
         scannedAt: new Date(),
       },
     });
+
+    // Broadcast new attendance to session room
+    broadcastAttendanceNew(sessionId, record);
+
+    // Fire-and-forget: recompute student risk score
+    riskService.computeRiskScore(schoolId, studentId).catch(() => {});
 
     return record;
   }
@@ -269,6 +289,12 @@ export class AttendanceService {
         scannedAt: new Date(),
       },
     });
+
+    // Broadcast new attendance to session room
+    broadcastAttendanceNew(sessionId, record);
+
+    // Fire-and-forget: recompute student risk score
+    riskService.computeRiskScore(schoolId, studentId).catch(() => {});
 
     return record;
   }
@@ -340,6 +366,12 @@ export class AttendanceService {
         note,
       },
     });
+
+    // Broadcast updated attendance to session room
+    broadcastAttendanceUpdated(record.sessionId, updated);
+
+    // Fire-and-forget: recompute student risk score
+    riskService.computeRiskScore(schoolId, record.studentId).catch(() => {});
 
     return updated;
   }

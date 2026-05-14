@@ -158,7 +158,7 @@ This plan converts the SAMS design into incremental coding tasks for a React + T
     - **Validates: Requirements 3.5**
     - Student A attempts to read student B's records; assert 403
 
-- [ ] 7. Implement user management and registration link service
+- [x] 7. Implement user management and registration link service
   - [x] 7.1 Implement `UserService` CRUD in `packages/backend/src/services/userService.ts`
     - `createUser`, `updateUser`, `deleteUser`, `listUsers` — all scoped to `schoolId`
     - Hash passwords with bcrypt (cost 12) on create/update
@@ -169,7 +169,7 @@ This plan converts the SAMS design into incremental coding tasks for a React + T
     - `resolveLink(token)`: return metadata; reject if expired or at max uses
     - `registerViaLink(token, fullName, admissionNumber)`: validate link, check duplicate admission number, create Student user
     - _Requirements: 4.1, 4.2, 4.3, 4.4, 4.5, 4.6, 4.7, 4.8_
-  - [ ] 7.3 Wire user routes: `GET/POST /api/v1/users`, `GET/PUT/DELETE /api/v1/users/:id`
+  - [x] 7.3 Wire user routes: `GET/POST /api/v1/users`, `GET/PUT/DELETE /api/v1/users/:id`
     - Wire registration link routes: `POST /api/v1/registration-links`, `GET /api/v1/registration-links/:token`, `POST /api/v1/registration-links/:token/register`
     - _Requirements: 4.1–4.9_
   - [ ]* 7.4 Write property test for registration link context embedding (Property 13)
@@ -185,17 +185,17 @@ This plan converts the SAMS design into incremental coding tasks for a React + T
     - **Validates: Requirements 4.8**
     - Register student with admission number X; attempt second registration with same X in same school; assert rejection
 
-- [ ] 8. Implement timetable service
+- [x] 8. Implement timetable service
   - [x] 8.1 Implement `TimetableService` in `packages/backend/src/services/timetableService.ts`
     - `createEntry`: validate required fields, detect overlaps for same teacher/class/room on same day+time, reject with `TIMETABLE_CONFLICT`
     - `updateEntry`, `deleteEntry` (soft-delete: do not cascade to historical sessions)
     - `listEntries`: scoped to `schoolId`, filterable by teacher/class/day
     - _Requirements: 17.1, 17.2, 17.4, 17.5_
-  - [ ] 8.2 Wire timetable routes: `GET/POST /api/v1/timetable`, `PUT/DELETE /api/v1/timetable/:id`
+  - [x] 8.2 Wire timetable routes: `GET/POST /api/v1/timetable`, `PUT/DELETE /api/v1/timetable/:id`
     - Restrict create/update/delete to `SCHOOL_ADMIN` role
     - _Requirements: 17.4_
 
-- [ ] 9. Implement attendance session and QR code service
+- [x] 9. Implement attendance session and QR code service
   - [x] 9.1 Implement `SessionService` in `packages/backend/src/services/sessionService.ts`
     - `startSession(teacherId, timetableEntryId, location)`: validate timetable entry belongs to teacher at current time, create `AttendanceSession`, generate initial QR token (JWT, 30 s expiry, random nonce), store in session record
     - `endSession(sessionId, teacherId)`: set `isActive=false`, `endedAt`, broadcast `session:ended` via Socket.io
@@ -203,17 +203,17 @@ This plan converts the SAMS design into incremental coding tasks for a React + T
     - `refreshQRCode(sessionId)`: generate new nonce, update DB, broadcast `qr:refresh` via Socket.io
     - `getActiveQR(sessionId)`: return current token or null
     - _Requirements: 5.1, 5.2, 9.4, 17.3_
-  - [ ] 9.2 Implement server-side QR refresh cron job in `packages/backend/src/jobs/qrRefresh.ts`
+  - [x] 9.2 Implement server-side QR refresh cron job in `packages/backend/src/jobs/qrRefresh.ts`
     - Every 30 seconds, find all active sessions and call `SessionService.refreshQRCode`
     - _Requirements: 5.2_
-  - [ ] 9.3 Wire session routes: `POST /api/v1/sessions`, `GET /api/v1/sessions/:id`, `GET /api/v1/sessions/:id/qr`, `POST /api/v1/sessions/:id/end`, `GET /api/v1/sessions`
+  - [x] 9.3 Wire session routes: `POST /api/v1/sessions`, `GET /api/v1/sessions/:id`, `GET /api/v1/sessions/:id/qr`, `POST /api/v1/sessions/:id/end`, `GET /api/v1/sessions`
     - _Requirements: 5.1, 5.2_
   - [ ]* 9.4 Write property test for QR code uniqueness across sessions (Property 16)
     - **Property 16: QR Code Uniqueness Across Sessions**
     - **Validates: Requirements 5.1**
     - Generate N concurrent sessions; assert all N QR tokens are distinct strings
 
-- [ ] 10. Implement attendance recording service
+- [x] 10. Implement attendance recording service
   - [x] 10.1 Implement `AttendanceService.recordQRScan` in `packages/backend/src/services/attendanceService.ts`
     - Verify QR JWT signature and expiry (reject if >30 s old with `QR_EXPIRED`)
     - Validate GPS coordinates within session radius using `haversineDistance` (reject with `GPS_OUT_OF_RANGE`)
@@ -232,7 +232,7 @@ This plan converts the SAMS design into incremental coding tasks for a React + T
   - [x] 10.4 Implement `AttendanceService.updateRecord`
     - Overwrite status and note; write AuditLog entry with previous and new status, actorId, timestamp
     - _Requirements: 6.5_
-  - [ ] 10.5 Wire attendance routes: `POST /api/v1/attendance/qr`, `POST /api/v1/attendance/manual`, `POST /api/v1/attendance/biometric`, `PUT /api/v1/attendance/:id`, `GET /api/v1/attendance`
+  - [x] 10.5 Wire attendance routes: `POST /api/v1/attendance/qr`, `POST /api/v1/attendance/manual`, `POST /api/v1/attendance/biometric`, `PUT /api/v1/attendance/:id`, `GET /api/v1/attendance`
     - _Requirements: 5.3, 6.1, 7.5_
   - [ ]* 10.6 Write property test for GPS radius enforcement (Property 18)
     - **Property 18: GPS Radius Enforcement**
@@ -255,7 +255,7 @@ This plan converts the SAMS design into incremental coding tasks for a React + T
     - **Validates: Requirements 6.5**
     - Update a record; assert AuditLog entry contains previous status, new status, actorId, and timestamp
 
-- [ ] 11. Implement offline sync service (backend)
+- [x] 11. Implement offline sync service (backend)
   - [x] 11.1 Implement `AttendanceService.syncOfflineRecords` in `packages/backend/src/services/attendanceService.ts`
     - Accept batch of `OfflineAttendanceRecord[]`
     - For each record, check if server record exists for same `sessionId + studentId`
@@ -263,7 +263,7 @@ This plan converts the SAMS design into incremental coding tasks for a React + T
     - Log every conflict resolution decision to AuditLog with both record values and resolution
     - Return `{synced: string[], conflicts: ConflictResult[]}`
     - _Requirements: 8.2, 8.3, 8.4_
-  - [ ] 11.2 Wire sync route: `POST /api/v1/attendance/sync`
+  - [x] 11.2 Wire sync route: `POST /api/v1/attendance/sync`
     - _Requirements: 8.2_
   - [ ]* 11.3 Write property test for offline conflict resolution (Property 25)
     - **Property 25: Offline Conflict Resolution**
@@ -274,42 +274,42 @@ This plan converts the SAMS design into incremental coding tasks for a React + T
     - **Validates: Requirements 8.4**
     - After sync with conflicts, assert AuditLog entries contain both record values and resolution decision
 
-- [ ] 12. Implement real-time WebSocket layer
-  - [ ] 12.1 Implement Socket.io server in `packages/backend/src/sockets/attendanceSocket.ts`
+- [x] 12. Implement real-time WebSocket layer
+  - [x] 12.1 Implement Socket.io server in `packages/backend/src/sockets/attendanceSocket.ts`
     - Authenticate via handshake token (verify JWT)
     - Handle `session:join` event: verify teacher owns session, join `session:{sessionId}` room, replay missed events from Redis list since `lastSeen`
     - Handle `qr:subscribe` event: join `qr:{sessionId}` room
     - Implement `broadcastAttendanceUpdate`, `broadcastQRRefresh`, `broadcastSessionEnd` emitters
     - Store attendance events in Redis list `events:{sessionId}` with 2-hour TTL
     - _Requirements: 9.1, 9.2, 9.3, 9.4_
-  - [ ] 12.2 Integrate Socket.io broadcasts into `AttendanceService` (emit on record create/update) and `SessionService` (emit on QR refresh and session end)
+  - [x] 12.2 Integrate Socket.io broadcasts into `AttendanceService` (emit on record create/update) and `SessionService` (emit on QR refresh and session end)
     - _Requirements: 9.1, 9.2_
 
-- [ ] 13. Implement report service
-  - [ ] 13.1 Implement `ReportService` in `packages/backend/src/services/reportService.ts`
+- [x] 13. Implement report service
+  - [x] 13.1 Implement `ReportService` in `packages/backend/src/services/reportService.ts`
     - `getStudentReport(studentId, dateRange)`: scoped to student's own records
     - `getClassReport(classId, dateRange)`: aggregated for all students in class
     - `getDepartmentReport(departmentId, dateRange)`: aggregated across all classes in department
     - `getSchoolReport(schoolId, dateRange)`: aggregated across all departments
     - All methods compute attendance percentage as `(totalPresent / totalExpected) * 100` rounded to 2 dp
     - _Requirements: 10.1, 10.2, 10.3, 10.4, 10.5, 10.7_
-  - [ ] 13.2 Implement `ReportService.exportReport(reportId, format)` returning a `Buffer`
+  - [x] 13.2 Implement `ReportService.exportReport(reportId, format)` returning a `Buffer`
     - PDF export using `pdfkit`; Excel export using `exceljs`
     - _Requirements: 10.6_
-  - [ ] 13.3 Wire report routes: `GET /api/v1/reports/student/:id`, `GET /api/v1/reports/class/:classId`, `GET /api/v1/reports/department/:deptId`, `GET /api/v1/reports/school`, `GET /api/v1/reports/:reportId/export`
+  - [x] 13.3 Wire report routes: `GET /api/v1/reports/student/:id`, `GET /api/v1/reports/class/:classId`, `GET /api/v1/reports/department/:deptId`, `GET /api/v1/reports/school`, `GET /api/v1/reports/:reportId/export`
     - Enforce role-based scope on each route
     - _Requirements: 10.7_
 
-- [ ] 14. Implement dropout risk scoring service
-  - [ ] 14.1 Implement `RiskService` in `packages/backend/src/services/riskService.ts`
+- [x] 14. Implement dropout risk scoring service
+  - [x] 14.1 Implement `RiskService` in `packages/backend/src/services/riskService.ts`
     - `computeRiskScore(studentId)`: fetch attendance weight (% present), grade weight (normalized), pattern weight (consecutive absences/late streaks); compute `score = A*0.4 + G*0.4 + P*0.2`; classify into LOW/MEDIUM/HIGH/CRITICAL
     - `getRiskScores(scope)`: return scores scoped to school or department
     - Upsert `RiskScore` record after computation
     - If risk level changes, trigger `NotificationService` alert to Teacher and HOD
     - _Requirements: 11.1, 11.2, 11.3, 11.4, 11.5_
-  - [ ] 14.2 Implement post-save hook in `AttendanceService` to call `RiskService.computeRiskScore` after every record create/update
+  - [x] 14.2 Implement post-save hook in `AttendanceService` to call `RiskService.computeRiskScore` after every record create/update
     - _Requirements: 11.4_
-  - [ ] 14.3 Wire risk score routes: `GET /api/v1/risk-scores`, `GET /api/v1/risk-scores/:studentId`
+  - [x] 14.3 Wire risk score routes: `GET /api/v1/risk-scores`, `GET /api/v1/risk-scores/:studentId`
     - _Requirements: 11.3_
 
 - [x] 15. Implement plan tier feature gating (license service)
@@ -327,22 +327,22 @@ This plan converts the SAMS design into incremental coding tasks for a React + T
     - **Validates: Requirements 12.1, 12.6**
     - For each tier limit N, register N students successfully; assert N+1th registration is rejected
 
-- [ ] 16. Implement M-Pesa payment service
+- [x] 16. Implement M-Pesa payment service
   - [x] 16.1 Implement `PaymentService` in `packages/backend/src/services/paymentService.ts`
     - `initiateSTKPush(schoolId, phone, amount, planTier)`: generate Daraja password (base64 of shortCode+passKey+timestamp), POST to Daraja STK push endpoint, insert `Payment` record with `status=PENDING`, log `PAYMENT_INITIATED` to AuditLog
     - `handleCallback(callbackData)`: parse `Body.stkCallback`; on `ResultCode===0` update Payment to SUCCESS, update School planTier and licenseExpiresAt, generate invoice, send email receipt; on failure update to FAILED, send failure email
     - `getInvoice(paymentId)`: return invoice record
     - _Requirements: 13.1, 13.2, 13.3, 13.4, 13.5_
-  - [ ] 16.2 Wire payment routes: `POST /api/v1/payments/initiate`, `POST /api/v1/payments/callback` (IP-whitelisted, no auth), `GET /api/v1/payments`, `GET /api/v1/payments/:id/invoice`
+  - [x] 16.2 Wire payment routes: `POST /api/v1/payments/initiate`, `POST /api/v1/payments/callback` (IP-whitelisted, no auth), `GET /api/v1/payments`, `GET /api/v1/payments/:id/invoice`
     - _Requirements: 13.1, 13.4_
 
-- [ ] 17. Implement notification service
+- [x] 17. Implement notification service
   - [x] 17.1 Implement `NotificationService` in `packages/backend/src/services/notificationService.ts`
     - `sendSMS(phone, message, retryCount=0)`: call Africa's Talking SDK; on failure retry up to 3 times with 60 s delay; log each attempt as `SMS_RETRY` in AuditLog
     - `sendEmail(to, subject, html)`: use Nodemailer transporter
     - `sendInApp(userId, notification)`: emit Socket.io event to user's personal room
     - _Requirements: 18.1, 18.2, 18.3, 18.4, 18.5, 18.6_
-  - [ ] 17.2 Implement notification triggers cron job in `packages/backend/src/jobs/notifications.ts`
+  - [x] 17.2 Implement notification triggers cron job in `packages/backend/src/jobs/notifications.ts`
     - Daily: check students below attendance threshold → SMS + in-app
     - Daily: check licenses expiring within 7 days → email School Admin
     - _Requirements: 18.1, 18.2_
@@ -362,20 +362,20 @@ This plan converts the SAMS design into incremental coding tasks for a React + T
     - **Validates: Requirements 16.1, 16.2**
     - Trigger each auditable event; assert created entry contains all required fields
 
-- [ ] 19. Checkpoint — backend core complete
+- [x] 19. Checkpoint — backend core complete
   - Ensure all tests pass, ask the user if questions arise.
 
-- [ ] 20. Implement biometric service (backend encryption layer)
-  - [ ] 20.1 Implement `biometricEncryption.ts` in `packages/backend/src/services/`
+- [x] 20. Implement biometric service (backend encryption layer)
+  - [x] 20.1 Implement `biometricEncryption.ts` in `packages/backend/src/services/`
     - `encryptDescriptor(descriptor: Float32Array, schoolKey: Buffer): EncryptedTemplate` using AES-256-GCM
     - `decryptDescriptor(template: EncryptedTemplate, schoolKey: Buffer): Float32Array`
     - _Requirements: 7.8, 19.3_
-  - [ ] 20.2 Implement `BiometricService` in `packages/backend/src/services/biometricService.ts`
+  - [x] 20.2 Implement `BiometricService` in `packages/backend/src/services/biometricService.ts`
     - `enrollTemplate(studentId, descriptor)`: encrypt descriptor, store `BiometricTemplate` record
     - `matchDescriptor(descriptor, classId)`: decrypt all class templates, compute Euclidean distances, return top match with confidence
     - `getEncryptedTemplates(classId)`: return encrypted templates for offline caching
     - _Requirements: 7.4, 7.5, 7.6, 7.8_
-  - [ ] 20.3 Wire biometric routes: `POST /api/v1/biometric/enroll`, `GET /api/v1/biometric/templates/:classId`
+  - [x] 20.3 Wire biometric routes: `POST /api/v1/biometric/enroll`, `GET /api/v1/biometric/templates/:classId`
     - Gate behind `LicenseService.checkFeatureAccess('biometric')` (Pro/Enterprise only)
     - _Requirements: 7.1, 12.4_
   - [ ]* 20.4 Write property test for biometric confidence threshold (Property 23)
@@ -387,26 +387,26 @@ This plan converts the SAMS design into incremental coding tasks for a React + T
     - **Validates: Requirements 7.8, 19.3**
     - Encrypt a descriptor; assert stored bytes differ from raw descriptor; decrypt and assert equality with original
 
-- [ ] 21. Implement AI assistant service
-  - [ ] 21.1 Implement local query engine in `packages/backend/src/services/ai/localEngine.ts`
+- [x] 21. Implement AI assistant service
+  - [x] 21.1 Implement local query engine in `packages/backend/src/services/ai/localEngine.ts`
     - Regex-based intent detection for: attendance percentage, absent students, risk scores, top students, class comparison
     - Query builder that enforces role-based scoping (Teacher → classId, Student → studentId, HOD → departmentId)
     - _Requirements: 14.1, 14.2, 14.3, 14.4_
-  - [ ] 21.2 Implement OpenAI engine in `packages/backend/src/services/ai/openaiEngine.ts`
+  - [x] 21.2 Implement OpenAI engine in `packages/backend/src/services/ai/openaiEngine.ts`
     - Build system prompt with user scope context
     - Define function-calling tools: `query_attendance`, `query_risk_scores`, `query_reports`
     - Dispatch function calls to scoped DB queries; return formatted response
     - Gate behind `LicenseService.checkFeatureAccess('ai')` (Pro/Enterprise only)
     - _Requirements: 14.5, 12.4_
-  - [ ] 21.3 Implement `AIService` router in `packages/backend/src/services/aiService.ts`
+  - [x] 21.3 Implement `AIService` router in `packages/backend/src/services/aiService.ts`
     - Route to local engine for Trial/Basic; route to OpenAI engine for Pro/Enterprise
     - Handle out-of-scope queries with standard "not available" message
     - _Requirements: 14.1, 14.7_
-  - [ ] 21.4 Wire AI routes: `POST /api/v1/ai/query`, `POST /api/v1/ai/voice`
+  - [x] 21.4 Wire AI routes: `POST /api/v1/ai/query`, `POST /api/v1/ai/voice`
     - _Requirements: 14.1, 14.6_
 
-- [ ] 22. Implement Super Admin panel backend routes
-  - [ ] 22.1 Implement Super Admin routes in `packages/backend/src/routes/superAdmin.ts`
+- [x] 22. Implement Super Admin panel backend routes
+  - [x] 22.1 Implement Super Admin routes in `packages/backend/src/routes/superAdmin.ts`
     - `POST /super/licenses`: generate license key using `encodeLicenseKey`, store bcrypt hash, return raw key once
     - `GET /super/schools`, `GET /super/schools/:id`: list/get schools with aggregated stats
     - `POST /super/schools/:id/suspend`: call `LicenseService.suspendSchool`
@@ -415,88 +415,88 @@ This plan converts the SAMS design into incremental coding tasks for a React + T
     - `GET /super/revenue`: aggregate payment totals by plan tier
     - `GET /super/audit-logs`: proxy to `AuditService.query` with filters
     - _Requirements: 15.1, 15.2, 15.3, 15.4, 15.5, 15.6_
-  - [ ] 22.2 Restrict all `/super/*` routes to `SUPER_ADMIN` role; ensure they are only mounted when `HOST === super.sams.ke`
+  - [x] 22.2 Restrict all `/super/*` routes to `SUPER_ADMIN` role; ensure they are only mounted when `HOST === super.sams.ke`
     - _Requirements: 15.1, 2.4_
 
-- [ ] 23. Checkpoint — all backend services complete
+- [x] 23. Checkpoint — all backend services complete
   - Ensure all tests pass, ask the user if questions arise.
 
-- [ ] 24. Set up frontend project
-  - [ ] 24.1 Scaffold `packages/frontend` with Vite + React + TypeScript + TailwindCSS
+- [x] 24. Set up frontend project
+  - [x] 24.1 Scaffold `packages/frontend` with Vite + React + TypeScript + TailwindCSS
     - Install dependencies: `react`, `react-dom`, `react-router-dom`, `zustand`, `axios`, `socket.io-client`, `idb`, `qrcode`, `face-api.js`, `@types/*`
     - Configure `vite.config.ts` with proxy to `api.sams.ke` for development
     - Configure TailwindCSS with custom theme (school branding support)
     - _Requirements: 20.1, 20.3_
-  - [ ] 24.2 Implement API client in `packages/frontend/src/services/apiClient.ts`
+  - [x] 24.2 Implement API client in `packages/frontend/src/services/apiClient.ts`
     - Axios instance with base URL, `Authorization: Bearer` header injection from Zustand store
     - Interceptor for 401 → auto-refresh token flow
     - _Requirements: 3.7, 3.8_
-  - [ ] 24.3 Implement Zustand auth store in `packages/frontend/src/store/authStore.ts`
+  - [x] 24.3 Implement Zustand auth store in `packages/frontend/src/store/authStore.ts`
     - State: `user`, `accessToken`, `refreshToken`, `isAuthenticated`
     - Actions: `login`, `logout`, `refreshToken`
     - Persist to `localStorage` (non-sensitive fields only)
     - _Requirements: 3.6, 3.8_
-  - [ ] 24.4 Implement React Router setup in `packages/frontend/src/main.tsx` with route guards based on role
+  - [x] 24.4 Implement React Router setup in `packages/frontend/src/main.tsx` with route guards based on role
     - Public routes: `/activate`, `/login`, `/register/:token`
     - Protected routes: `/dashboard`, `/sessions`, `/attendance`, `/reports`, `/ai`, `/settings`
     - _Requirements: 3.1, 3.2_
 
-- [ ] 25. Implement frontend authentication pages
-  - [ ] 25.1 Implement `LoginPage` at `packages/frontend/src/pages/LoginPage.tsx`
+- [x] 25. Implement frontend authentication pages
+  - [x] 25.1 Implement `LoginPage` at `packages/frontend/src/pages/LoginPage.tsx`
     - Form: schoolCode, identifier (email or admission number), password
     - Call `POST /api/v1/auth/login`; store tokens; redirect to role-appropriate dashboard
     - Display account-locked and rate-limit error messages
     - _Requirements: 3.6, 19.5_
-  - [ ] 25.2 Implement `ActivationPage` at `packages/frontend/src/pages/ActivationPage.tsx`
+  - [x] 25.2 Implement `ActivationPage` at `packages/frontend/src/pages/ActivationPage.tsx`
     - Form: license key, school name, school code, admin email, admin password
     - Call `POST /api/v1/activate`; display success with school code; redirect to login
     - _Requirements: 1.1, 1.6_
-  - [ ] 25.3 Implement `RegisterPage` at `packages/frontend/src/pages/RegisterPage.tsx`
+  - [x] 25.3 Implement `RegisterPage` at `packages/frontend/src/pages/RegisterPage.tsx`
     - Resolve link token on mount; pre-fill school/department/class; form: full name, admission number
     - Call `POST /api/v1/registration-links/:token/register`
     - _Requirements: 4.7_
 
-- [ ] 26. Implement IndexedDB offline store and service worker
-  - [ ] 26.1 Implement `offlineStore.ts` in `packages/frontend/src/services/offlineStore.ts` using `idb`
+- [x] 26. Implement IndexedDB offline store and service worker
+  - [x] 26.1 Implement `offlineStore.ts` in `packages/frontend/src/services/offlineStore.ts` using `idb`
     - Define `SAMSDatabase` schema with stores: `pendingAttendance`, `biometricTemplates`, `sessionCache`, `studentCache`
     - Implement `saveAttendanceRecord`, `getPendingRecords`, `markSynced`, `saveBiometricTemplate`, `getTemplatesForClass`
     - _Requirements: 8.1, 8.5_
-  - [ ] 26.2 Implement `syncService.ts` in `packages/frontend/src/services/syncService.ts`
+  - [x] 26.2 Implement `syncService.ts` in `packages/frontend/src/services/syncService.ts`
     - `syncPendingRecords()`: fetch pending from IndexedDB, POST to `/api/v1/attendance/sync`, mark synced
     - `onConnectivityRestored()`: register `window.addEventListener('online', ...)` to trigger sync within 30 s
     - _Requirements: 8.2, 5.9, 6.4_
-  - [ ] 26.3 Implement Service Worker in `packages/frontend/public/sw.js`
+  - [x] 26.3 Implement Service Worker in `packages/frontend/public/sw.js`
     - Cache-first for static assets (`sams-static-v1`)
     - Network-first with IndexedDB fallback for API GET requests (`sams-api-v1`)
     - Queue POST/PUT requests in IndexedDB when offline; replay on reconnect
     - _Requirements: 8.1, 8.5_
-  - [ ] 26.4 Register Service Worker in `packages/frontend/src/workers/swRegistration.ts`
+  - [x] 26.4 Register Service Worker in `packages/frontend/src/workers/swRegistration.ts`
     - _Requirements: 8.1_
 
-- [ ] 27. Implement QR attendance frontend
-  - [ ] 27.1 Implement `SessionPage` at `packages/frontend/src/pages/SessionPage.tsx` (Teacher view)
+- [x] 27. Implement QR attendance frontend
+  - [x] 27.1 Implement `SessionPage` at `packages/frontend/src/pages/SessionPage.tsx` (Teacher view)
     - Start session form: select timetable entry, capture GPS coordinates
     - Display live QR code rendered with `qrcode` library from JWT string
     - Subscribe to `qr:refresh` Socket.io event to update QR display every 30 s
     - Real-time attendance list updated via `attendance:update` Socket.io events
     - End session button
     - _Requirements: 5.1, 5.2, 9.1, 9.2_
-  - [ ] 27.2 Implement `QRScanPage` at `packages/frontend/src/pages/QRScanPage.tsx` (Student view)
+  - [x] 27.2 Implement `QRScanPage` at `packages/frontend/src/pages/QRScanPage.tsx` (Student view)
     - Camera-based QR scanner using browser APIs
     - Capture GPS coordinates on scan
     - POST to `/api/v1/attendance/qr`; if offline, save to IndexedDB via `offlineStore`
     - Display success/error feedback
     - _Requirements: 5.3, 5.4, 5.9_
 
-- [ ] 28. Implement manual attendance frontend
-  - [ ] 28.1 Implement `ManualAttendancePage` at `packages/frontend/src/pages/ManualAttendancePage.tsx`
+- [x] 28. Implement manual attendance frontend
+  - [x] 28.1 Implement `ManualAttendancePage` at `packages/frontend/src/pages/ManualAttendancePage.tsx`
     - Fetch student list for teacher's class from `/api/v1/users?role=STUDENT&classId=...`
     - Render each student with status selector (PRESENT/LATE/EXCUSED/ABSENT) and optional note field (≤500 chars)
     - Submit marks individually or in bulk; if offline, save to IndexedDB
     - _Requirements: 6.1, 6.2, 6.3, 6.4_
 
-- [ ] 29. Implement biometric attendance frontend
-  - [ ] 29.1 Implement `BiometricEnrollPage` at `packages/frontend/src/pages/BiometricEnrollPage.tsx`
+- [x] 29. Implement biometric attendance frontend
+  - [x] 29.1 Implement `BiometricEnrollPage` at `packages/frontend/src/pages/BiometricEnrollPage.tsx`
     - Load `face-api.js` models (SSD MobileNet, face landmark, face recognition)
     - Capture video frame, run `detectSingleFace().withFaceLandmarks().withFaceDescriptor()`
     - Perform liveness detection (blink/head-turn challenge)
@@ -504,7 +504,7 @@ This plan converts the SAMS design into incremental coding tasks for a React + T
     - POST encrypted descriptor to `/api/v1/biometric/enroll`
     - Gate UI behind plan tier check (Pro/Enterprise only)
     - _Requirements: 7.2, 7.3, 7.8, 12.4_
-  - [ ] 29.2 Implement `BiometricAttendancePage` at `packages/frontend/src/pages/BiometricAttendancePage.tsx`
+  - [x] 29.2 Implement `BiometricAttendancePage` at `packages/frontend/src/pages/BiometricAttendancePage.tsx`
     - Load cached templates from IndexedDB (or fetch from `/api/v1/biometric/templates/:classId`)
     - Decrypt templates client-side; run face detection on live video frame
     - Compute Euclidean distances; find best match with confidence score
@@ -512,40 +512,40 @@ This plan converts the SAMS design into incremental coding tasks for a React + T
     - If confidence < threshold: show retry prompt
     - _Requirements: 7.4, 7.5, 7.6, 7.7_
 
-- [ ] 30. Implement reports and risk score frontend
-  - [ ] 30.1 Implement `ReportsPage` at `packages/frontend/src/pages/ReportsPage.tsx`
+- [x] 30. Implement reports and risk score frontend
+  - [x] 30.1 Implement `ReportsPage` at `packages/frontend/src/pages/ReportsPage.tsx`
     - Role-aware: Student sees personal report; Teacher sees class report; HOD sees department report; Admin sees school report
     - Date range picker; attendance percentage display per student
     - Export button (PDF/Excel) calling `/api/v1/reports/:reportId/export`
     - _Requirements: 10.1, 10.2, 10.3, 10.4, 10.5, 10.6_
-  - [ ] 30.2 Implement `RiskScorePage` at `packages/frontend/src/pages/RiskScorePage.tsx`
+  - [x] 30.2 Implement `RiskScorePage` at `packages/frontend/src/pages/RiskScorePage.tsx`
     - Display risk scores with color-coded risk levels (LOW=green, MEDIUM=yellow, HIGH=orange, CRITICAL=red)
     - Filterable by risk level; scoped to HOD/Admin role
     - _Requirements: 11.2, 11.3_
 
-- [ ] 31. Implement AI assistant frontend
-  - [ ] 31.1 Implement `AIAssistantPage` at `packages/frontend/src/pages/AIAssistantPage.tsx`
+- [x] 31. Implement AI assistant frontend
+  - [x] 31.1 Implement `AIAssistantPage` at `packages/frontend/src/pages/AIAssistantPage.tsx`
     - Chat interface with text input and send button
     - Voice input button using `useVoiceQuery` hook (Web Speech API, `lang='en-KE'`)
     - POST to `/api/v1/ai/query` or `/api/v1/ai/voice`; display response in chat bubble
     - Show "not available" message for out-of-scope queries
     - _Requirements: 14.1, 14.6, 14.7_
-  - [ ] 31.2 Implement `useVoiceQuery` hook in `packages/frontend/src/hooks/useVoiceQuery.ts`
+  - [x] 31.2 Implement `useVoiceQuery` hook in `packages/frontend/src/hooks/useVoiceQuery.ts`
     - Initialize `SpeechRecognition` with `lang='en-KE'`; on result, call `submitQuery(transcript)`
     - _Requirements: 14.6_
 
-- [ ] 32. Implement Super Admin panel frontend
-  - [ ] 32.1 Scaffold `packages/super-admin` with Vite + React + TypeScript + TailwindCSS
+- [x] 32. Implement Super Admin panel frontend
+  - [x] 32.1 Scaffold `packages/super-admin` with Vite + React + TypeScript + TailwindCSS
     - Separate build output deployed to `super.sams.ke`
     - _Requirements: 15.1, 20.3_
-  - [ ] 32.2 Implement Super Admin dashboard pages
+  - [x] 32.2 Implement Super Admin dashboard pages
     - `LicenseGeneratorPage`: form to generate license key (school name, plan tier, expiry); display generated key once
     - `SchoolsListPage`: table of all schools with plan tier, student count, status; suspend/unsuspend/extend actions
     - `RevenuePage`: aggregated revenue stats by plan tier
     - `AuditLogPage`: filterable audit log viewer (by school, date range, event type)
     - _Requirements: 15.2, 15.3, 15.4, 15.5, 15.6_
 
-- [ ] 33. Checkpoint — all frontend pages complete
+- [x] 33. Checkpoint — all frontend pages complete
   - Ensure all tests pass, ask the user if questions arise.
 
 - [ ] 34. Write integration tests
@@ -571,21 +571,21 @@ This plan converts the SAMS design into incremental coding tasks for a React + T
     - Assert AI endpoint returns 403 for Trial/Basic schools
     - _Requirements: 12.2, 12.4_
 
-- [ ] 35. Configure deployment infrastructure
-  - [ ] 35.1 Write NGINX configuration in `nginx/sams.conf`
+- [x] 35. Configure deployment infrastructure
+  - [x] 35.1 Write NGINX configuration in `nginx/sams.conf`
     - Virtual hosts for `sams.ke`, `api.sams.ke`, `super.sams.ke` with SSL, WebSocket upgrade headers, SPA fallback, static asset caching, and rate limiting
     - HTTP → HTTPS 301 redirect for all hosts
     - IP allowlist for `super.sams.ke`
     - _Requirements: 20.1, 20.3, 19.1, 15.1_
-  - [ ] 35.2 Write PM2 ecosystem config in `ecosystem.config.js`
+  - [x] 35.2 Write PM2 ecosystem config in `ecosystem.config.js`
     - `sams-api` app: 2 cluster instances, auto-restart on crash, log paths
     - _Requirements: 20.1, 20.5_
-  - [ ] 35.3 Write GitHub Actions CI/CD pipeline in `.github/workflows/deploy.yml`
+  - [x] 35.3 Write GitHub Actions CI/CD pipeline in `.github/workflows/deploy.yml`
     - `test` job: checkout, setup Node 20, `npm ci`, `npm run test --workspaces`, `npm run build --workspaces`
     - `deploy` job (needs test): SSH to VPS, `git pull`, `npm ci`, `npm run build`, `prisma migrate deploy`, `pm2 reload`, `nginx -t && systemctl reload nginx`
     - _Requirements: 20.2_
 
-- [ ] 36. Final checkpoint — full system integration
+- [x] 36. Final checkpoint — full system integration
   - Ensure all tests pass, ask the user if questions arise.
 
 ---

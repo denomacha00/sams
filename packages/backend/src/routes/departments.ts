@@ -32,22 +32,24 @@ departmentsRouter.post('/', requirePermission('manage:users'), async (req: Reque
 departmentsRouter.put('/:id', requirePermission('manage:users'), async (req: Request, res: Response): Promise<void> => {
   const parsed = createDeptSchema.safeParse(req.body);
   if (!parsed.success) { res.status(400).json({ error: 'Validation failed', code: 'VALIDATION_ERROR' }); return; }
-  const dept = await prisma.department.findUnique({ where: { id: req.params.id } });
+  const id = req.params.id as string;
+  const dept = await prisma.department.findUnique({ where: { id } });
   if (!dept || dept.schoolId !== req.schoolId) { res.status(404).json({ error: 'Not found', code: 'NOT_FOUND' }); return; }
-  const updated = await prisma.department.update({ where: { id: req.params.id }, data: { name: parsed.data.name } });
+  const updated = await prisma.department.update({ where: { id }, data: { name: parsed.data.name } });
   res.json(updated);
 });
 
 departmentsRouter.delete('/:id', requirePermission('manage:users'), async (req: Request, res: Response): Promise<void> => {
-  const dept = await prisma.department.findUnique({ where: { id: req.params.id } });
+  const id = req.params.id as string;
+  const dept = await prisma.department.findUnique({ where: { id } });
   if (!dept || dept.schoolId !== req.schoolId) { res.status(404).json({ error: 'Not found', code: 'NOT_FOUND' }); return; }
-  await prisma.class.deleteMany({ where: { departmentId: req.params.id } });
-  await prisma.department.delete({ where: { id: req.params.id } });
+  await prisma.class.deleteMany({ where: { departmentId: id } });
+  await prisma.department.delete({ where: { id } });
   res.status(204).send();
 });
 
 departmentsRouter.get('/:id/classes', async (req: Request, res: Response): Promise<void> => {
-  const classes = await prisma.class.findMany({ where: { departmentId: req.params.id, schoolId: req.schoolId } });
+  const classes = await prisma.class.findMany({ where: { departmentId: req.params.id as string, schoolId: req.schoolId } });
   res.json(classes);
 });
 
@@ -71,16 +73,18 @@ classesRouter.post('/', requirePermission('manage:users'), async (req: Request, 
 });
 
 classesRouter.put('/:id', requirePermission('manage:users'), async (req: Request, res: Response): Promise<void> => {
-  const cls = await prisma.class.findUnique({ where: { id: req.params.id } });
+  const id = req.params.id as string;
+  const cls = await prisma.class.findUnique({ where: { id } });
   if (!cls || cls.schoolId !== req.schoolId) { res.status(404).json({ error: 'Not found', code: 'NOT_FOUND' }); return; }
   const { name, capacity, departmentId } = req.body;
-  const updated = await prisma.class.update({ where: { id: req.params.id }, data: { ...(name && { name }), ...(capacity && { capacity }), ...(departmentId && { departmentId }) } });
+  const updated = await prisma.class.update({ where: { id }, data: { ...(name && { name }), ...(capacity && { capacity }), ...(departmentId && { departmentId }) } });
   res.json(updated);
 });
 
 classesRouter.delete('/:id', requirePermission('manage:users'), async (req: Request, res: Response): Promise<void> => {
-  const cls = await prisma.class.findUnique({ where: { id: req.params.id } });
+  const id = req.params.id as string;
+  const cls = await prisma.class.findUnique({ where: { id } });
   if (!cls || cls.schoolId !== req.schoolId) { res.status(404).json({ error: 'Not found', code: 'NOT_FOUND' }); return; }
-  await prisma.class.delete({ where: { id: req.params.id } });
+  await prisma.class.delete({ where: { id } });
   res.status(204).send();
 });

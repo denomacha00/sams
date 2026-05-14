@@ -1,6 +1,7 @@
 import { prisma } from '../index';
 import { AppError } from '../middleware/errors';
 import { RiskLevel } from '@sams/shared';
+import { notificationService } from './notificationService';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -26,10 +27,10 @@ export class RiskService {
    *   P = pattern risk (0-100, based on consecutive absences)
    *
    * Classification:
-   *   0-25: LOW
-   *   26-50: MEDIUM
-   *   51-75: HIGH
-   *   76-100: CRITICAL
+   *   score < 25: LOW
+   *   25 <= score < 50: MEDIUM
+   *   50 <= score < 75: HIGH
+   *   score >= 75: CRITICAL
    */
   async computeRiskScore(schoolId: string, studentId: string): Promise<RiskScoreResult> {
     const student = await prisma.user.findUnique({
@@ -60,6 +61,14 @@ export class RiskService {
     // Classify risk level
     const riskLevel = this._classifyRisk(score);
 
+    // Fetch previous risk score to detect level changes
+    const previousScore = await prisma.riskScore.findUnique({
+      where: { studentId },
+      select: { riskLevel: true },
+    });
+
+    const previousLevel = previousScore?.riskLevel as RiskLevel | undefined;
+
     // Upsert risk score in DB
     const now = new Date();
     await prisma.riskScore.upsert({
@@ -83,6 +92,11 @@ export class RiskService {
         computedAt: now,
       },
     });
+
+    // If risk level changed, notify Teacher and HOD (Requirement 11.5)
+    if (previousLevel && previousLevel !== riskLevel) {
+      await this._notifyRiskLevelChange(studentId, schoolId, previousLevel, riskLevel, score);
+    }
 
     return {
       studentId,
@@ -212,12 +226,70 @@ export class RiskService {
 
   /**
    * Classify risk level based on score.
+   * LOW: score < 25
+   * MEDIUM: 25 <= score < 50
+   * HIGH: 50 <= score < 75
+   * CRITICAL: score >= 75
    */
   private _classifyRisk(score: number): RiskLevel {
-    if (score <= 25) return RiskLevel.LOW;
-    if (score <= 50) return RiskLevel.MEDIUM;
-    if (score <= 75) return RiskLevel.HIGH;
+    if (score < 25) return RiskLevel.LOW;
+    if (score < 50) return RiskLevel.MEDIUM;
+    if (score < 75) return RiskLevel.HIGH;
     return RiskLevel.CRITICAL;
+  }
+
+  /**
+   * Notify Teacher and HOD when a student's risk level changes.
+   * Requirement 11.5
+   */
+  private async _notifyRiskLevelChange(
+    studentId: string,
+    schoolId: string,
+    previousLevel: RiskLevel,
+    newLevel: RiskLevel,
+    score: number,
+  ): Promise<void> {
+    // Get the student's details including class and department
+    const student = await prisma.user.findUnique({
+      where: { id: studentId },
+      select: { fullName: true, classId: true, departmentId: true, admissionNumber: true },
+    });
+
+    if (!student) return;
+
+    const message = `Risk level change: ${student.fullName} (${student.admissionNumber ?? 'N/A'}) moved from ${previousLevel} to ${newLevel} (score: ${score.toFixed(1)})`;
+
+    // Find the student's Teacher (teacher assigned to the student's class)
+    if (student.classId) {
+      const teachers = await prisma.user.findMany({
+        where: { schoolId, classId: student.classId, role: 'TEACHER' },
+        select: { id: true },
+      });
+
+      for (const teacher of teachers) {
+        await notificationService.sendInApp(teacher.id, {
+          title: 'Student Risk Level Changed',
+          message,
+          type: 'RISK_ALERT',
+        });
+      }
+    }
+
+    // Find the HOD for the student's department
+    if (student.departmentId) {
+      const hods = await prisma.user.findMany({
+        where: { schoolId, departmentId: student.departmentId, role: 'HOD' },
+        select: { id: true },
+      });
+
+      for (const hod of hods) {
+        await notificationService.sendInApp(hod.id, {
+          title: 'Student Risk Level Changed',
+          message,
+          type: 'RISK_ALERT',
+        });
+      }
+    }
   }
 }
 

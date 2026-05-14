@@ -14,8 +14,14 @@ export default defineConfig({
     port: 3000,
     proxy: {
       '/api': {
-        target: 'http://localhost:4000',
+        target: process.env.VITE_API_PROXY_TARGET || 'https://api.sams.ke',
         changeOrigin: true,
+        secure: false,
+      },
+      '/socket.io': {
+        target: process.env.VITE_API_PROXY_TARGET || 'https://api.sams.ke',
+        changeOrigin: true,
+        ws: true,
       },
     },
   },

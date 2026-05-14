@@ -1,7 +1,9 @@
 import React, { useState, useRef, useEffect } from 'react';
 import apiClient from '../services/apiClient';
+import { useAuthStore } from '../store/authStore';
 
 const BiometricEnrollPage: React.FC = () => {
+  const user = useAuthStore((s) => s.user);
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
@@ -12,6 +14,21 @@ const BiometricEnrollPage: React.FC = () => {
   const [success, setSuccess] = useState(false);
   const [step, setStep] = useState<'init' | 'blink' | 'capture'>('init');
   const [blinkDetected, setBlinkDetected] = useState(false);
+  const [featureGated, setFeatureGated] = useState(false);
+
+  // Check plan tier access
+  useEffect(() => {
+    const checkAccess = async () => {
+      try {
+        await apiClient.get('/biometric/templates/check-access');
+      } catch (err: any) {
+        if (err.response?.status === 403) {
+          setFeatureGated(true);
+        }
+      }
+    };
+    checkAccess();
+  }, []);
 
   // Load face-api.js models
   useEffect(() => {
@@ -92,7 +109,7 @@ const BiometricEnrollPage: React.FC = () => {
 
       const descriptor = Array.from(detection.descriptor as Float32Array);
 
-      // POST encrypted descriptor to server
+      // POST descriptor to server (server handles encryption)
       await apiClient.post('/biometric/enroll', {
         descriptor,
       });
@@ -110,38 +127,80 @@ const BiometricEnrollPage: React.FC = () => {
     return () => stopCamera();
   }, []);
 
+  if (featureGated) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 p-6">
+        <div className="max-w-lg mx-auto">
+          <div className="backdrop-blur-xl bg-white/5 border border-white/10 rounded-2xl p-8 text-center">
+            <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-yellow-500/20 border border-yellow-500/30 mb-4">
+              <svg className="w-8 h-8 text-yellow-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+              </svg>
+            </div>
+            <h2 className="text-xl font-bold text-white mb-2">Feature Unavailable</h2>
+            <p className="text-gray-400">
+              Biometric enrollment requires a Professional or Enterprise plan. Please upgrade your subscription to access this feature.
+            </p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <div className="min-h-screen bg-gray-50 p-6">
+    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 p-6">
       <div className="max-w-lg mx-auto">
-        <h1 className="text-2xl font-bold text-gray-900 mb-6">Biometric Enrollment</h1>
+        {/* Header */}
+        <div className="mb-8">
+          <h1 className="text-2xl font-bold text-white">Biometric Enrollment</h1>
+          <p className="text-gray-400 text-sm mt-1">Register your face for biometric attendance</p>
+        </div>
 
         {success && (
-          <div className="mb-4 p-3 bg-green-50 border border-green-200 rounded-md">
-            <p className="text-sm text-green-700">Face enrolled successfully!</p>
+          <div className="mb-4 p-4 bg-emerald-500/20 border border-emerald-400/30 rounded-xl backdrop-blur-sm text-center">
+            <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-emerald-500/30 mb-3">
+              <svg className="w-8 h-8 text-emerald-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+              </svg>
+            </div>
+            <p className="text-emerald-200 font-medium text-lg">Enrollment Complete</p>
+            <p className="text-gray-400 text-sm mt-1">Your face has been registered for biometric attendance.</p>
           </div>
         )}
 
         {error && (
-          <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-md">
-            <p className="text-sm text-red-700">{error}</p>
+          <div className="mb-4 p-3 bg-red-500/20 border border-red-400/30 rounded-xl backdrop-blur-sm">
+            <p className="text-sm text-red-200 text-center">{error}</p>
           </div>
         )}
 
-        <div className="bg-white rounded-lg shadow-md p-6">
+        <div className="backdrop-blur-xl bg-white/5 border border-white/10 rounded-2xl p-6">
           {!modelsLoaded && !error && (
             <div className="text-center py-8">
-              <p className="text-gray-600">Loading face detection models...</p>
+              <div className="flex items-center justify-center gap-3">
+                <svg className="animate-spin h-5 w-5 text-purple-400" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                </svg>
+                <p className="text-gray-400">Loading face detection models...</p>
+              </div>
             </div>
           )}
 
           {modelsLoaded && !cameraActive && !success && (
             <div className="text-center py-8">
-              <p className="text-gray-600 mb-4">
+              <div className="inline-flex items-center justify-center w-20 h-20 rounded-2xl bg-gradient-to-br from-blue-500/20 to-purple-500/20 border border-white/10 mb-4">
+                <svg className="w-10 h-10 text-purple-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                </svg>
+              </div>
+              <p className="text-gray-300 mb-6">
                 We'll capture your face for biometric attendance. Make sure you're in a well-lit area.
               </p>
               <button
                 onClick={startCamera}
-                className="bg-blue-600 text-white py-2 px-6 rounded-md hover:bg-blue-700"
+                className="bg-gradient-to-r from-blue-600 to-purple-600 text-white font-semibold py-3 px-8 rounded-xl shadow-lg shadow-purple-500/25 hover:scale-[1.02] active:scale-[0.98] transition-all duration-200"
               >
                 Start Camera
               </button>
@@ -150,21 +209,27 @@ const BiometricEnrollPage: React.FC = () => {
 
           {cameraActive && (
             <div>
-              <video
-                ref={videoRef}
-                className="w-full rounded-md mb-4"
-                playsInline
-                muted
-              />
+              <div className="relative rounded-2xl overflow-hidden mb-4">
+                <video
+                  ref={videoRef}
+                  className="w-full rounded-2xl"
+                  playsInline
+                  muted
+                />
+                {/* Face outline overlay */}
+                <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                  <div className="w-48 h-60 border-2 border-purple-400/50 rounded-full" />
+                </div>
+              </div>
               <canvas ref={canvasRef} className="hidden" />
 
               {step === 'blink' && !blinkDetected && (
                 <div className="text-center">
-                  <p className="text-gray-700 mb-3 font-medium">Liveness Check</p>
-                  <p className="text-gray-600 mb-4">Please blink your eyes, then press the button below.</p>
+                  <p className="text-white font-medium mb-2">Liveness Check</p>
+                  <p className="text-gray-400 text-sm mb-4">Please blink your eyes, then press the button below.</p>
                   <button
                     onClick={handleBlinkCheck}
-                    className="bg-yellow-500 text-white py-2 px-6 rounded-md hover:bg-yellow-600"
+                    className="bg-yellow-500/20 border border-yellow-500/30 text-yellow-300 font-semibold py-2.5 px-6 rounded-xl hover:bg-yellow-500/30 transition-all duration-200"
                   >
                     I Blinked
                   </button>
@@ -173,21 +238,31 @@ const BiometricEnrollPage: React.FC = () => {
 
               {step === 'capture' && (
                 <div className="text-center">
-                  <p className="text-green-600 mb-3 font-medium">✓ Liveness confirmed</p>
-                  <p className="text-gray-600 mb-4">Look directly at the camera and press capture.</p>
+                  <p className="text-emerald-300 font-medium mb-2">✓ Liveness confirmed</p>
+                  <p className="text-gray-400 text-sm mb-4">Look directly at the camera and press capture.</p>
                   <button
                     onClick={captureAndEnroll}
                     disabled={loading}
-                    className="bg-blue-600 text-white py-2 px-6 rounded-md hover:bg-blue-700 disabled:opacity-50"
+                    className="bg-gradient-to-r from-blue-600 to-purple-600 text-white font-semibold py-3 px-8 rounded-xl shadow-lg shadow-purple-500/25 hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200"
                   >
-                    {loading ? 'Processing...' : 'Capture & Enroll'}
+                    {loading ? (
+                      <span className="flex items-center justify-center gap-2">
+                        <svg className="animate-spin h-5 w-5" viewBox="0 0 24 24">
+                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                        </svg>
+                        Processing...
+                      </span>
+                    ) : (
+                      'Capture & Enroll'
+                    )}
                   </button>
                 </div>
               )}
 
               <button
                 onClick={stopCamera}
-                className="mt-4 w-full bg-gray-200 text-gray-700 py-2 px-4 rounded-md hover:bg-gray-300"
+                className="mt-4 w-full bg-white/10 border border-white/20 text-white py-2.5 px-4 rounded-xl hover:bg-white/20 transition-all duration-200"
               >
                 Cancel
               </button>
@@ -195,13 +270,25 @@ const BiometricEnrollPage: React.FC = () => {
           )}
 
           {success && (
-            <div className="text-center py-8">
-              <div className="text-green-500 text-5xl mb-4">✓</div>
-              <p className="text-lg font-medium text-gray-900">Enrollment Complete</p>
-              <p className="text-gray-600 mt-2">Your face has been registered for biometric attendance.</p>
+            <div className="text-center py-4">
+              <button
+                onClick={() => {
+                  setSuccess(false);
+                  setStep('init');
+                  setBlinkDetected(false);
+                }}
+                className="bg-gradient-to-r from-blue-600 to-purple-600 text-white font-semibold py-3 px-8 rounded-xl shadow-lg shadow-purple-500/25 hover:scale-[1.02] active:scale-[0.98] transition-all duration-200"
+              >
+                Enroll Another
+              </button>
             </div>
           )}
         </div>
+
+        {/* Footer */}
+        <p className="text-center text-xs text-gray-500 mt-8">
+          © 2025 SAMS · Developed by Denis Macharia
+        </p>
       </div>
     </div>
   );

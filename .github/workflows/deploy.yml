@@ -14,6 +14,31 @@ jobs:
     name: Test & Build
     runs-on: ubuntu-latest
 
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_USER: sams_test
+          POSTGRES_PASSWORD: sams_test_pass
+          POSTGRES_DB: sams_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+      redis:
+        image: redis:7
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -27,8 +52,24 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Generate Prisma client
+        run: npx prisma generate
+        working-directory: packages/backend
+
+      - name: Run database migrations
+        run: npx prisma migrate deploy
+        working-directory: packages/backend
+        env:
+          DATABASE_URL: postgresql://sams_test:sams_test_pass@localhost:5432/sams_test
+
       - name: Run tests
         run: npm run test --workspaces --if-present
+        env:
+          DATABASE_URL: postgresql://sams_test:sams_test_pass@localhost:5432/sams_test
+          REDIS_URL: redis://localhost:6379
+          JWT_SECRET: test-jwt-secret
+          QR_SECRET: test-qr-secret
+          NODE_ENV: test
 
       - name: Build all packages
         run: npm run build --workspaces --if-present
@@ -49,8 +90,8 @@ jobs:
           script: |
             cd /var/www/sams
             git pull origin main
-            npm ci
+            npm ci --production=false
             npm run build --workspaces --if-present
             cd packages/backend && npx prisma migrate deploy && cd ../..
-            pm2 reload ecosystem.config.js
+            pm2 reload ecosystem.config.js --env production
             sudo nginx -t && sudo systemctl reload nginx

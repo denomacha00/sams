@@ -1,4 +1,4 @@
-import { Router, type Request, type Response } from 'express';
+import { Router, type Request, type Response, type NextFunction } from 'express';
 import { z } from 'zod';
 import { createHash } from 'crypto';
 import { PlanTier } from '@prisma/client';
@@ -20,11 +20,40 @@ const extendLicenseSchema = z.object({
   newExpiry: z.string().datetime(),
 });
 
+// ─── Host Restriction Middleware ──────────────────────────────────────────────
+// Requirement 2.4, 15.1: Super Admin panel is accessible only via super.sams.ke.
+// In development/testing, the SUPER_ADMIN_HOST env var can override the allowed host.
+// If SUPER_ADMIN_HOST_CHECK is set to "disabled", the check is skipped entirely
+// (useful for local development and testing).
+
+function requireSuperAdminHost(req: Request, res: Response, next: NextFunction): void {
+  const hostCheckDisabled = process.env.SUPER_ADMIN_HOST_CHECK === 'disabled';
+  if (hostCheckDisabled) {
+    next();
+    return;
+  }
+
+  const allowedHost = process.env.SUPER_ADMIN_HOST || 'super.sams.ke';
+  const requestHost = req.hostname;
+
+  if (requestHost !== allowedHost) {
+    res.status(403).json({
+      error: 'Forbidden',
+      code: 'HOST_NOT_ALLOWED',
+      message: 'Super Admin routes are only accessible via the Super Admin panel.',
+    });
+    return;
+  }
+
+  next();
+}
+
 // ─── Router ───────────────────────────────────────────────────────────────────
 
 export const superAdminRouter = Router();
 
-// All routes require super:admin permission
+// Task 22.2: Restrict all /super/* routes to SUPER_ADMIN role AND super.sams.ke host
+superAdminRouter.use(requireSuperAdminHost);
 superAdminRouter.use(requirePermission('super:admin'));
 
 // ─── POST /super/licenses — Generate a new license key ────────────────────────
@@ -83,6 +112,122 @@ superAdminRouter.post('/licenses', async (req: Request, res: Response): Promise<
     planTier,
     expiresAt: expiryDate.toISOString(),
     message: 'License key generated. Store it securely — it cannot be retrieved again.',
+  });
+});
+
+// ─── GET /super/licenses — List all license keys ──────────────────────────────
+
+superAdminRouter.get('/licenses', async (req: Request, res: Response): Promise<void> => {
+  const { planTier, used, expired } = req.query;
+
+  const where: any = {};
+  if (planTier && typeof planTier === 'string') {
+    where.planTier = planTier;
+  }
+  if (used === 'true') {
+    where.usedAt = { not: null };
+  } else if (used === 'false') {
+    where.usedAt = null;
+  }
+  if (expired === 'true') {
+    where.expiresAt = { lt: new Date() };
+  } else if (expired === 'false') {
+    where.expiresAt = { gte: new Date() };
+  }
+
+  const licenses = await prisma.licenseKey.findMany({
+    where,
+    orderBy: { createdAt: 'desc' },
+    select: {
+      id: true,
+      planTier: true,
+      schoolName: true,
+      expiresAt: true,
+      usedAt: true,
+      usedBySchoolId: true,
+      createdAt: true,
+    },
+  });
+
+  res.json({ licenses, count: licenses.length });
+});
+
+// ─── POST /super/licenses/:id/revoke — Revoke a license key ──────────────────
+
+superAdminRouter.post('/licenses/:id/revoke', async (req: Request, res: Response): Promise<void> => {
+  const licenseId = req.params.id as string;
+
+  const license = await prisma.licenseKey.findUnique({
+    where: { id: licenseId },
+  });
+
+  if (!license) {
+    res.status(404).json({ error: 'License key not found', code: 'NOT_FOUND' });
+    return;
+  }
+
+  if (license.usedAt) {
+    res.status(400).json({
+      error: 'Cannot revoke a license key that has already been used',
+      code: 'LICENSE_ALREADY_USED',
+    });
+    return;
+  }
+
+  await prisma.licenseKey.delete({
+    where: { id: licenseId },
+  });
+
+  // Audit log
+  await auditService.log({
+    eventType: 'LICENSE_ACTIVATION',
+    actorId: req.user?.sub,
+    actorRole: req.user?.role,
+    resourceSnapshot: {
+      action: 'LICENSE_REVOKED',
+      licenseId,
+      schoolName: license.schoolName,
+      planTier: license.planTier,
+      revokedAt: new Date().toISOString(),
+    },
+  });
+
+  res.json({ message: 'License key revoked successfully', licenseId });
+});
+
+// ─── GET /super/analytics — System-wide analytics ─────────────────────────────
+
+superAdminRouter.get('/analytics', async (_req: Request, res: Response): Promise<void> => {
+  const [totalSchools, totalStudents, activeSessions, totalTeachers, totalUsers] = await Promise.all([
+    prisma.school.count(),
+    prisma.user.count({ where: { role: 'STUDENT' } }),
+    prisma.attendanceSession.count({ where: { isActive: true } }),
+    prisma.user.count({ where: { role: 'TEACHER' } }),
+    prisma.user.count(),
+  ]);
+
+  const schoolsByPlan = await prisma.school.groupBy({
+    by: ['planTier'],
+    _count: { id: true },
+  });
+
+  const suspendedSchools = await prisma.school.count({ where: { isSuspended: true } });
+  const expiredSchools = await prisma.school.count({
+    where: { licenseExpiresAt: { lt: new Date() } },
+  });
+
+  res.json({
+    totalSchools,
+    totalStudents,
+    totalTeachers,
+    totalUsers,
+    activeSessions,
+    suspendedSchools,
+    expiredSchools,
+    schoolsByPlan: schoolsByPlan.map((g) => ({
+      planTier: g.planTier,
+      count: g._count.id,
+    })),
   });
 });
 

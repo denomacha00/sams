@@ -21,6 +21,20 @@ export function registerServiceWorker(): void {
             });
           }
         });
+
+        // When device comes back online, notify SW to replay queued requests
+        window.addEventListener('online', () => {
+          if (navigator.serviceWorker.controller) {
+            navigator.serviceWorker.controller.postMessage({ type: 'REPLAY_QUEUE' });
+          }
+
+          // Also try Background Sync API if available
+          if ('sync' in registration) {
+            (registration as any).sync.register('replay-queue').catch(() => {
+              // Background Sync not supported or permission denied — message fallback is enough
+            });
+          }
+        });
       } catch (error) {
         console.error('[SW] Registration failed:', error);
       }

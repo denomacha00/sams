@@ -13,6 +13,7 @@ export interface DateRange {
 export interface StudentReportData {
   studentId: string;
   studentName: string;
+  totalSessions: number;
   totalExpected: number;
   totalPresent: number;
   totalLate: number;
@@ -24,6 +25,7 @@ export interface StudentReportData {
 export interface ClassReportData {
   classId: string;
   className: string;
+  totalSessions: number;
   students: StudentReportData[];
   averageAttendancePercentage: number;
 }
@@ -47,12 +49,13 @@ export interface SchoolReportData {
 export class ReportService {
   /**
    * Get attendance report for a single student.
-   * Attendance % = (present / expected) * 100
+   * Attendance % = (totalPresent / totalExpected) * 100, rounded to 2 dp
+   * Requirements: 10.1, 10.5, 10.7
    */
   async getStudentReport(schoolId: string, studentId: string, dateRange?: DateRange): Promise<StudentReportData> {
     const student = await prisma.user.findUnique({
       where: { id: studentId },
-      select: { id: true, fullName: true, schoolId: true },
+      select: { id: true, fullName: true, schoolId: true, classId: true },
     });
 
     if (!student) {
@@ -63,19 +66,19 @@ export class ReportService {
       throw new AppError(403, 'FORBIDDEN', 'Access to this resource is not allowed');
     }
 
-    const where: Record<string, unknown> = {
+    const recordWhere: Record<string, unknown> = {
       studentId,
       schoolId,
     };
 
     if (dateRange) {
-      where.scannedAt = {
+      recordWhere.scannedAt = {
         gte: dateRange.from,
         lte: dateRange.to,
       };
     }
 
-    const records = await prisma.attendanceRecord.findMany({ where });
+    const records = await prisma.attendanceRecord.findMany({ where: recordWhere });
 
     // Count total expected sessions for this student in the date range
     const sessionWhere: Record<string, unknown> = { schoolId };
@@ -86,32 +89,26 @@ export class ReportService {
       };
     }
 
-    // Get sessions for classes the student belongs to
-    const studentData = await prisma.user.findUnique({
-      where: { id: studentId },
-      select: { classId: true },
-    });
-
-    let totalExpected = 0;
-    if (studentData?.classId) {
-      totalExpected = await prisma.attendanceSession.count({
+    let totalSessions = 0;
+    if (student.classId) {
+      totalSessions = await prisma.attendanceSession.count({
         where: {
           ...sessionWhere,
-          classId: studentData.classId,
+          classId: student.classId,
         },
       });
     }
 
-    // If no sessions found, use records count as expected
-    if (totalExpected === 0) {
-      totalExpected = records.length;
-    }
+    // totalExpected is the number of sessions the student should have attended
+    const totalExpected = totalSessions > 0 ? totalSessions : records.length;
 
     const totalPresent = records.filter((r) => r.status === 'PRESENT').length;
     const totalLate = records.filter((r) => r.status === 'LATE').length;
     const totalExcused = records.filter((r) => r.status === 'EXCUSED').length;
     const totalAbsent = totalExpected - totalPresent - totalLate - totalExcused;
 
+    // Attendance percentage = (totalPresent / totalExpected) * 100, rounded to 2 dp
+    // Per Requirement 10.5: (Total Present / Total Expected) × 100
     const attendancePercentage = totalExpected > 0
       ? Math.round((totalPresent / totalExpected) * 100 * 100) / 100
       : 0;
@@ -119,6 +116,7 @@ export class ReportService {
     return {
       studentId,
       studentName: student.fullName,
+      totalSessions: totalExpected,
       totalExpected,
       totalPresent,
       totalLate,
@@ -130,6 +128,8 @@ export class ReportService {
 
   /**
    * Get attendance report for a class.
+   * Aggregates attendance data for all students in the class.
+   * Requirements: 10.2, 10.5, 10.7
    */
   async getClassReport(schoolId: string, classId: string, dateRange?: DateRange): Promise<ClassReportData> {
     const classData = await prisma.class.findUnique({
@@ -144,6 +144,16 @@ export class ReportService {
     if (classData.schoolId !== schoolId) {
       throw new AppError(403, 'FORBIDDEN', 'Access to this resource is not allowed');
     }
+
+    // Count total sessions for this class in the date range
+    const sessionWhere: Record<string, unknown> = { schoolId, classId };
+    if (dateRange) {
+      sessionWhere.startedAt = {
+        gte: dateRange.from,
+        lte: dateRange.to,
+      };
+    }
+    const totalSessions = await prisma.attendanceSession.count({ where: sessionWhere });
 
     // Get all students in this class
     const students = await prisma.user.findMany({
@@ -166,6 +176,7 @@ export class ReportService {
     return {
       classId,
       className: classData.name,
+      totalSessions,
       students: studentReports,
       averageAttendancePercentage,
     };
@@ -173,6 +184,8 @@ export class ReportService {
 
   /**
    * Get attendance report for a department.
+   * Aggregates attendance data across all classes in the department.
+   * Requirements: 10.3, 10.5, 10.7
    */
   async getDepartmentReport(schoolId: string, departmentId: string, dateRange?: DateRange): Promise<DepartmentReportData> {
     const department = await prisma.department.findUnique({
@@ -216,6 +229,8 @@ export class ReportService {
 
   /**
    * Get attendance report for the entire school.
+   * Aggregates attendance data across all departments in the school.
+   * Requirements: 10.4, 10.5, 10.7
    */
   async getSchoolReport(schoolId: string, dateRange?: DateRange): Promise<SchoolReportData> {
     const school = await prisma.school.findUnique({
@@ -254,13 +269,56 @@ export class ReportService {
   }
 
   /**
-   * Export report data to PDF or Excel format.
+   * Export report by reportId and format.
+   * reportId format: "type:schoolId:targetId" (e.g., "student:school-1:student-1")
+   * For school reports: "school:school-1"
+   * Accepts optional dateRange encoded as query params in the reportId or as a separate param.
+   * Requirements: 10.6
    */
-  async exportReport(data: StudentReportData | ClassReportData | DepartmentReportData | SchoolReportData, format: 'pdf' | 'excel'): Promise<Buffer> {
+  async exportReportById(reportId: string, format: 'pdf' | 'excel', dateRange?: DateRange): Promise<Buffer> {
+    const parts = reportId.split(':');
+    if (parts.length < 2) {
+      throw new AppError(400, 'INVALID_REPORT_ID', 'Report ID must be in format "type:schoolId:targetId"');
+    }
+
+    const [type, schoolId, targetId] = parts;
+
+    let reportData: StudentReportData | ClassReportData | DepartmentReportData | SchoolReportData;
+
+    switch (type) {
+      case 'student':
+        if (!targetId) throw new AppError(400, 'INVALID_REPORT_ID', 'Student report requires a targetId');
+        reportData = await this.getStudentReport(schoolId, targetId, dateRange);
+        break;
+      case 'class':
+        if (!targetId) throw new AppError(400, 'INVALID_REPORT_ID', 'Class report requires a targetId');
+        reportData = await this.getClassReport(schoolId, targetId, dateRange);
+        break;
+      case 'department':
+        if (!targetId) throw new AppError(400, 'INVALID_REPORT_ID', 'Department report requires a targetId');
+        reportData = await this.getDepartmentReport(schoolId, targetId, dateRange);
+        break;
+      case 'school':
+        reportData = await this.getSchoolReport(schoolId, dateRange);
+        break;
+      default:
+        throw new AppError(400, 'INVALID_REPORT_ID', `Unknown report type: ${type}`);
+    }
+
+    return this.exportReport(reportData, format);
+  }
+
+  /**
+   * Export report data to PDF, Excel, or CSV format.
+   * Requirements: 10.6
+   */
+  async exportReport(data: StudentReportData | ClassReportData | DepartmentReportData | SchoolReportData, format: 'pdf' | 'excel' | 'csv'): Promise<Buffer> {
     if (format === 'pdf') {
       return this._exportPDF(data);
-    } else {
+    } else if (format === 'excel') {
       return this._exportExcel(data);
+    } else {
+      return this._exportCSV(data);
     }
   }
 
@@ -383,6 +441,49 @@ export class ReportService {
 
     const buffer = await workbook.xlsx.writeBuffer();
     return Buffer.from(buffer);
+  }
+
+  private _exportCSV(data: StudentReportData | ClassReportData | DepartmentReportData | SchoolReportData): Promise<Buffer> {
+    const lines: string[] = [];
+
+    if ('studentName' in data) {
+      // Student report
+      lines.push('Metric,Value');
+      lines.push(`Student,"${this._escapeCSV(data.studentName)}"`);
+      lines.push(`Total Expected,${data.totalExpected}`);
+      lines.push(`Present,${data.totalPresent}`);
+      lines.push(`Late,${data.totalLate}`);
+      lines.push(`Excused,${data.totalExcused}`);
+      lines.push(`Absent,${data.totalAbsent}`);
+      lines.push(`Attendance %,${data.attendancePercentage}`);
+    } else if ('className' in data) {
+      // Class report
+      lines.push('Student,Expected,Present,Late,Excused,Absent,Attendance %');
+      for (const student of data.students) {
+        lines.push(
+          `"${this._escapeCSV(student.studentName)}",${student.totalExpected},${student.totalPresent},${student.totalLate},${student.totalExcused},${student.totalAbsent},${student.attendancePercentage}`,
+        );
+      }
+    } else if ('departmentName' in data) {
+      // Department report
+      lines.push('Class,Average Attendance %');
+      for (const cls of data.classes) {
+        lines.push(`"${this._escapeCSV(cls.className)}",${cls.averageAttendancePercentage}`);
+      }
+    } else {
+      // School report
+      lines.push('Department,Average Attendance %');
+      for (const dept of data.departments) {
+        lines.push(`"${this._escapeCSV(dept.departmentName)}",${dept.averageAttendancePercentage}`);
+      }
+    }
+
+    const csvContent = lines.join('\n');
+    return Promise.resolve(Buffer.from(csvContent, 'utf-8'));
+  }
+
+  private _escapeCSV(value: string): string {
+    return value.replace(/"/g, '""');
   }
 }
 

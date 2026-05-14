@@ -1,4 +1,4 @@
-import { Router, type Request, type Response } from 'express';
+import { Router, type Request, type Response, type NextFunction } from 'express';
 import { z } from 'zod';
 import { PlanTier } from '@sams/shared';
 import { requirePermission } from '../middleware/rbac';
@@ -14,6 +14,37 @@ const initiatePaymentSchema = z.object({
   accountReference: z.string().max(50).optional(),
 });
 
+// ─── M-Pesa IP Whitelist Middleware ───────────────────────────────────────────
+// Safaricom M-Pesa Daraja API callback IPs.
+// In production, only requests from these IPs are allowed.
+// In development/test, all IPs are allowed.
+
+const MPESA_ALLOWED_IPS = (process.env.MPESA_ALLOWED_IPS ?? '196.201.214.200,196.201.214.206,196.201.213.114,196.201.214.207,196.201.214.208,196.201.213.44,196.201.212.127,196.201.212.128,196.201.212.129,196.201.212.130,196.201.212.131,196.201.212.132,196.201.212.133,196.201.212.134,196.201.212.135,196.201.212.136,196.201.212.137,196.201.212.138')
+  .split(',')
+  .map((ip) => ip.trim())
+  .filter(Boolean);
+
+function mpesaIpWhitelist(req: Request, res: Response, next: NextFunction): void {
+  // Skip IP check in development/test
+  if (process.env.NODE_ENV !== 'production') {
+    next();
+    return;
+  }
+
+  const forwarded = req.headers['x-forwarded-for'];
+  const clientIp = typeof forwarded === 'string'
+    ? forwarded.split(',')[0].trim()
+    : req.ip ?? req.socket.remoteAddress ?? '';
+
+  if (!MPESA_ALLOWED_IPS.includes(clientIp)) {
+    console.warn(`[PaymentsRouter] Blocked callback from non-whitelisted IP: ${clientIp}`);
+    res.status(403).json({ error: 'Forbidden', code: 'IP_NOT_ALLOWED' });
+    return;
+  }
+
+  next();
+}
+
 // ─── Router ───────────────────────────────────────────────────────────────────
 
 export const paymentsRouter = Router();
@@ -21,6 +52,7 @@ export const paymentsRouter = Router();
 /**
  * POST /api/v1/payments/initiate
  * Initiate an M-Pesa STK Push payment.
+ * Requires auth: School Admin only (manage:payments permission).
  */
 paymentsRouter.post('/initiate', requirePermission('manage:payments'), async (req: Request, res: Response): Promise<void> => {
   const parsed = initiatePaymentSchema.safeParse(req.body);
@@ -44,9 +76,10 @@ paymentsRouter.post('/initiate', requirePermission('manage:payments'), async (re
 
 /**
  * POST /api/v1/payments/callback
- * M-Pesa callback endpoint (public, IP-whitelisted).
+ * M-Pesa callback endpoint (public, IP-whitelisted, no auth).
+ * Called by Safaricom's Daraja API after STK Push completes.
  */
-paymentsRouter.post('/callback', async (req: Request, res: Response): Promise<void> => {
+paymentsRouter.post('/callback', mpesaIpWhitelist, async (req: Request, res: Response): Promise<void> => {
   try {
     await paymentService.handleCallback(req.body);
     // M-Pesa expects a 200 response

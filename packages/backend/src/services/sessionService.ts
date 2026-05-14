@@ -2,6 +2,7 @@ import jwt from 'jsonwebtoken';
 import { createId } from '@paralleldrive/cuid2';
 import { prisma } from '../index';
 import { AppError } from '../middleware/errors';
+import { broadcastQRRefresh, broadcastSessionEnd } from '../sockets/attendanceSocket';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -108,6 +109,9 @@ export class SessionService {
         endedAt: new Date(),
       },
     });
+
+    // Broadcast session ended to session room
+    broadcastSessionEnd(sessionId);
   }
 
   /**
@@ -151,6 +155,9 @@ export class SessionService {
         qrRefreshedAt: new Date(),
       },
     });
+
+    // Broadcast QR refresh to subscribed clients
+    broadcastQRRefresh(sessionId, qrToken);
 
     return qrToken;
   }

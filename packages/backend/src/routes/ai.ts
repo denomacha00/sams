@@ -1,82 +1,83 @@
 import { Router, type Request, type Response } from 'express';
 import { z } from 'zod';
-import { prisma } from '../index';
-import { UserRole } from '@sams/shared';
+import { aiService } from '../services/aiService';
 
-const querySchema = z.object({ question: z.string().min(1) });
+// ─── Validation Schemas ───────────────────────────────────────────────────────
+
+const querySchema = z.object({
+  question: z.string().min(1, 'Question is required').max(1000, 'Question must be 1000 characters or less'),
+});
+
+const voiceSchema = z.object({
+  transcription: z.string().min(1, 'Transcription is required').max(2000, 'Transcription must be 2000 characters or less'),
+});
+
+// ─── Router ───────────────────────────────────────────────────────────────────
 
 export const aiRouter = Router();
 
 /**
  * POST /api/v1/ai/query
- * Simple local AI query engine — answers attendance questions based on role scope.
+ * Process a text query through the AI service.
+ * Routes to local engine first; falls back to OpenAI for Pro/Enterprise plans.
+ *
+ * Requirements: 14.1
  */
 aiRouter.post('/query', async (req: Request, res: Response): Promise<void> => {
   const parsed = querySchema.safeParse(req.body);
   if (!parsed.success) {
-    res.status(400).json({ error: 'Question is required', code: 'VALIDATION_ERROR' });
+    res.status(400).json({
+      error: parsed.error.errors[0]?.message ?? 'Validation error',
+      code: 'VALIDATION_ERROR',
+    });
     return;
   }
 
   const { question } = parsed.data;
   const user = req.user;
-  const schoolId = req.schoolId;
-  const q = question.toLowerCase();
 
   try {
-    let answer = '';
-
-    // Attendance percentage queries
-    if (q.includes('attendance') && (q.includes('rate') || q.includes('percentage') || q.includes('%'))) {
-      const totalRecords = await prisma.attendanceRecord.count({ where: { schoolId } });
-      const presentRecords = await prisma.attendanceRecord.count({ where: { schoolId, status: 'PRESENT' } });
-      const lateRecords = await prisma.attendanceRecord.count({ where: { schoolId, status: 'LATE' } });
-      const rate = totalRecords > 0 ? (((presentRecords + lateRecords) / totalRecords) * 100).toFixed(1) : '0';
-      answer = `The overall attendance rate is ${rate}% (${presentRecords + lateRecords} present/late out of ${totalRecords} total records).`;
-    }
-    // Who is absent / missing
-    else if (q.includes('absent') || q.includes('missing') || q.includes('who')) {
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
-      const absentRecords = await prisma.attendanceRecord.findMany({
-        where: { schoolId, status: 'ABSENT', scannedAt: { gte: today } },
-        include: { student: { select: { fullName: true } } },
-        take: 10,
-      });
-      if (absentRecords.length === 0) {
-        answer = 'No absent students recorded today.';
-      } else {
-        const names = absentRecords.map((r) => r.student.fullName).join(', ');
-        answer = `${absentRecords.length} students marked absent today: ${names}`;
-      }
-    }
-    // How many students / teachers
-    else if (q.includes('how many') && (q.includes('student') || q.includes('teacher') || q.includes('user'))) {
-      const students = await prisma.user.count({ where: { schoolId, role: 'STUDENT' } });
-      const teachers = await prisma.user.count({ where: { schoolId, role: 'TEACHER' } });
-      const hods = await prisma.user.count({ where: { schoolId, role: 'HOD' } });
-      answer = `Your school has ${students} students, ${teachers} teachers, and ${hods} HODs.`;
-    }
-    // Sessions today
-    else if (q.includes('session') && (q.includes('today') || q.includes('how many'))) {
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
-      const sessions = await prisma.attendanceSession.count({ where: { schoolId, startedAt: { gte: today } } });
-      answer = `${sessions} attendance sessions have been held today.`;
-    }
-    // Risk / at risk
-    else if (q.includes('risk') || q.includes('dropout')) {
-      const highRisk = await prisma.riskScore.count({ where: { schoolId, riskLevel: { in: ['HIGH', 'CRITICAL'] } } });
-      answer = `There are ${highRisk} students currently at high or critical risk of dropout.`;
-    }
-    // Default
-    else {
-      answer = `I can help you with:\n• Attendance rates and percentages\n• Absent students today\n• Student/teacher counts\n• Sessions held today\n• Risk scores\n\nTry asking: "What is the attendance rate?" or "Who is absent today?"`;
-    }
-
-    res.json({ answer });
+    const result = await aiService.query(user, question);
+    res.json(result);
   } catch (err) {
     console.error('[AI] Query error:', err);
-    res.json({ answer: 'Sorry, I encountered an error processing your question. Please try again.' });
+    res.status(500).json({
+      answer: 'Sorry, I encountered an error processing your question. Please try again.',
+      intent: 'error',
+      engine: 'local',
+    });
+  }
+});
+
+/**
+ * POST /api/v1/ai/voice
+ * Process a voice query (client-side speech-to-text transcription).
+ * Accepts the transcribed text and processes it through the AI service.
+ *
+ * Requirements: 14.1, 14.6
+ */
+aiRouter.post('/voice', async (req: Request, res: Response): Promise<void> => {
+  const parsed = voiceSchema.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({
+      error: parsed.error.errors[0]?.message ?? 'Validation error',
+      code: 'VALIDATION_ERROR',
+    });
+    return;
+  }
+
+  const { transcription } = parsed.data;
+  const user = req.user;
+
+  try {
+    const result = await aiService.voiceQuery(user, transcription);
+    res.json(result);
+  } catch (err) {
+    console.error('[AI] Voice query error:', err);
+    res.status(500).json({
+      answer: 'Sorry, I encountered an error processing your voice query. Please try again.',
+      intent: 'error',
+      engine: 'local',
+    });
   }
 });

@@ -2,6 +2,7 @@ import React from 'react';
 import ReactDOM from 'react-dom/client';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import './index.css';
+import { UserRole } from '@sams/shared';
 
 import AuthGuard from './components/AuthGuard';
 import LoginPage from './pages/LoginPage';
@@ -39,7 +40,7 @@ ReactDOM.createRoot(document.getElementById('root') as HTMLElement).render(
         <Route path="/activate" element={<ActivationPage />} />
         <Route path="/register/:token" element={<RegisterPage />} />
 
-        {/* Protected routes */}
+        {/* Protected routes — any authenticated user */}
         <Route element={<AuthGuard />}>
           <Route path="/dashboard" element={<DashboardPage />} />
           <Route path="/sessions" element={<SessionPage />} />
@@ -51,8 +52,10 @@ ReactDOM.createRoot(document.getElementById('root') as HTMLElement).render(
           <Route path="/risk-scores" element={<RiskScorePage />} />
           <Route path="/ai" element={<AIAssistantPage />} />
           <Route path="/settings" element={<SettingsPage />} />
+        </Route>
 
-          {/* Admin routes */}
+        {/* Admin routes — restricted to SCHOOL_ADMIN and HOD roles */}
+        <Route element={<AuthGuard allowedRoles={[UserRole.SCHOOL_ADMIN, UserRole.HOD]} />}>
           <Route path="/admin" element={<AdminDashboardPage />} />
           <Route path="/admin/users" element={<UserManagementPage />} />
           <Route path="/admin/links" element={<RegistrationLinksPage />} />
