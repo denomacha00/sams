@@ -53,23 +53,12 @@ export class AIService {
       };
     }
 
-    // Local engine couldn't resolve — check if OpenAI/Groq is available
-    // Super Admin always gets AI access; for schools, check plan tier
-    let hasAIAccess = false;
-    try {
-      if (user.role === 'SUPER_ADMIN') {
-        hasAIAccess = true;
-      } else {
-        hasAIAccess = await licenseService.checkFeatureAccess(user.schoolId, 'ai');
-      }
-    } catch (err) {
-      console.error('[AIService] License check failed:', err);
-      // If license check fails, still allow if OPENAI_API_KEY is set
-      hasAIAccess = !!process.env.OPENAI_API_KEY;
-    }
+    // Local engine couldn't resolve — ALWAYS try Groq/OpenRouter for any question
+    // This makes the AI answer anything (physics, math, general knowledge, etc.)
+    const hasAPIKey = !!process.env.OPENAI_API_KEY;
 
-    if (!hasAIAccess) {
-      // Return the local engine's "unknown" response with help text
+    if (!hasAPIKey) {
+      // No API key configured — return help text
       return {
         answer: localResult.answer,
         intent: 'unknown',
@@ -77,7 +66,7 @@ export class AIService {
       };
     }
 
-    // Route to OpenAI engine for Pro/Enterprise plans
+    // Route to Groq/OpenRouter for ALL unknown questions
     try {
       const openaiResult = await openaiQuery(user, question);
 

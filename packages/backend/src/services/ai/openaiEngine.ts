@@ -485,21 +485,6 @@ export async function openaiQuery(
   user: AccessTokenPayload,
   question: string,
 ): Promise<OpenAIQueryResult> {
-  // Skip feature access check for SUPER_ADMIN
-  if (user.role !== 'SUPER_ADMIN') {
-    try {
-      const hasAccess = await licenseService.checkFeatureAccess(user.schoolId, 'ai');
-      if (!hasAccess) {
-        return {
-          answer: 'Advanced AI features are only available on Professional and Enterprise plans. Your query has been processed using the local engine.',
-          intent: 'feature_gated',
-        };
-      }
-    } catch {
-      // If license check fails, continue anyway
-    }
-  }
-
   const client = getOpenAIClient();
   const systemPrompt = buildSystemPrompt(user);
 
