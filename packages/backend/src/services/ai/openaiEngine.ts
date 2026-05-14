@@ -18,7 +18,9 @@ function getOpenAIClient(): OpenAI {
   if (!apiKey) {
     throw new Error('OPENAI_API_KEY environment variable is not set');
   }
-  return new OpenAI({ apiKey });
+  // Support Groq, OpenRouter, or any OpenAI-compatible API via OPENAI_BASE_URL
+  const baseURL = process.env.OPENAI_BASE_URL || 'https://api.groq.com/openai/v1';
+  return new OpenAI({ apiKey, baseURL });
 }
 
 // ─── System Prompt Builder ────────────────────────────────────────────────────
