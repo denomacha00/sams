@@ -9,7 +9,8 @@ export const aiRouter = Router();
 /**
  * POST /api/v1/ai/query
  * Process a text-based AI query.
- * Requires authentication (handled by global middleware).
+ * Allows unauthenticated requests but only for about_sams intent.
+ * Authenticated users get full AI access.
  * Requirement 14.1
  */
 aiRouter.post('/query', async (req: Request, res: Response): Promise<void> => {
@@ -18,6 +19,40 @@ aiRouter.post('/query', async (req: Request, res: Response): Promise<void> => {
 
     if (!question || typeof question !== 'string' || !question.trim()) {
       throw new AppError(400, 'VALIDATION_ERROR', 'A non-empty "question" field is required.');
+    }
+
+    // If user is not authenticated, only answer basic about_sams questions
+    if (!req.user) {
+      const aboutSamsPatterns = [
+        /what is sams/i,
+        /about sams/i,
+        /tell me about/i,
+        /how does sams work/i,
+        /sams features/i,
+        /what can sams do/i,
+        /sams system/i,
+        /smart attendance/i,
+        /help/i,
+      ];
+
+      const isAboutSams = aboutSamsPatterns.some((p) => p.test(question.trim()));
+
+      if (!isAboutSams) {
+        res.status(200).json({
+          answer: 'Please log in to access full AI assistant features. I can only answer basic questions about SAMS without authentication.\n\nTry asking: "What is SAMS?" or "What can SAMS do?"',
+          intent: 'auth_required',
+          engine: 'local',
+        });
+        return;
+      }
+
+      // Provide a static about_sams response for unauthenticated users
+      res.status(200).json({
+        answer: `SAMS (Smart Attendance Management System) is a multi-school enterprise platform for Kenyan institutions.\n\n**Key Features:**\n• QR Code attendance scanning\n• GPS-verified attendance\n• Biometric (fingerprint/face) verification\n• Real-time attendance tracking\n• Risk score analysis for at-risk students\n• AI-powered insights and reports\n• Multi-tenant (supports multiple schools)\n• SMS & email notifications\n• Offline-capable mobile support\n\n**User Roles:**\n• Super Admin — manages all schools\n• School Admin — manages one school\n• HOD — manages a department\n• Teacher — manages classes & sessions\n• Student — scans attendance\n\nFor more details, please log in or contact your school administrator.`,
+        intent: 'about_sams',
+        engine: 'local',
+      });
+      return;
     }
 
     const result = await aiService.query(req.user, question.trim());

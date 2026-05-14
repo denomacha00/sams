@@ -143,7 +143,7 @@ const LoginPage: React.FC = () => {
 
               <div>
                 <label htmlFor="identifier" className="block text-sm font-semibold text-gray-300 mb-1.5">
-                  Email or Admission Number
+                  Username or Phone Number
                 </label>
                 <input
                   id="identifier"
@@ -152,7 +152,7 @@ const LoginPage: React.FC = () => {
                   onChange={(e) => setIdentifier(e.target.value)}
                   required
                   className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-teal-500/40 focus:border-teal-400 transition-all duration-200"
-                  placeholder="Enter email or admission number"
+                  placeholder="Enter username, phone, or admission number"
                 />
               </div>
 
@@ -198,8 +198,11 @@ const LoginPage: React.FC = () => {
               </button>
             </form>
 
-            <div className="mt-6 pt-6 border-t border-white/10 text-center">
-              <Link to="/activate" className="text-sm text-teal-400 hover:text-teal-300 font-semibold transition-colors">
+            <div className="mt-6 pt-6 border-t border-white/10 text-center space-y-3">
+              <Link to="/forgot-password" className="block text-sm text-gray-400 hover:text-teal-300 font-medium transition-colors">
+                Forgot your password?
+              </Link>
+              <Link to="/activate" className="block text-sm text-teal-400 hover:text-teal-300 font-semibold transition-colors">
                 Activate a new school →
               </Link>
             </div>

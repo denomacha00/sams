@@ -37,7 +37,10 @@ const generateLinkSchema = z.object({
 
 const registerViaLinkSchema = z.object({
   fullName: z.string().min(1).max(200),
-  admissionNumber: z.string().min(1).max(50),
+  username: z.string().min(3).max(50),
+  phone: z.string().min(9).max(15).optional(),
+  password: z.string().min(8),
+  admissionNumber: z.string().min(1).max(50).optional(),
 });
 
 // ─── Router ───────────────────────────────────────────────────────────────────
@@ -284,8 +287,7 @@ registrationLinksRouter.post('/:token/register', async (req: Request, res: Respo
   try {
     const user = await registrationLinkService.registerViaLink(
       req.params.token as string,
-      parsed.data.fullName,
-      parsed.data.admissionNumber,
+      parsed.data,
     );
     res.status(201).json(user);
   } catch (err) {

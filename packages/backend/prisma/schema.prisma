@@ -99,6 +99,7 @@ model School {
   auditLogs         AuditLog[]
   payments          Payment[]
   riskScores        RiskScore[]
+  notifications     Notification[]
 }
 
 model User {
@@ -107,10 +108,13 @@ model User {
   school                 School    @relation(fields: [schoolId], references: [id])
   role                   UserRole
   fullName               String
+  username               String?   @unique
   email                  String?
   phone                  String?
   admissionNumber        String? // Students only
   passwordHash           String
+  passwordResetToken     String?
+  passwordResetExpires   DateTime?
   departmentId           String?
   department             Department? @relation(fields: [departmentId], references: [id])
   classId                String?
@@ -128,6 +132,7 @@ model User {
   sessionsStarted   AttendanceSession[] @relation("SessionTeacher")
   auditLogsActed    AuditLog[]          @relation("AuditActor")
   timetableEntries  TimetableEntry[]
+  notifications     Notification[]
 
   @@unique([schoolId, admissionNumber])
   @@index([schoolId, role])
@@ -318,5 +323,25 @@ model Payment {
   initiatedAt        DateTime      @default(now())
   completedAt        DateTime?
 
+  @@index([schoolId])
+}
+
+
+// ─── Notifications ────────────────────────────────────────────────────────────
+
+model Notification {
+  id        String   @id @default(cuid())
+  schoolId  String
+  userId    String
+  title     String
+  message   String
+  type      String   @default("MESSAGE")
+  read      Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  user   User   @relation(fields: [userId], references: [id])
+  school School @relation(fields: [schoolId], references: [id])
+
+  @@index([userId, read])
   @@index([schoolId])
 }

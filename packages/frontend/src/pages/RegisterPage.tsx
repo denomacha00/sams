@@ -16,8 +16,9 @@ const RegisterPage: React.FC = () => {
   const navigate = useNavigate();
   const [linkMeta, setLinkMeta] = useState<LinkMeta | null>(null);
   const [fullName, setFullName] = useState('');
-  const [identifier, setIdentifier] = useState('');
+  const [username, setUsername] = useState('');
   const [phone, setPhone] = useState('');
+  const [admissionNumber, setAdmissionNumber] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [resolving, setResolving] = useState(true);
@@ -39,7 +40,6 @@ const RegisterPage: React.FC = () => {
   }, [token]);
 
   const isStudent = linkMeta?.targetRole === 'STUDENT';
-  const isTeacherOrHOD = linkMeta?.targetRole === 'TEACHER' || linkMeta?.targetRole === 'HOD';
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -49,9 +49,10 @@ const RegisterPage: React.FC = () => {
     try {
       await apiClient.post(`/registration-links/${token}/register`, {
         fullName,
-        admissionNumber: identifier,
+        username,
         phone: phone || undefined,
         password,
+        admissionNumber: isStudent ? admissionNumber : undefined,
       });
       setSuccess(true);
       setTimeout(() => navigate('/login', { replace: true }), 2000);
@@ -96,7 +97,7 @@ const RegisterPage: React.FC = () => {
             <svg className="w-8 h-8 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z" /></svg>
           </div>
           <h1 className="text-2xl font-bold text-white">
-            {isStudent ? 'Student Registration' : isTeacherOrHOD ? 'Staff Registration' : 'Registration'}
+            {isStudent ? 'Student Registration' : 'Staff Registration'}
           </h1>
           <p className="text-gray-400 text-sm mt-1">
             Registering as <span className="text-teal-400 font-medium">{linkMeta?.targetRole}</span>
@@ -158,44 +159,44 @@ const RegisterPage: React.FC = () => {
               />
             </div>
 
-            {/* Different field based on role */}
-            {isStudent ? (
+            <div>
+              <label className="block text-sm font-semibold text-gray-300 mb-1.5">Username *</label>
+              <input
+                type="text"
+                value={username}
+                onChange={(e) => setUsername(e.target.value.toLowerCase().replace(/\s/g, ''))}
+                required
+                minLength={3}
+                className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-teal-500/40 focus:border-teal-400 transition-all"
+                placeholder="Choose a username"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-semibold text-gray-300 mb-1.5">Phone Number *</label>
+              <input
+                type="tel"
+                value={phone}
+                onChange={(e) => setPhone(e.target.value)}
+                required
+                className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-teal-500/40 focus:border-teal-400 transition-all"
+                placeholder="+254 7XX XXX XXX"
+              />
+            </div>
+
+            {/* Admission Number field for students only */}
+            {isStudent && (
               <div>
-                <label className="block text-sm font-semibold text-gray-300 mb-1.5">Admission Number *</label>
+                <label className="block text-sm font-semibold text-gray-300 mb-1.5">Admission Number (ADM) *</label>
                 <input
                   type="text"
-                  value={identifier}
-                  onChange={(e) => setIdentifier(e.target.value)}
+                  value={admissionNumber}
+                  onChange={(e) => setAdmissionNumber(e.target.value)}
                   required
                   className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-teal-500/40 focus:border-teal-400 transition-all"
                   placeholder="e.g. ADM/2024/001"
                 />
               </div>
-            ) : (
-              <>
-                <div>
-                  <label className="block text-sm font-semibold text-gray-300 mb-1.5">Work ID / Staff Number *</label>
-                  <input
-                    type="text"
-                    value={identifier}
-                    onChange={(e) => setIdentifier(e.target.value)}
-                    required
-                    className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-teal-500/40 focus:border-teal-400 transition-all"
-                    placeholder="e.g. TSC/12345"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-semibold text-gray-300 mb-1.5">Phone Number *</label>
-                  <input
-                    type="tel"
-                    value={phone}
-                    onChange={(e) => setPhone(e.target.value)}
-                    required
-                    className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-teal-500/40 focus:border-teal-400 transition-all"
-                    placeholder="+254 7XX XXX XXX"
-                  />
-                </div>
-              </>
             )}
 
             <div>

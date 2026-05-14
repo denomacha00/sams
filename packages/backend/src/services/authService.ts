@@ -67,13 +67,15 @@ export class AuthService {
       throw new Error('INVALID_CREDENTIALS');
     }
 
-    // 2. Find user by email OR admissionNumber within that school
+    // 2. Find user by email OR admissionNumber OR username OR phone within that school
     const user = await prisma.user.findFirst({
       where: {
         schoolId: school.id,
         OR: [
           { email: identifier },
           { admissionNumber: identifier },
+          { username: identifier },
+          { phone: identifier },
         ],
       },
     });

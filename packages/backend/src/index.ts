@@ -20,6 +20,7 @@ import { superAdminRouter } from './routes/superAdmin';
 import { departmentsRouter, classesRouter } from './routes/departments';
 import { aiRouter } from './routes/ai';
 import { biometricRouter } from './routes/biometric';
+import { notificationsRouter } from './routes/notifications';
 import { setupAttendanceSocket } from './sockets/attendanceSocket';
 import { startQRRefreshJob, stopQRRefreshJob } from './jobs/qrRefresh';
 import { startNotificationJob, stopNotificationJob } from './jobs/notifications';
@@ -61,9 +62,11 @@ app.get('/health', (_req, res) => {
 const PUBLIC_PATHS = [
   '/api/v1/auth/login',
   '/api/v1/auth/refresh',
+  '/api/v1/auth/forgot-password',
   '/api/v1/activate',
   '/api/v1/registration-links/',
   '/api/v1/payments/callback',
+  '/api/v1/ai/query',
 ];
 
 function isPublicPath(path: string): boolean {
@@ -94,6 +97,7 @@ app.use('/api/v1/departments', departmentsRouter);
 app.use('/api/v1/classes', classesRouter);
 app.use('/api/v1/ai', aiRouter);
 app.use('/api/v1/biometric', biometricRouter);
+app.use('/api/v1/notifications', notificationsRouter);
 app.use('/api/v1/super', superAdminRouter);
 
 // ─── Socket.io ────────────────────────────────────────────────────────────────

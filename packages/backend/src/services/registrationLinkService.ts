@@ -23,7 +23,10 @@ export interface GenerateLinkOptions {
 
 export interface RegisterViaLinkData {
   fullName: string;
-  admissionNumber: string;
+  username: string;
+  phone?: string;
+  password: string;
+  admissionNumber?: string; // Required for students
 }
 
 export interface AddStudentManuallyData {
@@ -138,26 +141,39 @@ export class RegistrationLinkService {
 
   /**
    * Register a new user via a registration link.
-   * Validates the link, checks for duplicate admission number (409 DUPLICATE_ADMISSION),
-   * hashes the admissionNumber as the default password, creates the user,
-   * and increments the link's useCount.
+   * Validates the link, checks for duplicate username/admission number,
+   * hashes the password, creates the user, and increments the link's useCount.
    *
    * Requirements: 4.9
    */
-  async registerViaLink(token: string, fullName: string, admissionNumber: string) {
+  async registerViaLink(token: string, data: RegisterViaLinkData) {
+    const { fullName, username, phone, password, admissionNumber } = data;
+
     // Validate the link
     const link = await this.resolveLink(token);
 
-    // Check for duplicate admission number within the school
-    const existingUser = await prisma.user.findFirst({
-      where: {
-        schoolId: link.schoolId,
-        admissionNumber,
-      },
-    });
+    // Check for duplicate username globally
+    if (username) {
+      const existingUsername = await prisma.user.findUnique({
+        where: { username },
+      });
+      if (existingUsername) {
+        throw new AppError(409, 'DUPLICATE_USERNAME', 'A user with this username already exists');
+      }
+    }
 
-    if (existingUser) {
-      throw new AppError(409, 'DUPLICATE_ADMISSION', 'A user with this admission number already exists');
+    // Check for duplicate admission number within the school (students)
+    if (admissionNumber) {
+      const existingUser = await prisma.user.findFirst({
+        where: {
+          schoolId: link.schoolId,
+          admissionNumber,
+        },
+      });
+
+      if (existingUser) {
+        throw new AppError(409, 'DUPLICATE_ADMISSION', 'A user with this admission number already exists');
+      }
     }
 
     // If registering a student, check the plan limit
@@ -165,8 +181,8 @@ export class RegistrationLinkService {
       await licenseService.checkStudentLimit(link.schoolId);
     }
 
-    // Hash admissionNumber as default password
-    const passwordHash = await bcrypt.hash(admissionNumber, BCRYPT_ROUNDS);
+    // Hash the provided password
+    const passwordHash = await bcrypt.hash(password, BCRYPT_ROUNDS);
 
     // Create the user
     const user = await prisma.user.create({
@@ -174,7 +190,9 @@ export class RegistrationLinkService {
         schoolId: link.schoolId,
         role: link.targetRole,
         fullName,
-        admissionNumber,
+        username,
+        phone: phone ?? null,
+        admissionNumber: admissionNumber ?? null,
         passwordHash,
         classId: link.classId ?? null,
         departmentId: null,

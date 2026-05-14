@@ -1,15 +1,19 @@
 import { Router, type Request, type Response } from 'express';
 import { z } from 'zod';
+import crypto from 'crypto';
+import bcrypt from 'bcrypt';
 import { authenticate } from '../middleware/auth';
 import { loginRateLimiter } from '../middleware/loginRateLimiter';
 import { authService } from '../services/authService';
+import { prisma } from '../index';
+import { notificationService } from '../services/notificationService';
 
 // ─── Validation Schemas ───────────────────────────────────────────────────────
 
 const loginSchema = z.object({
   schoolCode: z.string().min(3),
   identifier: z.string().min(1),
-  password: z.string().min(8),
+  password: z.string().min(1),
 });
 
 const refreshSchema = z.object({
@@ -18,6 +22,11 @@ const refreshSchema = z.object({
 
 const logoutSchema = z.object({
   refreshToken: z.string().min(1),
+});
+
+const forgotPasswordSchema = z.object({
+  schoolCode: z.string().min(3),
+  identifier: z.string().min(1),
 });
 
 // ─── Error Code → HTTP Status Mapping ────────────────────────────────────────
@@ -137,6 +146,94 @@ authRouter.post('/logout', authenticate, async (req: Request, res: Response): Pr
     res.status(500).json({
       error: 'Logout failed',
       code,
+      requestId: req.id,
+    });
+  }
+});
+
+/**
+ * POST /api/v1/auth/forgot-password
+ * Generate a temporary password and send via SMS/email.
+ */
+authRouter.post('/forgot-password', async (req: Request, res: Response): Promise<void> => {
+  const parsed = forgotPasswordSchema.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({
+      error: 'Validation failed',
+      code: 'VALIDATION_ERROR',
+      details: parsed.error.flatten().fieldErrors,
+      requestId: req.id,
+    });
+    return;
+  }
+
+  const { schoolCode, identifier } = parsed.data;
+
+  try {
+    // Find school
+    const school = await prisma.school.findUnique({ where: { schoolCode } });
+    if (!school) {
+      // Don't reveal whether school exists
+      res.status(200).json({ message: 'If the account exists, a reset link has been sent.' });
+      return;
+    }
+
+    // Find user by identifier within school
+    const user = await prisma.user.findFirst({
+      where: {
+        schoolId: school.id,
+        OR: [
+          { email: identifier },
+          { admissionNumber: identifier },
+          { username: identifier },
+          { phone: identifier },
+        ],
+      },
+    });
+
+    if (!user) {
+      // Don't reveal whether user exists
+      res.status(200).json({ message: 'If the account exists, a reset link has been sent.' });
+      return;
+    }
+
+    // Generate a temporary password
+    const tempPassword = crypto.randomBytes(4).toString('hex'); // 8-char hex string
+    const passwordHash = await bcrypt.hash(tempPassword, 12);
+
+    // Store the new password hash and set a reset token for tracking
+    await prisma.user.update({
+      where: { id: user.id },
+      data: {
+        passwordHash,
+        passwordResetToken: crypto.randomBytes(32).toString('hex'),
+        passwordResetExpires: new Date(Date.now() + 24 * 60 * 60 * 1000), // 24 hours
+      },
+    });
+
+    // Send temporary password via SMS if phone exists
+    if (user.phone) {
+      await notificationService.sendSMS(
+        user.phone,
+        `SAMS Password Reset: Your temporary password is ${tempPassword}. Please login and change it immediately.`,
+      );
+    }
+
+    // Send via email if email exists
+    if (user.email) {
+      await notificationService.sendEmail(
+        user.email,
+        'SAMS Password Reset',
+        `<p>Your temporary password is: <strong>${tempPassword}</strong></p><p>Please login and change your password immediately.</p>`,
+      );
+    }
+
+    res.status(200).json({ message: 'If the account exists, a reset link has been sent.' });
+  } catch (err) {
+    console.error('[Auth] Forgot password error:', err);
+    res.status(500).json({
+      error: 'Failed to process password reset',
+      code: 'INTERNAL_ERROR',
       requestId: req.id,
     });
   }
