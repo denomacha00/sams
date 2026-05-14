@@ -480,3 +480,278 @@ superAdminRouter.get('/audit-logs', async (req: Request, res: Response): Promise
 
   res.json({ logs, count: logs.length });
 });
+
+// ─── POST /super/ai-action — Execute admin actions via AI ─────────────────────
+
+const aiActionSchema = z.object({
+  action: z.enum([
+    'generate_license',
+    'suspend_school',
+    'unsuspend_school',
+    'extend_license',
+    'get_school_info',
+    'get_system_stats',
+  ]),
+  params: z.record(z.unknown()).default({}),
+});
+
+superAdminRouter.post('/ai-action', async (req: Request, res: Response): Promise<void> => {
+  const parsed = aiActionSchema.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({
+      error: 'Validation failed',
+      code: 'VALIDATION_ERROR',
+      details: parsed.error.flatten().fieldErrors,
+    });
+    return;
+  }
+
+  const { action, params } = parsed.data;
+
+  try {
+    switch (action) {
+      case 'generate_license': {
+        const planTier = (params.planTier as string) || 'BASIC';
+        const schoolName = (params.schoolName as string) || 'Unnamed School';
+        const daysValid = (params.daysValid as number) || 365;
+
+        const expiresAt = new Date();
+        expiresAt.setDate(expiresAt.getDate() + daysValid);
+
+        const validTiers = ['TRIAL', 'BASIC', 'PROFESSIONAL', 'ENTERPRISE'];
+        if (!validTiers.includes(planTier)) {
+          res.status(400).json({
+            error: `Invalid plan tier "${planTier}". Must be one of: ${validTiers.join(', ')}`,
+            code: 'INVALID_PLAN_TIER',
+          });
+          return;
+        }
+
+        const secret = process.env.LICENSE_SECRET || process.env.JWT_SECRET || 'default-license-secret';
+        const rawKey = encodeLicenseKey(
+          { schoolName, planTier: planTier as any, expiresAt },
+          secret,
+        );
+
+        const keyHash = createHash('sha256').update(rawKey).digest('hex');
+
+        await prisma.licenseKey.create({
+          data: {
+            keyHash,
+            planTier: planTier as any,
+            schoolName,
+            expiresAt,
+          },
+        });
+
+        await auditService.log({
+          eventType: 'LICENSE_ACTIVATION',
+          actorId: req.user?.sub,
+          actorRole: req.user?.role,
+          resourceSnapshot: {
+            action: 'LICENSE_GENERATED_VIA_AI',
+            schoolName,
+            planTier,
+            expiresAt: expiresAt.toISOString(),
+          },
+        });
+
+        res.json({
+          message: `✅ License generated successfully!\n\n**License Key:** \`${rawKey}\`\n\n**Details:**\n• School: ${schoolName}\n• Plan: ${planTier}\n• Expires: ${expiresAt.toLocaleDateString()}\n\n⚠️ Store this key securely — it cannot be retrieved again.`,
+          result: { licenseKey: rawKey, schoolName, planTier, expiresAt: expiresAt.toISOString() },
+        });
+        return;
+      }
+
+      case 'suspend_school': {
+        const schoolName = params.schoolName as string;
+        if (!schoolName) {
+          res.status(400).json({ error: 'School name is required', code: 'MISSING_PARAM' });
+          return;
+        }
+
+        const school = await prisma.school.findFirst({
+          where: { name: { contains: schoolName, mode: 'insensitive' } },
+        });
+
+        if (!school) {
+          res.status(404).json({
+            error: `School "${schoolName}" not found. Please check the name and try again.`,
+            code: 'NOT_FOUND',
+          });
+          return;
+        }
+
+        if (school.isSuspended) {
+          res.json({ message: `⚠️ School "${school.name}" is already suspended.` });
+          return;
+        }
+
+        await licenseService.suspendSchool(school.id);
+
+        res.json({
+          message: `✅ School "${school.name}" has been suspended.\n\n• All active sessions revoked\n• Users cannot log in\n• Audit log entry created`,
+          result: { schoolId: school.id, schoolName: school.name, action: 'suspended' },
+        });
+        return;
+      }
+
+      case 'unsuspend_school': {
+        const schoolName = params.schoolName as string;
+        if (!schoolName) {
+          res.status(400).json({ error: 'School name is required', code: 'MISSING_PARAM' });
+          return;
+        }
+
+        const school = await prisma.school.findFirst({
+          where: { name: { contains: schoolName, mode: 'insensitive' } },
+        });
+
+        if (!school) {
+          res.status(404).json({
+            error: `School "${schoolName}" not found. Please check the name and try again.`,
+            code: 'NOT_FOUND',
+          });
+          return;
+        }
+
+        if (!school.isSuspended) {
+          res.json({ message: `ℹ️ School "${school.name}" is not currently suspended.` });
+          return;
+        }
+
+        await prisma.school.update({
+          where: { id: school.id },
+          data: { isSuspended: false },
+        });
+
+        await auditService.log({
+          eventType: 'SCHOOL_SUSPENDED',
+          actorId: req.user?.sub,
+          actorRole: req.user?.role,
+          schoolId: school.id,
+          resourceSnapshot: {
+            schoolId: school.id,
+            schoolName: school.name,
+            action: 'SCHOOL_UNSUSPENDED_VIA_AI',
+            unsuspendedAt: new Date().toISOString(),
+          },
+        });
+
+        res.json({
+          message: `✅ School "${school.name}" has been unsuspended.\n\n• Users can now log in\n• Full access restored`,
+          result: { schoolId: school.id, schoolName: school.name, action: 'unsuspended' },
+        });
+        return;
+      }
+
+      case 'extend_license': {
+        const schoolName = params.schoolName as string;
+        const daysToAdd = (params.daysToAdd as number) || 30;
+
+        if (!schoolName) {
+          res.status(400).json({ error: 'School name is required', code: 'MISSING_PARAM' });
+          return;
+        }
+
+        const school = await prisma.school.findFirst({
+          where: { name: { contains: schoolName, mode: 'insensitive' } },
+        });
+
+        if (!school) {
+          res.status(404).json({
+            error: `School "${schoolName}" not found. Please check the name and try again.`,
+            code: 'NOT_FOUND',
+          });
+          return;
+        }
+
+        const currentExpiry = school.licenseExpiresAt;
+        const baseDate = currentExpiry > new Date() ? currentExpiry : new Date();
+        const newExpiry = new Date(baseDate);
+        newExpiry.setDate(newExpiry.getDate() + daysToAdd);
+
+        await licenseService.extendLicense(school.id, newExpiry);
+
+        res.json({
+          message: `✅ License extended for "${school.name}".\n\n• Previous expiry: ${currentExpiry.toLocaleDateString()}\n• New expiry: ${newExpiry.toLocaleDateString()}\n• Days added: ${daysToAdd}\n• Read-only mode cleared`,
+          result: {
+            schoolId: school.id,
+            schoolName: school.name,
+            previousExpiry: currentExpiry.toISOString(),
+            newExpiry: newExpiry.toISOString(),
+            daysAdded: daysToAdd,
+          },
+        });
+        return;
+      }
+
+      case 'get_school_info': {
+        const schoolName = params.schoolName as string;
+        if (!schoolName) {
+          res.status(400).json({ error: 'School name is required', code: 'MISSING_PARAM' });
+          return;
+        }
+
+        const school = await prisma.school.findFirst({
+          where: { name: { contains: schoolName, mode: 'insensitive' } },
+          include: {
+            _count: { select: { users: true, sessions: true, payments: true } },
+          },
+        });
+
+        if (!school) {
+          res.status(404).json({
+            error: `School "${schoolName}" not found.`,
+            code: 'NOT_FOUND',
+          });
+          return;
+        }
+
+        res.json({
+          message: `📋 **School Info: ${school.name}**\n\n• ID: ${school.id}\n• Code: ${school.schoolCode}\n• Plan: ${school.planTier}\n• License Expires: ${school.licenseExpiresAt.toLocaleDateString()}\n• Suspended: ${school.isSuspended ? 'Yes ⚠️' : 'No ✅'}\n• Read-Only: ${school.isReadOnly ? 'Yes' : 'No'}\n• Total Users: ${(school as any)._count.users}\n• Total Sessions: ${(school as any)._count.sessions}\n• Total Payments: ${(school as any)._count.payments}\n• Created: ${school.createdAt.toLocaleDateString()}`,
+          result: school,
+        });
+        return;
+      }
+
+      case 'get_system_stats': {
+        const [totalSchools, totalStudents, totalTeachers, activeSessions, suspendedSchools] =
+          await Promise.all([
+            prisma.school.count(),
+            prisma.user.count({ where: { role: 'STUDENT' } }),
+            prisma.user.count({ where: { role: 'TEACHER' } }),
+            prisma.attendanceSession.count({ where: { isActive: true } }),
+            prisma.school.count({ where: { isSuspended: true } }),
+          ]);
+
+        const revenue = await prisma.payment.aggregate({
+          where: { status: 'SUCCESS' },
+          _sum: { amount: true },
+        });
+
+        res.json({
+          message: `📊 **System Stats**\n\n• Schools: ${totalSchools}\n• Students: ${totalStudents}\n• Teachers: ${totalTeachers}\n• Active Sessions: ${activeSessions}\n• Suspended: ${suspendedSchools}\n• Revenue: KES ${(revenue._sum.amount || 0).toLocaleString()}`,
+          result: {
+            totalSchools,
+            totalStudents,
+            totalTeachers,
+            activeSessions,
+            suspendedSchools,
+            totalRevenue: revenue._sum.amount || 0,
+          },
+        });
+        return;
+      }
+
+      default:
+        res.status(400).json({ error: `Unknown action: ${action}`, code: 'UNKNOWN_ACTION' });
+    }
+  } catch (err: any) {
+    console.error('[SuperAdmin/AI-Action] Error:', err);
+    res.status(500).json({
+      error: err.message || 'Failed to execute action',
+      code: 'ACTION_FAILED',
+    });
+  }
+});

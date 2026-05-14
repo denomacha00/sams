@@ -1,6 +1,7 @@
 import React from 'react';
 import { Routes, Route, Link, useNavigate } from 'react-router-dom';
 import AuthGuard from './components/AuthGuard';
+import SuperAdminAI from './components/SuperAdminAI';
 import LoginPage from './pages/LoginPage';
 import DashboardPage from './pages/DashboardPage';
 import LicenseGeneratorPage from './pages/LicenseGeneratorPage';
@@ -73,6 +74,9 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
       <main className="flex-1 p-8 overflow-y-auto">
         {children}
       </main>
+
+      {/* AI Assistant */}
+      <SuperAdminAI />
     </div>
   );
 };

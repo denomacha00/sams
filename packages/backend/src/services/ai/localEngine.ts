@@ -21,6 +21,8 @@ export type DetectedIntent =
   | 'student_count'
   | 'session_status'
   | 'about_sams'
+  | 'super_admin_help'
+  | 'system_stats'
   | 'unknown';
 
 // ─── Intent Detection ─────────────────────────────────────────────────────────
@@ -40,6 +42,50 @@ const INTENT_PATTERNS: { intent: DetectedIntent; patterns: RegExp[] }[] = [
       /what\s*does\s*sams\s*do/i,
       /sams\s*features/i,
       /describe\s*sams/i,
+    ],
+  },
+  {
+    intent: 'super_admin_help',
+    patterns: [
+      /how\s*to\s*generate\s*(a\s*)?license/i,
+      /how\s*to\s*suspend/i,
+      /how\s*to\s*unsuspend/i,
+      /how\s*to\s*extend/i,
+      /how\s*to\s*fix/i,
+      /how\s*to\s*delete\s*(a\s*)?school/i,
+      /how\s*to\s*revoke/i,
+      /troubleshoot/i,
+      /common\s*problems/i,
+      /system\s*architecture/i,
+      /tech\s*stack/i,
+      /how\s*does\s*the\s*backend\s*work/i,
+      /how\s*does\s*the\s*system\s*work/i,
+      /admin\s*guide/i,
+      /help\s*me\s*with/i,
+      /what\s*tech/i,
+      /infrastructure/i,
+      /why\s*is\s*(a\s*)?school\s*not\s*working/i,
+      /school\s*not\s*working/i,
+      /how\s*to\s*manage/i,
+    ],
+  },
+  {
+    intent: 'system_stats',
+    patterns: [
+      /system\s*stats/i,
+      /how\s*many\s*schools/i,
+      /total\s*revenue/i,
+      /platform\s*stats/i,
+      /platform\s*overview/i,
+      /system\s*overview/i,
+      /any\s*suspended\s*schools/i,
+      /suspended\s*schools/i,
+      /total\s*students/i,
+      /total\s*teachers/i,
+      /active\s*schools/i,
+      /school\s*count/i,
+      /how\s*many\s*users/i,
+      /dashboard\s*stats/i,
     ],
   },
   {
@@ -1140,6 +1186,282 @@ Developed by Denis Macharia for Kenyan schools. Ask me anything specific!`;
   };
 }
 
+// ─── Super Admin Help Handler ─────────────────────────────────────────────────
+
+function handleSuperAdminHelp(question: string): AIQueryResult {
+  const q = question.toLowerCase();
+
+  if (/tech\s*stack|architecture|infrastructure|how\s*does\s*the\s*(backend|system)\s*work|what\s*tech/i.test(q)) {
+    return {
+      answer: `🏗️ **SAMS System Architecture**
+
+**Frontend (Super Admin Panel):**
+• React 18 + TypeScript + Vite
+• Tailwind CSS for styling
+• Zustand for state management
+• Axios for API calls
+• Hosted at super.sams.ke
+
+**Frontend (School Panel):**
+• React 18 + TypeScript + Vite
+• Tailwind CSS + React Router
+• PWA with offline support
+• WebSocket for real-time updates
+
+**Backend:**
+• Node.js + Express + TypeScript
+• Prisma ORM with PostgreSQL
+• Redis for caching & session management
+• Socket.io for real-time WebSocket
+• JWT authentication with refresh tokens
+• Role-based access control (RBAC)
+
+**Infrastructure:**
+• PM2 for process management
+• Nginx reverse proxy
+• PostgreSQL database
+• Redis cache
+• M-Pesa payment integration (Daraja API)
+
+**Security:**
+• Host-restricted Super Admin routes (super.sams.ke only)
+• AES-256 biometric encryption
+• Rate limiting on login
+• Audit logging for all admin actions
+• License key hashing (SHA-256)
+
+**Shared Package (@sams/shared):**
+• TypeScript types, enums, and utilities
+• License key encoding/decoding
+• Shared between frontend and backend`,
+      intent: 'super_admin_help',
+    };
+  }
+
+  if (/how\s*to\s*generate\s*(a\s*)?license/i.test(q)) {
+    return {
+      answer: `📋 **How to Generate a License Key**
+
+1. Go to **License Generator** page in the sidebar
+2. Fill in the form:
+   • **School Name** — The name of the school this license is for
+   • **Plan Tier** — TRIAL, BASIC, PROFESSIONAL, or ENTERPRISE
+   • **Expiry Date** — When the license should expire
+3. Click **Generate License Key**
+4. ⚠️ **IMPORTANT**: Copy the license key immediately! It cannot be retrieved again (only the hash is stored)
+5. Send the license key to the school administrator for activation
+
+**Via AI (me):** You can say "generate a license for Basic plan" and I'll help you execute it.
+
+**Plan Limits:**
+• TRIAL: 50 students
+• BASIC: 500 students
+• PROFESSIONAL: 2,000 students
+• ENTERPRISE: Unlimited`,
+      intent: 'super_admin_help',
+    };
+  }
+
+  if (/how\s*to\s*suspend/i.test(q)) {
+    return {
+      answer: `🚫 **How to Suspend a School**
+
+1. Go to **Schools** page in the sidebar
+2. Find the school you want to suspend
+3. Click on the school to view details
+4. Click **Suspend** button
+5. Confirm the action
+
+**What happens when a school is suspended:**
+• All active attendance sessions are immediately revoked
+• Users cannot log in or perform any actions
+• The school is marked as suspended in the database
+• An audit log entry is created
+
+**Via AI (me):** You can say "suspend school [name]" and I'll execute it.
+
+**To unsuspend:** Go to the school details and click "Unsuspend", or tell me "unsuspend school [name]".`,
+      intent: 'super_admin_help',
+    };
+  }
+
+  if (/how\s*to\s*extend/i.test(q)) {
+    return {
+      answer: `📅 **How to Extend a School's License**
+
+1. Go to **Schools** page in the sidebar
+2. Find the school whose license you want to extend
+3. Click on the school to view details
+4. Click **Extend License** button
+5. Set the new expiry date
+6. Confirm
+
+**What happens:**
+• The license expiry date is updated
+• If the school was in read-only mode (expired), full access is restored
+• An audit log entry is created
+
+**Via AI (me):** You can say "extend license for [school name] by 30 days" and I'll execute it.
+
+**Note:** If a school's license expires, it automatically enters read-only mode. Extending the license restores full access.`,
+      intent: 'super_admin_help',
+    };
+  }
+
+  if (/troubleshoot|common\s*problems|why\s*is.*not\s*working|how\s*to\s*fix/i.test(q)) {
+    return {
+      answer: `🔧 **Common Problems & Troubleshooting**
+
+**1. School can't log in:**
+• Check if the school is suspended → Unsuspend it
+• Check if the license has expired → Extend the license
+• Check if the school was activated properly
+
+**2. License key not working:**
+• License keys are one-time use — check if already used
+• Check if the key has expired
+• Verify the school name matches exactly
+
+**3. Attendance not recording:**
+• Check if there's an active session for the class
+• Verify the student's GPS is within range
+• Check if the school is in read-only mode (expired license)
+
+**4. School in read-only mode:**
+• This happens when the license expires
+• Extend the license to restore full access
+
+**5. Payment not reflecting:**
+• Check M-Pesa callback status in audit logs
+• Verify the payment reference number
+• Check if the callback URL is correctly configured
+
+**6. QR code not scanning:**
+• QR codes refresh every 30 seconds for security
+• Ensure the student's device camera has permission
+• Check if the session is still active
+
+**Need more help?** Ask me about specific issues!`,
+      intent: 'super_admin_help',
+    };
+  }
+
+  // Default admin guide
+  return {
+    answer: `📖 **Super Admin Guide**
+
+Here's what you can do as a Super Admin:
+
+**License Management:**
+• Generate new license keys for schools
+• Revoke unused license keys
+• View all licenses and their status
+
+**School Management:**
+• View all registered schools
+• Suspend/unsuspend schools
+• Extend school licenses
+• Delete schools (⚠️ irreversible)
+
+**Monitoring:**
+• View platform-wide analytics
+• Check revenue by plan tier
+• View audit logs for all actions
+• Monitor active sessions across schools
+
+**Quick Commands (tell me):**
+• "how many schools" — Get platform stats
+• "suspend school X" — Suspend a school
+• "extend license for X" — Extend a license
+• "generate a license for Basic plan" — Generate a key
+• "system architecture" — View tech stack
+• "common problems" — Troubleshooting guide
+
+What would you like help with?`,
+    intent: 'super_admin_help',
+  };
+}
+
+// ─── System Stats Handler ─────────────────────────────────────────────────────
+
+async function handleSystemStats(): Promise<AIQueryResult> {
+  const [
+    totalSchools,
+    totalStudents,
+    totalTeachers,
+    totalUsers,
+    activeSessions,
+    suspendedSchools,
+    expiredSchools,
+  ] = await Promise.all([
+    prisma.school.count(),
+    prisma.user.count({ where: { role: 'STUDENT' } }),
+    prisma.user.count({ where: { role: 'TEACHER' } }),
+    prisma.user.count(),
+    prisma.attendanceSession.count({ where: { isActive: true } }),
+    prisma.school.count({ where: { isSuspended: true } }),
+    prisma.school.count({ where: { licenseExpiresAt: { lt: new Date() } } }),
+  ]);
+
+  const revenue = await prisma.payment.aggregate({
+    where: { status: 'SUCCESS' },
+    _sum: { amount: true },
+    _count: { id: true },
+  });
+
+  const totalRevenue = revenue._sum.amount || 0;
+  const totalPayments = revenue._count.id || 0;
+
+  const schoolsByPlan = await prisma.school.groupBy({
+    by: ['planTier'],
+    _count: { id: true },
+  });
+
+  const planBreakdown = schoolsByPlan
+    .map((g: any) => `  • ${g.planTier}: ${g._count.id} school(s)`)
+    .join('\n');
+
+  const answer = `📊 **SAMS Platform Statistics**
+
+**Schools:**
+• Total Schools: ${totalSchools}
+• Active Schools: ${totalSchools - suspendedSchools - expiredSchools}
+• Suspended Schools: ${suspendedSchools}
+• Expired Licenses: ${expiredSchools}
+
+**Users:**
+• Total Users: ${totalUsers}
+• Students: ${totalStudents}
+• Teachers: ${totalTeachers}
+
+**Activity:**
+• Active Sessions Right Now: ${activeSessions}
+
+**Revenue:**
+• Total Revenue: KES ${totalRevenue.toLocaleString()}
+• Total Payments: ${totalPayments}
+
+**Plan Distribution:**
+${planBreakdown || '  • No schools registered yet'}`;
+
+  return {
+    answer,
+    intent: 'system_stats',
+    data: {
+      totalSchools,
+      totalStudents,
+      totalTeachers,
+      totalUsers,
+      activeSessions,
+      suspendedSchools,
+      expiredSchools,
+      totalRevenue,
+      totalPayments,
+      schoolsByPlan: schoolsByPlan.map((g: any) => ({ planTier: g.planTier, count: g._count.id })),
+    },
+  };
+}
+
 // ─── Local Engine ─────────────────────────────────────────────────────────────
 
 /**
@@ -1158,6 +1480,10 @@ export async function localQuery(
     switch (intent) {
       case 'about_sams':
         return handleAboutSams();
+      case 'super_admin_help':
+        return handleSuperAdminHelp(question);
+      case 'system_stats':
+        return await handleSystemStats();
       case 'attendance_percentage':
         return await handleAttendancePercentage(scope);
       case 'absent_students':
@@ -1181,7 +1507,7 @@ export async function localQuery(
       case 'unknown':
       default:
         return {
-          answer: `I can help you with:\n• About SAMS ("what is SAMS", "what can you do")\n• Attendance rates and percentages\n• Absent students today\n• Risk scores and at-risk students\n• Top students by attendance\n• Class attendance comparison\n• Generate timetable ("generate timetable" for whole school, or "generate timetable for Form 1A")\n• Remake timetable ("remake timetable", "regenerate timetable")\n• View timetable ("show my timetable")\n• Student count ("how many students")\n• Active sessions ("who is teaching now")\n\nTry asking: "What is SAMS?" or "Generate timetable for the whole school"`,
+          answer: `I can help you with:\n• About SAMS ("what is SAMS", "what can you do")\n• Attendance rates and percentages\n• Absent students today\n• Risk scores and at-risk students\n• Top students by attendance\n• Class attendance comparison\n• Generate timetable ("generate timetable" for whole school, or "generate timetable for Form 1A")\n• Remake timetable ("remake timetable", "regenerate timetable")\n• View timetable ("show my timetable")\n• Student count ("how many students")\n• Active sessions ("who is teaching now")\n• System stats ("how many schools", "total revenue")\n• Admin guides ("how to generate a license", "how to suspend a school")\n\nTry asking: "What is SAMS?" or "Generate timetable for the whole school"`,
           intent: 'unknown',
         };
     }
