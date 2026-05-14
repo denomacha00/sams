@@ -13,13 +13,23 @@ export interface OpenAIQueryResult {
 
 // ─── OpenAI Client ────────────────────────────────────────────────────────────
 
+/**
+ * Multi-provider AI client with automatic fallback.
+ * Priority: Primary (OPENAI_API_KEY) → Fallback (OPENAI_FALLBACK_KEY)
+ */
 function getOpenAIClient(): OpenAI {
   const apiKey = process.env.OPENAI_API_KEY;
   if (!apiKey) {
     throw new Error('OPENAI_API_KEY environment variable is not set');
   }
-  // Support Groq, OpenRouter, or any OpenAI-compatible API via OPENAI_BASE_URL
   const baseURL = process.env.OPENAI_BASE_URL || 'https://api.groq.com/openai/v1';
+  return new OpenAI({ apiKey, baseURL });
+}
+
+function getFallbackClient(): OpenAI | null {
+  const apiKey = process.env.OPENAI_FALLBACK_KEY;
+  if (!apiKey) return null;
+  const baseURL = process.env.OPENAI_FALLBACK_URL || 'https://openrouter.ai/api/v1';
   return new OpenAI({ apiKey, baseURL });
 }
 
@@ -514,9 +524,29 @@ export async function openaiQuery(
       intent: 'openai_response',
     };
   } catch (err) {
-    console.error('[AI/Groq] Error:', err);
+    console.error('[AI/Primary] Error, trying fallback:', (err as Error).message);
 
-    // Return a helpful fallback instead of an error message
+    // Try fallback provider (OpenRouter)
+    const fallback = getFallbackClient();
+    if (fallback) {
+      try {
+        const fallbackResponse = await fallback.chat.completions.create({
+          model: process.env.OPENAI_FALLBACK_MODEL ?? 'meta-llama/llama-3.1-8b-instruct:free',
+          messages,
+          temperature: 0.3,
+          max_tokens: 1000,
+        });
+
+        const fallbackAnswer = fallbackResponse.choices[0]?.message?.content;
+        if (fallbackAnswer) {
+          return { answer: fallbackAnswer, intent: 'openai_response' };
+        }
+      } catch (fallbackErr) {
+        console.error('[AI/Fallback] Also failed:', (fallbackErr as Error).message);
+      }
+    }
+
+    // Both failed — return helpful fallback
     return {
       answer: `I can help you with:\n• "What is SAMS?" — learn about the system\n• "How many students?" — get counts\n• "Show my timetable" — view schedule\n• "Generate timetable" — create timetables\n• "Who is absent today?" — check attendance\n• "Risk scores" — view at-risk students\n\nPlease try one of these, or rephrase your question.`,
       intent: 'fallback',
