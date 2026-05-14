@@ -3,6 +3,7 @@ import { localQuery, type AIQueryResult } from './ai/localEngine';
 import { openaiQuery } from './ai/openaiEngine';
 import { licenseService } from './licenseService';
 
+
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 export interface AIServiceResponse {
@@ -28,8 +29,19 @@ export class AIService {
    * Routes to local engine first; falls back to OpenAI for Pro/Enterprise.
    */
   async query(user: AccessTokenPayload, question: string): Promise<AIServiceResponse> {
-    // Try local engine first
-    const localResult = await localQuery(user, question);
+    // Try local engine first — wrapped in try-catch so it never throws
+    let localResult: AIQueryResult;
+    try {
+      localResult = await localQuery(user, question);
+    } catch (err) {
+      console.error('[AIService] Local engine error:', err);
+      // Return a helpful fallback instead of throwing
+      return {
+        answer: `I can help you with:\n• Attendance rates and percentages\n• Absent students today\n• Risk scores and at-risk students\n• Top students by attendance\n• Class attendance comparison\n• Timetable viewing and generation\n• Student counts\n• Active session status\n\nTry asking: "What is the attendance rate?" or "Show my timetable"`,
+        intent: 'error_fallback',
+        engine: 'local',
+      };
+    }
 
     // If local engine resolved the query, return it
     if (localResult.intent !== 'unknown') {
@@ -42,7 +54,12 @@ export class AIService {
     }
 
     // Local engine couldn't resolve — check if OpenAI is available
-    const hasAIAccess = await licenseService.checkFeatureAccess(user.schoolId, 'ai');
+    let hasAIAccess = false;
+    try {
+      hasAIAccess = await licenseService.checkFeatureAccess(user.schoolId, 'ai');
+    } catch (err) {
+      console.error('[AIService] License check failed:', err);
+    }
 
     if (!hasAIAccess) {
       // Return the local engine's "unknown" response with help text
