@@ -194,7 +194,7 @@ registrationLinksRouter.post('/', async (req: Request, res: Response): Promise<v
       req.schoolId,
       req.user.departmentId,
       parsed.data.classId || undefined,
-      { expiryDays: parsed.data.expiryDays, maxUses: parsed.data.maxUses, targetRole: (req.body as any).targetRole || undefined },
+      { expiryDays: parsed.data.expiryDays, maxUses: parsed.data.maxUses, targetRole: (req.body as any).targetRole || undefined } as any,
     );
     res.status(201).json(link);
   } catch (err) {
@@ -253,7 +253,7 @@ registrationLinksRouter.delete('/:id', async (req: Request, res: Response): Prom
     return;
   }
   try {
-    const id = req.params.id as string;
+    const id = String(req.params.id);
     const link = await prisma.registrationLink.findUnique({ where: { id } });
     if (!link || link.schoolId !== req.schoolId) {
       res.status(404).json({ error: 'Link not found', code: 'NOT_FOUND' });
