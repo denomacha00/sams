@@ -21,37 +21,28 @@ aiRouter.post('/query', async (req: Request, res: Response): Promise<void> => {
       throw new AppError(400, 'VALIDATION_ERROR', 'A non-empty "question" field is required.');
     }
 
-    // If user is not authenticated, only answer basic about_sams questions
+    // If user is not authenticated, use a guest user context
     if (!req.user) {
-      const aboutSamsPatterns = [
-        /what is sams/i,
-        /about sams/i,
-        /tell me about/i,
-        /how does sams work/i,
-        /sams features/i,
-        /what can sams do/i,
-        /sams system/i,
-        /smart attendance/i,
-        /help/i,
-      ];
+      // Create a guest user payload for the AI service
+      const guestUser = {
+        sub: 'guest',
+        schoolId: 'guest',
+        role: 'STUDENT' as any,
+        iat: 0,
+        exp: 0,
+      };
 
-      const isAboutSams = aboutSamsPatterns.some((p) => p.test(question.trim()));
-
-      if (!isAboutSams) {
+      try {
+        const { localQuery } = require('../services/ai/localEngine');
+        const result = await localQuery(guestUser, question.trim());
+        res.status(200).json(result);
+      } catch {
         res.status(200).json({
-          answer: 'Please log in to access full AI assistant features. I can only answer basic questions about SAMS without authentication.\n\nTry asking: "What is SAMS?" or "What can SAMS do?"',
-          intent: 'auth_required',
+          answer: `SAMS (Smart Attendance Management System) is a multi-school platform for Kenyan institutions.\n\nFeatures: QR attendance, GPS verification, biometric, real-time tracking, AI insights, reports, SMS notifications, offline support.\n\nRoles: Super Admin, School Admin, HOD, Teacher, Student.\n\nLog in to access personalized features like attendance data, timetables, and risk scores.`,
+          intent: 'about_sams',
           engine: 'local',
         });
-        return;
       }
-
-      // Provide a static about_sams response for unauthenticated users
-      res.status(200).json({
-        answer: `SAMS (Smart Attendance Management System) is a multi-school enterprise platform for Kenyan institutions.\n\n**Key Features:**\n• QR Code attendance scanning\n• GPS-verified attendance\n• Biometric (fingerprint/face) verification\n• Real-time attendance tracking\n• Risk score analysis for at-risk students\n• AI-powered insights and reports\n• Multi-tenant (supports multiple schools)\n• SMS & email notifications\n• Offline-capable mobile support\n\n**User Roles:**\n• Super Admin — manages all schools\n• School Admin — manages one school\n• HOD — manages a department\n• Teacher — manages classes & sessions\n• Student — scans attendance\n\nFor more details, please log in or contact your school administrator.`,
-        intent: 'about_sams',
-        engine: 'local',
-      });
       return;
     }
 
