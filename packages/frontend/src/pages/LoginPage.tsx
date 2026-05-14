@@ -13,9 +13,9 @@ const LoginPage: React.FC = () => {
   const getRoleRedirect = (role: UserRole): string => {
     switch (role) {
       case UserRole.SCHOOL_ADMIN: return '/dashboard';
-      case UserRole.HOD: return '/reports';
-      case UserRole.TEACHER: return '/sessions';
-      case UserRole.STUDENT: return '/sessions/scan';
+      case UserRole.HOD: return '/dashboard';
+      case UserRole.TEACHER: return '/dashboard';
+      case UserRole.STUDENT: return '/dashboard';
       default: return '/dashboard';
     }
   };
