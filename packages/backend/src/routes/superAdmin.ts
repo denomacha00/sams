@@ -481,6 +481,82 @@ superAdminRouter.get('/audit-logs', async (req: Request, res: Response): Promise
   res.json({ logs, count: logs.length });
 });
 
+// ─── AI Knowledge Base CRUD ────────────────────────────────────────────────────
+
+const aiKnowledgeSchema = z.object({
+  title: z.string().min(1).max(200),
+  content: z.string().min(1),
+  category: z.string().default('general'),
+});
+
+// GET /super/ai-knowledge — List all knowledge entries
+superAdminRouter.get('/ai-knowledge', async (_req: Request, res: Response): Promise<void> => {
+  const entries = await prisma.aIKnowledge.findMany({
+    orderBy: { createdAt: 'desc' },
+  });
+  res.json({ entries });
+});
+
+// POST /super/ai-knowledge — Add a new knowledge entry
+superAdminRouter.post('/ai-knowledge', async (req: Request, res: Response): Promise<void> => {
+  const parsed = aiKnowledgeSchema.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({
+      error: 'Validation failed',
+      code: 'VALIDATION_ERROR',
+      details: parsed.error.flatten().fieldErrors,
+    });
+    return;
+  }
+
+  const entry = await prisma.aIKnowledge.create({
+    data: parsed.data,
+  });
+
+  res.status(201).json({ entry });
+});
+
+// PUT /super/ai-knowledge/:id — Update a knowledge entry
+superAdminRouter.put('/ai-knowledge/:id', async (req: Request, res: Response): Promise<void> => {
+  const id = req.params.id as string;
+  const parsed = aiKnowledgeSchema.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({
+      error: 'Validation failed',
+      code: 'VALIDATION_ERROR',
+      details: parsed.error.flatten().fieldErrors,
+    });
+    return;
+  }
+
+  const existing = await prisma.aIKnowledge.findUnique({ where: { id } });
+  if (!existing) {
+    res.status(404).json({ error: 'Knowledge entry not found', code: 'NOT_FOUND' });
+    return;
+  }
+
+  const entry = await prisma.aIKnowledge.update({
+    where: { id },
+    data: parsed.data,
+  });
+
+  res.json({ entry });
+});
+
+// DELETE /super/ai-knowledge/:id — Delete a knowledge entry
+superAdminRouter.delete('/ai-knowledge/:id', async (req: Request, res: Response): Promise<void> => {
+  const id = req.params.id as string;
+
+  const existing = await prisma.aIKnowledge.findUnique({ where: { id } });
+  if (!existing) {
+    res.status(404).json({ error: 'Knowledge entry not found', code: 'NOT_FOUND' });
+    return;
+  }
+
+  await prisma.aIKnowledge.delete({ where: { id } });
+  res.json({ message: 'Knowledge entry deleted successfully' });
+});
+
 // ─── POST /super/ai-action — Execute admin actions via AI ─────────────────────
 
 const aiActionSchema = z.object({

@@ -345,3 +345,14 @@ model Notification {
   @@index([userId, read])
   @@index([schoolId])
 }
+
+// ─── AI Knowledge Base ────────────────────────────────────────────────────────
+
+model AIKnowledge {
+  id        String   @id @default(cuid())
+  title     String
+  content   String   @db.Text
+  category  String   @default("general")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}

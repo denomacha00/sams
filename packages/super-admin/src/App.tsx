@@ -8,6 +8,7 @@ import LicenseGeneratorPage from './pages/LicenseGeneratorPage';
 import SchoolsListPage from './pages/SchoolsListPage';
 import RevenuePage from './pages/RevenuePage';
 import AuditLogPage from './pages/AuditLogPage';
+import KnowledgeBasePage from './pages/KnowledgeBasePage';
 import { useAuthStore } from './store/authStore';
 
 const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
@@ -57,6 +58,12 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
             className="block px-4 py-2 text-gray-300 hover:bg-gray-700 hover:text-white rounded-lg transition-colors"
           >
             Audit Logs
+          </Link>
+          <Link
+            to="/knowledge"
+            className="block px-4 py-2 text-gray-300 hover:bg-gray-700 hover:text-white rounded-lg transition-colors"
+          >
+            Knowledge Base
           </Link>
         </nav>
         <div className="p-4 border-t border-gray-700">
@@ -123,6 +130,14 @@ function App(): React.ReactElement {
           element={
             <Layout>
               <AuditLogPage />
+            </Layout>
+          }
+        />
+        <Route
+          path="/knowledge"
+          element={
+            <Layout>
+              <KnowledgeBasePage />
             </Layout>
           }
         />

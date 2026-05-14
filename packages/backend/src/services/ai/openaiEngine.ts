@@ -39,7 +39,7 @@ function getFallbackClient(): OpenAI | null {
  * Build a system prompt that includes the user's scope context.
  * This ensures the AI model understands the user's permissions and data boundaries.
  */
-function buildSystemPrompt(user: AccessTokenPayload): string {
+async function buildSystemPrompt(user: AccessTokenPayload): Promise<string> {
   let scopeDescription = '';
 
   switch (user.role) {
@@ -60,6 +60,23 @@ function buildSystemPrompt(user: AccessTokenPayload): string {
       break;
   }
 
+  // Fetch custom knowledge base entries
+  let knowledgeSection = '';
+  try {
+    const knowledgeEntries = await prisma.aIKnowledge.findMany({
+      orderBy: { createdAt: 'desc' },
+    });
+    if (knowledgeEntries.length > 0) {
+      const formatted = knowledgeEntries
+        .map((entry: { title: string; content: string }) => `- [${entry.title}]: ${entry.content}`)
+        .join('\n');
+      knowledgeSection = `\n\nCustom Knowledge:\n${formatted}`;
+    }
+  } catch (err) {
+    // If knowledge fetch fails, continue without it
+    console.error('[AI] Failed to fetch knowledge base:', err);
+  }
+
   return `You are SAMS AI — a smart, helpful assistant built into the Smart Attendance Management System (SAMS). You were developed by Denis Macharia.
 
 You can help with:
@@ -74,7 +91,7 @@ ${scopeDescription}
 
 User context: schoolId=${user.schoolId}, userId=${user.sub}, role=${user.role}
 
-Be concise, friendly, and helpful. Answer in plain language.`;
+Be concise, friendly, and helpful. Answer in plain language.${knowledgeSection}`;
 }
 
 // ─── Function-Calling Tools ───────────────────────────────────────────────────
@@ -486,7 +503,7 @@ export async function openaiQuery(
   question: string,
 ): Promise<OpenAIQueryResult> {
   const client = getOpenAIClient();
-  const systemPrompt = buildSystemPrompt(user);
+  const systemPrompt = await buildSystemPrompt(user);
 
   const messages: OpenAI.Chat.Completions.ChatCompletionMessageParam[] = [
     { role: 'system', content: systemPrompt },

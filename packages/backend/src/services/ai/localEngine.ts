@@ -23,6 +23,7 @@ export type DetectedIntent =
   | 'about_sams'
   | 'super_admin_help'
   | 'system_stats'
+  | 'custom_knowledge'
   | 'unknown';
 
 // ─── Intent Detection ─────────────────────────────────────────────────────────
@@ -86,6 +87,19 @@ const INTENT_PATTERNS: { intent: DetectedIntent; patterns: RegExp[] }[] = [
       /school\s*count/i,
       /how\s*many\s*users/i,
       /dashboard\s*stats/i,
+    ],
+  },
+  {
+    intent: 'custom_knowledge',
+    patterns: [
+      /who\s*is\s*denis/i,
+      /tell\s*me\s*about\s*the\s*developer/i,
+      /company\s*info/i,
+      /who\s*(built|created|made|developed)\s*(this|sams)/i,
+      /about\s*the\s*(developer|creator|founder)/i,
+      /custom\s*knowledge/i,
+      /knowledge\s*base/i,
+      /what\s*do\s*you\s*know\s*about/i,
     ],
   },
   {
@@ -1462,6 +1476,32 @@ ${planBreakdown || '  • No schools registered yet'}`;
   };
 }
 
+// ─── Custom Knowledge Handler ─────────────────────────────────────────────────
+
+async function handleCustomKnowledge(): Promise<AIQueryResult> {
+  const entries = await prisma.aIKnowledge.findMany({
+    orderBy: { createdAt: 'desc' },
+  });
+
+  if (entries.length === 0) {
+    return {
+      answer: 'No custom knowledge entries have been added yet. The Super Admin can add information via the Knowledge Base page.',
+      intent: 'custom_knowledge',
+      data: { count: 0, entries: [] },
+    };
+  }
+
+  const formatted = entries
+    .map((entry: { title: string; content: string; category: string }) => `**${entry.title}** (${entry.category}):\n${entry.content}`)
+    .join('\n\n');
+
+  return {
+    answer: `📚 Here's what I know:\n\n${formatted}`,
+    intent: 'custom_knowledge',
+    data: { count: entries.length, entries },
+  };
+}
+
 // ─── Local Engine ─────────────────────────────────────────────────────────────
 
 /**
@@ -1484,6 +1524,8 @@ export async function localQuery(
         return handleSuperAdminHelp(question);
       case 'system_stats':
         return await handleSystemStats();
+      case 'custom_knowledge':
+        return await handleCustomKnowledge();
       case 'attendance_percentage':
         return await handleAttendancePercentage(scope);
       case 'absent_students':
