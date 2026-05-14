@@ -53,12 +53,19 @@ export class AIService {
       };
     }
 
-    // Local engine couldn't resolve — check if OpenAI is available
+    // Local engine couldn't resolve — check if OpenAI/Groq is available
+    // Super Admin always gets AI access; for schools, check plan tier
     let hasAIAccess = false;
     try {
-      hasAIAccess = await licenseService.checkFeatureAccess(user.schoolId, 'ai');
+      if (user.role === 'SUPER_ADMIN') {
+        hasAIAccess = true;
+      } else {
+        hasAIAccess = await licenseService.checkFeatureAccess(user.schoolId, 'ai');
+      }
     } catch (err) {
       console.error('[AIService] License check failed:', err);
+      // If license check fails, still allow if OPENAI_API_KEY is set
+      hasAIAccess = !!process.env.OPENAI_API_KEY;
     }
 
     if (!hasAIAccess) {
