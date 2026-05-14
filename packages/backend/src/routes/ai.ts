@@ -1,16 +1,6 @@
 import { Router, type Request, type Response } from 'express';
-import { z } from 'zod';
 import { aiService } from '../services/aiService';
-
-// ─── Validation Schemas ───────────────────────────────────────────────────────
-
-const querySchema = z.object({
-  question: z.string().min(1, 'Question is required').max(1000, 'Question must be 1000 characters or less'),
-});
-
-const voiceSchema = z.object({
-  transcription: z.string().min(1, 'Transcription is required').max(2000, 'Transcription must be 2000 characters or less'),
-});
+import { AppError } from '../middleware/errors';
 
 // ─── Router ───────────────────────────────────────────────────────────────────
 
@@ -18,66 +8,45 @@ export const aiRouter = Router();
 
 /**
  * POST /api/v1/ai/query
- * Process a text query through the AI service.
- * Routes to local engine first; falls back to OpenAI for Pro/Enterprise plans.
- *
- * Requirements: 14.1
+ * Process a text-based AI query.
+ * Requires authentication (handled by global middleware).
+ * Requirement 14.1
  */
 aiRouter.post('/query', async (req: Request, res: Response): Promise<void> => {
-  const parsed = querySchema.safeParse(req.body);
-  if (!parsed.success) {
-    res.status(400).json({
-      error: parsed.error.errors[0]?.message ?? 'Validation error',
-      code: 'VALIDATION_ERROR',
-    });
-    return;
-  }
-
-  const { question } = parsed.data;
-  const user = req.user;
-
   try {
-    const result = await aiService.query(user, question);
-    res.json(result);
+    const { question } = req.body;
+
+    if (!question || typeof question !== 'string' || !question.trim()) {
+      throw new AppError(400, 'VALIDATION_ERROR', 'A non-empty "question" field is required.');
+    }
+
+    const result = await aiService.query(req.user, question.trim());
+    res.status(200).json(result);
   } catch (err) {
-    console.error('[AI] Query error:', err);
-    res.status(500).json({
-      answer: 'Sorry, I encountered an error processing your question. Please try again.',
-      intent: 'error',
-      engine: 'local',
-    });
+    if (err instanceof AppError) throw err;
+    throw new AppError(500, 'INTERNAL_ERROR', 'Failed to process AI query');
   }
 });
 
 /**
  * POST /api/v1/ai/voice
- * Process a voice query (client-side speech-to-text transcription).
- * Accepts the transcribed text and processes it through the AI service.
- *
- * Requirements: 14.1, 14.6
+ * Process a voice transcription query.
+ * The client performs speech-to-text and sends the text here.
+ * Requirement 14.6
  */
 aiRouter.post('/voice', async (req: Request, res: Response): Promise<void> => {
-  const parsed = voiceSchema.safeParse(req.body);
-  if (!parsed.success) {
-    res.status(400).json({
-      error: parsed.error.errors[0]?.message ?? 'Validation error',
-      code: 'VALIDATION_ERROR',
-    });
-    return;
-  }
-
-  const { transcription } = parsed.data;
-  const user = req.user;
-
   try {
-    const result = await aiService.voiceQuery(user, transcription);
-    res.json(result);
+    const { transcription, question } = req.body;
+    const text = transcription || question;
+
+    if (!text || typeof text !== 'string' || !text.trim()) {
+      throw new AppError(400, 'VALIDATION_ERROR', 'A non-empty transcription or question is required.');
+    }
+
+    const result = await aiService.voiceQuery(req.user, text.trim());
+    res.status(200).json(result);
   } catch (err) {
-    console.error('[AI] Voice query error:', err);
-    res.status(500).json({
-      answer: 'Sorry, I encountered an error processing your voice query. Please try again.',
-      intent: 'error',
-      engine: 'local',
-    });
+    if (err instanceof AppError) throw err;
+    throw new AppError(500, 'INTERNAL_ERROR', 'Failed to process voice query');
   }
 });

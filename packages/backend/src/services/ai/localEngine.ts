@@ -20,11 +20,28 @@ export type DetectedIntent =
   | 'view_timetable'
   | 'student_count'
   | 'session_status'
+  | 'about_sams'
   | 'unknown';
 
 // ─── Intent Detection ─────────────────────────────────────────────────────────
 
 const INTENT_PATTERNS: { intent: DetectedIntent; patterns: RegExp[] }[] = [
+  {
+    intent: 'about_sams',
+    patterns: [
+      /what\s*is\s*sams/i,
+      /how\s*does\s*sams\s*work/i,
+      /tell\s*me\s*about\s*sams/i,
+      /what\s*can\s*you\s*do/i,
+      /^help$/i,
+      /what\s*are\s*(your|sams('s)?)\s*features/i,
+      /about\s*sams/i,
+      /explain\s*sams/i,
+      /what\s*does\s*sams\s*do/i,
+      /sams\s*features/i,
+      /describe\s*sams/i,
+    ],
+  },
   {
     intent: 'generate_timetable',
     patterns: [
@@ -794,6 +811,46 @@ async function handleSessionStatus(scope: QueryScope): Promise<AIQueryResult> {
 }
 
 
+// ─── About SAMS Handler ───────────────────────────────────────────────────────
+
+function handleAboutSams(): AIQueryResult {
+  const answer = `🎓 **SAMS — Smart Attendance Management System**
+
+SAMS is a multi-school platform designed for Kenyan educational institutions to streamline attendance tracking and school management.
+
+**Core Features:**
+• **QR Code Attendance** — Teachers generate session QR codes; students scan to mark attendance instantly
+• **GPS Verification** — Validates student location during attendance marking to prevent proxy attendance
+• **Biometric (Face Recognition)** — Optional face-based attendance for enhanced security
+• **Manual Marking** — Teachers can manually mark attendance when needed
+• **Offline-First** — Works without internet; auto-syncs when connectivity is restored
+
+**Smart Features:**
+• **Real-Time WebSocket Updates** — Live attendance status across all connected devices
+• **AI Assistant** — Ask questions about attendance data, trends, and insights (that's me!)
+• **Risk Scoring** — Identifies students at risk of dropping out based on attendance patterns
+• **Timetable Management** — Auto-generate and manage class timetables
+
+**Reports & Integration:**
+• **Reports** — Generate PDF and Excel reports for attendance, performance, and analytics
+• **M-Pesa Payment Integration** — School license payments via M-Pesa
+• **Notifications** — SMS and push notifications for parents and staff
+
+**Role-Based Access:**
+• Super Admin — Platform-wide management
+• School Admin — Full school management
+• HOD (Head of Department) — Department oversight
+• Teacher — Session and attendance management
+• Student — View own attendance and timetable
+
+Developed by Denis Macharia for Kenyan schools. Ask me anything specific!`;
+
+  return {
+    answer,
+    intent: 'about_sams',
+  };
+}
+
 // ─── Local Engine ─────────────────────────────────────────────────────────────
 
 /**
@@ -812,6 +869,8 @@ export async function localQuery(
 
   try {
     switch (intent) {
+      case 'about_sams':
+        return handleAboutSams();
       case 'attendance_percentage':
         return await handleAttendancePercentage(scope);
       case 'absent_students':
@@ -833,7 +892,7 @@ export async function localQuery(
       case 'unknown':
       default:
         return {
-          answer: `I can help you with:\n• Attendance rates and percentages\n• Absent students today\n• Risk scores and at-risk students\n• Top students by attendance\n• Class attendance comparison\n• Generate a timetable ("generate timetable for Form 1A")\n• View timetable ("show my timetable")\n• Student count ("how many students")\n• Active sessions ("who is teaching now")\n\nTry asking: "What is the attendance rate?" or "Generate timetable for Form 1A"`,
+          answer: `I can help you with:\n• About SAMS ("what is SAMS", "what can you do")\n• Attendance rates and percentages\n• Absent students today\n• Risk scores and at-risk students\n• Top students by attendance\n• Class attendance comparison\n• Generate a timetable ("generate timetable for Form 1A")\n• View timetable ("show my timetable")\n• Student count ("how many students")\n• Active sessions ("who is teaching now")\n\nTry asking: "What is SAMS?" or "What is the attendance rate?"`,
           intent: 'unknown',
         };
     }
