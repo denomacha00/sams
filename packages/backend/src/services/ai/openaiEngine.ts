@@ -475,13 +475,19 @@ export async function openaiQuery(
   user: AccessTokenPayload,
   question: string,
 ): Promise<OpenAIQueryResult> {
-  // Gate behind feature access check
-  const hasAccess = await licenseService.checkFeatureAccess(user.schoolId, 'ai');
-  if (!hasAccess) {
-    return {
-      answer: 'Advanced AI features are only available on Professional and Enterprise plans. Your query has been processed using the local engine.',
-      intent: 'feature_gated',
-    };
+  // Skip feature access check for SUPER_ADMIN
+  if (user.role !== 'SUPER_ADMIN') {
+    try {
+      const hasAccess = await licenseService.checkFeatureAccess(user.schoolId, 'ai');
+      if (!hasAccess) {
+        return {
+          answer: 'Advanced AI features are only available on Professional and Enterprise plans. Your query has been processed using the local engine.',
+          intent: 'feature_gated',
+        };
+      }
+    } catch {
+      // If license check fails, continue anyway
+    }
   }
 
   const client = getOpenAIClient();
@@ -493,67 +499,27 @@ export async function openaiQuery(
   ];
 
   try {
-    // First call — may include function calls
-    let response = await client.chat.completions.create({
-      model: process.env.OPENAI_MODEL ?? 'gpt-4o-mini',
+    // Simple chat completion without function calling (works with Groq free tier)
+    const response = await client.chat.completions.create({
+      model: process.env.OPENAI_MODEL ?? 'llama3-70b-8192',
       messages,
-      tools: AI_TOOLS,
-      tool_choice: 'auto',
       temperature: 0.3,
       max_tokens: 1000,
     });
 
-    let assistantMessage = response.choices[0]?.message;
-
-    // Handle function calls (up to 3 rounds to prevent infinite loops)
-    let rounds = 0;
-    while (assistantMessage?.tool_calls && assistantMessage.tool_calls.length > 0 && rounds < 3) {
-      rounds++;
-
-      // Add assistant message with tool calls to conversation
-      messages.push(assistantMessage);
-
-      // Execute each function call and add results
-      for (const toolCall of assistantMessage.tool_calls) {
-        const functionResult = await dispatchFunctionCall(
-          toolCall.function.name,
-          toolCall.function.arguments,
-          user,
-        );
-
-        messages.push({
-          role: 'tool',
-          tool_call_id: toolCall.id,
-          content: functionResult,
-        });
-      }
-
-      // Get next response
-      response = await client.chat.completions.create({
-        model: process.env.OPENAI_MODEL ?? 'gpt-4o-mini',
-        messages,
-        tools: AI_TOOLS,
-        tool_choice: 'auto',
-        temperature: 0.3,
-        max_tokens: 1000,
-      });
-
-      assistantMessage = response.choices[0]?.message;
-    }
-
-    const answer = assistantMessage?.content ?? 'I was unable to generate a response. Please try rephrasing your question.';
+    const answer = response.choices[0]?.message?.content ?? 'I was unable to generate a response. Please try rephrasing your question.';
 
     return {
       answer,
       intent: 'openai_response',
     };
   } catch (err) {
-    console.error('[AI/OpenAI] Error:', err);
+    console.error('[AI/Groq] Error:', err);
 
-    // If OpenAI fails, return a graceful error
+    // Return a helpful fallback instead of an error message
     return {
-      answer: 'I encountered an error processing your question with the AI engine. Please try again or rephrase your question.',
-      intent: 'error',
+      answer: `I can help you with:\n• "What is SAMS?" — learn about the system\n• "How many students?" — get counts\n• "Show my timetable" — view schedule\n• "Generate timetable" — create timetables\n• "Who is absent today?" — check attendance\n• "Risk scores" — view at-risk students\n\nPlease try one of these, or rephrase your question.`,
+      intent: 'fallback',
     };
   }
 }
