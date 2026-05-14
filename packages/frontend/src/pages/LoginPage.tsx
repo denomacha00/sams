@@ -4,7 +4,6 @@ import { useAuthStore } from '../store/authStore';
 import { UserRole } from '@sams/shared';
 
 const LoginPage: React.FC = () => {
-  const [schoolCode, setSchoolCode] = useState('');
   const [identifier, setIdentifier] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -25,7 +24,7 @@ const LoginPage: React.FC = () => {
     e.preventDefault();
     clearError();
     try {
-      await login(schoolCode, identifier, password);
+      await login('', identifier, password);
       const user = useAuthStore.getState().user;
       if (user) navigate(getRoleRedirect(user.role), { replace: true });
     } catch { /* error in store */ }
@@ -127,23 +126,8 @@ const LoginPage: React.FC = () => {
 
             <form onSubmit={handleSubmit} className="space-y-5">
               <div>
-                <label htmlFor="schoolCode" className="block text-sm font-semibold text-gray-300 mb-1.5">
-                  School Code
-                </label>
-                <input
-                  id="schoolCode"
-                  type="text"
-                  value={schoolCode}
-                  onChange={(e) => setSchoolCode(e.target.value.toUpperCase())}
-                  required
-                  className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-teal-500/40 focus:border-teal-400 transition-all duration-200"
-                  placeholder="e.g. KHS2024"
-                />
-              </div>
-
-              <div>
                 <label htmlFor="identifier" className="block text-sm font-semibold text-gray-300 mb-1.5">
-                  Username or Phone Number
+                  Username / Phone / Email / ADM
                 </label>
                 <input
                   id="identifier"
@@ -152,7 +136,7 @@ const LoginPage: React.FC = () => {
                   onChange={(e) => setIdentifier(e.target.value)}
                   required
                   className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-teal-500/40 focus:border-teal-400 transition-all duration-200"
-                  placeholder="Enter username, phone, or admission number"
+                  placeholder="Enter username, phone, email, or ADM number"
                 />
               </div>
 

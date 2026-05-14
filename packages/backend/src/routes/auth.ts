@@ -11,7 +11,7 @@ import { notificationService } from '../services/notificationService';
 // ─── Validation Schemas ───────────────────────────────────────────────────────
 
 const loginSchema = z.object({
-  schoolCode: z.string().min(3),
+  schoolCode: z.string().optional().default(''),
   identifier: z.string().min(1),
   password: z.string().min(1),
 });

@@ -58,27 +58,42 @@ export class AuthService {
     identifier: string,
     password: string,
   ): Promise<TokenPair> {
-    // 1. Find school by schoolCode
-    const school = await prisma.school.findUnique({
-      where: { schoolCode },
-    });
+    let user: any = null;
 
-    if (!school) {
-      throw new Error('INVALID_CREDENTIALS');
+    if (schoolCode) {
+      // If school code provided, scope to that school
+      const school = await prisma.school.findUnique({
+        where: { schoolCode },
+      });
+
+      if (!school) {
+        throw new Error('INVALID_CREDENTIALS');
+      }
+
+      user = await prisma.user.findFirst({
+        where: {
+          schoolId: school.id,
+          OR: [
+            { email: identifier },
+            { admissionNumber: identifier },
+            { username: identifier },
+            { phone: identifier },
+          ],
+        },
+      });
+    } else {
+      // No school code — search across ALL schools by unique identifier
+      user = await prisma.user.findFirst({
+        where: {
+          OR: [
+            { email: identifier },
+            { admissionNumber: identifier },
+            { username: identifier },
+            { phone: identifier },
+          ],
+        },
+      });
     }
-
-    // 2. Find user by email OR admissionNumber OR username OR phone within that school
-    const user = await prisma.user.findFirst({
-      where: {
-        schoolId: school.id,
-        OR: [
-          { email: identifier },
-          { admissionNumber: identifier },
-          { username: identifier },
-          { phone: identifier },
-        ],
-      },
-    });
 
     if (!user) {
       throw new Error('INVALID_CREDENTIALS');
