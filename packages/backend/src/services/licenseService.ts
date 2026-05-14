@@ -1,4 +1,4 @@
-import { PlanTier } from '@prisma/client';
+import { PlanTier } from '@sams/shared';
 import { prisma } from '../index';
 import { auditService } from './auditService';
 import { notificationService } from './notificationService';
@@ -118,7 +118,7 @@ export class LicenseService {
     });
 
     const allowedTiers = FEATURE_ACCESS[feature] ?? [];
-    return allowedTiers.includes(school.planTier);
+    return allowedTiers.includes(school.planTier as PlanTier);
   }
 
   /**

@@ -1,5 +1,5 @@
 import bcrypt from 'bcrypt';
-import { UserRole } from '@prisma/client';
+import { UserRole } from '@sams/shared';
 import { prisma } from '../index';
 import { licenseService } from './licenseService';
 import { AppError } from '../middleware/errors';

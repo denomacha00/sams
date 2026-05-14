@@ -122,14 +122,14 @@ export class RiskService {
         select: { id: true },
       });
 
-      const studentIds = students.map((s) => s.id);
+      const studentIds = students.map((s: { id: string }) => s.id);
 
       const scores = await prisma.riskScore.findMany({
         where: { schoolId, studentId: { in: studentIds } },
         orderBy: { score: 'desc' },
       });
 
-      return scores.map((s) => ({
+      return scores.map((s: any) => ({
         studentId: s.studentId,
         attendanceWeight: s.attendanceWeight,
         gradeWeight: s.gradeWeight,
@@ -145,7 +145,7 @@ export class RiskService {
       orderBy: { score: 'desc' },
     });
 
-    return scores.map((s) => ({
+    return scores.map((s: any) => ({
       studentId: s.studentId,
       attendanceWeight: s.attendanceWeight,
       gradeWeight: s.gradeWeight,

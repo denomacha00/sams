@@ -1,6 +1,6 @@
 import bcrypt from 'bcrypt';
 import { createId } from '@paralleldrive/cuid2';
-import { UserRole } from '@prisma/client';
+import { UserRole } from '@sams/shared';
 import { prisma } from '../index';
 import { licenseService } from './licenseService';
 import { AppError } from '../middleware/errors';
@@ -61,8 +61,8 @@ export class RegistrationLinkService {
     // Determine target role — use provided targetRole or derive from creator role
     let targetRole: UserRole;
 
-    if (options && (options as any).targetRole) {
-      targetRole = (options as any).targetRole as UserRole;
+    if (options && options.targetRole) {
+      targetRole = options.targetRole as UserRole;
     } else {
       switch (creatorRole) {
         case UserRole.SCHOOL_ADMIN:

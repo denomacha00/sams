@@ -1,7 +1,6 @@
 import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
 import { createId } from '@paralleldrive/cuid2';
-import { UserRole } from '@prisma/client';
 import { prisma } from '../index';
 import { auditService } from './auditService';
 import { notificationService } from './notificationService';
@@ -27,7 +26,7 @@ export interface TokenPair {
 interface AccessTokenPayload {
   sub: string;
   schoolId: string;
-  role: UserRole;
+  role: string;
   departmentId?: string;
   classId?: string;
 }
@@ -332,7 +331,7 @@ export class AuthService {
   private _generateTokenPair(user: {
     id: string;
     schoolId: string;
-    role: UserRole;
+    role: string;
     departmentId: string | null;
     classId: string | null;
   }): TokenPair {

@@ -1,7 +1,7 @@
 import { Router, type Request, type Response, type NextFunction } from 'express';
 import { z } from 'zod';
 import { createHash } from 'crypto';
-import { PlanTier } from '@prisma/client';
+import { PlanTier } from '@sams/shared';
 import { encodeLicenseKey } from '@sams/shared';
 import { prisma } from '../index';
 import { licenseService } from '../services/licenseService';
@@ -70,7 +70,7 @@ superAdminRouter.post('/licenses', async (req: Request, res: Response): Promise<
   }
 
   const { schoolName, planTier, expiresAt } = parsed.data;
-  const expiryDate = new Date(expiresAt);
+  const expiryDate = new Date(expiresAt as string);
 
   const secret = process.env.LICENSE_SECRET || process.env.JWT_SECRET || 'default-license-secret';
 
@@ -224,7 +224,7 @@ superAdminRouter.get('/analytics', async (_req: Request, res: Response): Promise
     activeSessions,
     suspendedSchools,
     expiredSchools,
-    schoolsByPlan: schoolsByPlan.map((g) => ({
+    schoolsByPlan: schoolsByPlan.map((g: any) => ({
       planTier: g.planTier,
       count: g._count.id,
     })),
@@ -246,7 +246,7 @@ superAdminRouter.get('/schools', async (_req: Request, res: Response): Promise<v
     orderBy: { createdAt: 'desc' },
   });
 
-  const result = schools.map((school) => ({
+  const result = schools.map((school: any) => ({
     id: school.id,
     name: school.name,
     schoolCode: school.schoolCode,
@@ -405,7 +405,7 @@ superAdminRouter.delete('/schools/:id', async (req: Request, res: Response): Pro
   }
 
   // Delete all related data in order (respecting foreign keys)
-  await prisma.$transaction(async (tx) => {
+  await prisma.$transaction(async (tx: any) => {
     await tx.attendanceRecord.deleteMany({ where: { schoolId } });
     await tx.attendanceSession.deleteMany({ where: { schoolId } });
     await tx.registrationLink.deleteMany({ where: { schoolId } });
@@ -448,11 +448,11 @@ superAdminRouter.get('/revenue', async (_req: Request, res: Response): Promise<v
     _count: { id: true },
   });
 
-  const totalRevenue = revenue.reduce((sum, r) => sum + (r._sum.amount || 0), 0);
+  const totalRevenue = revenue.reduce((sum: number, r: any) => sum + (r._sum.amount || 0), 0);
 
   res.json({
     totalRevenue,
-    byPlanTier: revenue.map((r) => ({
+    byPlanTier: revenue.map((r: any) => ({
       planTier: r.planTier,
       totalAmount: r._sum.amount || 0,
       paymentCount: r._count.id,

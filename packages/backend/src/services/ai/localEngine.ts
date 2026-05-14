@@ -230,7 +230,7 @@ async function handleAbsentStudents(scope: QueryScope): Promise<AIQueryResult> {
     };
   }
 
-  const students = absentRecords.map((r) => ({
+  const students = absentRecords.map((r: any) => ({
     name: r.student.fullName,
     admissionNumber: r.student.admissionNumber,
   }));

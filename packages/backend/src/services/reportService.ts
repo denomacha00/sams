@@ -78,7 +78,7 @@ export class ReportService {
       };
     }
 
-    const records = await prisma.attendanceRecord.findMany({ where: recordWhere });
+    const records: any[] = await prisma.attendanceRecord.findMany({ where: recordWhere });
 
     // Count total expected sessions for this student in the date range
     const sessionWhere: Record<string, unknown> = { schoolId };

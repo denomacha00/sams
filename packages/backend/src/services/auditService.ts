@@ -1,23 +1,33 @@
-import { AuditLog, AuditEventType, UserRole, Prisma } from '@prisma/client';
 import { prisma } from '../index';
 
 // ─── Interfaces ───────────────────────────────────────────────────────────────
 
 export interface AuditEvent {
-  eventType: AuditEventType;
+  eventType: string;
   actorId?: string;
-  actorRole?: UserRole;
+  actorRole?: string;
   schoolId?: string;
   resourceSnapshot: Record<string, unknown>;
 }
 
 export interface AuditFilters {
   schoolId?: string;
-  eventType?: AuditEventType;
+  eventType?: string;
   dateFrom?: Date;
   dateTo?: Date;
   limit?: number;
   offset?: number;
+}
+
+interface AuditLogRecord {
+  id: string;
+  sequenceNum: bigint;
+  schoolId: string | null;
+  actorId: string | null;
+  actorRole: string | null;
+  eventType: string;
+  resourceSnapshot: unknown;
+  createdAt: Date;
 }
 
 // ─── Audit Service ────────────────────────────────────────────────────────────
@@ -31,11 +41,11 @@ export class AuditService {
   async log(event: AuditEvent): Promise<void> {
     await prisma.auditLog.create({
       data: {
-        eventType: event.eventType,
+        eventType: event.eventType as any,
         actorId: event.actorId ?? null,
-        actorRole: event.actorRole ?? null,
+        actorRole: event.actorRole as any ?? null,
         schoolId: event.schoolId ?? null,
-        resourceSnapshot: event.resourceSnapshot as Prisma.InputJsonValue,
+        resourceSnapshot: event.resourceSnapshot as any,
       },
     });
   }
@@ -45,13 +55,13 @@ export class AuditService {
    * Results are ordered by sequenceNum ASC (chronological, tamper-evident order).
    * Supports pagination via limit and offset.
    */
-  async query(filters: AuditFilters): Promise<AuditLog[]> {
+  async query(filters: AuditFilters): Promise<AuditLogRecord[]> {
     const { schoolId, eventType, dateFrom, dateTo, limit, offset } = filters;
 
-    return prisma.auditLog.findMany({
+    const results = await prisma.auditLog.findMany({
       where: {
         ...(schoolId !== undefined && { schoolId }),
-        ...(eventType !== undefined && { eventType }),
+        ...(eventType !== undefined && { eventType: eventType as any }),
         ...(dateFrom !== undefined || dateTo !== undefined
           ? {
               createdAt: {
@@ -67,6 +77,8 @@ export class AuditService {
       ...(limit !== undefined && { take: limit }),
       ...(offset !== undefined && { skip: offset }),
     });
+
+    return results as unknown as AuditLogRecord[];
   }
 }
 

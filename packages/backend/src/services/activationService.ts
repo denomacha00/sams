@@ -130,7 +130,7 @@ export class ActivationService {
     // ── Step 6: Transactional creation ───────────────────────────────────────
     const passwordHash = await bcrypt.hash(adminPassword, BCRYPT_COST);
 
-    const { school, adminUser } = await prisma.$transaction(async (tx) => {
+    const { school, adminUser } = await prisma.$transaction(async (tx: any) => {
       // Create School record
       const school = await tx.school.create({
         data: {
