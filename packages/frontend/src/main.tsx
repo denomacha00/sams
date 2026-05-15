@@ -32,6 +32,7 @@ import UserManagementPage from './pages/admin/UserManagementPage';
 import RegistrationLinksPage from './pages/admin/RegistrationLinksPage';
 import TimetablePage from './pages/admin/TimetablePage';
 import DepartmentsPage from './pages/admin/DepartmentsPage';
+import KnowledgeManagementPage from './pages/admin/KnowledgeManagementPage';
 
 import { useAuthStore } from './store/authStore';
 import { registerServiceWorker } from './workers/swRegistration';
@@ -84,6 +85,7 @@ ReactDOM.createRoot(document.getElementById('root') as HTMLElement).render(
           <Route path="/profile" element={<ProfilePage />} />
           <Route path="/settings" element={<SettingsPage />} />
           <Route path="/notifications" element={<NotificationsPage />} />
+          <Route path="/admin/knowledge" element={<KnowledgeManagementPage />} />
         </Route>
 
         {/* Admin routes — restricted to SCHOOL_ADMIN and HOD roles */}
