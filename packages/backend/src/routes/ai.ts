@@ -1,10 +1,51 @@
-import { Router, type Request, type Response } from 'express';
+import { Router, type Request, type Response, type NextFunction } from 'express';
+import jwt from 'jsonwebtoken';
+import { type AccessTokenPayload, UserRole } from '@sams/shared';
 import { aiService } from '../services/aiService';
 import { openaiQuery } from '../services/ai/openaiEngine';
 import { conversationMemoryService } from '../services/conversationMemoryService';
 import { AppError } from '../middleware/errors';
 
 export const aiRouter = Router();
+
+// ─── Optional Auth Middleware ─────────────────────────────────────────────────
+// Tries to parse the JWT token if present, but doesn't reject if missing.
+// This allows the AI route to work for both authenticated and unauthenticated users.
+aiRouter.use((req: Request, _res: Response, next: NextFunction) => {
+  const authHeader = req.headers.authorization;
+  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    return next();
+  }
+
+  const token = authHeader.slice(7);
+  const secret = process.env.JWT_SECRET;
+  if (!secret) {
+    return next();
+  }
+
+  try {
+    const payload = jwt.verify(token, secret) as AccessTokenPayload;
+    if (
+      typeof payload.sub === 'string' &&
+      typeof payload.schoolId === 'string' &&
+      Object.values(UserRole).includes(payload.role)
+    ) {
+      req.user = {
+        sub: payload.sub,
+        schoolId: payload.schoolId,
+        role: payload.role,
+        departmentId: payload.departmentId,
+        classId: payload.classId,
+        iat: payload.iat,
+        exp: payload.exp,
+      };
+    }
+  } catch {
+    // Token invalid/expired — continue as unauthenticated
+  }
+
+  next();
+});
 
 // SAMS data intents that require authentication
 const DATA_INTENTS = [
