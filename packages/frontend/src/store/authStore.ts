@@ -24,6 +24,7 @@ interface AuthState {
   loading: boolean;
   login: (schoolCode: string, identifier: string, password: string) => Promise<void>;
   setAuth: (user: AuthUser, accessToken: string, refreshToken: string) => void;
+  updateUser: (fields: Partial<AuthUser>) => void;
   logout: () => Promise<void>;
   refreshAccessToken: () => Promise<void>;
   clearError: () => void;
@@ -48,6 +49,13 @@ export const useAuthStore = create<AuthState>()(
           loading: false,
           error: null,
         });
+      },
+
+      updateUser: (fields: Partial<AuthUser>) => {
+        const current = get().user;
+        if (current) {
+          set({ user: { ...current, ...fields } });
+        }
       },
 
       login: async (schoolCode: string, identifier: string, password: string) => {

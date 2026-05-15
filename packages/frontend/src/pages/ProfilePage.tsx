@@ -38,11 +38,18 @@ const ProfilePage: React.FC = () => {
     setSaving(true);
     clearMessages();
     try {
-      await apiClient.patch('/users/me', {
+      const { data } = await apiClient.patch('/users/me', {
         username,
         ...(canEditName && { fullName }),
         email,
         phone: phone || undefined,
+      });
+      // Update the local auth store so changes persist across navigation
+      useAuthStore.getState().updateUser({
+        username: data.username,
+        fullName: data.fullName,
+        email: data.email,
+        phone: data.phone,
       });
       setSuccess('Profile updated successfully!');
     } catch (err: any) {
