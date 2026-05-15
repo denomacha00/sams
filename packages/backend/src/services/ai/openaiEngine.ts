@@ -73,7 +73,7 @@ async function buildSystemPrompt(user: AccessTokenPayload): Promise<string> {
     }
   }
 
-  const nameContext = userName ? `\nThe user's name is "${userName}". Address them by name when appropriate.` : '';
+  const nameContext = userName ? `\n\nIMPORTANT: The user's REAL NAME is "${userName}". ALWAYS call them "${userName}" — never call them "the student", "the teacher", or any role label. Their name is ${userName}.` : '';
 
   switch (user.role) {
     case UserRole.SUPER_ADMIN:
