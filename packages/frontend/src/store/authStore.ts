@@ -5,8 +5,10 @@ import { UserRole } from '@sams/shared';
 
 export interface AuthUser {
   id: string;
+  username?: string;
   fullName: string;
   email?: string;
+  phone?: string;
   role: UserRole;
   schoolId: string;
   departmentId?: string;
