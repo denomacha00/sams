@@ -20,6 +20,9 @@ const ProfilePage: React.FC = () => {
 
   const clearMessages = () => { setSuccess(null); setError(null); };
 
+  const isStudent = user?.role === UserRole.STUDENT;
+  const canEditName = !isStudent; // Only teachers/admins/HOD can edit their name
+
   const getRoleLabel = () => {
     switch (user?.role) {
       case UserRole.SCHOOL_ADMIN: return 'School Administrator';
@@ -35,7 +38,12 @@ const ProfilePage: React.FC = () => {
     setSaving(true);
     clearMessages();
     try {
-      await apiClient.patch('/users/me', { username, fullName, email, phone: phone || undefined });
+      await apiClient.patch('/users/me', {
+        username,
+        ...(canEditName && { fullName }),
+        email,
+        phone: phone || undefined,
+      });
       setSuccess('Profile updated successfully!');
     } catch (err: any) {
       setError(err.response?.data?.error || 'Failed to update profile');
@@ -130,9 +138,16 @@ const ProfilePage: React.FC = () => {
                 className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-purple-500/50 transition-all" placeholder="Your username" />
             </div>
             <div>
-              <label htmlFor="fullName" className="block text-xs font-semibold text-gray-300 uppercase tracking-wider mb-2">Full Name</label>
-              <input id="fullName" type="text" value={fullName} onChange={(e) => setFullName(e.target.value)}
-                className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-purple-500/50 transition-all" placeholder="Your full name" />
+              <label htmlFor="fullName" className="block text-xs font-semibold text-gray-300 uppercase tracking-wider mb-2">
+                Full Name {isStudent && <span className="text-gray-500 normal-case">(contact admin to change)</span>}
+              </label>
+              <input id="fullName" type="text" value={fullName} onChange={(e) => canEditName && setFullName(e.target.value)}
+                readOnly={!canEditName}
+                className={`w-full border rounded-xl px-4 py-3 placeholder-gray-500 focus:outline-none transition-all ${
+                  canEditName
+                    ? 'bg-white/5 border-white/10 text-white focus:ring-2 focus:ring-purple-500/50'
+                    : 'bg-white/[0.02] border-white/5 text-gray-400 cursor-not-allowed'
+                }`} placeholder="Your full name" />
             </div>
             <div>
               <label htmlFor="email" className="block text-xs font-semibold text-gray-300 uppercase tracking-wider mb-2">Email</label>

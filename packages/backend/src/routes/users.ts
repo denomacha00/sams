@@ -80,11 +80,14 @@ usersRouter.patch('/me', async (req: Request, res: Response): Promise<void> => {
       }
     }
 
+    // Students cannot change their fullName (only admins/teachers can)
+    const isStudent = req.user.role === 'STUDENT';
+
     const updated = await prisma.user.update({
       where: { id: req.user.sub },
       data: {
         ...(parsed.data.username && { username: parsed.data.username }),
-        ...(parsed.data.fullName && { fullName: parsed.data.fullName }),
+        ...(!isStudent && parsed.data.fullName && { fullName: parsed.data.fullName }),
         ...(parsed.data.email && { email: parsed.data.email }),
         ...(parsed.data.phone && { phone: parsed.data.phone }),
       },
