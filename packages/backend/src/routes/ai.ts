@@ -54,6 +54,14 @@ const DATA_INTENTS = [
   'student_count', 'session_status', 'system_stats',
 ];
 
+// Keywords that indicate a SAMS data query (even if intent detection misses it)
+const SAMS_DATA_KEYWORDS = [
+  'my report', 'my attendance', 'class report', 'my class', 'my students',
+  'my timetable', 'my schedule', 'my grades', 'my score', 'risk score',
+  'absent', 'present', 'late', 'session', 'department report',
+  'school report', 'how many students', 'attendance rate',
+];
+
 // ─── Conversation Management Endpoints ────────────────────────────────────────
 
 /**
@@ -159,9 +167,13 @@ aiRouter.post('/query', async (req: Request, res: Response): Promise<void> => {
     // Unauthenticated user — check if it's a data query
     const { detectIntent } = require('../services/ai/localEngine');
     const intent = detectIntent(question.trim());
+    const lowerQuestion = question.trim().toLowerCase();
 
-    // Block SAMS data queries for unauthenticated users
-    if (DATA_INTENTS.includes(intent)) {
+    // Block SAMS data queries for unauthenticated users (intent-based + keyword-based)
+    const isDataQuery = DATA_INTENTS.includes(intent) ||
+      SAMS_DATA_KEYWORDS.some((kw) => lowerQuestion.includes(kw));
+
+    if (isDataQuery) {
       res.status(200).json({
         answer: 'Please log in to access school data like attendance, timetables, and reports. I can answer general questions without login.\n\nTry asking: "What is SAMS?" or "What is photosynthesis?"',
         intent: 'auth_required',
@@ -188,8 +200,16 @@ aiRouter.post('/query', async (req: Request, res: Response): Promise<void> => {
     }
 
     // For general knowledge questions, go directly to Groq/OpenRouter
+    // Use a restricted guest context — no school data
     try {
-      const result = await openaiQuery(guestUser, question.trim());
+      const guestUserRestricted = {
+        sub: 'guest',
+        schoolId: 'none',
+        role: 'STUDENT' as any,
+        iat: 0,
+        exp: 0,
+      };
+      const result = await openaiQuery(guestUserRestricted, question.trim());
       res.status(200).json(result);
     } catch {
       res.status(200).json({

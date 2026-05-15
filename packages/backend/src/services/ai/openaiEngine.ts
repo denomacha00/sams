@@ -2,7 +2,6 @@ import OpenAI from 'openai';
 import { prisma } from '../../index';
 import { type AccessTokenPayload, UserRole } from '@sams/shared';
 import { licenseService } from '../licenseService';
-import { knowledgeService } from '../knowledgeService';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -100,12 +99,16 @@ async function buildSystemPrompt(user: AccessTokenPayload): Promise<string> {
   // Fetch custom knowledge base entries (scoped to user's role)
   let knowledgeSection = '';
   try {
-    const knowledgeEntries = await knowledgeService.getForAIContext(user);
-    if (knowledgeEntries.length > 0) {
-      const formatted = knowledgeEntries
-        .map((entry) => `- [${entry.title}]: ${entry.content}`)
-        .join('\n');
-      knowledgeSection = `\n\nCustom Knowledge:\n${formatted}`;
+    // Skip knowledge fetch for guest/unauthenticated users
+    if (user.schoolId && user.schoolId !== 'guest' && user.schoolId !== 'none') {
+      const { knowledgeService } = await import('../knowledgeService');
+      const knowledgeEntries = await knowledgeService.getForAIContext(user);
+      if (knowledgeEntries.length > 0) {
+        const formatted = knowledgeEntries
+          .map((entry) => `- [${entry.title}]: ${entry.content}`)
+          .join('\n');
+        knowledgeSection = `\n\nCustom Knowledge:\n${formatted}`;
+      }
     }
   } catch (err) {
     // If knowledge fetch fails, continue without it (graceful degradation)
