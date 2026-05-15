@@ -2,6 +2,7 @@ import OpenAI from 'openai';
 import { prisma } from '../../index';
 import { type AccessTokenPayload, UserRole } from '@sams/shared';
 import { licenseService } from '../licenseService';
+import { knowledgeService } from '../knowledgeService';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -96,20 +97,18 @@ async function buildSystemPrompt(user: AccessTokenPayload): Promise<string> {
       break;
   }
 
-  // Fetch custom knowledge base entries
+  // Fetch custom knowledge base entries (scoped to user's role)
   let knowledgeSection = '';
   try {
-    const knowledgeEntries = await prisma.aIKnowledge.findMany({
-      orderBy: { createdAt: 'desc' },
-    });
+    const knowledgeEntries = await knowledgeService.getForAIContext(user);
     if (knowledgeEntries.length > 0) {
       const formatted = knowledgeEntries
-        .map((entry: { title: string; content: string }) => `- [${entry.title}]: ${entry.content}`)
+        .map((entry) => `- [${entry.title}]: ${entry.content}`)
         .join('\n');
       knowledgeSection = `\n\nCustom Knowledge:\n${formatted}`;
     }
   } catch (err) {
-    // If knowledge fetch fails, continue without it
+    // If knowledge fetch fails, continue without it (graceful degradation)
     console.error('[AI] Failed to fetch knowledge base:', err);
   }
 

@@ -102,6 +102,7 @@ model School {
   notifications     Notification[]
   conversationThreads ConversationThread[]
   conversationRecords ConversationRecord[]
+  knowledgeEntries  AIKnowledge[]
 }
 
 model User {
@@ -139,6 +140,7 @@ model User {
   notifications     Notification[]
   conversationThreads ConversationThread[]
   conversationRecords ConversationRecord[]
+  knowledgeEntries  AIKnowledge[]
 
   @@unique([schoolId, admissionNumber])
   @@index([schoolId, role])
@@ -164,6 +166,7 @@ model Department {
 
   users   User[]
   classes Class[]
+  knowledgeEntries AIKnowledge[]
 
   @@unique([schoolId, name])
 }
@@ -182,6 +185,7 @@ model Class {
   timetableEntries  TimetableEntry[]
   sessions          AttendanceSession[]
   registrationLinks RegistrationLink[]
+  knowledgeEntries  AIKnowledge[]
 
   @@unique([schoolId, name])
 }
@@ -357,12 +361,25 @@ model Notification {
 // ─── AI Knowledge Base ────────────────────────────────────────────────────────
 
 model AIKnowledge {
-  id        String   @id @default(cuid())
-  title     String
-  content   String   @db.Text
-  category  String   @default("general")
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id           String      @id @default(cuid())
+  title        String      @db.VarChar(200)
+  content      String      @db.Text
+  category     String      @default("general") @db.VarChar(50)
+  schoolId     String
+  school       School      @relation(fields: [schoolId], references: [id])
+  departmentId String?
+  department   Department? @relation(fields: [departmentId], references: [id])
+  classId      String?
+  class        Class?      @relation(fields: [classId], references: [id])
+  createdById  String
+  createdBy    User        @relation(fields: [createdById], references: [id])
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
+
+  @@index([schoolId])
+  @@index([schoolId, departmentId])
+  @@index([schoolId, classId])
+  @@index([createdById])
 }
 
 // ─── Conversation Memory ──────────────────────────────────────────────────────
