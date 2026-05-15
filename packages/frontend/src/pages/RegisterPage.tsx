@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import apiClient from '../services/apiClient';
 
@@ -25,6 +25,16 @@ const RegisterPage: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
 
+  // Biometric enrollment state
+  const [showBiometric, setShowBiometric] = useState(false);
+  const [bioStep, setBioStep] = useState<'init' | 'camera' | 'capture' | 'done'>('init');
+  const [bioLoading, setBioLoading] = useState(false);
+  const [bioError, setBioError] = useState<string | null>(null);
+  const [bioModelsLoaded, setBioModelsLoaded] = useState(false);
+  const [registeredCredentials, setRegisteredCredentials] = useState<{ accessToken: string } | null>(null);
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const streamRef = useRef<MediaStream | null>(null);
+
   useEffect(() => {
     const resolveLink = async () => {
       try {
@@ -47,7 +57,7 @@ const RegisterPage: React.FC = () => {
     setError(null);
 
     try {
-      await apiClient.post(`/registration-links/${token}/register`, {
+      const { data } = await apiClient.post(`/registration-links/${token}/register`, {
         fullName,
         username,
         phone: phone || undefined,
@@ -55,13 +65,116 @@ const RegisterPage: React.FC = () => {
         admissionNumber: isStudent ? admissionNumber : undefined,
       });
       setSuccess(true);
-      setTimeout(() => navigate('/login', { replace: true }), 2000);
+      // Store credentials for optional biometric enrollment
+      if (data.accessToken) {
+        setRegisteredCredentials({ accessToken: data.accessToken });
+      }
+      // If student, offer biometric enrollment; otherwise redirect after delay
+      if (isStudent) {
+        // Don't auto-redirect — show biometric option
+      } else {
+        setTimeout(() => navigate('/login', { replace: true }), 2000);
+      }
     } catch (err: any) {
       setError(err.response?.data?.error || 'Registration failed. Please try again.');
     } finally {
       setLoading(false);
     }
   };
+
+  // Biometric enrollment helpers
+  const loadBioModels = async () => {
+    try {
+      const faceapi = (window as any).faceapi;
+      if (!faceapi) {
+        setBioError('Face detection library not loaded. Please refresh.');
+        return;
+      }
+      const MODEL_URL = '/models';
+      await Promise.all([
+        faceapi.nets.tinyFaceDetector.loadFromUri(MODEL_URL),
+        faceapi.nets.faceLandmark68Net.loadFromUri(MODEL_URL),
+        faceapi.nets.faceRecognitionNet.loadFromUri(MODEL_URL),
+      ]);
+      setBioModelsLoaded(true);
+    } catch {
+      setBioError('Failed to load face detection models.');
+    }
+  };
+
+  const startBiometricEnroll = async () => {
+    setShowBiometric(true);
+    setBioStep('init');
+    await loadBioModels();
+  };
+
+  const startCamera = async () => {
+    setBioError(null);
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: 'user', width: 640, height: 480 },
+      });
+      streamRef.current = stream;
+      if (videoRef.current) {
+        videoRef.current.srcObject = stream;
+        await videoRef.current.play();
+        setBioStep('camera');
+      }
+    } catch {
+      setBioError('Camera access denied. Please allow camera permissions.');
+    }
+  };
+
+  const stopCamera = () => {
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach((t) => t.stop());
+      streamRef.current = null;
+    }
+  };
+
+  const captureAndEnroll = async () => {
+    if (!videoRef.current) return;
+    setBioLoading(true);
+    setBioError(null);
+
+    try {
+      const faceapi = (window as any).faceapi;
+      if (!faceapi) throw new Error('Face API not available');
+
+      const detection = await faceapi
+        .detectSingleFace(videoRef.current, new faceapi.TinyFaceDetectorOptions())
+        .withFaceLandmarks()
+        .withFaceDescriptor();
+
+      if (!detection) {
+        setBioError('No face detected. Position your face clearly in the frame.');
+        setBioLoading(false);
+        return;
+      }
+
+      const descriptor = Array.from(detection.descriptor as Float32Array);
+
+      // Use the token from registration to authenticate the enrollment
+      const headers: Record<string, string> = {};
+      if (registeredCredentials?.accessToken) {
+        headers['Authorization'] = `Bearer ${registeredCredentials.accessToken}`;
+      }
+
+      await apiClient.post('/biometric/enroll', { descriptor }, { headers });
+
+      stopCamera();
+      setBioStep('done');
+    } catch (err: any) {
+      setBioError(err.response?.data?.error || 'Enrollment failed. Please try again.');
+    } finally {
+      setBioLoading(false);
+    }
+  };
+
+  // Cleanup camera on unmount
+  useEffect(() => {
+    return () => stopCamera();
+  }, []);
 
   if (resolving) {
     return (
@@ -129,11 +242,105 @@ const RegisterPage: React.FC = () => {
         )}
 
         {/* Success */}
-        {success && (
+        {success && !showBiometric && (
           <div className="mb-6 p-4 bg-emerald-500/20 border border-emerald-400/30 rounded-xl text-center">
             <svg className="w-8 h-8 text-emerald-400 mx-auto mb-2" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
             <p className="text-emerald-200 font-medium">Registration successful!</p>
-            <p className="text-emerald-300/70 text-sm mt-1">Redirecting to login...</p>
+            {isStudent ? (
+              <div className="mt-4 space-y-3">
+                <p className="text-gray-400 text-sm">Would you like to enroll your face for biometric attendance?</p>
+                <div className="flex gap-3 justify-center">
+                  <button
+                    onClick={startBiometricEnroll}
+                    className="bg-gradient-to-r from-purple-600 to-blue-600 text-white font-semibold py-2.5 px-5 rounded-xl hover:scale-[1.02] active:scale-[0.98] transition-all shadow-lg shadow-purple-500/20"
+                  >
+                    Enroll Face
+                  </button>
+                  <button
+                    onClick={() => navigate('/login', { replace: true })}
+                    className="bg-white/10 border border-white/20 text-gray-300 font-medium py-2.5 px-5 rounded-xl hover:bg-white/20 transition-all"
+                  >
+                    Skip for now
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <p className="text-emerald-300/70 text-sm mt-1">Redirecting to login...</p>
+            )}
+          </div>
+        )}
+
+        {/* Biometric Enrollment Step */}
+        {showBiometric && (
+          <div className="mb-6 p-4 bg-purple-500/10 border border-purple-400/20 rounded-xl">
+            <h3 className="text-lg font-bold text-white text-center mb-3">Face Enrollment</h3>
+
+            {bioError && (
+              <div className="mb-3 p-2 bg-red-500/20 border border-red-400/30 rounded-lg">
+                <p className="text-xs text-red-300 text-center">{bioError}</p>
+              </div>
+            )}
+
+            {bioStep === 'init' && !bioModelsLoaded && (
+              <div className="text-center py-4">
+                <div className="flex items-center justify-center gap-2">
+                  <svg className="animate-spin h-5 w-5 text-purple-400" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" /><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" /></svg>
+                  <p className="text-gray-400 text-sm">Loading face detection models...</p>
+                </div>
+              </div>
+            )}
+
+            {bioStep === 'init' && bioModelsLoaded && (
+              <div className="text-center py-4">
+                <p className="text-gray-400 text-sm mb-4">Position your face in a well-lit area and press start.</p>
+                <button
+                  onClick={startCamera}
+                  className="bg-gradient-to-r from-blue-600 to-purple-600 text-white font-semibold py-2.5 px-6 rounded-xl shadow-lg shadow-purple-500/20 hover:scale-[1.02] active:scale-[0.98] transition-all"
+                >
+                  Start Camera
+                </button>
+              </div>
+            )}
+
+            {bioStep === 'camera' && (
+              <div>
+                <div className="relative rounded-xl overflow-hidden mb-4">
+                  <video ref={videoRef} className="w-full rounded-xl" playsInline muted />
+                  <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                    <div className="w-40 h-52 border-2 border-purple-400/50 rounded-full" />
+                  </div>
+                </div>
+                <div className="flex gap-3 justify-center">
+                  <button
+                    onClick={captureAndEnroll}
+                    disabled={bioLoading}
+                    className="bg-gradient-to-r from-blue-600 to-purple-600 text-white font-semibold py-2.5 px-6 rounded-xl shadow-lg shadow-purple-500/20 hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+                  >
+                    {bioLoading ? 'Processing...' : 'Capture & Enroll'}
+                  </button>
+                  <button
+                    onClick={() => { stopCamera(); setShowBiometric(false); navigate('/login', { replace: true }); }}
+                    className="bg-white/10 border border-white/20 text-gray-300 py-2.5 px-4 rounded-xl hover:bg-white/20 transition-all"
+                  >
+                    Skip
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {bioStep === 'done' && (
+              <div className="text-center py-4">
+                <svg className="w-10 h-10 text-emerald-400 mx-auto mb-2" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
+                <p className="text-emerald-200 font-medium">Face enrolled successfully!</p>
+                <p className="text-gray-400 text-sm mt-1">You can now use biometric attendance.</p>
+                <button
+                  onClick={() => navigate('/login', { replace: true })}
+                  className="mt-4 bg-gradient-to-r from-teal-500 to-cyan-600 text-white font-semibold py-2.5 px-6 rounded-xl hover:scale-[1.02] active:scale-[0.98] transition-all"
+                >
+                  Continue to Login
+                </button>
+              </div>
+            )}
           </div>
         )}
 

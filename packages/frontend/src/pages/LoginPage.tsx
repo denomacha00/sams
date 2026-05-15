@@ -1,14 +1,94 @@
-import React, { useState } from 'react';
+import React, { useState, useCallback } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuthStore } from '../store/authStore';
+import apiClient from '../services/apiClient';
 import { UserRole } from '@sams/shared';
 
 const LoginPage: React.FC = () => {
   const [identifier, setIdentifier] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
+  const [webauthnLoading, setWebauthnLoading] = useState(false);
+  const [webauthnError, setWebauthnError] = useState<string | null>(null);
   const { login, loading, error, clearError } = useAuthStore();
   const navigate = useNavigate();
+
+  // Check if WebAuthn is available in this browser
+  const webauthnAvailable = typeof window !== 'undefined' && !!window.PublicKeyCredential;
+
+  /**
+   * WebAuthn fingerprint sign-in flow:
+   * 1. Request challenge from server
+   * 2. Browser prompts for biometric/fingerprint
+   * 3. Send assertion to server for verification
+   * 4. Server returns JWT on success
+   */
+  const handleWebAuthnLogin = useCallback(async () => {
+    if (!webauthnAvailable) return;
+    setWebauthnError(null);
+    setWebauthnLoading(true);
+
+    try {
+      // Step 1: Get authentication options from server
+      const { data: options } = await apiClient.post('/auth/webauthn/authenticate/options', {});
+
+      // Convert base64 challenge to ArrayBuffer
+      const challenge = Uint8Array.from(atob(options.challenge), (c) => c.charCodeAt(0));
+
+      // Convert allowCredentials IDs from base64
+      const allowCredentials = (options.allowCredentials || []).map((cred: any) => ({
+        ...cred,
+        id: Uint8Array.from(atob(cred.id), (c) => c.charCodeAt(0)),
+      }));
+
+      // Step 2: Request credential from browser (triggers fingerprint prompt)
+      const credential = (await navigator.credentials.get({
+        publicKey: {
+          challenge,
+          rpId: options.rpId || window.location.hostname,
+          allowCredentials,
+          userVerification: 'preferred',
+          timeout: 60000,
+        },
+      })) as PublicKeyCredential | null;
+
+      if (!credential) {
+        setWebauthnError('Authentication was cancelled.');
+        setWebauthnLoading(false);
+        return;
+      }
+
+      const response = credential.response as AuthenticatorAssertionResponse;
+
+      // Convert ArrayBuffers to base64 for transport
+      const toBase64 = (buffer: ArrayBuffer) =>
+        btoa(String.fromCharCode(...new Uint8Array(buffer)));
+
+      // Step 3: Send assertion to server for verification
+      const { data: authResult } = await apiClient.post('/auth/webauthn/authenticate/verify', {
+        credentialId: credential.id,
+        authenticatorData: toBase64(response.authenticatorData),
+        clientDataJSON: toBase64(response.clientDataJSON),
+        signature: toBase64(response.signature),
+      });
+
+      // Step 4: Store tokens and redirect
+      if (authResult.token) {
+        useAuthStore.getState().setAuth(authResult.user, authResult.token, authResult.refreshToken);
+        navigate(getRoleRedirect(authResult.user.role), { replace: true });
+      }
+    } catch (err: any) {
+      if (err.name === 'NotAllowedError') {
+        setWebauthnError('Fingerprint authentication was denied or timed out.');
+      } else if (err.response?.data?.error) {
+        setWebauthnError(err.response.data.error);
+      } else {
+        setWebauthnError('Fingerprint sign-in failed. Please use password instead.');
+      }
+    } finally {
+      setWebauthnLoading(false);
+    }
+  }, [webauthnAvailable, navigate]);
 
   const getRoleRedirect = (role: UserRole): string => {
     switch (role) {
@@ -183,6 +263,31 @@ const LoginPage: React.FC = () => {
             </form>
 
             <div className="mt-6 pt-6 border-t border-white/10 text-center space-y-3">
+              {/* WebAuthn Fingerprint Sign-In for Teachers */}
+              {webauthnAvailable && (
+                <div className="mb-3">
+                  <button
+                    type="button"
+                    onClick={handleWebAuthnLogin}
+                    disabled={webauthnLoading}
+                    className="w-full flex items-center justify-center gap-2 bg-white/5 border border-white/20 text-white font-semibold py-3 px-4 rounded-xl hover:bg-white/10 focus:outline-none focus:ring-2 focus:ring-teal-500/40 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200"
+                  >
+                    {webauthnLoading ? (
+                      <svg className="animate-spin h-5 w-5 text-teal-400" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" /><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" /></svg>
+                    ) : (
+                      <svg className="w-5 h-5 text-teal-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 11c0 3.517-1.009 6.799-2.753 9.571m-3.44-2.04l.054-.09A13.916 13.916 0 008 11a4 4 0 118 0c0 1.017-.07 2.019-.203 3m-2.118 6.844A21.88 21.88 0 0015.171 17m3.839 1.132c.645-2.266.99-4.659.99-7.132A8 8 0 008 4.07M3 15.364c.64-1.319 1-2.8 1-4.364 0-1.457.39-2.823 1.07-4" />
+                      </svg>
+                    )}
+                    {webauthnLoading ? 'Authenticating...' : 'Sign in with Fingerprint'}
+                  </button>
+                  {webauthnError && (
+                    <p className="text-xs text-red-400 mt-2">{webauthnError}</p>
+                  )}
+                  <p className="text-xs text-gray-500 mt-1">For teachers with registered fingerprints</p>
+                </div>
+              )}
+
               <Link to="/forgot-password" className="block text-sm text-gray-400 hover:text-teal-300 font-medium transition-colors">
                 Forgot your password?
               </Link>

@@ -21,6 +21,7 @@ interface AuthState {
   error: string | null;
   loading: boolean;
   login: (schoolCode: string, identifier: string, password: string) => Promise<void>;
+  setAuth: (user: AuthUser, accessToken: string, refreshToken: string) => void;
   logout: () => Promise<void>;
   refreshAccessToken: () => Promise<void>;
   clearError: () => void;
@@ -35,6 +36,17 @@ export const useAuthStore = create<AuthState>()(
       isAuthenticated: false,
       error: null,
       loading: false,
+
+      setAuth: (user: AuthUser, accessToken: string, refreshToken: string) => {
+        set({
+          user,
+          accessToken,
+          refreshToken,
+          isAuthenticated: true,
+          loading: false,
+          error: null,
+        });
+      },
 
       login: async (schoolCode: string, identifier: string, password: string) => {
         set({ loading: true, error: null });
