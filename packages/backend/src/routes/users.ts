@@ -43,9 +43,112 @@ const registerViaLinkSchema = z.object({
   admissionNumber: z.string().min(1).max(50).optional(),
 });
 
+const updateMeSchema = z.object({
+  username: z.string().min(3).max(50).optional(),
+  fullName: z.string().min(1).max(200).optional(),
+  email: z.string().email().optional(),
+  phone: z.string().min(9).max(15).optional(),
+});
+
 // ─── Router ───────────────────────────────────────────────────────────────────
 
 export const usersRouter = Router();
+
+/**
+ * PATCH /api/v1/users/me
+ * Update the authenticated user's own profile.
+ */
+usersRouter.patch('/me', async (req: Request, res: Response): Promise<void> => {
+  const parsed = updateMeSchema.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({
+      error: 'Validation failed',
+      code: 'VALIDATION_ERROR',
+      details: parsed.error.flatten().fieldErrors,
+    });
+    return;
+  }
+
+  try {
+    // If username is being changed, check uniqueness
+    if (parsed.data.username) {
+      const existing = await prisma.user.findUnique({
+        where: { username: parsed.data.username },
+      });
+      if (existing && existing.id !== req.user.sub) {
+        throw new AppError(400, 'USERNAME_TAKEN', 'This username is already taken');
+      }
+    }
+
+    const updated = await prisma.user.update({
+      where: { id: req.user.sub },
+      data: {
+        ...(parsed.data.username && { username: parsed.data.username }),
+        ...(parsed.data.fullName && { fullName: parsed.data.fullName }),
+        ...(parsed.data.email && { email: parsed.data.email }),
+        ...(parsed.data.phone && { phone: parsed.data.phone }),
+      },
+      select: {
+        id: true,
+        username: true,
+        fullName: true,
+        email: true,
+        phone: true,
+        role: true,
+      },
+    });
+
+    res.status(200).json(updated);
+  } catch (err) {
+    if (err instanceof AppError) throw err;
+    throw new AppError(500, 'INTERNAL_ERROR', 'Failed to update profile');
+  }
+});
+
+/**
+ * POST /api/v1/users/me/password
+ * Change the authenticated user's password.
+ */
+usersRouter.post('/me/password', async (req: Request, res: Response): Promise<void> => {
+  const schema = z.object({
+    currentPassword: z.string().min(1),
+    newPassword: z.string().min(8),
+  });
+
+  const parsed = schema.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({
+      error: 'Validation failed',
+      code: 'VALIDATION_ERROR',
+      details: parsed.error.flatten().fieldErrors,
+    });
+    return;
+  }
+
+  try {
+    const bcrypt = await import('bcrypt');
+    const user = await prisma.user.findUnique({ where: { id: req.user.sub } });
+    if (!user) {
+      throw new AppError(404, 'USER_NOT_FOUND', 'User not found');
+    }
+
+    const valid = await bcrypt.compare(parsed.data.currentPassword, user.passwordHash);
+    if (!valid) {
+      throw new AppError(400, 'INVALID_PASSWORD', 'Current password is incorrect');
+    }
+
+    const newHash = await bcrypt.hash(parsed.data.newPassword, 12);
+    await prisma.user.update({
+      where: { id: req.user.sub },
+      data: { passwordHash: newHash },
+    });
+
+    res.status(200).json({ message: 'Password changed successfully' });
+  } catch (err) {
+    if (err instanceof AppError) throw err;
+    throw new AppError(500, 'INTERNAL_ERROR', 'Failed to change password');
+  }
+});
 
 /**
  * GET /api/v1/users

@@ -5,9 +5,10 @@ import { UserRole } from '@sams/shared';
 
 const ProfilePage: React.FC = () => {
   const user = useAuthStore((s) => s.user);
+  const [username, setUsername] = useState(user?.username || '');
   const [fullName, setFullName] = useState(user?.fullName || '');
   const [email, setEmail] = useState(user?.email || '');
-  const [phone, setPhone] = useState('');
+  const [phone, setPhone] = useState(user?.phone || '');
   const [saving, setSaving] = useState(false);
   const [success, setSuccess] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -34,7 +35,7 @@ const ProfilePage: React.FC = () => {
     setSaving(true);
     clearMessages();
     try {
-      await apiClient.patch('/users/me', { fullName, email, phone: phone || undefined });
+      await apiClient.patch('/users/me', { username, fullName, email, phone: phone || undefined });
       setSuccess('Profile updated successfully!');
     } catch (err: any) {
       setError(err.response?.data?.error || 'Failed to update profile');
@@ -123,6 +124,11 @@ const ProfilePage: React.FC = () => {
 
           {/* Profile form */}
           <form onSubmit={handleProfileUpdate} className="space-y-4">
+            <div>
+              <label htmlFor="username" className="block text-xs font-semibold text-gray-300 uppercase tracking-wider mb-2">Username</label>
+              <input id="username" type="text" value={username} onChange={(e) => setUsername(e.target.value)}
+                className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-purple-500/50 transition-all" placeholder="Your username" />
+            </div>
             <div>
               <label htmlFor="fullName" className="block text-xs font-semibold text-gray-300 uppercase tracking-wider mb-2">Full Name</label>
               <input id="fullName" type="text" value={fullName} onChange={(e) => setFullName(e.target.value)}
