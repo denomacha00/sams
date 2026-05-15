@@ -53,6 +53,7 @@ const ICONS = {
   check: 'M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z',
   fire: 'M17.657 18.657A8 8 0 016.343 7.343S7 9 9 10c0-2 .5-5 2.986-7C14 5 16.09 5.777 17.656 7.343A7.975 7.975 0 0120 13a7.975 7.975 0 01-2.343 5.657z',
   trending: 'M13 7h8m0 0v8m0-8l-8 8-4-4-6 6',
+  settings: 'M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.066 2.573c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.573 1.066c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.066-2.573c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z M15 12a3 3 0 11-6 0 3 3 0 016 0z',
 };
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -237,6 +238,7 @@ function getQuickActions(role?: UserRole): QuickAction[] {
         { to: '/timetable', label: 'View Timetable', icon: ICONS.calendar, gradient: 'from-blue-500 to-indigo-500' },
         { to: '/reports', label: 'My Reports', icon: ICONS.chart, gradient: 'from-purple-500 to-pink-500' },
         { to: '/ai', label: 'AI Assistant', icon: ICONS.ai, gradient: 'from-violet-500 to-purple-500' },
+        { to: '/settings', label: 'Settings', icon: ICONS.settings, gradient: 'from-gray-500 to-slate-500' },
         { to: '/notifications', label: 'Notifications', icon: ICONS.bell, gradient: 'from-rose-500 to-red-500' },
       ];
     case UserRole.HOD:
