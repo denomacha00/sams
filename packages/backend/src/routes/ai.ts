@@ -294,10 +294,11 @@ aiRouter.post('/query-with-image', aiUpload.array('images', 4), async (req: Requ
     const client = new OpenAI({
       apiKey,
       baseURL: process.env.OPENAI_BASE_URL || 'https://api.groq.com/openai/v1',
+      timeout: 60000, // 60 second timeout for vision
     });
 
     const response = await client.chat.completions.create({
-      model: process.env.VISION_MODEL || 'llama-3.2-90b-vision-preview',
+      model: process.env.VISION_MODEL || 'llama-3.2-11b-vision-preview',
       messages: [
         {
           role: 'user',
@@ -319,8 +320,12 @@ aiRouter.post('/query-with-image', aiUpload.array('images', 4), async (req: Requ
     });
   } catch (err) {
     if (err instanceof AppError) throw err;
-    console.error('[AI] Image query error:', err);
-    throw new AppError(500, 'INTERNAL_ERROR', 'Failed to analyze image');
+    console.error('[AI] Image query error:', (err as Error).message || err);
+    res.status(200).json({
+      answer: 'I could not analyze the image. This may be due to the image being too large or the vision service being temporarily unavailable. Try a smaller image or try again later.',
+      intent: 'image_analysis_error',
+      engine: 'local',
+    });
   }
 });
 
