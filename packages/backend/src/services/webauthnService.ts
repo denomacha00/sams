@@ -70,10 +70,6 @@ export class WebAuthnService {
       throw new AppError(404, 'USER_NOT_FOUND', 'User not found');
     }
 
-    if (user.role !== 'TEACHER' && user.role !== 'SCHOOL_ADMIN' && user.role !== 'HOD') {
-      throw new AppError(403, 'FORBIDDEN', 'WebAuthn registration is only available for staff');
-    }
-
     // Get existing credentials to exclude
     const existingCreds = await prisma.webAuthnCredential.findMany({
       where: { userId },

@@ -327,8 +327,8 @@ const SettingsPage: React.FC = () => {
           </div>
         )}
 
-        {/* Fingerprint Sign-In (Staff only) */}
-        {isStaff && webauthnAvailable && (
+        {/* Fingerprint Registration (All roles) */}
+        {webauthnAvailable && (
           <div className="backdrop-blur-xl bg-white/5 border border-white/10 rounded-2xl p-6 mb-6">
             <div className="flex items-center gap-3 mb-4">
               <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-teal-500/20 to-cyan-500/20 border border-teal-500/30 flex items-center justify-center">
@@ -338,7 +338,7 @@ const SettingsPage: React.FC = () => {
               </div>
               <div>
                 <h3 className="text-lg font-semibold text-white">Fingerprint Sign-In</h3>
-                <p className="text-xs text-gray-400">Quick passwordless login with your fingerprint</p>
+                <p className="text-xs text-gray-400">Register your fingerprint for quick authentication</p>
               </div>
             </div>
             {fingerprintRegistered ? (
@@ -348,7 +348,7 @@ const SettingsPage: React.FC = () => {
               </div>
             ) : (
               <div>
-                <p className="text-sm text-gray-400 mb-4">Register your fingerprint to sign in without typing your password.</p>
+                <p className="text-sm text-gray-400 mb-4">Register your fingerprint for biometric verification and quick sign-in.</p>
                 <button onClick={handleFingerprintRegister} disabled={fingerprintLoading}
                   className="w-full flex items-center justify-center gap-2 bg-gradient-to-r from-teal-600 to-cyan-600 text-white font-semibold py-3 px-4 rounded-xl shadow-lg shadow-teal-500/25 hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50 transition-all">
                   {fingerprintLoading ? (
