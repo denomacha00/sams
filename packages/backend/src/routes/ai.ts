@@ -7,10 +7,10 @@ import { openaiQuery } from '../services/ai/openaiEngine';
 import { conversationMemoryService } from '../services/conversationMemoryService';
 import { AppError } from '../middleware/errors';
 
-// ─── Multer config for image uploads ──────────────────────────────────────────
+// Multer config for multi-image uploads (max 4 images, 5MB each)
 const aiUpload = multer({
   storage: multer.memoryStorage(),
-  limits: { fileSize: 5 * 1024 * 1024 },
+  limits: { fileSize: 5 * 1024 * 1024, files: 4 },
   fileFilter: (_req, file, cb) => {
     if (file.mimetype.startsWith('image/')) cb(null, true);
     else cb(new Error('Only image files are allowed'));
@@ -268,18 +268,21 @@ aiRouter.post('/voice', async (req: Request, res: Response): Promise<void> => {
 
 /**
  * POST /api/v1/ai/query-with-image
- * Accepts an image upload + question, sends to vision model for analysis.
+ * Accepts up to 4 image uploads + question, sends to vision model for analysis.
  */
-aiRouter.post('/query-with-image', aiUpload.single('image'), async (req: Request, res: Response): Promise<void> => {
+aiRouter.post('/query-with-image', aiUpload.array('images', 4), async (req: Request, res: Response): Promise<void> => {
   try {
-    if (!req.file) {
-      throw new AppError(400, 'VALIDATION_ERROR', 'An image file is required.');
+    const files = (req as any).files as Express.Multer.File[];
+    if (!files || files.length === 0) {
+      throw new AppError(400, 'VALIDATION_ERROR', 'At least one image file is required.');
     }
     const question = (req.body.question as string) || 'What is in this image?';
 
-    // Convert image to base64
-    const base64Image = req.file.buffer.toString('base64');
-    const mimeType = req.file.mimetype;
+    // Convert images to base64 content parts
+    const imageContent = files.map((file) => ({
+      type: 'image_url' as const,
+      image_url: { url: `data:${file.mimetype};base64,${file.buffer.toString('base64')}` },
+    }));
 
     // Call vision model
     const OpenAI = (await import('openai')).default;
@@ -300,14 +303,14 @@ aiRouter.post('/query-with-image', aiUpload.single('image'), async (req: Request
           role: 'user',
           content: [
             { type: 'text', text: question },
-            { type: 'image_url', image_url: { url: `data:${mimeType};base64,${base64Image}` } },
+            ...imageContent,
           ],
         },
       ],
       max_tokens: 1024,
     });
 
-    const answer = response.choices[0]?.message?.content || 'I could not analyze this image.';
+    const answer = response.choices[0]?.message?.content || 'I could not analyze the image(s).';
 
     res.status(200).json({
       answer,
@@ -325,7 +328,7 @@ aiRouter.post('/query-with-image', aiUpload.single('image'), async (req: Request
 
 /**
  * POST /api/v1/ai/generate-image
- * Generates an image from a text prompt using Pollinations AI.
+ * Generates an image from a text prompt using Pollinations AI (free).
  */
 aiRouter.post('/generate-image', async (req: Request, res: Response): Promise<void> => {
   try {
@@ -334,7 +337,6 @@ aiRouter.post('/generate-image', async (req: Request, res: Response): Promise<vo
       throw new AppError(400, 'VALIDATION_ERROR', 'A non-empty "prompt" field is required.');
     }
 
-    // Use Pollinations AI (free, no API key needed)
     const encodedPrompt = encodeURIComponent(prompt.trim());
     const imageUrl = `https://image.pollinations.ai/prompt/${encodedPrompt}?width=512&height=512&nologo=true`;
 

@@ -7,7 +7,7 @@ interface Message {
   role: 'user' | 'assistant';
   content: string;
   imageUrl?: string;
-  userImage?: string;
+  userImages?: string[];
   timestamp: Date;
 }
 
@@ -37,54 +37,54 @@ const FloatingAI: React.FC = () => {
   const [messages, setMessages] = useState<Message[]>([WELCOME_MESSAGE]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
-  const [selectedImage, setSelectedImage] = useState<File | null>(null);
-  const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const [selectedImages, setSelectedImages] = useState<File[]>([]);
+  const [imagePreviews, setImagePreviews] = useState<string[]>([]);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Patterns that trigger image generation
+  // Image generation patterns
   const IMAGE_GEN_PATTERNS = [
     /^generate\s+(?:an?\s+)?image/i,
     /^draw\s+/i,
     /^show\s+me\s+a\s+picture/i,
     /^create\s+(?:an?\s+)?image/i,
     /^make\s+(?:an?\s+)?image/i,
-    /^generate\s+(?:a\s+)?picture/i,
   ];
 
-  const isImageGenerationRequest = (text: string): boolean => {
-    return IMAGE_GEN_PATTERNS.some((pattern) => pattern.test(text.trim()));
-  };
+  const isImageGenRequest = (text: string) => IMAGE_GEN_PATTERNS.some((p) => p.test(text.trim()));
 
   const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      if (file.size > 5 * 1024 * 1024) {
-        alert('Image must be less than 5MB');
-        return;
-      }
-      setSelectedImage(file);
-      const reader = new FileReader();
-      reader.onload = () => setImagePreview(reader.result as string);
-      reader.readAsDataURL(file);
-    }
-  };
+    const files = Array.from(e.target.files || []);
+    const remaining = 4 - selectedImages.length;
+    const toAdd = files.slice(0, remaining).filter((f) => f.size <= 5 * 1024 * 1024);
 
-  const clearSelectedImage = () => {
-    setSelectedImage(null);
-    setImagePreview(null);
+    if (toAdd.length === 0) return;
+
+    setSelectedImages((prev) => [...prev, ...toAdd]);
+    toAdd.forEach((file) => {
+      const reader = new FileReader();
+      reader.onload = () => setImagePreviews((prev) => [...prev, reader.result as string]);
+      reader.readAsDataURL(file);
+    });
     if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
+  const removeImage = (index: number) => {
+    setSelectedImages((prev) => prev.filter((_, i) => i !== index));
+    setImagePreviews((prev) => prev.filter((_, i) => i !== index));
+  };
+
+  const clearImages = () => { setSelectedImages([]); setImagePreviews([]); };
+
   const submitQuery = useCallback(async (text: string) => {
-    if (!text.trim() && !selectedImage) return;
+    if (!text.trim() && selectedImages.length === 0) return;
 
     const userMessage: Message = {
       id: crypto.randomUUID(),
       role: 'user',
       content: text.trim() || 'What is in this image?',
-      userImage: imagePreview || undefined,
+      userImages: imagePreviews.length > 0 ? [...imagePreviews] : undefined,
       timestamp: new Date(),
     };
     setMessages((prev) => [...prev, userMessage]);
@@ -92,62 +92,46 @@ const FloatingAI: React.FC = () => {
     setLoading(true);
 
     try {
-      // Case 1: Image uploaded — use vision endpoint
-      if (selectedImage) {
+      // Case 1: Images uploaded — use vision endpoint
+      if (selectedImages.length > 0) {
         const formData = new FormData();
-        formData.append('image', selectedImage);
+        selectedImages.forEach((file) => formData.append('images', file));
         formData.append('question', text.trim() || 'What is in this image?');
-        clearSelectedImage();
+        clearImages();
 
         const { data } = await apiClient.post('/ai/query-with-image', formData, {
           headers: { 'Content-Type': 'multipart/form-data' },
         });
-        const assistantMessage: Message = {
-          id: crypto.randomUUID(),
-          role: 'assistant',
-          content: data.answer,
-          timestamp: new Date(),
-        };
-        setMessages((prev) => [...prev, assistantMessage]);
+        setMessages((prev) => [...prev, {
+          id: crypto.randomUUID(), role: 'assistant', content: data.answer, timestamp: new Date(),
+        }]);
         return;
       }
 
       // Case 2: Image generation request
-      if (isImageGenerationRequest(text)) {
+      if (isImageGenRequest(text)) {
         const { data } = await apiClient.post('/ai/generate-image', { prompt: text.trim() });
-        const assistantMessage: Message = {
-          id: crypto.randomUUID(),
-          role: 'assistant',
-          content: `Here's the generated image for: "${data.prompt}"`,
-          imageUrl: data.imageUrl,
-          timestamp: new Date(),
-        };
-        setMessages((prev) => [...prev, assistantMessage]);
+        setMessages((prev) => [...prev, {
+          id: crypto.randomUUID(), role: 'assistant',
+          content: `Here's the generated image:`, imageUrl: data.imageUrl, timestamp: new Date(),
+        }]);
         return;
       }
 
       // Case 3: Normal text query
       const { data } = await apiClient.post('/ai/query', { question: text.trim() });
-      const assistantMessage: Message = {
-        id: crypto.randomUUID(),
-        role: 'assistant',
-        content: data.answer,
-        imageUrl: data.imageUrl,
-        timestamp: new Date(),
-      };
-      setMessages((prev) => [...prev, assistantMessage]);
+      setMessages((prev) => [...prev, {
+        id: crypto.randomUUID(), role: 'assistant', content: data.answer, timestamp: new Date(),
+      }]);
     } catch {
-      const errorMessage: Message = {
-        id: crypto.randomUUID(),
-        role: 'assistant',
-        content: "I'm having trouble connecting. Please try again in a moment.",
-        timestamp: new Date(),
-      };
-      setMessages((prev) => [...prev, errorMessage]);
+      setMessages((prev) => [...prev, {
+        id: crypto.randomUUID(), role: 'assistant',
+        content: "I'm having trouble connecting. Please try again.", timestamp: new Date(),
+      }]);
     } finally {
       setLoading(false);
     }
-  }, [selectedImage, imagePreview]);
+  }, [selectedImages, imagePreviews]);
 
   const { isListening, startListening, stopListening } = useVoiceQuery(submitQuery);
 
@@ -219,23 +203,18 @@ const FloatingAI: React.FC = () => {
                     : 'bg-white/5 border border-white/10 text-gray-200'
                 }`}
               >
-                {/* User uploaded image thumbnail */}
-                {msg.userImage && (
-                  <img
-                    src={msg.userImage}
-                    alt="Uploaded"
-                    className="max-w-full max-h-32 rounded-lg mb-2 object-cover"
-                  />
+                {/* User uploaded images */}
+                {msg.userImages && msg.userImages.length > 0 && (
+                  <div className="flex gap-1 mb-2 flex-wrap">
+                    {msg.userImages.map((img, i) => (
+                      <img key={i} src={img} alt="Uploaded" className="h-16 w-16 object-cover rounded-lg" />
+                    ))}
+                  </div>
                 )}
                 <p className="whitespace-pre-wrap leading-relaxed">{msg.content}</p>
                 {/* AI generated image */}
                 {msg.imageUrl && (
-                  <img
-                    src={msg.imageUrl}
-                    alt="AI Generated"
-                    className="max-w-full rounded-lg mt-2 border border-white/10"
-                    loading="lazy"
-                  />
+                  <img src={msg.imageUrl} alt="AI Generated" className="max-w-full rounded-lg mt-2 border border-white/10" loading="lazy" />
                 )}
               </div>
             </div>
@@ -262,42 +241,32 @@ const FloatingAI: React.FC = () => {
 
         {/* Input */}
         <div className="border-t border-white/10 p-3">
-          {/* Image preview */}
-          {imagePreview && (
-            <div className="mb-2 relative inline-block">
-              <img
-                src={imagePreview}
-                alt="Selected"
-                className="h-16 w-16 object-cover rounded-lg border border-white/20"
-              />
-              <button
-                type="button"
-                onClick={clearSelectedImage}
-                className="absolute -top-1.5 -right-1.5 w-5 h-5 bg-red-500 rounded-full flex items-center justify-center text-white text-xs hover:bg-red-600 transition-colors"
-                aria-label="Remove image"
-              >
-                ×
-              </button>
+          {/* Image previews */}
+          {imagePreviews.length > 0 && (
+            <div className="flex gap-2 mb-2 flex-wrap">
+              {imagePreviews.map((img, i) => (
+                <div key={i} className="relative">
+                  <img src={img} alt="Selected" className="h-12 w-12 object-cover rounded-lg border border-white/20" />
+                  <button type="button" onClick={() => removeImage(i)}
+                    className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 rounded-full flex items-center justify-center text-white text-[10px] hover:bg-red-600">×</button>
+                </div>
+              ))}
+              {selectedImages.length < 4 && (
+                <button type="button" onClick={() => fileInputRef.current?.click()}
+                  className="h-12 w-12 rounded-lg border border-dashed border-white/20 flex items-center justify-center text-gray-500 hover:text-white hover:border-white/40 transition-colors">
+                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>
+                </button>
+              )}
             </div>
           )}
           <form onSubmit={handleSubmit} className="flex gap-2">
-            {/* Hidden file input */}
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept="image/*"
-              onChange={handleImageSelect}
-              className="hidden"
-            />
+            {/* Hidden file input (multiple) */}
+            <input ref={fileInputRef} type="file" accept="image/*" multiple onChange={handleImageSelect} className="hidden" />
 
             {/* Image upload button */}
-            <button
-              type="button"
-              onClick={() => fileInputRef.current?.click()}
-              className="p-2 bg-white/5 text-gray-400 border border-white/10 rounded-lg hover:bg-white/10 hover:text-white transition-all duration-200"
-              title="Upload image"
-              aria-label="Upload image"
-            >
+            <button type="button" onClick={() => fileInputRef.current?.click()}
+              className="p-2 bg-white/5 text-gray-400 border border-white/10 rounded-lg hover:bg-white/10 hover:text-white transition-all"
+              title="Upload images (max 4)" aria-label="Upload images">
               <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
                 <path strokeLinecap="round" strokeLinejoin="round" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
                 <path strokeLinecap="round" strokeLinejoin="round" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
@@ -309,7 +278,7 @@ const FloatingAI: React.FC = () => {
               type="text"
               value={input}
               onChange={(e) => setInput(e.target.value)}
-              placeholder={selectedImage ? 'Ask about this image...' : 'Ask SAMS AI...'}
+              placeholder={selectedImages.length > 0 ? 'Ask about these images...' : 'Ask SAMS AI...'}
               disabled={loading}
               className="flex-1 bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm text-white placeholder-gray-500 focus:outline-none focus:ring-1 focus:ring-purple-500/50 disabled:opacity-50 transition-all"
             />
@@ -337,7 +306,7 @@ const FloatingAI: React.FC = () => {
             {/* Send button */}
             <button
               type="submit"
-              disabled={loading || (!input.trim() && !selectedImage)}
+              disabled={loading || (!input.trim() && selectedImages.length === 0)}
               className="p-2 bg-gradient-to-r from-purple-600 to-blue-600 text-white rounded-lg shadow-md shadow-purple-500/20 hover:scale-105 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200"
               aria-label="Send message"
             >
