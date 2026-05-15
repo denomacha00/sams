@@ -42,19 +42,34 @@ function getFallbackClient(): OpenAI | null {
 async function buildSystemPrompt(user: AccessTokenPayload): Promise<string> {
   let scopeDescription = '';
   let userName = '';
+  let schoolInfo = '';
 
-  // Fetch the user's name from the database
+  // Fetch the user's name and school details from the database
   if (user.sub !== 'guest') {
     try {
       const dbUser = await prisma.user.findUnique({
         where: { id: user.sub },
-        select: { fullName: true },
+        select: {
+          fullName: true,
+          school: {
+            select: {
+              name: true,
+              schoolCode: true,
+              planTier: true,
+              licenseExpiresAt: true,
+              isSuspended: true,
+            },
+          },
+        },
       });
       if (dbUser) {
         userName = dbUser.fullName;
+        if (dbUser.school) {
+          schoolInfo = `\n\nUser's School Information:\n• School Name: ${dbUser.school.name}\n• School Code: ${dbUser.school.schoolCode}\n• Plan: ${dbUser.school.planTier}\n• License Expires: ${dbUser.school.licenseExpiresAt.toLocaleDateString()}\n• Suspended: ${dbUser.school.isSuspended ? 'Yes' : 'No'}`;
+        }
       }
     } catch {
-      // If user fetch fails, continue without name
+      // If user fetch fails, continue without name/school
     }
   }
 
@@ -110,8 +125,11 @@ When answering general knowledge questions, answer them directly and helpfully l
 For SAMS-specific data queries, respect the user's scope:
 ${scopeDescription}
 ${nameContext}
+${schoolInfo}
 
 User context: schoolId=${user.schoolId}, userId=${user.sub}, role=${user.role}${userName ? `, name=${userName}` : ''}
+
+When the user asks about their school code, school name, plan, or any school details, use the School Information provided above. Do NOT guess or make up school codes.
 
 Be concise, friendly, and helpful. Address the user by their name. Answer in plain language.${knowledgeSection}`;
 }
