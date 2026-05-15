@@ -37,6 +37,7 @@ const FloatingAI: React.FC = () => {
   const [messages, setMessages] = useState<Message[]>([WELCOME_MESSAGE]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
+  const [threadId, setThreadId] = useState<string | null>(null);
   const [selectedImages, setSelectedImages] = useState<File[]>([]);
   const [imagePreviews, setImagePreviews] = useState<string[]>([]);
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -119,7 +120,8 @@ const FloatingAI: React.FC = () => {
       }
 
       // Case 3: Normal text query
-      const { data } = await apiClient.post('/ai/query', { question: text.trim() });
+      const { data } = await apiClient.post('/ai/query', { question: text.trim(), threadId });
+      if (data.threadId) setThreadId(data.threadId);
       setMessages((prev) => [...prev, {
         id: crypto.randomUUID(), role: 'assistant', content: data.answer, timestamp: new Date(),
       }]);
