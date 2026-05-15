@@ -2,7 +2,7 @@ module.exports = {
   apps: [
     {
       name: 'sams-api',
-      script: './packages/backend/dist/index.js',
+      script: './packages/backend/dist/backend/src/index.js',
       instances: 2,
       exec_mode: 'cluster',
       autorestart: true,
