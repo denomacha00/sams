@@ -21,8 +21,10 @@ import ReportsPage from './pages/ReportsPage';
 import RiskScorePage from './pages/RiskScorePage';
 import AIAssistantPage from './pages/AIAssistantPage';
 import SettingsPage from './pages/SettingsPage';
+import ProfilePage from './pages/ProfilePage';
 import NotificationsPage from './pages/NotificationsPage';
 import TimetableViewPage from './pages/TimetableViewPage';
+import LinkAttendancePage from './pages/LinkAttendancePage';
 
 // Admin pages
 import AdminDashboardPage from './pages/admin/AdminDashboardPage';
@@ -69,6 +71,7 @@ ReactDOM.createRoot(document.getElementById('root') as HTMLElement).render(
         {/* Protected routes — any authenticated user */}
         <Route element={<AuthGuard />}>
           <Route path="/dashboard" element={<DashboardPage />} />
+          <Route path="/attend/:token" element={<LinkAttendancePage />} />
           <Route path="/sessions" element={<SessionPage />} />
           <Route path="/sessions/scan" element={<QRScanPage />} />
           <Route path="/attendance" element={<ManualAttendancePage />} />
@@ -78,6 +81,7 @@ ReactDOM.createRoot(document.getElementById('root') as HTMLElement).render(
           <Route path="/reports" element={<ReportsPage />} />
           <Route path="/risk-scores" element={<RiskScorePage />} />
           <Route path="/ai" element={<AIAssistantPage />} />
+          <Route path="/profile" element={<ProfilePage />} />
           <Route path="/settings" element={<SettingsPage />} />
           <Route path="/notifications" element={<NotificationsPage />} />
         </Route>

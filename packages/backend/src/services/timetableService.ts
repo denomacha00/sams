@@ -159,7 +159,13 @@ export class TimetableService {
       where.dayOfWeek = filters.dayOfWeek;
     }
 
-    const entries = await prisma.timetableEntry.findMany({ where });
+    const entries = await prisma.timetableEntry.findMany({
+      where,
+      include: {
+        class: { select: { name: true } },
+        teacher: { select: { fullName: true } },
+      },
+    });
 
     return entries;
   }

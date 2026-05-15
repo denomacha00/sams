@@ -17,6 +17,7 @@ import {
 // ─── Constants ────────────────────────────────────────────────────────────────
 
 const QR_SECRET = process.env.QR_SECRET ?? 'qr-secret-dev';
+const FRONTEND_URL = process.env.FRONTEND_URL ?? 'http://localhost:5173';
 const BIOMETRIC_CONFIDENCE_THRESHOLD = parseFloat(
   process.env.BIOMETRIC_CONFIDENCE_THRESHOLD ?? '0.6',
 );
@@ -30,9 +31,176 @@ interface QRTokenPayload {
   exp: number;
 }
 
+interface LinkTokenPayload {
+  sessionId: string;
+  type: 'LINK';
+  nonce: string;
+  iat: number;
+  exp: number;
+}
+
 // ─── Attendance Service ───────────────────────────────────────────────────────
 
 export class AttendanceService {
+  /**
+   * Generate a shareable attendance link for an active session.
+   * Creates a JWT with type 'LINK', stores it on the session record,
+   * and returns the full shareable URL.
+   */
+  async generateAttendanceLink(
+    sessionId: string,
+    schoolId: string,
+    expiryMinutes: number = 5,
+  ) {
+    // 1. Validate session exists, is active, and belongs to the teacher's school
+    const session = await prisma.attendanceSession.findUnique({
+      where: { id: sessionId },
+    });
+
+    if (!session) {
+      throw new AppError(404, 'SESSION_NOT_FOUND', 'Attendance session not found');
+    }
+
+    if (!session.isActive) {
+      throw new AppError(400, 'SESSION_ENDED', 'Attendance session has ended');
+    }
+
+    if (session.schoolId !== schoolId) {
+      throw new AppError(403, 'FORBIDDEN', 'Session does not belong to your school');
+    }
+
+    // 2. Generate JWT with type 'LINK'
+    const nonce = createId();
+    const now = Math.floor(Date.now() / 1000);
+    const exp = now + expiryMinutes * 60;
+
+    const linkToken = jwt.sign(
+      { sessionId, type: 'LINK', nonce, iat: now, exp },
+      QR_SECRET,
+    );
+
+    // 3. Store token and expiry on the session record
+    const expiresAt = new Date(exp * 1000);
+
+    await prisma.attendanceSession.update({
+      where: { id: sessionId },
+      data: {
+        currentLinkToken: linkToken,
+        linkExpiresAt: expiresAt,
+      },
+    });
+
+    // 4. Return link details
+    const linkUrl = `${FRONTEND_URL}/attend/${linkToken}`;
+
+    return {
+      linkToken,
+      linkUrl,
+      expiresAt: expiresAt.toISOString(),
+      sessionId,
+    };
+  }
+
+  /**
+   * Record attendance via link token.
+   * Validates the link JWT (type: 'LINK'), checks GPS proximity,
+   * prevents duplicates, classifies status, and creates the record.
+   */
+  async recordLinkAttendance(
+    studentId: string,
+    schoolId: string,
+    linkToken: string,
+    gpsCoords: { lat: number; lng: number },
+  ) {
+    // 1. Verify JWT signature and expiry
+    let payload: LinkTokenPayload;
+    try {
+      payload = jwt.verify(linkToken, QR_SECRET) as LinkTokenPayload;
+    } catch {
+      throw new AppError(400, 'LINK_EXPIRED', 'Attendance link is expired or invalid');
+    }
+
+    // 2. Validate token has type: 'LINK' to prevent QR token reuse
+    if (payload.type !== 'LINK') {
+      throw new AppError(400, 'INVALID_TOKEN_TYPE', 'Invalid token type — expected a link token');
+    }
+
+    // 3. Fetch session, check isActive
+    const session = await prisma.attendanceSession.findUnique({
+      where: { id: payload.sessionId },
+    });
+
+    if (!session) {
+      throw new AppError(404, 'SESSION_NOT_FOUND', 'Attendance session not found');
+    }
+
+    if (!session.isActive) {
+      throw new AppError(400, 'SESSION_ENDED', 'Attendance session has ended');
+    }
+
+    // 4. Validate GPS proximity using haversineDistance
+    if (session.locationLat != null && session.locationLng != null) {
+      const distance = haversineDistance(
+        gpsCoords.lat,
+        gpsCoords.lng,
+        session.locationLat,
+        session.locationLng,
+      );
+
+      if (distance > session.locationRadiusM) {
+        throw new AppError(
+          400,
+          'GPS_OUT_OF_RANGE',
+          `Student is ${Math.round(distance)}m away, must be within ${session.locationRadiusM}m`,
+        );
+      }
+    }
+
+    // 5. Check duplicate via sessionId + studentId unique constraint
+    const existing = await prisma.attendanceRecord.findUnique({
+      where: {
+        sessionId_studentId: {
+          sessionId: session.id,
+          studentId,
+        },
+      },
+    });
+
+    if (existing) {
+      throw new AppError(
+        400,
+        'DUPLICATE_SCAN',
+        'Attendance already recorded for this session',
+      );
+    }
+
+    // 6. Classify status (PRESENT/LATE) using classifyAttendanceStatus
+    const status = classifyAttendanceStatus(
+      new Date(),
+      session.startedAt,
+      session.lateThresholdMin,
+    );
+
+    // 7. Create AttendanceRecord with method="LINK"
+    const record = await prisma.attendanceRecord.create({
+      data: {
+        id: createId(),
+        schoolId,
+        sessionId: session.id,
+        studentId,
+        status,
+        method: 'LINK',
+        scannedAt: new Date(),
+      },
+    });
+
+    // 8. Broadcast via WebSocket and trigger risk score recomputation
+    broadcastAttendanceNew(session.id, record);
+    riskService.computeRiskScore(schoolId, studentId).catch(() => {});
+
+    return record;
+  }
+
   /**
    * Record attendance via QR code scan.
    * Validates the QR JWT, checks GPS proximity, prevents duplicates,

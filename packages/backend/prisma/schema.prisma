@@ -224,6 +224,8 @@ model AttendanceSession {
   locationRadiusM  Int      @default(100)
   currentQRToken   String?
   qrRefreshedAt    DateTime?
+  currentLinkToken String?
+  linkExpiresAt    DateTime?
   startedAt        DateTime @default(now())
   endedAt          DateTime?
   isActive         Boolean  @default(true)

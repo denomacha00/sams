@@ -1,5 +1,6 @@
 import { Router, type Request, type Response } from 'express';
 import { z } from 'zod';
+import jwt from 'jsonwebtoken';
 import { UserRole, AttendanceStatus } from '@sams/shared';
 import { requirePermission } from '../middleware/rbac';
 import { attendanceService } from '../services/attendanceService';
@@ -45,6 +46,19 @@ const syncSchema = z.object({
     scannedAt: z.string().min(1),
     synced: z.boolean(),
   })),
+});
+
+const linkGenerateSchema = z.object({
+  sessionId: z.string().min(1),
+  expiryMinutes: z.number().int().min(1).max(60).default(5),
+});
+
+const linkAttendanceSchema = z.object({
+  linkToken: z.string().min(1),
+  gpsCoords: z.object({
+    lat: z.number().min(-90).max(90),
+    lng: z.number().min(-180).max(180),
+  }),
 });
 
 // ─── Router ───────────────────────────────────────────────────────────────────
@@ -138,6 +152,124 @@ attendanceRouter.post('/biometric', requirePermission('mark:attendance'), async 
   } catch (err) {
     if (err instanceof AppError) throw err;
     throw new AppError(500, 'INTERNAL_ERROR', 'Failed to record biometric attendance');
+  }
+});
+
+/**
+ * POST /api/v1/attendance/link/generate
+ * Generate a shareable attendance link for an active session (teacher).
+ */
+attendanceRouter.post('/link/generate', requirePermission('start:session'), async (req: Request, res: Response): Promise<void> => {
+  const parsed = linkGenerateSchema.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({
+      error: 'Validation failed',
+      code: 'VALIDATION_ERROR',
+      details: parsed.error.flatten().fieldErrors,
+    });
+    return;
+  }
+
+  try {
+    const result = await attendanceService.generateAttendanceLink(
+      parsed.data.sessionId,
+      req.schoolId,
+      parsed.data.expiryMinutes,
+    );
+    res.status(201).json(result);
+  } catch (err) {
+    if (err instanceof AppError) throw err;
+    throw new AppError(500, 'INTERNAL_ERROR', 'Failed to generate attendance link');
+  }
+});
+
+/**
+ * POST /api/v1/attendance/link
+ * Record attendance via link token (authenticated student, no special permission).
+ */
+attendanceRouter.post('/link', async (req: Request, res: Response): Promise<void> => {
+  const parsed = linkAttendanceSchema.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({
+      error: 'Validation failed',
+      code: 'VALIDATION_ERROR',
+      details: parsed.error.flatten().fieldErrors,
+    });
+    return;
+  }
+
+  try {
+    const record = await attendanceService.recordLinkAttendance(
+      req.user.sub,
+      req.schoolId,
+      parsed.data.linkToken,
+      parsed.data.gpsCoords,
+    );
+    res.status(201).json(record);
+  } catch (err) {
+    if (err instanceof AppError) throw err;
+    throw new AppError(500, 'INTERNAL_ERROR', 'Failed to record link attendance');
+  }
+});
+
+/**
+ * GET /api/v1/attendance/link/:token/info
+ * Get link metadata (session subject, class name, teacher) for the attendance page UI.
+ */
+attendanceRouter.get('/link/:token/info', async (req: Request, res: Response): Promise<void> => {
+  const token = req.params.token as string;
+
+  try {
+    // Verify the token JWT, extract sessionId
+    const QR_SECRET = process.env.QR_SECRET ?? 'qr-secret-dev';
+
+    let payload: { sessionId: string; type?: string; exp?: number };
+    try {
+      payload = jwt.verify(token, QR_SECRET) as unknown as { sessionId: string; type?: string; exp?: number };
+    } catch {
+      res.status(200).json({ valid: false, error: 'INVALID' });
+      return;
+    }
+
+    // Validate token type
+    if (payload.type !== 'LINK') {
+      res.status(200).json({ valid: false, error: 'INVALID' });
+      return;
+    }
+
+    // Fetch session with class and teacher info
+    const session = await prisma.attendanceSession.findUnique({
+      where: { id: payload.sessionId },
+      include: {
+        class: true,
+        teacher: { select: { fullName: true } },
+      },
+    });
+
+    if (!session) {
+      res.status(200).json({ valid: false, error: 'INVALID' });
+      return;
+    }
+
+    if (!session.isActive) {
+      res.status(200).json({ valid: false, error: 'SESSION_ENDED' });
+      return;
+    }
+
+    // Return session info
+    const expiresAt = payload.exp ? new Date(payload.exp * 1000).toISOString() : undefined;
+
+    res.status(200).json({
+      valid: true,
+      sessionId: session.id,
+      subject: session.subject,
+      className: session.class?.name ?? null,
+      teacherName: session.teacher?.fullName ?? null,
+      expiresAt,
+    });
+  } catch (err) {
+    if (err instanceof AppError) throw err;
+    throw new AppError(500, 'INTERNAL_ERROR', 'Failed to get link info');
   }
 });
 
