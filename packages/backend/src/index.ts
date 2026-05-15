@@ -139,6 +139,12 @@ async function start(): Promise<void> {
 
     httpServer.listen(PORT, () => {
       console.log(`[SAMS] API listening on port ${PORT}`);
+
+      // Conversation memory encryption check
+      if (!process.env.CONVERSATION_MASTER_KEY || process.env.CONVERSATION_MASTER_KEY.length < 32) {
+        console.warn('[STARTUP] CONVERSATION_MASTER_KEY not set or too short. Conversation memory will be disabled.');
+      }
+
       startQRRefreshJob();
       startNotificationJob();
     });

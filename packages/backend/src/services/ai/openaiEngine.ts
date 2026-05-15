@@ -555,3 +555,70 @@ export async function openaiQuery(
     };
   }
 }
+
+
+// ─── OpenAI Engine with History ───────────────────────────────────────────────
+
+/**
+ * OpenAI-powered query with conversation history injection.
+ * Injects prior conversation messages between system prompt and current question.
+ */
+export async function openaiQueryWithHistory(
+  user: AccessTokenPayload,
+  question: string,
+  history: Array<{ role: 'user' | 'assistant'; content: string }>,
+): Promise<OpenAIQueryResult> {
+  const client = getOpenAIClient();
+  const systemPrompt = await buildSystemPrompt(user);
+
+  // Build messages: system + history + current question
+  const messages: OpenAI.Chat.Completions.ChatCompletionMessageParam[] = [
+    { role: 'system', content: systemPrompt },
+    ...history,
+    { role: 'user', content: question },
+  ];
+
+  try {
+    const response = await client.chat.completions.create({
+      model: process.env.OPENAI_MODEL ?? 'llama3-70b-8192',
+      messages,
+      temperature: 0.3,
+      max_tokens: 1000,
+    });
+
+    const answer = response.choices[0]?.message?.content ?? 'I was unable to generate a response. Please try rephrasing your question.';
+
+    return {
+      answer,
+      intent: 'openai_response',
+    };
+  } catch (err) {
+    console.error('[AI/Primary] Error with history, trying fallback:', (err as Error).message);
+
+    // Try fallback provider (OpenRouter)
+    const fallback = getFallbackClient();
+    if (fallback) {
+      try {
+        const fallbackResponse = await fallback.chat.completions.create({
+          model: process.env.OPENAI_FALLBACK_MODEL ?? 'meta-llama/llama-3.1-8b-instruct:free',
+          messages,
+          temperature: 0.3,
+          max_tokens: 1000,
+        });
+
+        const fallbackAnswer = fallbackResponse.choices[0]?.message?.content;
+        if (fallbackAnswer) {
+          return { answer: fallbackAnswer, intent: 'openai_response' };
+        }
+      } catch (fallbackErr) {
+        console.error('[AI/Fallback] Also failed:', (fallbackErr as Error).message);
+      }
+    }
+
+    // Both failed — return helpful fallback
+    return {
+      answer: `I can help you with:\n• "What is SAMS?" — learn about the system\n• "How many students?" — get counts\n• "Show my timetable" — view schedule\n• "Generate timetable" — create timetables\n• "Who is absent today?" — check attendance\n• "Risk scores" — view at-risk students\n\nPlease try one of these, or rephrase your question.`,
+      intent: 'fallback',
+    };
+  }
+}

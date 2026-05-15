@@ -100,6 +100,8 @@ model School {
   payments          Payment[]
   riskScores        RiskScore[]
   notifications     Notification[]
+  conversationThreads ConversationThread[]
+  conversationRecords ConversationRecord[]
 }
 
 model User {
@@ -133,6 +135,8 @@ model User {
   auditLogsActed    AuditLog[]          @relation("AuditActor")
   timetableEntries  TimetableEntry[]
   notifications     Notification[]
+  conversationThreads ConversationThread[]
+  conversationRecords ConversationRecord[]
 
   @@unique([schoolId, admissionNumber])
   @@index([schoolId, role])
@@ -355,4 +359,41 @@ model AIKnowledge {
   category  String   @default("general")
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+}
+
+// ─── Conversation Memory ──────────────────────────────────────────────────────
+
+model ConversationThread {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  schoolId  String
+  school    School   @relation(fields: [schoolId], references: [id])
+  title     String   @db.VarChar(200)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  records ConversationRecord[]
+
+  @@index([userId, schoolId])
+  @@index([userId, updatedAt])
+}
+
+model ConversationRecord {
+  id                String             @id @default(cuid())
+  userId            String
+  user              User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  schoolId          String
+  school            School             @relation(fields: [schoolId], references: [id])
+  threadId          String
+  thread            ConversationThread @relation(fields: [threadId], references: [id], onDelete: Cascade)
+  encryptedMessage  Bytes
+  encryptedResponse Bytes
+  iv                Bytes
+  authTag           Bytes
+  createdAt         DateTime           @default(now())
+
+  @@index([userId, schoolId, threadId])
+  @@index([userId, schoolId, createdAt])
+  @@index([threadId, createdAt])
 }

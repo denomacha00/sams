@@ -1,6 +1,7 @@
 import { Router, type Request, type Response } from 'express';
 import { aiService } from '../services/aiService';
 import { openaiQuery } from '../services/ai/openaiEngine';
+import { conversationMemoryService } from '../services/conversationMemoryService';
 import { AppError } from '../middleware/errors';
 
 export const aiRouter = Router();
@@ -12,6 +13,87 @@ const DATA_INTENTS = [
   'student_count', 'session_status', 'system_stats',
 ];
 
+// ─── Conversation Management Endpoints ────────────────────────────────────────
+
+/**
+ * GET /api/v1/ai/conversations
+ * List conversation threads for the authenticated user (paginated).
+ */
+aiRouter.get('/conversations', async (req: Request, res: Response): Promise<void> => {
+  if (!req.user) { res.status(401).json({ error: 'Authentication required' }); return; }
+  const page = parseInt(req.query.page as string) || 1;
+  const pageSize = parseInt(req.query.pageSize as string) || 50;
+  const result = await conversationMemoryService.getThreads(req.user.sub, req.user.schoolId, page, pageSize);
+  res.json(result);
+});
+
+/**
+ * GET /api/v1/ai/conversations/:threadId
+ * Get decrypted records for a specific thread (paginated).
+ */
+aiRouter.get('/conversations/:threadId', async (req: Request, res: Response): Promise<void> => {
+  if (!req.user) { res.status(401).json({ error: 'Authentication required' }); return; }
+  const threadId = req.params.threadId as string;
+  const page = parseInt(req.query.page as string || '1') || 1;
+  const pageSize = parseInt(req.query.pageSize as string || '100') || 100;
+  try {
+    const result = await conversationMemoryService.getThreadRecords(req.user.sub, req.user.schoolId, threadId, page, pageSize);
+    res.json(result);
+  } catch (err) {
+    if (err instanceof Error && err.message === 'Thread not found') {
+      res.status(404).json({ error: 'Thread not found' });
+      return;
+    }
+    throw err;
+  }
+});
+
+/**
+ * POST /api/v1/ai/conversations
+ * Create a new conversation thread.
+ */
+aiRouter.post('/conversations', async (req: Request, res: Response): Promise<void> => {
+  if (!req.user) { res.status(401).json({ error: 'Authentication required' }); return; }
+  const { title } = req.body;
+  if (!title || typeof title !== 'string' || title.trim().length === 0 || title.trim().length > 200) {
+    res.status(400).json({ error: 'Title must be 1-200 characters' });
+    return;
+  }
+  const thread = await conversationMemoryService.createThread(req.user.sub, req.user.schoolId, title.trim());
+  res.status(201).json({ thread });
+});
+
+/**
+ * DELETE /api/v1/ai/conversations/:threadId
+ * Delete a thread and all its records.
+ */
+aiRouter.delete('/conversations/:threadId', async (req: Request, res: Response): Promise<void> => {
+  if (!req.user) { res.status(401).json({ error: 'Authentication required' }); return; }
+  const threadId = req.params.threadId as string;
+  try {
+    await conversationMemoryService.deleteThread(req.user.sub, req.user.schoolId, threadId);
+    res.json({ message: 'Thread deleted successfully' });
+  } catch (err) {
+    if (err instanceof Error && err.message === 'Thread not found') {
+      res.status(404).json({ error: 'Thread not found' });
+      return;
+    }
+    throw err;
+  }
+});
+
+/**
+ * DELETE /api/v1/ai/conversations
+ * Delete all conversation data for the authenticated user.
+ */
+aiRouter.delete('/conversations', async (req: Request, res: Response): Promise<void> => {
+  if (!req.user) { res.status(401).json({ error: 'Authentication required' }); return; }
+  await conversationMemoryService.deleteAllUserData(req.user.sub, req.user.schoolId);
+  res.json({ message: 'All conversation data deleted' });
+});
+
+// ─── AI Query Endpoints ───────────────────────────────────────────────────────
+
 /**
  * POST /api/v1/ai/query
  * - Authenticated users: full access to all AI features
@@ -19,7 +101,7 @@ const DATA_INTENTS = [
  */
 aiRouter.post('/query', async (req: Request, res: Response): Promise<void> => {
   try {
-    const { question } = req.body;
+    const { question, threadId, confirmAction, pendingAction } = req.body;
 
     if (!question || typeof question !== 'string' || !question.trim()) {
       throw new AppError(400, 'VALIDATION_ERROR', 'A non-empty "question" field is required.');
@@ -27,8 +109,9 @@ aiRouter.post('/query', async (req: Request, res: Response): Promise<void> => {
 
     // Authenticated user — full access
     if (req.user) {
-      const result = await aiService.query(req.user, question.trim());
-      res.status(200).json(result);
+      const result = await aiService.query(req.user, question.trim(), { threadId, confirmAction, pendingAction });
+      const response: Record<string, unknown> = { ...result };
+      res.status(200).json(response);
       return;
     }
 
