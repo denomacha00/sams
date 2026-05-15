@@ -75,25 +75,30 @@ async function buildSystemPrompt(user: AccessTokenPayload): Promise<string> {
 
   const nameContext = userName ? `\n\nIMPORTANT: The user's REAL NAME is "${userName}". ALWAYS call them "${userName}" — never call them "the student", "the teacher", or any role label. Their name is ${userName}.` : '';
 
-  switch (user.role) {
-    case UserRole.SUPER_ADMIN:
-      scopeDescription = `You are assisting the Super Admin (${userName || 'admin'}). They have FULL access to the entire platform — all schools, all users, all data. They can perform any action including suspending schools, generating licenses, viewing any school's data, and managing the system. You can execute actions for them.`;
-      break;
-    case UserRole.TEACHER:
-      scopeDescription = `You are assisting a Teacher named ${userName || 'the teacher'}. They can only see data for their assigned class (classId: ${user.classId ?? 'none'}). Do not provide information about other classes or students outside their class.`;
-      break;
-    case UserRole.STUDENT:
-      scopeDescription = `You are assisting a Student named ${userName || 'the student'}. They can only see their own attendance records (studentId: ${user.sub}). Do not provide information about other students.`;
-      break;
-    case UserRole.HOD:
-      scopeDescription = `You are assisting a Head of Department (HOD) named ${userName || 'the HOD'}. They can see data for all classes and students within their department (departmentId: ${user.departmentId ?? 'none'}). Do not provide information about other departments.`;
-      break;
-    case UserRole.SCHOOL_ADMIN:
-      scopeDescription = `You are assisting a School Admin named ${userName || 'the admin'}. They can see all data within their school (schoolId: ${user.schoolId}).`;
-      break;
-    default:
-      scopeDescription = `You are assisting a user with role ${user.role}. Only provide data within their school scope.`;
-      break;
+  // Handle guest (unauthenticated) users
+  if (user.sub === 'guest') {
+    scopeDescription = `You are assisting a GUEST visitor who is not logged in. They do NOT have access to any school data. You can answer general knowledge questions, explain what SAMS is, and help them understand the system. If they tell you their name during the conversation, remember it and use it. Do NOT call them "student" or any role — they are simply a guest.`;
+  } else {
+    switch (user.role) {
+      case UserRole.SUPER_ADMIN:
+        scopeDescription = `You are assisting the Super Admin (${userName || 'admin'}). They have FULL access to the entire platform — all schools, all users, all data. They can perform any action including suspending schools, generating licenses, viewing any school's data, and managing the system. You can execute actions for them.`;
+        break;
+      case UserRole.TEACHER:
+        scopeDescription = `You are assisting a Teacher named ${userName || 'the teacher'}. They can only see data for their assigned class (classId: ${user.classId ?? 'none'}). Do not provide information about other classes or students outside their class.`;
+        break;
+      case UserRole.STUDENT:
+        scopeDescription = `You are assisting a Student named ${userName || 'the student'}. They can only see their own attendance records (studentId: ${user.sub}). Do not provide information about other students.`;
+        break;
+      case UserRole.HOD:
+        scopeDescription = `You are assisting a Head of Department (HOD) named ${userName || 'the HOD'}. They can see data for all classes and students within their department (departmentId: ${user.departmentId ?? 'none'}). Do not provide information about other departments.`;
+        break;
+      case UserRole.SCHOOL_ADMIN:
+        scopeDescription = `You are assisting a School Admin named ${userName || 'the admin'}. They can see all data within their school (schoolId: ${user.schoolId}).`;
+        break;
+      default:
+        scopeDescription = `You are assisting a user with role ${user.role}. Only provide data within their school scope.`;
+        break;
+    }
   }
 
   // Fetch custom knowledge base entries (scoped to user's role)
