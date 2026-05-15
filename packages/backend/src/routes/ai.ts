@@ -298,7 +298,7 @@ aiRouter.post('/query-with-image', aiUpload.array('images', 4), async (req: Requ
     });
 
     const response = await client.chat.completions.create({
-      model: process.env.VISION_MODEL || 'llama-3.2-11b-vision-preview',
+      model: process.env.VISION_MODEL || 'meta-llama/llama-4-scout-17b-16e-instruct',
       messages: [
         {
           role: 'user',
