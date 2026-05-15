@@ -202,16 +202,18 @@ aiRouter.post('/query', async (req: Request, res: Response): Promise<void> => {
       exp: 0,
     };
 
-    // For about_sams, use local engine
-    if (intent === 'about_sams' || intent === 'super_admin_help') {
+    // For about_sams, use local engine ONLY if no history (first message)
+    const history = req.body.history as Array<{ role: string; content: string }> | undefined;
+    const hasHistory = history && history.length > 1;
+
+    if (!hasHistory && (intent === 'about_sams' || intent === 'super_admin_help')) {
       const { localQuery } = require('../services/ai/localEngine');
       const result = await localQuery(guestUser, question.trim());
       res.status(200).json(result);
       return;
     }
 
-    // For general knowledge questions, go directly to Groq/OpenRouter
-    // Use a restricted guest context — no school data
+    // For all other guest messages, go to Groq WITH conversation history
     try {
       const guestUserRestricted = {
         sub: 'guest',
@@ -221,8 +223,6 @@ aiRouter.post('/query', async (req: Request, res: Response): Promise<void> => {
         exp: 0,
       };
 
-      // If frontend sent conversation history, use it for context
-      const history = req.body.history as Array<{ role: string; content: string }> | undefined;
       if (history && history.length > 0) {
         const { openaiQueryWithHistory } = require('../services/ai/openaiEngine');
         const formattedHistory = history.slice(-10).map((m: any) => ({
