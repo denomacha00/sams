@@ -14,9 +14,18 @@ const ProfilePage: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
 
   // Profile picture state
-  const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(user?.avatarUrl || null);
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Crop modal state
+  const [cropImage, setCropImage] = useState<string | null>(null);
+  const [cropScale, setCropScale] = useState(1);
+  const [cropPosition, setCropPosition] = useState({ x: 0, y: 0 });
+  const cropCanvasRef = useRef<HTMLCanvasElement>(null);
+  const cropImgRef = useRef<HTMLImageElement>(null);
+  const isDragging = useRef(false);
+  const dragStart = useRef({ x: 0, y: 0 });
 
   const clearMessages = () => { setSuccess(null); setError(null); };
 
@@ -59,28 +68,96 @@ const ProfilePage: React.FC = () => {
     }
   };
 
-  // Profile picture upload
+  // Profile picture - open crop modal
   const handleAvatarUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    if (file.size > 2 * 1024 * 1024) {
-      setError('Image must be less than 2MB');
+    if (file.size > 5 * 1024 * 1024) {
+      setError('Image must be less than 5MB');
       return;
     }
+    clearMessages();
+    const url = URL.createObjectURL(file);
+    setCropImage(url);
+    setCropScale(1);
+    setCropPosition({ x: 0, y: 0 });
+  };
+
+  // Handle crop drag
+  const handleCropMouseDown = (e: React.MouseEvent) => {
+    isDragging.current = true;
+    dragStart.current = { x: e.clientX - cropPosition.x, y: e.clientY - cropPosition.y };
+  };
+
+  const handleCropMouseMove = (e: React.MouseEvent) => {
+    if (!isDragging.current) return;
+    setCropPosition({
+      x: e.clientX - dragStart.current.x,
+      y: e.clientY - dragStart.current.y,
+    });
+  };
+
+  const handleCropMouseUp = () => { isDragging.current = false; };
+
+  // Touch support for mobile
+  const handleCropTouchStart = (e: React.TouchEvent) => {
+    isDragging.current = true;
+    const touch = e.touches[0];
+    dragStart.current = { x: touch.clientX - cropPosition.x, y: touch.clientY - cropPosition.y };
+  };
+
+  const handleCropTouchMove = (e: React.TouchEvent) => {
+    if (!isDragging.current) return;
+    const touch = e.touches[0];
+    setCropPosition({
+      x: touch.clientX - dragStart.current.x,
+      y: touch.clientY - dragStart.current.y,
+    });
+  };
+
+  const handleCropTouchEnd = () => { isDragging.current = false; };
+
+  // Crop and upload
+  const handleCropConfirm = async () => {
+    if (!cropImage || !cropImgRef.current) return;
     setUploadingAvatar(true);
     clearMessages();
+
     try {
+      // Draw cropped image to canvas
+      const canvas = document.createElement('canvas');
+      canvas.width = 400;
+      canvas.height = 400;
+      const ctx = canvas.getContext('2d')!;
+      const img = cropImgRef.current;
+
+      const size = 200 / cropScale;
+      const centerX = (img.naturalWidth / 2) - (cropPosition.x / cropScale);
+      const centerY = (img.naturalHeight / 2) - (cropPosition.y / cropScale);
+
+      ctx.drawImage(
+        img,
+        centerX - size / 2, centerY - size / 2, size, size,
+        0, 0, 400, 400
+      );
+
+      // Convert to blob
+      const blob = await new Promise<Blob>((resolve) =>
+        canvas.toBlob((b) => resolve(b!), 'image/jpeg', 0.9)
+      );
+
       const formData = new FormData();
-      formData.append('avatar', file);
+      formData.append('avatar', blob, 'avatar.jpg');
       const { data } = await apiClient.post('/users/me/avatar', formData, {
         headers: { 'Content-Type': 'multipart/form-data' },
       });
-      setAvatarUrl(data.avatarUrl || URL.createObjectURL(file));
+
+      setAvatarUrl(data.avatarUrl + '?t=' + Date.now());
+      useAuthStore.getState().updateUser({ avatarUrl: data.avatarUrl });
+      setCropImage(null);
       setSuccess('Profile picture updated!');
     } catch (err: any) {
-      // If endpoint doesn't exist yet, show preview locally
-      setAvatarUrl(URL.createObjectURL(file));
-      setSuccess('Profile picture updated locally (server upload coming soon)');
+      setError(err.response?.data?.error || 'Failed to upload profile picture');
     } finally {
       setUploadingAvatar(false);
     }
@@ -88,6 +165,76 @@ const ProfilePage: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 p-6">
+      {/* Crop Modal */}
+      {cropImage && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
+          <div className="bg-slate-800 border border-white/10 rounded-2xl p-6 max-w-sm w-full">
+            <h3 className="text-lg font-semibold text-white mb-4 text-center">Resize & Position</h3>
+
+            {/* Crop area */}
+            <div
+              className="relative w-48 h-48 mx-auto rounded-full overflow-hidden border-2 border-purple-500/50 cursor-move select-none"
+              onMouseDown={handleCropMouseDown}
+              onMouseMove={handleCropMouseMove}
+              onMouseUp={handleCropMouseUp}
+              onMouseLeave={handleCropMouseUp}
+              onTouchStart={handleCropTouchStart}
+              onTouchMove={handleCropTouchMove}
+              onTouchEnd={handleCropTouchEnd}
+            >
+              <img
+                ref={cropImgRef}
+                src={cropImage}
+                alt="Crop preview"
+                className="absolute pointer-events-none"
+                style={{
+                  transform: `translate(${cropPosition.x}px, ${cropPosition.y}px) scale(${cropScale})`,
+                  transformOrigin: 'center',
+                  maxWidth: 'none',
+                  width: '100%',
+                  height: '100%',
+                  objectFit: 'cover',
+                }}
+                draggable={false}
+              />
+            </div>
+
+            {/* Zoom slider */}
+            <div className="mt-4">
+              <label className="block text-xs text-gray-400 mb-2 text-center">Zoom</label>
+              <input
+                type="range"
+                min="1"
+                max="3"
+                step="0.1"
+                value={cropScale}
+                onChange={(e) => setCropScale(parseFloat(e.target.value))}
+                className="w-full accent-purple-500"
+              />
+            </div>
+
+            <p className="text-xs text-gray-500 text-center mt-2">Drag to reposition, slide to zoom</p>
+
+            {/* Actions */}
+            <div className="flex gap-3 mt-5">
+              <button
+                onClick={() => { setCropImage(null); setCropScale(1); setCropPosition({ x: 0, y: 0 }); }}
+                className="flex-1 bg-white/10 border border-white/20 text-white py-2.5 rounded-xl hover:bg-white/20 transition-all"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleCropConfirm}
+                disabled={uploadingAvatar}
+                className="flex-1 bg-gradient-to-r from-blue-600 to-purple-600 text-white font-semibold py-2.5 rounded-xl shadow-lg shadow-purple-500/25 hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50 transition-all"
+              >
+                {uploadingAvatar ? 'Uploading...' : 'Save'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className="max-w-2xl mx-auto">
         {/* Header */}
         <div className="mb-8">

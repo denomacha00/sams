@@ -1,11 +1,30 @@
 import { Router, type Request, type Response } from 'express';
 import { z } from 'zod';
+import path from 'path';
+import fs from 'fs';
+import multer from 'multer';
+import sharp from 'sharp';
 import { UserRole } from '@sams/shared';
 import { requirePermission } from '../middleware/rbac';
 import { userService } from '../services/userService';
 import { registrationLinkService } from '../services/registrationLinkService';
 import { prisma } from '../index';
 import { AppError } from '../middleware/errors';
+
+// ─── Avatar Upload Config ─────────────────────────────────────────────────────
+
+const UPLOADS_DIR = path.resolve(process.env.UPLOADS_DIR || '/var/www/sams/uploads/avatars');
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 5 * 1024 * 1024 }, // 5MB max
+  fileFilter: (_req, file, cb) => {
+    if (file.mimetype.startsWith('image/')) {
+      cb(null, true);
+    } else {
+      cb(new Error('Only image files are allowed'));
+    }
+  },
+});
 
 // ─── Validation Schemas ───────────────────────────────────────────────────────
 
@@ -98,6 +117,7 @@ usersRouter.patch('/me', async (req: Request, res: Response): Promise<void> => {
         email: true,
         phone: true,
         role: true,
+        avatarUrl: true,
       },
     });
 
@@ -150,6 +170,44 @@ usersRouter.post('/me/password', async (req: Request, res: Response): Promise<vo
   } catch (err) {
     if (err instanceof AppError) throw err;
     throw new AppError(500, 'INTERNAL_ERROR', 'Failed to change password');
+  }
+});
+
+/**
+ * POST /api/v1/users/me/avatar
+ * Upload and resize profile picture (200x200 JPEG).
+ */
+usersRouter.post('/me/avatar', upload.single('avatar'), async (req: Request, res: Response): Promise<void> => {
+  try {
+    if (!req.file) {
+      throw new AppError(400, 'NO_FILE', 'No image file provided');
+    }
+
+    // Ensure uploads directory exists
+    if (!fs.existsSync(UPLOADS_DIR)) {
+      fs.mkdirSync(UPLOADS_DIR, { recursive: true });
+    }
+
+    // Resize to 200x200 and convert to JPEG
+    const filename = `${req.user.sub}.jpg`;
+    const filepath = path.join(UPLOADS_DIR, filename);
+
+    await sharp(req.file.buffer)
+      .resize(200, 200, { fit: 'cover', position: 'center' })
+      .jpeg({ quality: 85 })
+      .toFile(filepath);
+
+    // Save URL to database
+    const avatarUrl = `/uploads/avatars/${filename}`;
+    await prisma.user.update({
+      where: { id: req.user.sub },
+      data: { avatarUrl },
+    });
+
+    res.status(200).json({ avatarUrl });
+  } catch (err) {
+    if (err instanceof AppError) throw err;
+    throw new AppError(500, 'INTERNAL_ERROR', 'Failed to upload avatar');
   }
 });
 

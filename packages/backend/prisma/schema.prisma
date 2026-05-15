@@ -125,6 +125,7 @@ model User {
   failedLoginCount       Int       @default(0)
   failedLoginWindowStart DateTime?
   lastLoginAt            DateTime?
+  avatarUrl              String?
   createdAt              DateTime  @default(now())
   updatedAt              DateTime  @updatedAt
 
