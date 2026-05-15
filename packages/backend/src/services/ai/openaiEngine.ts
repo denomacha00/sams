@@ -41,19 +41,40 @@ function getFallbackClient(): OpenAI | null {
  */
 async function buildSystemPrompt(user: AccessTokenPayload): Promise<string> {
   let scopeDescription = '';
+  let userName = '';
+
+  // Fetch the user's name from the database
+  if (user.sub !== 'guest') {
+    try {
+      const dbUser = await prisma.user.findUnique({
+        where: { id: user.sub },
+        select: { fullName: true },
+      });
+      if (dbUser) {
+        userName = dbUser.fullName;
+      }
+    } catch {
+      // If user fetch fails, continue without name
+    }
+  }
+
+  const nameContext = userName ? `\nThe user's name is "${userName}". Address them by name when appropriate.` : '';
 
   switch (user.role) {
+    case UserRole.SUPER_ADMIN:
+      scopeDescription = `You are assisting the Super Admin (${userName || 'admin'}). They have FULL access to the entire platform — all schools, all users, all data. They can perform any action including suspending schools, generating licenses, viewing any school's data, and managing the system. You can execute actions for them.`;
+      break;
     case UserRole.TEACHER:
-      scopeDescription = `You are assisting a Teacher. They can only see data for their assigned class (classId: ${user.classId ?? 'none'}). Do not provide information about other classes or students outside their class.`;
+      scopeDescription = `You are assisting a Teacher named ${userName || 'the teacher'}. They can only see data for their assigned class (classId: ${user.classId ?? 'none'}). Do not provide information about other classes or students outside their class.`;
       break;
     case UserRole.STUDENT:
-      scopeDescription = `You are assisting a Student. They can only see their own attendance records (studentId: ${user.sub}). Do not provide information about other students.`;
+      scopeDescription = `You are assisting a Student named ${userName || 'the student'}. They can only see their own attendance records (studentId: ${user.sub}). Do not provide information about other students.`;
       break;
     case UserRole.HOD:
-      scopeDescription = `You are assisting a Head of Department (HOD). They can see data for all classes and students within their department (departmentId: ${user.departmentId ?? 'none'}). Do not provide information about other departments.`;
+      scopeDescription = `You are assisting a Head of Department (HOD) named ${userName || 'the HOD'}. They can see data for all classes and students within their department (departmentId: ${user.departmentId ?? 'none'}). Do not provide information about other departments.`;
       break;
     case UserRole.SCHOOL_ADMIN:
-      scopeDescription = `You are assisting a School Admin. They can see all data within their school (schoolId: ${user.schoolId}).`;
+      scopeDescription = `You are assisting a School Admin named ${userName || 'the admin'}. They can see all data within their school (schoolId: ${user.schoolId}).`;
       break;
     default:
       scopeDescription = `You are assisting a user with role ${user.role}. Only provide data within their school scope.`;
@@ -88,10 +109,11 @@ When answering general knowledge questions, answer them directly and helpfully l
 
 For SAMS-specific data queries, respect the user's scope:
 ${scopeDescription}
+${nameContext}
 
-User context: schoolId=${user.schoolId}, userId=${user.sub}, role=${user.role}
+User context: schoolId=${user.schoolId}, userId=${user.sub}, role=${user.role}${userName ? `, name=${userName}` : ''}
 
-Be concise, friendly, and helpful. Answer in plain language.${knowledgeSection}`;
+Be concise, friendly, and helpful. Address the user by their name. Answer in plain language.${knowledgeSection}`;
 }
 
 // ─── Function-Calling Tools ───────────────────────────────────────────────────
