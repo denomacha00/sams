@@ -205,9 +205,10 @@ const QRScanPage: React.FC = () => {
               <div className="relative rounded-2xl overflow-hidden">
                 <video
                   ref={videoRef}
-                  className="w-full rounded-2xl"
+                  className="w-full h-64 sm:h-80 object-cover rounded-2xl bg-black"
                   playsInline
                   muted
+                  autoPlay
                 />
                 <canvas ref={canvasRef} className="hidden" />
                 {/* Viewfinder overlay */}
