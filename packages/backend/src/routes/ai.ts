@@ -1,10 +1,21 @@
 import { Router, type Request, type Response, type NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
+import multer from 'multer';
 import { type AccessTokenPayload, UserRole } from '@sams/shared';
 import { aiService } from '../services/aiService';
 import { openaiQuery } from '../services/ai/openaiEngine';
 import { conversationMemoryService } from '../services/conversationMemoryService';
 import { AppError } from '../middleware/errors';
+
+// ─── Multer config for image uploads ──────────────────────────────────────────
+const aiUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 5 * 1024 * 1024 },
+  fileFilter: (_req, file, cb) => {
+    if (file.mimetype.startsWith('image/')) cb(null, true);
+    else cb(new Error('Only image files are allowed'));
+  },
+});
 
 export const aiRouter = Router();
 
@@ -250,5 +261,91 @@ aiRouter.post('/voice', async (req: Request, res: Response): Promise<void> => {
   } catch (err) {
     if (err instanceof AppError) throw err;
     throw new AppError(500, 'INTERNAL_ERROR', 'Failed to process voice query');
+  }
+});
+
+// ─── Image Vision Endpoint ────────────────────────────────────────────────────
+
+/**
+ * POST /api/v1/ai/query-with-image
+ * Accepts an image upload + question, sends to vision model for analysis.
+ */
+aiRouter.post('/query-with-image', aiUpload.single('image'), async (req: Request, res: Response): Promise<void> => {
+  try {
+    if (!req.file) {
+      throw new AppError(400, 'VALIDATION_ERROR', 'An image file is required.');
+    }
+    const question = (req.body.question as string) || 'What is in this image?';
+
+    // Convert image to base64
+    const base64Image = req.file.buffer.toString('base64');
+    const mimeType = req.file.mimetype;
+
+    // Call vision model
+    const OpenAI = (await import('openai')).default;
+    const apiKey = process.env.OPENAI_API_KEY;
+    if (!apiKey) {
+      throw new AppError(500, 'CONFIG_ERROR', 'AI API key not configured');
+    }
+
+    const client = new OpenAI({
+      apiKey,
+      baseURL: process.env.OPENAI_BASE_URL || 'https://api.groq.com/openai/v1',
+    });
+
+    const response = await client.chat.completions.create({
+      model: process.env.VISION_MODEL || 'llama-3.2-90b-vision-preview',
+      messages: [
+        {
+          role: 'user',
+          content: [
+            { type: 'text', text: question },
+            { type: 'image_url', image_url: { url: `data:${mimeType};base64,${base64Image}` } },
+          ],
+        },
+      ],
+      max_tokens: 1024,
+    });
+
+    const answer = response.choices[0]?.message?.content || 'I could not analyze this image.';
+
+    res.status(200).json({
+      answer,
+      intent: 'image_analysis',
+      engine: 'openai',
+    });
+  } catch (err) {
+    if (err instanceof AppError) throw err;
+    console.error('[AI] Image query error:', err);
+    throw new AppError(500, 'INTERNAL_ERROR', 'Failed to analyze image');
+  }
+});
+
+// ─── Image Generation Endpoint ────────────────────────────────────────────────
+
+/**
+ * POST /api/v1/ai/generate-image
+ * Generates an image from a text prompt using Pollinations AI.
+ */
+aiRouter.post('/generate-image', async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { prompt } = req.body;
+    if (!prompt || typeof prompt !== 'string' || !prompt.trim()) {
+      throw new AppError(400, 'VALIDATION_ERROR', 'A non-empty "prompt" field is required.');
+    }
+
+    // Use Pollinations AI (free, no API key needed)
+    const encodedPrompt = encodeURIComponent(prompt.trim());
+    const imageUrl = `https://image.pollinations.ai/prompt/${encodedPrompt}?width=512&height=512&nologo=true`;
+
+    res.status(200).json({
+      imageUrl,
+      prompt: prompt.trim(),
+      intent: 'image_generation',
+      engine: 'pollinations',
+    });
+  } catch (err) {
+    if (err instanceof AppError) throw err;
+    throw new AppError(500, 'INTERNAL_ERROR', 'Failed to generate image');
   }
 });

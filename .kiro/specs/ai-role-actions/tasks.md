@@ -114,7 +114,7 @@ Extend the SAMS AI action system from SUPER_ADMIN-only to a unified role-aware p
     - _Requirements: 7.1, 7.2, 7.3, 7.4, 8.1, 8.2, 8.3, 9.4, 10.1_
 
 - [ ] 8. Add audit event types for AI actions
-  - [-] 8.1 Add `AI_ACTION_EXECUTED` and `AI_ACTION_DENIED` event types
+  - [x] 8.1 Add `AI_ACTION_EXECUTED` and `AI_ACTION_DENIED` event types
     - Update the audit service event types to include `AI_ACTION_EXECUTED` and `AI_ACTION_DENIED`
     - Ensure audit log entries include: actorId, actorRole, action type, affected resource or denial reason
     - _Requirements: 8.4, 9.5_
