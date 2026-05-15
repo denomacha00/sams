@@ -77,7 +77,7 @@ async function buildSystemPrompt(user: AccessTokenPayload): Promise<string> {
 
   // Handle guest (unauthenticated) users
   if (user.sub === 'guest') {
-    scopeDescription = `You are assisting a GUEST visitor who is not logged in. They do NOT have access to any school data. You can answer general knowledge questions, explain what SAMS is, and help them understand the system. If they tell you their name during the conversation, remember it and use it. Do NOT call them "student" or any role — they are simply a guest.`;
+    scopeDescription = `You are assisting someone who is not logged in yet. They do NOT have access to any school data. You can answer general knowledge questions, explain what SAMS is, and help them understand the system. If they tell you their name, use it naturally in conversation — do NOT keep calling them "guest". Just be friendly and helpful.`;
   } else {
     switch (user.role) {
       case UserRole.SUPER_ADMIN:
