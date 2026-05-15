@@ -129,6 +129,7 @@ model User {
   updatedAt              DateTime  @updatedAt
 
   refreshTokens     RefreshToken[]
+  webauthnCredentials WebAuthnCredential[]
   biometricTemplate BiometricTemplate?
   attendanceRecords AttendanceRecord[]
   sessionsStarted   AttendanceSession[] @relation("SessionTeacher")
@@ -396,4 +397,22 @@ model ConversationRecord {
   @@index([userId, schoolId, threadId])
   @@index([userId, schoolId, createdAt])
   @@index([threadId, createdAt])
+}
+
+// ─── WebAuthn Credentials ─────────────────────────────────────────────────────
+
+model WebAuthnCredential {
+  id              String   @id @default(cuid())
+  userId          String
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  credentialId    String   @unique // base64url-encoded credential ID
+  publicKey       Bytes    // COSE public key
+  counter         Int      @default(0) // signature counter for replay protection
+  deviceType      String   @default("platform") // "platform" or "cross-platform"
+  transports      String[] // e.g. ["internal", "usb", "ble", "nfc"]
+  backedUp        Boolean  @default(false)
+  createdAt       DateTime @default(now())
+  lastUsedAt      DateTime?
+
+  @@index([userId])
 }

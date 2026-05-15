@@ -5,6 +5,7 @@ import bcrypt from 'bcrypt';
 import { authenticate } from '../middleware/auth';
 import { loginRateLimiter } from '../middleware/loginRateLimiter';
 import { authService } from '../services/authService';
+import { webauthnService } from '../services/webauthnService';
 import { prisma } from '../index';
 import { notificationService } from '../services/notificationService';
 
@@ -236,5 +237,112 @@ authRouter.post('/forgot-password', async (req: Request, res: Response): Promise
       code: 'INTERNAL_ERROR',
       requestId: req.id,
     });
+  }
+});
+
+// ─── WebAuthn Routes ──────────────────────────────────────────────────────────
+
+/**
+ * POST /api/v1/auth/webauthn/register/options
+ * Generate WebAuthn registration options for the authenticated teacher.
+ * Requires authentication.
+ */
+authRouter.post('/webauthn/register/options', authenticate, async (req: Request, res: Response): Promise<void> => {
+  try {
+    const options = await webauthnService.generateRegistrationOptions(req.user.sub);
+    res.status(200).json(options);
+  } catch (err: any) {
+    if (err.statusCode) {
+      res.status(err.statusCode).json({ error: err.message, code: err.code });
+    } else {
+      res.status(500).json({ error: 'Failed to generate registration options', code: 'INTERNAL_ERROR' });
+    }
+  }
+});
+
+/**
+ * POST /api/v1/auth/webauthn/register/verify
+ * Verify and store a WebAuthn credential registration.
+ * Requires authentication.
+ */
+authRouter.post('/webauthn/register/verify', authenticate, async (req: Request, res: Response): Promise<void> => {
+  const { credentialId, publicKey, clientDataJSON, transports } = req.body;
+
+  if (!credentialId || !publicKey || !clientDataJSON) {
+    res.status(400).json({ error: 'Missing required fields', code: 'VALIDATION_ERROR' });
+    return;
+  }
+
+  try {
+    const result = await webauthnService.verifyRegistration(
+      req.user.sub,
+      credentialId,
+      publicKey,
+      clientDataJSON,
+      transports,
+    );
+    res.status(201).json(result);
+  } catch (err: any) {
+    if (err.statusCode) {
+      res.status(err.statusCode).json({ error: err.message, code: err.code });
+    } else {
+      res.status(500).json({ error: 'Failed to verify registration', code: 'INTERNAL_ERROR' });
+    }
+  }
+});
+
+/**
+ * POST /api/v1/auth/webauthn/authenticate/options
+ * Generate WebAuthn authentication options (no auth required — this is for login).
+ */
+authRouter.post('/webauthn/authenticate/options', async (req: Request, res: Response): Promise<void> => {
+  try {
+    const options = await webauthnService.generateAuthenticationOptions();
+    res.status(200).json(options);
+  } catch (err: any) {
+    if (err.statusCode) {
+      res.status(err.statusCode).json({ error: err.message, code: err.code });
+    } else {
+      res.status(500).json({ error: 'Failed to generate authentication options', code: 'INTERNAL_ERROR' });
+    }
+  }
+});
+
+/**
+ * POST /api/v1/auth/webauthn/authenticate/verify
+ * Verify a WebAuthn authentication assertion and return JWT tokens.
+ */
+authRouter.post('/webauthn/authenticate/verify', async (req: Request, res: Response): Promise<void> => {
+  const { credentialId, authenticatorData, clientDataJSON, signature } = req.body;
+
+  if (!credentialId || !authenticatorData || !clientDataJSON || !signature) {
+    res.status(400).json({ error: 'Missing required fields', code: 'VALIDATION_ERROR' });
+    return;
+  }
+
+  try {
+    const { user } = await webauthnService.verifyAuthentication(
+      credentialId,
+      authenticatorData,
+      clientDataJSON,
+      signature,
+    );
+
+    // Generate JWT tokens for the authenticated user (same as password login)
+    const tokenPair = await authService.generateTokensForUser(user.id);
+
+    res.status(200).json({
+      token: tokenPair.accessToken,
+      refreshToken: tokenPair.refreshToken,
+      user,
+    });
+  } catch (err: any) {
+    if (err.statusCode) {
+      res.status(err.statusCode).json({ error: err.message, code: err.code });
+    } else if (err.message === 'ACCOUNT_LOCKED') {
+      res.status(401).json({ error: 'Account is locked', code: 'ACCOUNT_LOCKED' });
+    } else {
+      res.status(401).json({ error: 'Authentication failed', code: 'AUTH_FAILED' });
+    }
   }
 });

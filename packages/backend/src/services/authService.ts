@@ -343,6 +343,49 @@ export class AuthService {
   // ─── Private Helpers ────────────────────────────────────────────────────────
 
   /**
+   * Generate tokens for a user by ID (used by WebAuthn login flow).
+   * Stores the refresh token and updates lastLoginAt.
+   */
+  async generateTokensForUser(userId: string): Promise<TokenPair> {
+    const user = await prisma.user.findUnique({ where: { id: userId } });
+    if (!user) throw new Error('USER_NOT_FOUND');
+    if (user.isLocked) throw new Error('ACCOUNT_LOCKED');
+
+    const tokenPair = this._generateTokenPair(user);
+
+    // Hash and store refresh token
+    const refreshTokenHash = await bcrypt.hash(tokenPair.refreshToken, BCRYPT_ROUNDS);
+    await prisma.refreshToken.create({
+      data: {
+        userId: user.id,
+        tokenHash: refreshTokenHash,
+        expiresAt: new Date(Date.now() + REFRESH_TOKEN_EXPIRY_MS),
+      },
+    });
+
+    // Update lastLoginAt
+    await prisma.user.update({
+      where: { id: user.id },
+      data: { lastLoginAt: new Date(), failedLoginCount: 0, failedLoginWindowStart: null },
+    });
+
+    // Log USER_LOGIN
+    await auditService.log({
+      eventType: 'USER_LOGIN',
+      actorId: user.id,
+      actorRole: user.role,
+      schoolId: user.schoolId,
+      resourceSnapshot: {
+        userId: user.id,
+        method: 'webauthn',
+        loginAt: new Date().toISOString(),
+      },
+    });
+
+    return tokenPair;
+  }
+
+  /**
    * Generate a JWT access token and refresh token for the given user.
    */
   private _generateTokenPair(user: {
