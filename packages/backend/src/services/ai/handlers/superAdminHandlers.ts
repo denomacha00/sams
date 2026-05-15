@@ -93,7 +93,12 @@ const generateLicenseHandler: ActionHandler = async (params, scope) => {
   const { createHash } = await import('crypto');
   const { encodeLicenseKey } = await import('@sams/shared');
 
-  const schoolName = (params.schoolName as string) || 'Unnamed School';
+  const schoolName = (params.schoolName as string) || '';
+  if (!schoolName) {
+    return {
+      answer: 'What school name should I use for the license? Please say: "generate license for [School Name]"',
+    };
+  }
   const planTier = (params.planTier as string) || 'BASIC';
   const daysValid = (params.daysValid as number) || 365;
   const expiresAt = new Date();

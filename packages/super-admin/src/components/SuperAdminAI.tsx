@@ -32,13 +32,35 @@ const SuperAdminAI: React.FC = () => {
   ]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
+  const [selectedImages, setSelectedImages] = useState<File[]>([]);
+  const [imagePreviews, setImagePreviews] = useState<string[]>([]);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
   const generateId = () => Math.random().toString(36).substring(2, 10);
+
+  const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || []);
+    const remaining = 4 - selectedImages.length;
+    const toAdd = files.slice(0, remaining).filter((f) => f.size <= 5 * 1024 * 1024);
+    if (toAdd.length === 0) return;
+    setSelectedImages((prev) => [...prev, ...toAdd]);
+    toAdd.forEach((file) => {
+      const reader = new FileReader();
+      reader.onload = () => setImagePreviews((prev) => [...prev, reader.result as string]);
+      reader.readAsDataURL(file);
+    });
+    if (fileInputRef.current) fileInputRef.current.value = '';
+  };
+
+  const removeImage = (index: number) => {
+    setSelectedImages((prev) => prev.filter((_, i) => i !== index));
+    setImagePreviews((prev) => prev.filter((_, i) => i !== index));
+  };
 
   const detectActionIntent = (
     question: string,
@@ -125,12 +147,13 @@ const SuperAdminAI: React.FC = () => {
 
   const handleSend = async () => {
     const question = input.trim();
-    if (!question || loading) return;
+    if (!question && selectedImages.length === 0) return;
+    if (loading) return;
 
     const userMsg: ChatMessage = {
       id: generateId(),
       role: 'user',
-      content: question,
+      content: question || 'What is in this image?',
       timestamp: new Date(),
     };
     setMessages((prev) => [...prev, userMsg]);
@@ -138,11 +161,34 @@ const SuperAdminAI: React.FC = () => {
     setLoading(true);
 
     try {
+      // If images are selected, use vision endpoint
+      if (selectedImages.length > 0) {
+        const formData = new FormData();
+        selectedImages.forEach((file) => formData.append('images', file));
+        formData.append('question', question || 'What is in this image?');
+        setSelectedImages([]);
+        setImagePreviews([]);
+
+        const { data } = await apiClient.post('/ai/query-with-image', formData, {
+          headers: { 'Content-Type': 'multipart/form-data' },
+        });
+        setMessages((prev) => [...prev, {
+          id: generateId(), role: 'assistant', content: data.answer, timestamp: new Date(),
+        }]);
+        return;
+      }
+
       // Check if this is an action intent
       const actionIntent = detectActionIntent(question);
 
-      // Query the AI endpoint
-      const { data } = await apiClient.post('/ai/query', { question });
+      // Build history for context
+      const history = messages
+        .filter((m) => m.id !== 'welcome')
+        .map((m) => ({ role: m.role, content: m.content }));
+      history.push({ role: 'user', content: question });
+
+      // Query the AI endpoint with history
+      const { data } = await apiClient.post('/ai/query', { question, history });
 
       const assistantMsg: ChatMessage = {
         id: generateId(),
@@ -279,19 +325,47 @@ const SuperAdminAI: React.FC = () => {
 
           {/* Input */}
           <div className="border-t border-gray-700 p-3">
+            {/* Image previews */}
+            {imagePreviews.length > 0 && (
+              <div className="flex gap-2 mb-2 flex-wrap">
+                {imagePreviews.map((img, i) => (
+                  <div key={i} className="relative">
+                    <img src={img} alt="Selected" className="h-10 w-10 object-cover rounded border border-gray-600" />
+                    <button type="button" onClick={() => removeImage(i)}
+                      className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 rounded-full flex items-center justify-center text-white text-[10px]">×</button>
+                  </div>
+                ))}
+              </div>
+            )}
             <div className="flex gap-2">
+              {/* Hidden file input */}
+              <input ref={fileInputRef} type="file" accept="image/*" multiple onChange={handleImageSelect} className="hidden" />
+
+              {/* Image upload button */}
+              <button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                className="bg-gray-800 border border-gray-600 text-gray-400 hover:text-white px-2 py-2 rounded-lg transition-colors"
+                title="Upload images (max 4)"
+              >
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
+                </svg>
+              </button>
+
               <input
                 type="text"
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
                 onKeyDown={handleKeyDown}
-                placeholder="Ask anything about the system..."
+                placeholder={selectedImages.length > 0 ? 'Ask about these images...' : 'Ask anything about the system...'}
                 className="flex-1 bg-gray-800 border border-gray-600 rounded-lg px-3 py-2 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-purple-500"
                 disabled={loading}
               />
               <button
                 onClick={() => void handleSend()}
-                disabled={loading || !input.trim()}
+                disabled={loading || (!input.trim() && selectedImages.length === 0)}
                 className="bg-purple-600 hover:bg-purple-700 disabled:bg-gray-700 disabled:text-gray-500 text-white px-3 py-2 rounded-lg transition-colors"
                 aria-label="Send message"
               >
@@ -301,7 +375,7 @@ const SuperAdminAI: React.FC = () => {
               </button>
             </div>
             <p className="text-xs text-gray-500 mt-1.5">
-              Try: "how many schools" • "suspend school X" • "system architecture"
+              Try: "generate license for School X" • "suspend school Y" • "system stats"
             </p>
           </div>
         </div>
