@@ -35,13 +35,28 @@ const ReportsPage: React.FC = () => {
       case UserRole.STUDENT:
         return `/reports/student/${user.id}`;
       case UserRole.TEACHER:
-        return `/reports/class/${user.classId}`;
+        return user.classId ? `/reports/class/${user.classId}` : `/reports/school`;
       case UserRole.HOD:
-        return `/reports/department/${user.departmentId}`;
+        return user.departmentId ? `/reports/department/${user.departmentId}` : `/reports/school`;
       case UserRole.SCHOOL_ADMIN:
         return '/reports/school';
       default:
         return `/reports/student/${user?.id}`;
+    }
+  };
+
+  const getExportReportId = (): string => {
+    switch (user?.role) {
+      case UserRole.STUDENT:
+        return `student:${user.id}`;
+      case UserRole.TEACHER:
+        return user.classId ? `class:${user.classId}` : 'school';
+      case UserRole.HOD:
+        return user.departmentId ? `department:${user.departmentId}` : 'school';
+      case UserRole.SCHOOL_ADMIN:
+        return 'school';
+      default:
+        return `student:${user?.id}`;
     }
   };
 
@@ -65,11 +80,11 @@ const ReportsPage: React.FC = () => {
     setError(null);
     try {
       const { data } = await apiClient.get(
-        `${getReportEndpoint()}?from=${dateFrom}&to=${dateTo}`
+        `${getReportEndpoint()}?from=${dateFrom}T00:00:00.000Z&to=${dateTo}T23:59:59.999Z`
       );
       setReport(data);
     } catch (err: any) {
-      setError(err.response?.data?.error || 'Failed to load report');
+      setError(err.response?.data?.error || err.response?.data?.message || 'Failed to load report');
     } finally {
       setLoading(false);
     }
@@ -82,8 +97,9 @@ const ReportsPage: React.FC = () => {
   const handleExport = async (format: 'pdf' | 'excel') => {
     setExporting(true);
     try {
+      const reportId = getExportReportId();
       const response = await apiClient.get(
-        `${getReportEndpoint()}/export?format=${format}&from=${dateFrom}&to=${dateTo}`,
+        `/reports/${reportId}/export?format=${format}&from=${dateFrom}T00:00:00.000Z&to=${dateTo}T23:59:59.999Z`,
         { responseType: 'blob' }
       );
       const blob = new Blob([response.data]);

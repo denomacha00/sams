@@ -22,6 +22,7 @@ import RiskScorePage from './pages/RiskScorePage';
 import AIAssistantPage from './pages/AIAssistantPage';
 import SettingsPage from './pages/SettingsPage';
 import NotificationsPage from './pages/NotificationsPage';
+import TimetableViewPage from './pages/TimetableViewPage';
 
 // Admin pages
 import AdminDashboardPage from './pages/admin/AdminDashboardPage';
@@ -73,6 +74,7 @@ ReactDOM.createRoot(document.getElementById('root') as HTMLElement).render(
           <Route path="/attendance" element={<ManualAttendancePage />} />
           <Route path="/biometric/enroll" element={<BiometricEnrollPage />} />
           <Route path="/biometric/attendance" element={<BiometricAttendancePage />} />
+          <Route path="/timetable" element={<TimetableViewPage />} />
           <Route path="/reports" element={<ReportsPage />} />
           <Route path="/risk-scores" element={<RiskScorePage />} />
           <Route path="/ai" element={<AIAssistantPage />} />

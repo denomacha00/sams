@@ -227,14 +227,14 @@ function getQuickActions(role?: UserRole): QuickAction[] {
         { to: '/sessions', label: 'Start Session', icon: ICONS.session, gradient: 'from-teal-500 to-cyan-500' },
         { to: '/attendance', label: 'Mark Attendance', icon: ICONS.clipboard, gradient: 'from-blue-500 to-indigo-500' },
         { to: '/reports', label: 'View Reports', icon: ICONS.chart, gradient: 'from-purple-500 to-pink-500' },
-        { to: '/admin/timetable', label: 'My Timetable', icon: ICONS.calendar, gradient: 'from-orange-500 to-amber-500' },
+        { to: '/timetable', label: 'My Timetable', icon: ICONS.calendar, gradient: 'from-orange-500 to-amber-500' },
         { to: '/ai', label: 'AI Assistant', icon: ICONS.ai, gradient: 'from-violet-500 to-purple-500' },
         { to: '/notifications', label: 'Notifications', icon: ICONS.bell, gradient: 'from-rose-500 to-red-500' },
       ];
     case UserRole.STUDENT:
       return [
         { to: '/sessions/scan', label: 'Scan QR', icon: ICONS.qr, gradient: 'from-teal-500 to-cyan-500' },
-        { to: '/admin/timetable', label: 'View Timetable', icon: ICONS.calendar, gradient: 'from-blue-500 to-indigo-500' },
+        { to: '/timetable', label: 'View Timetable', icon: ICONS.calendar, gradient: 'from-blue-500 to-indigo-500' },
         { to: '/reports', label: 'My Reports', icon: ICONS.chart, gradient: 'from-purple-500 to-pink-500' },
         { to: '/ai', label: 'AI Assistant', icon: ICONS.ai, gradient: 'from-violet-500 to-purple-500' },
         { to: '/notifications', label: 'Notifications', icon: ICONS.bell, gradient: 'from-rose-500 to-red-500' },
