@@ -220,8 +220,21 @@ aiRouter.post('/query', async (req: Request, res: Response): Promise<void> => {
         iat: 0,
         exp: 0,
       };
-      const result = await openaiQuery(guestUserRestricted, question.trim());
-      res.status(200).json(result);
+
+      // If frontend sent conversation history, use it for context
+      const history = req.body.history as Array<{ role: string; content: string }> | undefined;
+      if (history && history.length > 0) {
+        const { openaiQueryWithHistory } = require('../services/ai/openaiEngine');
+        const formattedHistory = history.slice(-10).map((m: any) => ({
+          role: m.role as 'user' | 'assistant',
+          content: m.content,
+        }));
+        const result = await openaiQueryWithHistory(guestUserRestricted, question.trim(), formattedHistory);
+        res.status(200).json(result);
+      } else {
+        const result = await openaiQuery(guestUserRestricted, question.trim());
+        res.status(200).json(result);
+      }
     } catch {
       res.status(200).json({
         answer: 'I can answer general questions and questions about SAMS. For school-specific data, please log in first.',

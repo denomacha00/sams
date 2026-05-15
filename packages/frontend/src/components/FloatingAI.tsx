@@ -120,7 +120,10 @@ const FloatingAI: React.FC = () => {
       }
 
       // Case 3: Normal text query
-      const { data } = await apiClient.post('/ai/query', { question: text.trim(), threadId });
+      const history = messages
+        .filter((m) => m.id !== 'welcome')
+        .map((m) => ({ role: m.role, content: m.content }));
+      const { data } = await apiClient.post('/ai/query', { question: text.trim(), threadId, history });
       if (data.threadId) setThreadId(data.threadId);
       setMessages((prev) => [...prev, {
         id: crypto.randomUUID(), role: 'assistant', content: data.answer, timestamp: new Date(),
