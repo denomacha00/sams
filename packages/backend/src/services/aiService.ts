@@ -4,6 +4,13 @@ import { openaiQuery, openaiQueryWithHistory } from './ai/openaiEngine';
 import { conversationMemoryService } from './conversationMemoryService';
 import { tokenBudgetManager } from './ai/tokenBudgetManager';
 import { actionIntentDetector, type DetectedAction } from './ai/actionIntentDetector';
+import {
+  findAction,
+  isActionPermitted,
+  getActionNames,
+  type ActionScope,
+} from './ai/roleActionRegistry';
+import { auditService } from './auditService';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -31,7 +38,7 @@ export interface PendingAction {
  * - Falls back to OpenAI engine for Pro/Enterprise plans when local engine
  *   cannot resolve the query (returns 'unknown' intent)
  * - Integrates conversation memory for contextual follow-up discussions
- * - Detects and executes Super Admin action intents
+ * - Detects and executes role-specific action intents for all authenticated users
  *
  * Requirements: 1.1, 1.2, 1.6, 5.1, 5.2, 5.3, 5.5, 5.6, 6.1, 6.4, 6.5, 6.6, 11.1, 11.2, 11.3, 11.4, 11.5, 11.8, 11.9, 14.1, 14.7
  */
@@ -39,7 +46,7 @@ export class AIService {
   /**
    * Process a text query through the AI pipeline.
    * Routes to local engine first; falls back to OpenAI for Pro/Enterprise.
-   * Integrates conversation memory and Super Admin action detection.
+   * Integrates conversation memory and role-aware action detection.
    */
   async query(
     user: AccessTokenPayload,
@@ -85,18 +92,23 @@ export class AIService {
       };
     }
 
-    // Step 2: Check for Super Admin action intent
-    if (user.role === UserRole.SUPER_ADMIN) {
+    // Step 2: Action intent detection for ALL authenticated users (not just SUPER_ADMIN)
+    if (user.sub !== 'guest') {
       // If user confirmed a pending action — execute it
       if (options?.confirmAction && options?.pendingAction) {
-        const result = await this.executeSuperAdminAction(user, options.pendingAction);
+        const result = await this.executeAction(user, options.pendingAction);
         const threadId = await this.safelyPersist(user, question, result.answer, options?.threadId);
         return { ...result, threadId };
       }
 
-      // Detect action intent from the question
-      const actionIntent = actionIntentDetector.detect(question, user.role);
+      // Detect action intent using the registry for the user's role
+      const actionIntent = await actionIntentDetector.detect(question, user.role);
       if (actionIntent.isAction) {
+        // Defense in depth: verify action is permitted for this role
+        if (!isActionPermitted(user.role, actionIntent.action!)) {
+          return this.buildDenialResponse(user.role, actionIntent.action!);
+        }
+
         if (actionIntent.requiresConfirmation) {
           // Return confirmation prompt with pendingAction
           return {
@@ -111,8 +123,9 @@ export class AIService {
             requiresConfirmation: true,
           };
         }
+
         // Non-destructive action — execute immediately
-        const result = await this.executeSuperAdminAction(user, {
+        const result = await this.executeAction(user, {
           action: actionIntent.action!,
           params: actionIntent.params!,
           description: actionIntent.description!,
@@ -250,239 +263,99 @@ export class AIService {
   }
 
   /**
-   * Execute a Super Admin action directly using Prisma and service calls.
-   * Handles: suspend_school, unsuspend_school, extend_license, generate_license,
-   * get_school_info, get_system_stats.
+   * Unified action executor. Replaces the old executeSuperAdminAction.
+   * 1. Validates permission via registry lookup
+   * 2. Extracts scope from JWT
+   * 3. Dispatches to the action handler
+   * 4. Logs audit entry
+   * 5. Returns structured response
    */
-  private async executeSuperAdminAction(
+  private async executeAction(
     user: AccessTokenPayload,
     pendingAction: PendingAction,
   ): Promise<AIServiceResponse> {
     const { action, params } = pendingAction;
 
-    // Dynamic imports to avoid circular dependencies
-    const { prisma } = await import('../index');
-    const { licenseService } = await import('./licenseService');
-    const { auditService } = await import('./auditService');
+    // Authorization check via registry
+    const actionDef = findAction(user.role, action);
+    if (!actionDef) {
+      await this.logDeniedAction(user, action);
+      return this.buildDenialResponse(user.role, action);
+    }
+
+    // Build scope from JWT claims
+    const scope: ActionScope = {
+      userId: user.sub,
+      role: user.role,
+      schoolId: user.schoolId,
+      departmentId: user.departmentId,
+      classId: user.classId,
+    };
 
     try {
-      switch (action) {
-        case 'suspend_school': {
-          const schoolName = params.schoolName as string;
-          if (!schoolName)
-            return { answer: 'School name is required.', intent: 'action_error', engine: 'openai' };
-          const school = await prisma.school.findFirst({
-            where: { name: { contains: schoolName, mode: 'insensitive' } },
-          });
-          if (!school)
-            return {
-              answer: `School "${schoolName}" not found.`,
-              intent: 'action_error',
-              engine: 'openai',
-            };
-          if (school.isSuspended)
-            return {
-              answer: `⚠️ School "${school.name}" is already suspended.`,
-              intent: 'action_executed',
-              engine: 'openai',
-            };
-          await licenseService.suspendSchool(school.id);
-          await auditService.log({
-            eventType: 'SCHOOL_SUSPENDED',
-            actorId: user.sub,
-            actorRole: user.role,
-            schoolId: school.id,
-            resourceSnapshot: {
-              action: 'SCHOOL_SUSPENDED_VIA_AI',
-              schoolName: school.name,
-            },
-          });
-          return {
-            answer: `✅ School "${school.name}" has been suspended.\n\n• All active sessions revoked\n• Users cannot log in\n• Audit log entry created`,
-            intent: 'action_executed',
-            engine: 'openai',
-            data: { schoolId: school.id, schoolName: school.name },
-          };
-        }
+      // Dispatch to handler
+      const result = await actionDef.handler(params, scope);
 
-        case 'unsuspend_school': {
-          const schoolName = params.schoolName as string;
-          if (!schoolName)
-            return { answer: 'School name is required.', intent: 'action_error', engine: 'openai' };
-          const school = await prisma.school.findFirst({
-            where: { name: { contains: schoolName, mode: 'insensitive' } },
-          });
-          if (!school)
-            return {
-              answer: `School "${schoolName}" not found.`,
-              intent: 'action_error',
-              engine: 'openai',
-            };
-          if (!school.isSuspended)
-            return {
-              answer: `ℹ️ School "${school.name}" is not currently suspended.`,
-              intent: 'action_executed',
-              engine: 'openai',
-            };
-          await prisma.school.update({
-            where: { id: school.id },
-            data: { isSuspended: false },
-          });
-          await auditService.log({
-            eventType: 'SCHOOL_SUSPENDED',
-            actorId: user.sub,
-            actorRole: user.role,
-            schoolId: school.id,
-            resourceSnapshot: {
-              action: 'SCHOOL_UNSUSPENDED_VIA_AI',
-              schoolName: school.name,
-            },
-          });
-          return {
-            answer: `✅ School "${school.name}" has been unsuspended.\n\n• Users can now log in\n• Full access restored`,
-            intent: 'action_executed',
-            engine: 'openai',
-            data: { schoolId: school.id, schoolName: school.name },
-          };
-        }
+      // Audit log
+      await auditService.log({
+        eventType: 'AI_ACTION_EXECUTED',
+        actorId: user.sub,
+        actorRole: user.role,
+        schoolId: user.schoolId,
+        resourceSnapshot: {
+          action,
+          params,
+          result: 'success',
+        },
+      });
 
-        case 'extend_license': {
-          const schoolName = params.schoolName as string;
-          const daysToAdd = (params.daysToAdd as number) || 30;
-          if (!schoolName)
-            return { answer: 'School name is required.', intent: 'action_error', engine: 'openai' };
-          const school = await prisma.school.findFirst({
-            where: { name: { contains: schoolName, mode: 'insensitive' } },
-          });
-          if (!school)
-            return {
-              answer: `School "${schoolName}" not found.`,
-              intent: 'action_error',
-              engine: 'openai',
-            };
-          const baseDate =
-            school.licenseExpiresAt > new Date() ? school.licenseExpiresAt : new Date();
-          const newExpiry = new Date(baseDate);
-          newExpiry.setDate(newExpiry.getDate() + daysToAdd);
-          await licenseService.extendLicense(school.id, newExpiry);
-          return {
-            answer: `✅ License extended for "${school.name}".\n\n• Previous expiry: ${school.licenseExpiresAt.toLocaleDateString()}\n• New expiry: ${newExpiry.toLocaleDateString()}\n• Days added: ${daysToAdd}`,
-            intent: 'action_executed',
-            engine: 'openai',
-            data: { schoolId: school.id, newExpiry: newExpiry.toISOString() },
-          };
-        }
-
-        case 'generate_license': {
-          const schoolName = (params.schoolName as string) || 'Unnamed School';
-          const planTier = (params.planTier as string) || 'BASIC';
-          const daysValid = (params.daysValid as number) || 365;
-          const expiresAt = new Date();
-          expiresAt.setDate(expiresAt.getDate() + daysValid);
-
-          const { createHash } = await import('crypto');
-          const { encodeLicenseKey } = await import('@sams/shared');
-
-          const secret =
-            process.env.LICENSE_SECRET || process.env.JWT_SECRET || 'default-license-secret';
-          const rawKey = encodeLicenseKey(
-            { schoolName, planTier: planTier as any, expiresAt },
-            secret,
-          );
-          const keyHash = createHash('sha256').update(rawKey).digest('hex');
-
-          await prisma.licenseKey.create({
-            data: {
-              keyHash,
-              planTier: planTier as any,
-              schoolName,
-              expiresAt,
-            },
-          });
-
-          await auditService.log({
-            eventType: 'LICENSE_ACTIVATION',
-            actorId: user.sub,
-            actorRole: user.role,
-            resourceSnapshot: {
-              action: 'LICENSE_GENERATED_VIA_AI',
-              schoolName,
-              planTier,
-            },
-          });
-
-          return {
-            answer: `✅ License generated!\n\n**Key:** \`${rawKey}\`\n\n• School: ${schoolName}\n• Plan: ${planTier}\n• Expires: ${expiresAt.toLocaleDateString()}\n\n⚠️ Store this key securely.`,
-            intent: 'action_executed',
-            engine: 'openai',
-            data: { licenseKey: rawKey, schoolName, planTier },
-          };
-        }
-
-        case 'get_school_info': {
-          const schoolName = params.schoolName as string;
-          if (!schoolName)
-            return { answer: 'School name is required.', intent: 'action_error', engine: 'openai' };
-          const school = await prisma.school.findFirst({
-            where: { name: { contains: schoolName, mode: 'insensitive' } },
-            include: {
-              _count: { select: { users: true, sessions: true, payments: true } },
-            },
-          });
-          if (!school)
-            return {
-              answer: `School "${schoolName}" not found.`,
-              intent: 'action_error',
-              engine: 'openai',
-            };
-          return {
-            answer: `📋 **${school.name}**\n\n• Code: ${school.schoolCode}\n• Plan: ${school.planTier}\n• Expires: ${school.licenseExpiresAt.toLocaleDateString()}\n• Suspended: ${school.isSuspended ? 'Yes ⚠️' : 'No ✅'}\n• Users: ${(school as any)._count.users}\n• Sessions: ${(school as any)._count.sessions}\n• Payments: ${(school as any)._count.payments}`,
-            intent: 'action_executed',
-            engine: 'openai',
-            data: school,
-          };
-        }
-
-        case 'get_system_stats': {
-          const [totalSchools, totalStudents, totalTeachers, activeSessions, suspendedSchools] =
-            await Promise.all([
-              prisma.school.count(),
-              prisma.user.count({ where: { role: 'STUDENT' } }),
-              prisma.user.count({ where: { role: 'TEACHER' } }),
-              prisma.attendanceSession.count({ where: { isActive: true } }),
-              prisma.school.count({ where: { isSuspended: true } }),
-            ]);
-          const revenue = await prisma.payment.aggregate({
-            where: { status: 'SUCCESS' },
-            _sum: { amount: true },
-          });
-          return {
-            answer: `📊 **System Stats**\n\n• Schools: ${totalSchools}\n• Students: ${totalStudents}\n• Teachers: ${totalTeachers}\n• Active Sessions: ${activeSessions}\n• Suspended: ${suspendedSchools}\n• Revenue: KES ${(revenue._sum.amount || 0).toLocaleString()}`,
-            intent: 'action_executed',
-            engine: 'openai',
-            data: {
-              totalSchools,
-              totalStudents,
-              totalTeachers,
-              activeSessions,
-              suspendedSchools,
-            },
-          };
-        }
-
-        default:
-          return {
-            answer: `Unknown action: ${action}`,
-            intent: 'action_error',
-            engine: 'openai',
-          };
-      }
-    } catch (err) {
       return {
-        answer: `Failed to execute action: ${err instanceof Error ? err.message : 'Unknown error'}`,
+        answer: result.answer,
+        intent: 'action_executed',
+        engine: 'openai',
+        data: result.data,
+      };
+    } catch (err) {
+      console.error('[AIService] Action execution failed:', err);
+      // Safe error response — no internal details exposed
+      return {
+        answer: 'The action could not be completed. Please try again or contact support.',
         intent: 'action_error',
         engine: 'openai',
       };
+    }
+  }
+
+  /**
+   * Build a denial response with role-appropriate suggestions.
+   */
+  private buildDenialResponse(role: string, requestedAction: string): AIServiceResponse {
+    const permitted = getActionNames(role);
+    const suggestions = permitted.length > 0
+      ? `You can: ${permitted.map((a) => `\n• ${a}`).join('')}`
+      : 'You can ask me questions about your data.';
+
+    return {
+      answer: `❌ The action "${requestedAction}" is not available for your role.\n\n${suggestions}`,
+      intent: 'action_denied',
+      engine: 'openai',
+    };
+  }
+
+  /**
+   * Log a denied action attempt for audit purposes.
+   */
+  private async logDeniedAction(user: AccessTokenPayload, action: string): Promise<void> {
+    try {
+      await auditService.log({
+        eventType: 'AI_ACTION_DENIED',
+        actorId: user.sub,
+        actorRole: user.role,
+        schoolId: user.schoolId,
+        resourceSnapshot: { action, reason: 'not_permitted_for_role' },
+      });
+    } catch (err) {
+      console.error('[AIService] Failed to log denied action:', err);
     }
   }
 }

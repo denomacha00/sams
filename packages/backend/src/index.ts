@@ -21,7 +21,6 @@ import { departmentsRouter, classesRouter } from './routes/departments';
 import { aiRouter } from './routes/ai';
 import { biometricRouter } from './routes/biometric';
 import { notificationsRouter } from './routes/notifications';
-import { knowledgeRouter } from './routes/knowledge';
 import { setupAttendanceSocket } from './sockets/attendanceSocket';
 import { startQRRefreshJob, stopQRRefreshJob } from './jobs/qrRefresh';
 import { startNotificationJob, stopNotificationJob } from './jobs/notifications';
@@ -99,7 +98,6 @@ app.use('/api/v1/classes', classesRouter);
 app.use('/api/v1/ai', aiRouter);
 app.use('/api/v1/biometric', biometricRouter);
 app.use('/api/v1/notifications', notificationsRouter);
-app.use('/api/v1/knowledge', knowledgeRouter);
 app.use('/api/v1/super', superAdminRouter);
 
 // ─── Socket.io ────────────────────────────────────────────────────────────────

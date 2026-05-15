@@ -55,7 +55,6 @@ const ICONS = {
   trending: 'M13 7h8m0 0v8m0-8l-8 8-4-4-6 6',
   settings: 'M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.066 2.573c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.573 1.066c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.066-2.573c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z M15 12a3 3 0 11-6 0 3 3 0 016 0z',
   profile: 'M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z',
-  book: 'M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253',
 };
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -223,7 +222,6 @@ function getQuickActions(role?: UserRole): QuickAction[] {
         { to: '/reports', label: 'View Reports', icon: ICONS.chart, gradient: 'from-purple-500 to-pink-500' },
         { to: '/admin/timetable', label: 'Timetable', icon: ICONS.calendar, gradient: 'from-orange-500 to-amber-500' },
         { to: '/admin/departments', label: 'Departments', icon: ICONS.building, gradient: 'from-green-500 to-emerald-500' },
-        { to: '/admin/knowledge', label: 'Knowledge Base', icon: ICONS.book, gradient: 'from-indigo-500 to-violet-500' },
         { to: '/notifications', label: 'Notifications', icon: ICONS.bell, gradient: 'from-rose-500 to-red-500' },
       ];
     case UserRole.TEACHER:
@@ -232,7 +230,6 @@ function getQuickActions(role?: UserRole): QuickAction[] {
         { to: '/attendance', label: 'Mark Attendance', icon: ICONS.clipboard, gradient: 'from-blue-500 to-indigo-500' },
         { to: '/reports', label: 'View Reports', icon: ICONS.chart, gradient: 'from-purple-500 to-pink-500' },
         { to: '/timetable', label: 'My Timetable', icon: ICONS.calendar, gradient: 'from-orange-500 to-amber-500' },
-        { to: '/admin/knowledge', label: 'Knowledge Base', icon: ICONS.book, gradient: 'from-indigo-500 to-violet-500' },
         { to: '/ai', label: 'AI Assistant', icon: ICONS.ai, gradient: 'from-violet-500 to-purple-500' },
         { to: '/notifications', label: 'Notifications', icon: ICONS.bell, gradient: 'from-rose-500 to-red-500' },
       ];
@@ -251,7 +248,6 @@ function getQuickActions(role?: UserRole): QuickAction[] {
         { to: '/risk-scores', label: 'Risk Scores', icon: ICONS.warning, gradient: 'from-orange-500 to-red-500' },
         { to: '/admin/users', label: 'Manage Users', icon: ICONS.users, gradient: 'from-blue-500 to-indigo-500' },
         { to: '/admin/timetable', label: 'Timetable', icon: ICONS.calendar, gradient: 'from-purple-500 to-pink-500' },
-        { to: '/admin/knowledge', label: 'Knowledge Base', icon: ICONS.book, gradient: 'from-indigo-500 to-violet-500' },
         { to: '/notifications', label: 'Notifications', icon: ICONS.bell, gradient: 'from-rose-500 to-red-500' },
         { to: '/ai', label: 'AI Assistant', icon: ICONS.ai, gradient: 'from-violet-500 to-purple-500' },
       ];
