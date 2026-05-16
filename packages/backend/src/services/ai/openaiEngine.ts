@@ -120,6 +120,24 @@ async function buildSystemPrompt(user: AccessTokenPayload): Promise<string> {
     console.error('[AI] Failed to fetch knowledge base:', err);
   }
 
+  // For SUPER_ADMIN, inject real-time system stats into the prompt
+  let systemDataSection = '';
+  if (user.role === 'SUPER_ADMIN') {
+    try {
+      const { prisma } = await import('../index');
+      const [schoolCount, userCount, studentCount, teacherCount, sessionCount] = await Promise.all([
+        prisma.school.count(),
+        prisma.user.count(),
+        prisma.user.count({ where: { role: 'STUDENT' } }),
+        prisma.user.count({ where: { role: 'TEACHER' } }),
+        prisma.attendanceSession.count(),
+      ]);
+      systemDataSection = `\n\nREAL-TIME SYSTEM DATA (from database - use these exact numbers when asked):\n- Total Schools: ${schoolCount}\n- Total Users: ${userCount}\n- Total Students: ${studentCount}\n- Total Teachers: ${teacherCount}\n- Total Attendance Sessions: ${sessionCount}`;
+    } catch {
+      // If stats fetch fails, continue without them
+    }
+  }
+
   return `You are SAMS AI — a smart, helpful assistant built into the Smart Attendance Management System (SAMS). You were developed by Denis Macharia.
 
 You can help with:
@@ -153,7 +171,7 @@ CRITICAL — NEVER MAKE UP DATA:
 
 If the user asks for something above their permission level, politely tell them they don't have access and suggest who to contact.
 
-Be concise, friendly, and helpful. Address the user by their name. Answer in plain language.${knowledgeSection}`;
+Be concise, friendly, and helpful. Address the user by their name. Answer in plain language.${knowledgeSection}${systemDataSection}`;
 }
 
 // ─── Function-Calling Tools ───────────────────────────────────────────────────

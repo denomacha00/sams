@@ -316,11 +316,28 @@ export class KnowledgeService {
   ): Promise<Array<{ title: string; content: string; category: string }>> {
     const where = this.buildAIScopeFilter(user);
 
-    return prisma.aIKnowledge.findMany({
+    const entries = await prisma.aIKnowledge.findMany({
       where,
       select: { title: true, content: true, category: true },
       orderBy: { createdAt: 'desc' },
     });
+
+    // Also include global entries from super admin
+    const globalEntries = await prisma.aIKnowledge.findMany({
+      where: {
+        createdBy: { role: 'SUPER_ADMIN' },
+      },
+      select: { title: true, content: true, category: true },
+    });
+
+    // Merge and deduplicate
+    const allEntries = [...entries];
+    for (const ge of globalEntries) {
+      if (!allEntries.some(e => e.title === ge.title)) {
+        allEntries.push(ge);
+      }
+    }
+    return allEntries;
   }
 
   /**

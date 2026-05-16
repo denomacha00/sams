@@ -427,18 +427,22 @@ superAdminRouter.delete('/schools/:id', async (req: Request, res: Response): Pro
     await tx.school.delete({ where: { id: schoolId } });
   });
 
-  // Audit log
-  await auditService.log({
-    eventType: 'SCHOOL_SUSPENDED',
-    actorId: req.user?.sub,
-    actorRole: req.user?.role,
-    resourceSnapshot: {
-      schoolId,
-      schoolName: school.name,
-      action: 'SCHOOL_DELETED',
-      deletedAt: new Date().toISOString(),
-    },
-  });
+  // Audit log — wrapped in try-catch since the school no longer exists
+  try {
+    await auditService.log({
+      eventType: 'SCHOOL_SUSPENDED',
+      actorId: req.user?.sub,
+      actorRole: req.user?.role,
+      resourceSnapshot: {
+        schoolId,
+        schoolName: school.name,
+        action: 'SCHOOL_DELETED',
+        deletedAt: new Date().toISOString(),
+      },
+    });
+  } catch {
+    // School was deleted, audit log may fail — that's ok
+  }
 
   res.json({ message: 'School deleted successfully', schoolId });
 });
@@ -483,7 +487,9 @@ superAdminRouter.get('/audit-logs', async (req: Request, res: Response): Promise
 
   const logs = await auditService.query(filters);
 
-  res.json({ logs, count: logs.length });
+  // Serialize BigInt values to strings for JSON compatibility
+  const serializedLogs = JSON.parse(JSON.stringify(logs, (_, v) => typeof v === 'bigint' ? v.toString() : v));
+  res.json({ logs: serializedLogs, count: serializedLogs.length });
 });
 
 // ─── AI Knowledge Base CRUD ────────────────────────────────────────────────────
