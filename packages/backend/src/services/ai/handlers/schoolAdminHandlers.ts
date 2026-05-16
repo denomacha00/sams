@@ -98,6 +98,33 @@ const manageTimetableHandler: ActionHandler = async (_params, scope) => {
   };
 };
 
+const getSchoolStatsHandler: ActionHandler = async (_params, scope) => {
+  const { prisma } = await import('../../../index');
+
+  const [totalStudents, totalTeachers, totalHODs, totalDepartments, totalClasses, totalSessions] = await Promise.all([
+    prisma.user.count({ where: { schoolId: scope.schoolId, role: 'STUDENT' } }),
+    prisma.user.count({ where: { schoolId: scope.schoolId, role: 'TEACHER' } }),
+    prisma.user.count({ where: { schoolId: scope.schoolId, role: 'HOD' } }),
+    prisma.department.count({ where: { schoolId: scope.schoolId } }),
+    prisma.class.count({ where: { schoolId: scope.schoolId } }),
+    prisma.attendanceSession.count({ where: { schoolId: scope.schoolId } }),
+  ]);
+
+  const totalUsers = totalStudents + totalTeachers + totalHODs + 1; // +1 for admin
+
+  return {
+    answer: `📊 **School Statistics**\n\n` +
+      `• **Total Users:** ${totalUsers}\n` +
+      `• **Students:** ${totalStudents}\n` +
+      `• **Teachers:** ${totalTeachers}\n` +
+      `• **HODs:** ${totalHODs}\n` +
+      `• **Departments:** ${totalDepartments}\n` +
+      `• **Classes:** ${totalClasses}\n` +
+      `• **Attendance Sessions:** ${totalSessions}`,
+    data: { totalStudents, totalTeachers, totalHODs, totalDepartments, totalClasses, totalSessions, totalUsers },
+  };
+};
+
 // ─── Action Definitions ───────────────────────────────────────────────────────
 
 export const schoolAdminActions: ActionDefinition[] = [
@@ -193,5 +220,24 @@ export const schoolAdminActions: ActionDefinition[] = [
     descriptionTemplate: () =>
       `Generate or update the school timetable.`,
     handler: manageTimetableHandler,
+  },
+  {
+    action: 'get_school_stats',
+    description: 'Get school statistics like number of students, teachers, departments, classes, attendance rate',
+    destructive: false,
+    patterns: [
+      /how\s+many\s+(students?|teachers?|users?|departments?|classes?|hods?)/i,
+      /(?:show|get|what(?:'s| is| are)?)\s+(?:my\s+)?(?:school\s+)?(?:stats|statistics|numbers|data|overview)/i,
+      /(?:total|count)\s+(?:of\s+)?(students?|teachers?|users?|departments?|classes?)/i,
+      /(?:how many|number of)\s+(?:people|users|members)/i,
+      /(?:school|my)\s+(?:info|information|details|summary)/i,
+    ],
+    extractParams: (message: string) => {
+      const match = message.match(/(students?|teachers?|users?|departments?|classes?|hods?)/i);
+      return { entity: match?.[1]?.toLowerCase() || 'all' };
+    },
+    descriptionTemplate: (params) =>
+      `Get school statistics for ${params.entity || 'all'}.`,
+    handler: getSchoolStatsHandler,
   },
 ];
