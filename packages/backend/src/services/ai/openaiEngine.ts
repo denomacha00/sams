@@ -124,7 +124,7 @@ async function buildSystemPrompt(user: AccessTokenPayload): Promise<string> {
   let systemDataSection = '';
   if (user.role === 'SUPER_ADMIN') {
     try {
-      const { prisma } = await import('../index');
+      const { prisma } = await import('../../index');
       const [schoolCount, userCount, studentCount, teacherCount, sessionCount] = await Promise.all([
         prisma.school.count(),
         prisma.user.count(),
