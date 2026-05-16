@@ -214,9 +214,12 @@ const NotificationsPage: React.FC = () => {
     }
   };
 
-  // Check if current user is the sender of a notification
+  // Check if current user is the sender of a notification or is an admin
   const isOwnNotification = (notif: Notification): boolean => {
-    return !!user && !!notif.senderId && notif.senderId === user.id;
+    if (!user) return false;
+    // Admins and HODs can always edit/delete notifications
+    if (['SCHOOL_ADMIN', 'HOD'].includes(user.role)) return true;
+    return !!notif.senderId && notif.senderId === user.id;
   };
 
   return (
@@ -349,8 +352,9 @@ const NotificationsPage: React.FC = () => {
             {notifications.map((notif) => {
               const senderDisplay = truncateName(getDisplaySenderName(notif));
               const isOwn = isOwnNotification(notif);
-              const canModify = isOwn && isWithin24Hours(notif.createdAt);
-              const windowExpired = isOwn && !isWithin24Hours(notif.createdAt);
+              const isAdmin = user && ['SCHOOL_ADMIN', 'HOD'].includes(user.role);
+              const canModify = isOwn && (isAdmin || isWithin24Hours(notif.createdAt));
+              const windowExpired = isOwn && !isAdmin && !isWithin24Hours(notif.createdAt);
 
               return (
                 <div
