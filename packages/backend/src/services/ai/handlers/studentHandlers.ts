@@ -59,7 +59,7 @@ const viewTimetableHandler: ActionHandler = async (_params, scope) => {
   );
 
   const formatted = Object.entries(grouped)
-    .map(([day, entries]) => `**${day}**\n${entries.map((e) => `  • ${e}`).join('\n')}`)
+    .map(([day, entries]) => `**${day}**\n${(entries as string[]).map((e) => `  • ${e}`).join('\n')}`)
     .join('\n\n');
 
   return {
