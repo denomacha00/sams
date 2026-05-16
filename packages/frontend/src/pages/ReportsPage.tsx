@@ -30,18 +30,18 @@ const ReportsPage: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [exporting, setExporting] = useState(false);
 
-  const getReportEndpoint = (): string => {
+  const getReportEndpoint = (): string | null => {
     switch (user?.role) {
       case UserRole.STUDENT:
-        return `/reports/student/${user.id}`;
+        return user.id ? `/reports/student/${user.id}` : null;
       case UserRole.TEACHER:
-        return user.classId ? `/reports/class/${user.classId}` : `/reports/school`;
+        return user.classId ? `/reports/class/${user.classId}` : '/reports/school';
       case UserRole.HOD:
-        return user.departmentId ? `/reports/department/${user.departmentId}` : `/reports/school`;
+        return user.departmentId ? `/reports/department/${user.departmentId}` : '/reports/school';
       case UserRole.SCHOOL_ADMIN:
         return '/reports/school';
       default:
-        return `/reports/student/${user?.id}`;
+        return user?.id ? `/reports/student/${user.id}` : null;
     }
   };
 
@@ -76,15 +76,22 @@ const ReportsPage: React.FC = () => {
   };
 
   const fetchReport = async () => {
+    const endpoint = getReportEndpoint();
+    if (!endpoint) {
+      setError('Unable to determine report scope. Please ensure your account is properly configured.');
+      return;
+    }
     setLoading(true);
     setError(null);
     try {
       const { data } = await apiClient.get(
-        `${getReportEndpoint()}?from=${dateFrom}T00:00:00.000Z&to=${dateTo}T23:59:59.999Z`
+        `${endpoint}?from=${dateFrom}T00:00:00.000Z&to=${dateTo}T23:59:59.999Z`
       );
       setReport(data);
     } catch (err: any) {
-      setError(err.response?.data?.error || err.response?.data?.message || 'Failed to load report');
+      const msg = err.response?.data?.error || err.response?.data?.message || 'Failed to load report';
+      setError(msg);
+      setReport(null);
     } finally {
       setLoading(false);
     }
@@ -171,6 +178,22 @@ const ReportsPage: React.FC = () => {
         </div>
 
         {/* Stats cards */}
+        {loading && (
+          <div className="flex items-center justify-center py-16">
+            <svg className="animate-spin h-8 w-8 text-teal-400" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" /><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" /></svg>
+          </div>
+        )}
+
+        {!loading && !report && !error && (
+          <div className="backdrop-blur-xl bg-white/5 border border-white/10 rounded-2xl p-12 text-center">
+            <svg className="w-16 h-16 text-gray-600 mx-auto mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+            </svg>
+            <h3 className="text-lg font-semibold text-white mb-2">No Report Data</h3>
+            <p className="text-gray-400 text-sm">No attendance records found for the selected date range. Try adjusting the dates or take attendance first.</p>
+          </div>
+        )}
+
         {report && (
           <>
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-6">
