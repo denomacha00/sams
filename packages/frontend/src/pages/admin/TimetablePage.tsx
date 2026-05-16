@@ -48,10 +48,33 @@ const TimetablePage: React.FC = () => {
   const [filterClass, setFilterClass] = useState('');
   const [filterTeacher, setFilterTeacher] = useState('');
   const [viewMode, setViewMode] = useState<'table' | 'grid'>('table');
+  const [departments, setDepartments] = useState<{id: string; name: string; classes?: {id: string; name: string}[]}[]>([]);
+  const [teachers, setTeachers] = useState<{id: string; fullName: string}[]>([]);
 
   useEffect(() => {
     fetchEntries();
+    fetchDepartments();
+    fetchTeachers();
   }, []);
+
+  const fetchDepartments = async () => {
+    try {
+      const { data } = await apiClient.get('/departments');
+      setDepartments(Array.isArray(data) ? data : (data.departments || []));
+    } catch (err) {
+      console.error('Failed to fetch departments:', err);
+    }
+  };
+
+  const fetchTeachers = async () => {
+    try {
+      const { data } = await apiClient.get('/users?role=TEACHER');
+      const users = data.users || data || [];
+      setTeachers(users);
+    } catch (err) {
+      console.error('Failed to fetch teachers:', err);
+    }
+  };
 
   const fetchEntries = async () => {
     try {
@@ -302,26 +325,36 @@ const TimetablePage: React.FC = () => {
 
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm text-gray-300 mb-1">Class ID *</label>
-                  <input
-                    type="text"
+                  <label className="block text-sm text-gray-300 mb-1">Class *</label>
+                  <select
                     required
                     value={formData.classId}
                     onChange={(e) => setFormData({ ...formData, classId: e.target.value })}
-                    className="w-full px-4 py-2.5 rounded-xl bg-white/5 border border-white/10 text-white placeholder-gray-500 focus:outline-none focus:border-cyan-500/50 transition-colors"
-                    placeholder="Class ID"
-                  />
+                    className="w-full px-4 py-2.5 rounded-xl bg-white/5 border border-white/10 text-white focus:outline-none focus:border-cyan-500/50 transition-colors"
+                  >
+                    <option value="" className="bg-slate-800">-- Select Class --</option>
+                    {departments.map(dept => (
+                      <optgroup key={dept.id} label={dept.name} className="bg-slate-800">
+                        {(dept.classes || []).map(cls => (
+                          <option key={cls.id} value={cls.id} className="bg-slate-800">{cls.name}</option>
+                        ))}
+                      </optgroup>
+                    ))}
+                  </select>
                 </div>
                 <div>
-                  <label className="block text-sm text-gray-300 mb-1">Teacher ID *</label>
-                  <input
-                    type="text"
+                  <label className="block text-sm text-gray-300 mb-1">Teacher *</label>
+                  <select
                     required
                     value={formData.teacherId}
                     onChange={(e) => setFormData({ ...formData, teacherId: e.target.value })}
-                    className="w-full px-4 py-2.5 rounded-xl bg-white/5 border border-white/10 text-white placeholder-gray-500 focus:outline-none focus:border-cyan-500/50 transition-colors"
-                    placeholder="Teacher ID"
-                  />
+                    className="w-full px-4 py-2.5 rounded-xl bg-white/5 border border-white/10 text-white focus:outline-none focus:border-cyan-500/50 transition-colors"
+                  >
+                    <option value="" className="bg-slate-800">-- Select Teacher --</option>
+                    {teachers.map(t => (
+                      <option key={t.id} value={t.id} className="bg-slate-800">{t.fullName}</option>
+                    ))}
+                  </select>
                 </div>
               </div>
 
