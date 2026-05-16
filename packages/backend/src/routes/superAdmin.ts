@@ -510,7 +510,11 @@ superAdminRouter.post('/ai-knowledge', async (req: Request, res: Response): Prom
   }
 
   const entry = await prisma.aIKnowledge.create({
-    data: parsed.data,
+    data: {
+      ...parsed.data,
+      schoolId: req.user.schoolId,
+      createdById: req.user.sub,
+    },
   });
 
   res.status(201).json({ entry });

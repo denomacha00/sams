@@ -48,9 +48,10 @@ describe('ROLE_PERMISSIONS', () => {
     expect(perms).toContain('manage:payments');
   });
 
-  it('HOD has manage:users, view:reports, view:risk', () => {
+  it('HOD has manage:users, manage:timetable, view:reports, view:risk', () => {
     const perms = ROLE_PERMISSIONS[UserRole.HOD];
     expect(perms).toContain('manage:users');
+    expect(perms).toContain('manage:timetable');
     expect(perms).toContain('view:reports');
     expect(perms).toContain('view:risk');
     expect(perms).not.toContain('manage:payments');
@@ -156,7 +157,7 @@ describe('requirePermission', () => {
     expect(status).toHaveBeenCalledWith(403);
   });
 
-  it('HOD can view:risk but not manage:timetable', () => {
+  it('HOD can view:risk and manage:timetable', () => {
     const req = makeReq({ user: { sub: 'u1', schoolId: 's1', role: UserRole.HOD, iat: 0, exp: 9999 } } as any);
     const { res } = makeRes();
     const next = makeNext();
@@ -165,12 +166,11 @@ describe('requirePermission', () => {
     expect(next).toHaveBeenCalledOnce();
 
     const req2 = makeReq({ user: { sub: 'u1', schoolId: 's1', role: UserRole.HOD, iat: 0, exp: 9999 } } as any);
-    const { res: res2, status: status2 } = makeRes();
+    const { res: res2 } = makeRes();
     const next2 = makeNext();
 
     requirePermission('manage:timetable')(req2, res2, next2);
-    expect(next2).not.toHaveBeenCalled();
-    expect(status2).toHaveBeenCalledWith(403);
+    expect(next2).toHaveBeenCalledOnce();
   });
 
   it('all roles can view:reports', () => {

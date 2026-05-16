@@ -18,7 +18,7 @@ const DEFAULT_MAX_USES = 100;
 export interface GenerateLinkOptions {
   expiryDays?: number;
   maxUses?: number;
-  targetRole?: string;
+  targetRole?: 'TEACHER' | 'STUDENT';
 }
 
 export interface RegisterViaLinkData {
@@ -65,6 +65,12 @@ export class RegistrationLinkService {
     let targetRole: UserRole;
 
     if (options && options.targetRole) {
+      // HOD-specific validation: only TEACHER or STUDENT allowed
+      if (creatorRole === UserRole.HOD) {
+        if (options.targetRole !== 'TEACHER' && options.targetRole !== 'STUDENT') {
+          throw new AppError(400, 'INVALID_TARGET_ROLE', 'HOD can only generate links for TEACHER or STUDENT roles');
+        }
+      }
       targetRole = options.targetRole as UserRole;
     } else {
       switch (creatorRole) {
@@ -79,6 +85,27 @@ export class RegistrationLinkService {
           break;
         default:
           throw new AppError(403, 'FORBIDDEN', 'Your role cannot generate registration links');
+      }
+    }
+
+    // HOD + STUDENT: require classId and validate department ownership
+    if (creatorRole === UserRole.HOD && targetRole === UserRole.STUDENT) {
+      if (!classId) {
+        throw new AppError(400, 'CLASS_REQUIRED', 'A class must be selected for student registration links');
+      }
+
+      // Validate that the classId belongs to the HOD's department
+      const classRecord = await prisma.class.findUnique({
+        where: { id: classId },
+        select: { departmentId: true },
+      });
+
+      if (!classRecord) {
+        throw new AppError(400, 'CLASS_REQUIRED', 'The specified class does not exist');
+      }
+
+      if (classRecord.departmentId !== departmentId) {
+        throw new AppError(403, 'FORBIDDEN', 'Class does not belong to your department');
       }
     }
 
@@ -209,6 +236,83 @@ export class RegistrationLinkService {
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const { passwordHash: _, ...userWithoutPassword } = user;
     return userWithoutPassword;
+  }
+
+  /**
+   * Get registration links scoped by the requesting user's role.
+   *
+   * - SCHOOL_ADMIN: returns all links for the school
+   * - HOD: returns only links created by the HOD
+   * - TEACHER: returns only links created by the teacher
+   * - Others: throws 403 FORBIDDEN
+   *
+   * All results are sorted by createdAt descending.
+   *
+   * Requirements: 4.1, 4.3, 4.4
+   */
+  async getLinksForUser(userId: string, userRole: UserRole, schoolId: string) {
+    if (userRole === UserRole.SCHOOL_ADMIN) {
+      return prisma.registrationLink.findMany({
+        where: { schoolId },
+        orderBy: { createdAt: 'desc' },
+      });
+    }
+
+    if (userRole === UserRole.HOD || userRole === UserRole.TEACHER) {
+      return prisma.registrationLink.findMany({
+        where: { schoolId, createdById: userId },
+        orderBy: { createdAt: 'desc' },
+      });
+    }
+
+    throw new AppError(403, 'FORBIDDEN', 'You do not have permission to access registration links');
+  }
+
+  /**
+   * Delete a registration link with ownership-based access control.
+   *
+   * - SCHOOL_ADMIN can delete any link in their school
+   * - HOD can only delete links they created (createdById === requesterId)
+   * - TEACHER can only delete links they created (createdById === requesterId)
+   * - Returns 404 if link not found or doesn't belong to the school
+   * - Returns 403 if ownership check fails
+   * - Deletion does NOT affect user accounts previously created via the link
+   *
+   * Requirements: 5.1, 5.2, 5.3, 5.5
+   */
+  async deleteLink(
+    linkId: string,
+    requesterId: string,
+    requesterRole: UserRole,
+    schoolId: string,
+  ): Promise<void> {
+    // Find the link by id
+    const link = await prisma.registrationLink.findUnique({
+      where: { id: linkId },
+    });
+
+    // If not found or doesn't belong to the school, throw 404
+    if (!link || link.schoolId !== schoolId) {
+      throw new AppError(404, 'NOT_FOUND', 'Registration link not found');
+    }
+
+    // SCHOOL_ADMIN can delete any link in their school
+    if (requesterRole === UserRole.SCHOOL_ADMIN) {
+      await prisma.registrationLink.delete({ where: { id: linkId } });
+      return;
+    }
+
+    // HOD and TEACHER can only delete links they created
+    if (requesterRole === UserRole.HOD || requesterRole === UserRole.TEACHER) {
+      if (link.createdById !== requesterId) {
+        throw new AppError(403, 'FORBIDDEN', 'You can only delete links you created');
+      }
+      await prisma.registrationLink.delete({ where: { id: linkId } });
+      return;
+    }
+
+    // Any other role is forbidden
+    throw new AppError(403, 'FORBIDDEN', 'You do not have permission to delete registration links');
   }
 
   /**

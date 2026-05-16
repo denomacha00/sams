@@ -9,10 +9,34 @@ interface Notification {
   type: string;
   read: boolean;
   createdAt: string;
+  updatedAt: string | null;
+  senderId: string | null;
+  senderName: string | null;
+  batchId: string | null;
 }
 
 type Scope = 'school' | 'department' | 'class';
 type Channel = 'inapp' | 'sms';
+
+/** Truncate a string to maxLen characters, appending ellipsis if exceeded */
+function truncateName(name: string, maxLen = 50): string {
+  if (name.length <= maxLen) return name;
+  return name.slice(0, maxLen) + '…';
+}
+
+/** Check if a notification was created within the last 24 hours */
+function isWithin24Hours(createdAt: string): boolean {
+  const created = new Date(createdAt).getTime();
+  const now = Date.now();
+  return now - created < 24 * 60 * 60 * 1000;
+}
+
+/** Get display name for a notification sender */
+function getDisplaySenderName(notification: Notification): string {
+  if (notification.senderId === null) return 'System';
+  if (!notification.senderName || notification.senderName === 'Deleted User') return 'Deleted User';
+  return notification.senderName;
+}
 
 const NotificationsPage: React.FC = () => {
   const user = useAuthStore((s) => s.user);
@@ -28,6 +52,17 @@ const NotificationsPage: React.FC = () => {
   const [sending, setSending] = useState(false);
   const [sendError, setSendError] = useState<string | null>(null);
   const [sendSuccess, setSendSuccess] = useState(false);
+
+  // Edit modal state
+  const [editingNotification, setEditingNotification] = useState<Notification | null>(null);
+  const [editMessage, setEditMessage] = useState('');
+  const [editLoading, setEditLoading] = useState(false);
+  const [editError, setEditError] = useState<string | null>(null);
+
+  // Delete confirmation state
+  const [deletingNotification, setDeletingNotification] = useState<Notification | null>(null);
+  const [deleteLoading, setDeleteLoading] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
 
   const canSend = user && ['SCHOOL_ADMIN', 'HOD', 'TEACHER'].includes(user.role);
 
@@ -99,6 +134,89 @@ const NotificationsPage: React.FC = () => {
       default:
         return [];
     }
+  };
+
+  // Edit handlers
+  const openEditModal = (notif: Notification) => {
+    setEditingNotification(notif);
+    setEditMessage(notif.message);
+    setEditError(null);
+  };
+
+  const closeEditModal = () => {
+    setEditingNotification(null);
+    setEditMessage('');
+    setEditError(null);
+  };
+
+  const handleEdit = async () => {
+    if (!editingNotification) return;
+    if (editMessage.trim().length < 1 || editMessage.length > 1000) {
+      setEditError('Message must be between 1 and 1000 characters');
+      return;
+    }
+
+    setEditLoading(true);
+    setEditError(null);
+
+    try {
+      await apiClient.patch(`/notifications/${editingNotification.id}`, {
+        message: editMessage.trim(),
+      });
+      // Update local state - update all notifications with the same batchId
+      setNotifications((prev) =>
+        prev.map((n) => {
+          if (editingNotification.batchId && n.batchId === editingNotification.batchId) {
+            return { ...n, message: editMessage.trim(), updatedAt: new Date().toISOString() };
+          }
+          if (n.id === editingNotification.id) {
+            return { ...n, message: editMessage.trim(), updatedAt: new Date().toISOString() };
+          }
+          return n;
+        })
+      );
+      closeEditModal();
+    } catch (err: any) {
+      setEditError(err.response?.data?.error || err.response?.data?.message || 'Failed to edit notification');
+    } finally {
+      setEditLoading(false);
+    }
+  };
+
+  // Delete handlers
+  const openDeleteConfirm = (notif: Notification) => {
+    setDeletingNotification(notif);
+    setDeleteError(null);
+  };
+
+  const closeDeleteConfirm = () => {
+    setDeletingNotification(null);
+    setDeleteError(null);
+  };
+
+  const handleDelete = async () => {
+    if (!deletingNotification || !deletingNotification.batchId) return;
+
+    setDeleteLoading(true);
+    setDeleteError(null);
+
+    try {
+      await apiClient.delete(`/notifications/batch/${deletingNotification.batchId}`);
+      // Remove all notifications with the same batchId from local state
+      setNotifications((prev) =>
+        prev.filter((n) => n.batchId !== deletingNotification.batchId)
+      );
+      closeDeleteConfirm();
+    } catch (err: any) {
+      setDeleteError(err.response?.data?.error || err.response?.data?.message || 'Failed to delete notification');
+    } finally {
+      setDeleteLoading(false);
+    }
+  };
+
+  // Check if current user is the sender of a notification
+  const isOwnNotification = (notif: Notification): boolean => {
+    return !!user && !!notif.senderId && notif.senderId === user.id;
   };
 
   return (
@@ -228,39 +346,195 @@ const NotificationsPage: React.FC = () => {
           </div>
         ) : (
           <div className="space-y-3">
-            {notifications.map((notif) => (
-              <div
-                key={notif.id}
-                onClick={() => !notif.read && markAsRead(notif.id)}
-                className={`p-4 rounded-xl border transition-all cursor-pointer ${
-                  notif.read
-                    ? 'bg-white/3 border-white/5'
-                    : 'bg-white/5 border-teal-500/20 hover:border-teal-500/40'
-                }`}
-              >
-                <div className="flex items-start justify-between">
-                  <div className="flex-1">
-                    <div className="flex items-center gap-2">
-                      {!notif.read && (
-                        <div className="w-2 h-2 rounded-full bg-teal-400 flex-shrink-0" />
-                      )}
-                      <h3 className={`text-sm font-semibold ${notif.read ? 'text-gray-400' : 'text-white'}`}>
-                        {notif.title}
-                      </h3>
+            {notifications.map((notif) => {
+              const senderDisplay = truncateName(getDisplaySenderName(notif));
+              const isOwn = isOwnNotification(notif);
+              const canModify = isOwn && isWithin24Hours(notif.createdAt);
+              const windowExpired = isOwn && !isWithin24Hours(notif.createdAt);
+
+              return (
+                <div
+                  key={notif.id}
+                  onClick={() => !notif.read && markAsRead(notif.id)}
+                  className={`p-4 rounded-xl border transition-all cursor-pointer backdrop-blur-sm ${
+                    notif.read
+                      ? 'bg-white/[0.03] border-white/5'
+                      : 'bg-white/[0.06] border-teal-500/20 hover:border-teal-500/40'
+                  }`}
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        {!notif.read && (
+                          <div className="w-2 h-2 rounded-full bg-teal-400 flex-shrink-0" />
+                        )}
+                        <h3 className={`text-sm font-semibold ${notif.read ? 'text-gray-400' : 'text-white'}`}>
+                          {notif.title}
+                        </h3>
+                        <span className="text-xs px-2 py-0.5 rounded-full bg-white/10 text-gray-400 border border-white/5">
+                          {senderDisplay}
+                        </span>
+                        {notif.updatedAt && (
+                          <span className="text-xs text-amber-400/70 italic">edited</span>
+                        )}
+                      </div>
+                      <p className={`text-sm mt-1.5 ${notif.read ? 'text-gray-500' : 'text-gray-300'}`}>
+                        {notif.message}
+                      </p>
                     </div>
-                    <p className={`text-sm mt-1 ${notif.read ? 'text-gray-500' : 'text-gray-300'}`}>
-                      {notif.message}
-                    </p>
+                    <div className="flex items-center gap-2 flex-shrink-0">
+                      {/* Edit/Delete controls for own notifications */}
+                      {isOwn && (
+                        <div className="flex items-center gap-1">
+                          <div className="relative group">
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                if (canModify) openEditModal(notif);
+                              }}
+                              disabled={!canModify}
+                              className={`p-1.5 rounded-lg transition-all ${
+                                canModify
+                                  ? 'hover:bg-white/10 text-gray-400 hover:text-teal-400'
+                                  : 'text-gray-600 cursor-not-allowed'
+                              }`}
+                              aria-label="Edit notification"
+                            >
+                              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                              </svg>
+                            </button>
+                            {windowExpired && (
+                              <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2 py-1 text-xs text-white bg-gray-800 border border-white/10 rounded-lg whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10">
+                                Modification window expired
+                              </div>
+                            )}
+                          </div>
+                          <div className="relative group">
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                if (canModify) openDeleteConfirm(notif);
+                              }}
+                              disabled={!canModify}
+                              className={`p-1.5 rounded-lg transition-all ${
+                                canModify
+                                  ? 'hover:bg-white/10 text-gray-400 hover:text-red-400'
+                                  : 'text-gray-600 cursor-not-allowed'
+                              }`}
+                              aria-label="Delete notification"
+                            >
+                              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                              </svg>
+                            </button>
+                            {windowExpired && (
+                              <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2 py-1 text-xs text-white bg-gray-800 border border-white/10 rounded-lg whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10">
+                                Modification window expired
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      )}
+                      <span className="text-xs text-gray-500 ml-2">
+                        {new Date(notif.createdAt).toLocaleDateString()}
+                      </span>
+                    </div>
                   </div>
-                  <span className="text-xs text-gray-500 flex-shrink-0 ml-4">
-                    {new Date(notif.createdAt).toLocaleDateString()}
-                  </span>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </div>
+
+      {/* Edit Modal */}
+      {editingNotification && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div
+            className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+            onClick={closeEditModal}
+          />
+          <div className="relative w-full max-w-lg bg-slate-800/95 backdrop-blur-xl border border-white/10 rounded-2xl p-6 shadow-2xl">
+            <h2 className="text-lg font-semibold text-white mb-4">Edit Notification</h2>
+
+            {editError && (
+              <div className="mb-4 p-3 bg-red-500/20 border border-red-400/30 rounded-xl">
+                <p className="text-sm text-red-300">{editError}</p>
+              </div>
+            )}
+
+            <div className="mb-4">
+              <label className="block text-sm font-semibold text-gray-300 mb-1.5">Message</label>
+              <textarea
+                value={editMessage}
+                onChange={(e) => setEditMessage(e.target.value)}
+                rows={5}
+                maxLength={1000}
+                className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-teal-500/40 focus:border-teal-400 transition-all resize-none"
+                placeholder="Edit your message..."
+              />
+              <p className="text-xs text-gray-500 mt-1 text-right">
+                {editMessage.length}/1000
+              </p>
+            </div>
+
+            <div className="flex gap-3 justify-end">
+              <button
+                onClick={closeEditModal}
+                className="px-4 py-2 text-sm font-medium text-gray-300 bg-white/5 border border-white/10 rounded-xl hover:bg-white/10 transition-all"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleEdit}
+                disabled={editLoading || editMessage.trim().length < 1 || editMessage.length > 1000}
+                className="px-4 py-2 text-sm font-semibold text-white bg-gradient-to-r from-teal-500 to-cyan-600 rounded-xl hover:from-teal-400 hover:to-cyan-500 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-lg shadow-teal-500/20"
+              >
+                {editLoading ? 'Saving...' : 'Save Changes'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Confirmation Dialog */}
+      {deletingNotification && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div
+            className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+            onClick={closeDeleteConfirm}
+          />
+          <div className="relative w-full max-w-md bg-slate-800/95 backdrop-blur-xl border border-white/10 rounded-2xl p-6 shadow-2xl">
+            <h2 className="text-lg font-semibold text-white mb-2">Delete Notification</h2>
+            <p className="text-sm text-gray-400 mb-6">
+              Are you sure you want to delete this notification? This will remove it for all recipients and cannot be undone.
+            </p>
+
+            {deleteError && (
+              <div className="mb-4 p-3 bg-red-500/20 border border-red-400/30 rounded-xl">
+                <p className="text-sm text-red-300">{deleteError}</p>
+              </div>
+            )}
+
+            <div className="flex gap-3 justify-end">
+              <button
+                onClick={closeDeleteConfirm}
+                className="px-4 py-2 text-sm font-medium text-gray-300 bg-white/5 border border-white/10 rounded-xl hover:bg-white/10 transition-all"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleDelete}
+                disabled={deleteLoading}
+                className="px-4 py-2 text-sm font-semibold text-white bg-gradient-to-r from-red-500 to-rose-600 rounded-xl hover:from-red-400 hover:to-rose-500 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-lg shadow-red-500/20"
+              >
+                {deleteLoading ? 'Deleting...' : 'Delete'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

@@ -102,7 +102,7 @@ const addKnowledgeHandler: ActionHandler = async (params, scope) => {
   }
 
   const entry = await prisma.aIKnowledge.create({
-    data: { title, content, category },
+    data: { title, content, category, schoolId: scope.schoolId, createdById: scope.userId },
   });
 
   return {

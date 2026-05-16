@@ -141,6 +141,7 @@ model User {
   notifications     Notification[]
   conversationThreads ConversationThread[]
   conversationRecords ConversationRecord[]
+  knowledgeEntries  AIKnowledge[]
 
   @@unique([schoolId, admissionNumber])
   @@index([schoolId, role])
@@ -340,31 +341,45 @@ model Payment {
 // ─── Notifications ────────────────────────────────────────────────────────────
 
 model Notification {
-  id        String   @id @default(cuid())
+  id        String    @id @default(cuid())
   schoolId  String
   userId    String
+  senderId  String?
+  batchId   String?
   title     String
   message   String
-  type      String   @default("MESSAGE")
-  read      Boolean  @default(false)
-  createdAt DateTime @default(now())
+  type      String    @default("MESSAGE")
+  read      Boolean   @default(false)
+  createdAt DateTime  @default(now())
+  updatedAt DateTime?
 
   user   User   @relation(fields: [userId], references: [id])
   school School @relation(fields: [schoolId], references: [id])
 
   @@index([userId, read])
   @@index([schoolId])
+  @@index([batchId])
+  @@index([senderId])
 }
 
 // ─── AI Knowledge Base ────────────────────────────────────────────────────────
 
 model AIKnowledge {
-  id        String   @id @default(cuid())
-  title     String
-  content   String   @db.Text
-  category  String   @default("general")
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id           String   @id @default(cuid())
+  title        String
+  content      String   @db.Text
+  category     String   @default("general")
+  schoolId     String
+  departmentId String?
+  classId      String?
+  createdById  String
+  createdBy    User     @relation(fields: [createdById], references: [id])
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@index([schoolId])
+  @@index([schoolId, departmentId])
+  @@index([schoolId, classId])
 }
 
 // ─── Conversation Memory ──────────────────────────────────────────────────────

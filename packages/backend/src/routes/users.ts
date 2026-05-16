@@ -52,6 +52,7 @@ const generateLinkSchema = z.object({
   classId: z.string().optional(),
   expiryDays: z.number().int().min(7).max(365).optional(),
   maxUses: z.number().int().min(1).optional(),
+  targetRole: z.enum(['TEACHER', 'STUDENT']).optional(),
 });
 
 const registerViaLinkSchema = z.object({
@@ -313,7 +314,11 @@ export const registrationLinksRouter = Router();
 
 /**
  * GET /api/v1/registration-links
- * List all registration links for the school.
+ * List registration links scoped by the user's role.
+ * - SCHOOL_ADMIN sees all links for the school
+ * - HOD sees only links they created
+ * - Other roles get 403
+ * - Unauthenticated requests get empty array (public access compatibility)
  */
 registrationLinksRouter.get('/', async (req: Request, res: Response): Promise<void> => {
   // This route is under PUBLIC_PATHS so req.user might not be set
@@ -323,12 +328,14 @@ registrationLinksRouter.get('/', async (req: Request, res: Response): Promise<vo
     return;
   }
   try {
-    const links = await prisma.registrationLink.findMany({
-      where: { schoolId: req.schoolId },
-      orderBy: { createdAt: 'desc' },
-    });
+    const links = await registrationLinkService.getLinksForUser(
+      req.user.sub,
+      req.user.role as any,
+      req.schoolId,
+    );
     res.json(links);
   } catch (err) {
+    if (err instanceof AppError) throw err;
     res.json([]);
   }
 });
@@ -355,13 +362,20 @@ registrationLinksRouter.post('/', async (req: Request, res: Response): Promise<v
   }
 
   try {
+    // Determine classId: use body classId, especially when targetRole is STUDENT
+    const classId = parsed.data.classId || undefined;
+
     const link = await registrationLinkService.generateLink(
       req.user.sub,
       req.user.role,
       req.schoolId,
       req.user.departmentId,
-      parsed.data.classId || undefined,
-      { expiryDays: parsed.data.expiryDays, maxUses: parsed.data.maxUses, targetRole: (req.body as any).targetRole || undefined } as any,
+      classId,
+      {
+        expiryDays: parsed.data.expiryDays,
+        maxUses: parsed.data.maxUses,
+        targetRole: parsed.data.targetRole,
+      },
     );
     res.status(201).json(link);
   } catch (err) {
@@ -412,7 +426,10 @@ registrationLinksRouter.get('/:token', async (req: Request, res: Response): Prom
 
 /**
  * DELETE /api/v1/registration-links/:id
- * Delete a registration link.
+ * Delete a registration link with ownership check.
+ * - SCHOOL_ADMIN can delete any link in their school
+ * - HOD can only delete links they created
+ * - Returns 403 if ownership check fails, 404 if not found
  */
 registrationLinksRouter.delete('/:id', async (req: Request, res: Response): Promise<void> => {
   if (!req.user || !req.schoolId) {
@@ -420,16 +437,16 @@ registrationLinksRouter.delete('/:id', async (req: Request, res: Response): Prom
     return;
   }
   try {
-    const id = String(req.params.id);
-    const link = await prisma.registrationLink.findUnique({ where: { id } });
-    if (!link || link.schoolId !== req.schoolId) {
-      res.status(404).json({ error: 'Link not found', code: 'NOT_FOUND' });
-      return;
-    }
-    await prisma.registrationLink.delete({ where: { id } });
+    await registrationLinkService.deleteLink(
+      req.params.id as string,
+      req.user.sub,
+      req.user.role as any,
+      req.schoolId,
+    );
     res.status(204).send();
   } catch (err) {
-    res.status(500).json({ error: 'Failed to delete link', code: 'INTERNAL_ERROR' });
+    if (err instanceof AppError) throw err;
+    throw new AppError(500, 'INTERNAL_ERROR', 'Failed to delete registration link');
   }
 });
 

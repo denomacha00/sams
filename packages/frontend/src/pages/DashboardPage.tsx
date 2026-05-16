@@ -55,7 +55,9 @@ const ICONS = {
   trending: 'M13 7h8m0 0v8m0-8l-8 8-4-4-6 6',
   settings: 'M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.066 2.573c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.573 1.066c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.066-2.573c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z M15 12a3 3 0 11-6 0 3 3 0 016 0z',
   profile: 'M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z',
+  book: 'M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253',
 };
+
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -85,11 +87,36 @@ function getRoleLabel(role?: UserRole): string {
   }
 }
 
+function getRoleGreeting(role?: UserRole): string {
+  switch (role) {
+    case UserRole.SCHOOL_ADMIN: return 'Your school is running smoothly. Here\'s your command center.';
+    case UserRole.HOD: return 'Your department is performing well. Monitor and manage from here.';
+    case UserRole.TEACHER: return 'Ready to inspire today? Here\'s your teaching overview.';
+    case UserRole.STUDENT: return 'Stay on track with your attendance and schedule.';
+    default: return 'Welcome to your personalized dashboard.';
+  }
+}
+
+// ─── Section Header Component ────────────────────────────────────────────────
+
+const SectionHeader: React.FC<{ title: string; icon: string; gradient: string }> = ({ title, icon, gradient }) => (
+  <div className="mb-6">
+    <div className="flex items-center gap-3 mb-3">
+      <div className={`w-8 h-8 rounded-lg bg-gradient-to-br ${gradient} flex items-center justify-center shadow-lg`}>
+        <svg className="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={icon} />
+        </svg>
+      </div>
+      <h3 className="text-lg font-semibold text-white tracking-tight">{title}</h3>
+    </div>
+    <div className={`h-px bg-gradient-to-r ${gradient} opacity-30`} />
+  </div>
+);
 
 // ─── Skeleton Loader ─────────────────────────────────────────────────────────
 
 const SkeletonCard: React.FC = () => (
-  <div className="animate-pulse rounded-2xl border border-white/10 bg-white/5 p-6">
+  <div className="animate-pulse rounded-2xl border border-white/10 bg-white/5 p-6 min-h-[140px]">
     <div className="w-12 h-12 rounded-xl bg-white/10 mb-4" />
     <div className="h-4 w-20 bg-white/10 rounded mb-2" />
     <div className="h-8 w-16 bg-white/10 rounded" />
@@ -100,18 +127,26 @@ const SkeletonCard: React.FC = () => (
 
 const AnimatedStatCard: React.FC<{ stat: StatCard; index: number }> = ({ stat, index }) => (
   <div
-    className="relative overflow-hidden rounded-2xl border border-white/10 bg-white/5 backdrop-blur-sm p-6 hover:bg-white/10 hover:border-white/20 transition-all duration-300 hover:scale-[1.02] group"
-    style={{ animationDelay: `${index * 100}ms`, animation: 'fadeInUp 0.5s ease-out forwards', opacity: 0 }}
+    className="relative overflow-hidden rounded-2xl border border-white/10 bg-white/[0.03] backdrop-blur-md p-6 min-h-[140px] hover:bg-white/[0.08] hover:border-white/20 transition-all duration-500 hover:scale-[1.03] group cursor-default"
+    style={{
+      animationDelay: `${index * 100}ms`,
+      animation: 'fadeInUp 0.5s ease-out forwards',
+      opacity: 0,
+    }}
   >
-    <div className={`absolute inset-0 bg-gradient-to-br ${stat.gradient} opacity-5 group-hover:opacity-10 transition-opacity duration-300`} />
+    {/* Gradient glow on hover */}
+    <div className={`absolute -inset-1 bg-gradient-to-br ${stat.gradient} opacity-0 group-hover:opacity-15 blur-xl transition-opacity duration-500 rounded-2xl`} />
+    <div className={`absolute inset-0 bg-gradient-to-br ${stat.gradient} opacity-[0.03] group-hover:opacity-[0.08] transition-opacity duration-500`} />
+    {/* Glass border highlight */}
+    <div className="absolute inset-0 rounded-2xl border border-white/[0.05] group-hover:border-white/[0.15] transition-all duration-500" />
     <div className="relative z-10">
-      <div className={`w-12 h-12 rounded-xl bg-gradient-to-br ${stat.gradient} flex items-center justify-center shadow-lg ${stat.shadowColor} mb-4`}>
+      <div className={`w-12 h-12 rounded-xl bg-gradient-to-br ${stat.gradient} flex items-center justify-center shadow-lg ${stat.shadowColor} mb-4 group-hover:shadow-xl transition-shadow duration-500`}>
         <svg className="w-6 h-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d={stat.icon} />
         </svg>
       </div>
-      <p className="text-sm text-gray-400 mb-1">{stat.label}</p>
-      <p className="text-2xl font-bold text-white">{stat.value}</p>
+      <p className="text-sm text-gray-400 mb-1 font-medium">{stat.label}</p>
+      <p className="text-2xl font-bold text-white tracking-tight">{stat.value}</p>
     </div>
   </div>
 );
@@ -121,17 +156,21 @@ const AnimatedStatCard: React.FC<{ stat: StatCard; index: number }> = ({ stat, i
 const QuickActionButton: React.FC<{ action: QuickAction; index: number }> = ({ action, index }) => (
   <Link
     to={action.to}
-    className="group relative overflow-hidden rounded-2xl border border-white/10 bg-white/5 backdrop-blur-sm p-5 hover:bg-white/10 hover:border-white/20 transition-all duration-300 hover:scale-[1.02] hover:shadow-xl hover:shadow-black/20"
+    className="group relative overflow-hidden rounded-2xl border border-white/10 bg-white/[0.03] backdrop-blur-md p-5 min-h-[120px] hover:bg-white/[0.08] hover:border-white/20 transition-all duration-500 hover:scale-[1.03] hover:shadow-2xl hover:shadow-black/30 flex flex-col justify-between"
     style={{ animationDelay: `${(index + 4) * 80}ms`, animation: 'fadeInUp 0.5s ease-out forwards', opacity: 0 }}
   >
-    <div className={`absolute top-0 left-0 right-0 h-1 bg-gradient-to-r ${action.gradient} opacity-0 group-hover:opacity-100 transition-opacity duration-300`} />
-    <div className={`w-10 h-10 rounded-lg bg-gradient-to-br ${action.gradient} flex items-center justify-center shadow-md mb-3`}>
-      <svg className="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d={action.icon} />
-      </svg>
+    {/* Gradient glow on hover */}
+    <div className={`absolute -inset-1 bg-gradient-to-br ${action.gradient} opacity-0 group-hover:opacity-10 blur-xl transition-opacity duration-500 rounded-2xl`} />
+    <div className={`absolute top-0 left-0 right-0 h-[2px] bg-gradient-to-r ${action.gradient} opacity-0 group-hover:opacity-100 transition-opacity duration-300`} />
+    <div>
+      <div className={`w-10 h-10 rounded-lg bg-gradient-to-br ${action.gradient} flex items-center justify-center shadow-md mb-3 group-hover:shadow-lg transition-shadow duration-500`}>
+        <svg className="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d={action.icon} />
+        </svg>
+      </div>
+      <h3 className="text-sm font-medium text-white/90 group-hover:text-white transition-colors">{action.label}</h3>
     </div>
-    <h3 className="text-sm font-medium text-white group-hover:text-white/90">{action.label}</h3>
-    <div className="absolute bottom-5 right-5 opacity-0 group-hover:opacity-100 transition-all duration-300 translate-x-2 group-hover:translate-x-0">
+    <div className="absolute bottom-4 right-4 opacity-0 group-hover:opacity-100 transition-all duration-300 translate-x-2 group-hover:translate-x-0">
       <svg className="w-4 h-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 8l4 4m0 0l-4 4m4-4H3" />
       </svg>
@@ -139,12 +178,13 @@ const QuickActionButton: React.FC<{ action: QuickAction; index: number }> = ({ a
   </Link>
 );
 
+
 // ─── Today's Schedule Component ──────────────────────────────────────────────
 
 const TodaySchedule: React.FC<{ entries: TimetableEntry[]; loading: boolean }> = ({ entries, loading }) => (
-  <div className="rounded-2xl border border-white/10 bg-white/5 backdrop-blur-sm p-6" style={{ animation: 'fadeInUp 0.5s ease-out 0.6s forwards', opacity: 0 }}>
+  <div className="rounded-2xl border border-white/10 bg-white/[0.03] backdrop-blur-md p-6 min-h-[280px]" style={{ animation: 'fadeInUp 0.5s ease-out 0.6s forwards', opacity: 0 }}>
     <div className="flex items-center gap-3 mb-5">
-      <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-blue-500 to-cyan-500 flex items-center justify-center">
+      <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-blue-500 to-cyan-500 flex items-center justify-center shadow-lg shadow-blue-500/20">
         <svg className="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={ICONS.calendar} />
         </svg>
@@ -161,11 +201,18 @@ const TodaySchedule: React.FC<{ entries: TimetableEntry[]; loading: boolean }> =
         ))}
       </div>
     ) : entries.length === 0 ? (
-      <p className="text-gray-500 text-sm text-center py-6">No classes scheduled for today</p>
+      <div className="flex flex-col items-center justify-center py-8">
+        <div className="w-12 h-12 rounded-full bg-white/5 flex items-center justify-center mb-3">
+          <svg className="w-6 h-6 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d={ICONS.calendar} />
+          </svg>
+        </div>
+        <p className="text-gray-500 text-sm">No classes scheduled for today</p>
+      </div>
     ) : (
       <div className="space-y-2">
         {entries.map((entry) => (
-          <div key={entry.id} className="flex items-center gap-4 p-3 rounded-xl bg-white/5 hover:bg-white/10 transition-colors">
+          <div key={entry.id} className="flex items-center gap-4 p-3 rounded-xl bg-white/[0.03] hover:bg-white/[0.07] border border-white/5 hover:border-white/10 transition-all duration-300">
             <div className="text-xs font-mono text-teal-400 w-20 shrink-0">
               {entry.startTime} - {entry.endTime}
             </div>
@@ -184,9 +231,9 @@ const TodaySchedule: React.FC<{ entries: TimetableEntry[]; loading: boolean }> =
 // ─── Activity Feed Component ─────────────────────────────────────────────────
 
 const ActivityFeed: React.FC = () => (
-  <div className="rounded-2xl border border-white/10 bg-white/5 backdrop-blur-sm p-6" style={{ animation: 'fadeInUp 0.5s ease-out 0.7s forwards', opacity: 0 }}>
+  <div className="rounded-2xl border border-white/10 bg-white/[0.03] backdrop-blur-md p-6 min-h-[280px]" style={{ animation: 'fadeInUp 0.5s ease-out 0.7s forwards', opacity: 0 }}>
     <div className="flex items-center gap-3 mb-5">
-      <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center">
+      <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center shadow-lg shadow-purple-500/20">
         <svg className="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={ICONS.trending} />
         </svg>
@@ -200,10 +247,10 @@ const ActivityFeed: React.FC = () => (
         { text: 'Report generated', time: '1 hour ago', color: 'bg-purple-500' },
         { text: 'Timetable updated', time: '3 hours ago', color: 'bg-orange-500' },
       ].map((item, i) => (
-        <div key={i} className="flex items-center gap-3 p-2">
-          <div className={`w-2 h-2 rounded-full ${item.color}`} />
+        <div key={i} className="flex items-center gap-3 p-3 rounded-xl bg-white/[0.02] hover:bg-white/[0.05] border border-white/5 hover:border-white/10 transition-all duration-300">
+          <div className={`w-2.5 h-2.5 rounded-full ${item.color} shadow-sm`} />
           <p className="text-sm text-gray-300 flex-1">{item.text}</p>
-          <span className="text-xs text-gray-500">{item.time}</span>
+          <span className="text-xs text-gray-500 font-medium">{item.time}</span>
         </div>
       ))}
     </div>
@@ -222,7 +269,9 @@ function getQuickActions(role?: UserRole): QuickAction[] {
         { to: '/reports', label: 'View Reports', icon: ICONS.chart, gradient: 'from-purple-500 to-pink-500' },
         { to: '/admin/timetable', label: 'Timetable', icon: ICONS.calendar, gradient: 'from-orange-500 to-amber-500' },
         { to: '/admin/departments', label: 'Departments', icon: ICONS.building, gradient: 'from-green-500 to-emerald-500' },
+        { to: '/admin/knowledge', label: 'Knowledge Base', icon: ICONS.book, gradient: 'from-amber-500 to-yellow-500' },
         { to: '/notifications', label: 'Notifications', icon: ICONS.bell, gradient: 'from-rose-500 to-red-500' },
+        { to: '/ai', label: 'AI Assistant', icon: ICONS.ai, gradient: 'from-violet-500 to-purple-500' },
       ];
     case UserRole.TEACHER:
       return [
@@ -230,6 +279,7 @@ function getQuickActions(role?: UserRole): QuickAction[] {
         { to: '/attendance', label: 'Mark Attendance', icon: ICONS.clipboard, gradient: 'from-blue-500 to-indigo-500' },
         { to: '/reports', label: 'View Reports', icon: ICONS.chart, gradient: 'from-purple-500 to-pink-500' },
         { to: '/timetable', label: 'My Timetable', icon: ICONS.calendar, gradient: 'from-orange-500 to-amber-500' },
+        { to: '/admin/knowledge', label: 'Knowledge Base', icon: ICONS.book, gradient: 'from-amber-500 to-yellow-500' },
         { to: '/ai', label: 'AI Assistant', icon: ICONS.ai, gradient: 'from-violet-500 to-purple-500' },
         { to: '/notifications', label: 'Notifications', icon: ICONS.bell, gradient: 'from-rose-500 to-red-500' },
       ];
@@ -246,8 +296,10 @@ function getQuickActions(role?: UserRole): QuickAction[] {
       return [
         { to: '/reports', label: 'View Reports', icon: ICONS.chart, gradient: 'from-teal-500 to-cyan-500' },
         { to: '/risk-scores', label: 'Risk Scores', icon: ICONS.warning, gradient: 'from-orange-500 to-red-500' },
+        { to: '/admin/links', label: 'Registration Links', icon: ICONS.link, gradient: 'from-emerald-500 to-teal-500' },
         { to: '/admin/users', label: 'Manage Users', icon: ICONS.users, gradient: 'from-blue-500 to-indigo-500' },
         { to: '/admin/timetable', label: 'Timetable', icon: ICONS.calendar, gradient: 'from-purple-500 to-pink-500' },
+        { to: '/admin/knowledge', label: 'Knowledge Base', icon: ICONS.book, gradient: 'from-amber-500 to-yellow-500' },
         { to: '/notifications', label: 'Notifications', icon: ICONS.bell, gradient: 'from-rose-500 to-red-500' },
         { to: '/ai', label: 'AI Assistant', icon: ICONS.ai, gradient: 'from-violet-500 to-purple-500' },
       ];
@@ -468,55 +520,83 @@ const DashboardPage: React.FC = () => {
   const quickActions = getQuickActions(user?.role);
 
   return (
-    <div className="min-h-screen bg-slate-900">
-      {/* CSS Keyframes */}
+    <div className="min-h-screen bg-slate-900 relative overflow-hidden">
+      {/* CSS Keyframes & Animations */}
       <style>{`
         @keyframes fadeInUp {
           from { opacity: 0; transform: translateY(20px); }
           to { opacity: 1; transform: translateY(0); }
         }
+        @keyframes shimmer {
+          0% { background-position: -200% 0; }
+          100% { background-position: 200% 0; }
+        }
+        @keyframes float {
+          0%, 100% { transform: translateY(0px); }
+          50% { transform: translateY(-6px); }
+        }
+        @keyframes gradientShift {
+          0% { background-position: 0% 50%; }
+          50% { background-position: 100% 50%; }
+          100% { background-position: 0% 50%; }
+        }
+        @keyframes pulse-glow {
+          0%, 100% { opacity: 0.4; }
+          50% { opacity: 0.8; }
+        }
       `}</style>
 
+      {/* Ambient background effects */}
+      <div className="fixed inset-0 pointer-events-none overflow-hidden">
+        <div className="absolute -top-40 -right-40 w-80 h-80 bg-teal-500/[0.07] rounded-full blur-3xl" style={{ animation: 'pulse-glow 8s ease-in-out infinite' }} />
+        <div className="absolute top-1/3 -left-40 w-96 h-96 bg-blue-500/[0.05] rounded-full blur-3xl" style={{ animation: 'pulse-glow 10s ease-in-out infinite 2s' }} />
+        <div className="absolute -bottom-40 right-1/4 w-72 h-72 bg-purple-500/[0.05] rounded-full blur-3xl" style={{ animation: 'pulse-glow 12s ease-in-out infinite 4s' }} />
+      </div>
+
+      {/* Animated gradient border glow at top */}
+      <div className="absolute top-0 left-0 right-0 h-[2px] bg-gradient-to-r from-transparent via-teal-500/50 to-transparent" style={{ backgroundSize: '200% 100%', animation: 'gradientShift 4s ease infinite' }} />
+
       {/* Header */}
-      <header className="border-b border-white/10 backdrop-blur-sm bg-slate-900/80 sticky top-0 z-50">
-        <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
+      <header className="relative border-b border-white/[0.06] backdrop-blur-xl bg-slate-900/70 sticky top-0 z-50">
+        <div className="absolute inset-0 bg-gradient-to-r from-teal-500/[0.02] via-transparent to-blue-500/[0.02]" />
+        <div className="relative max-w-7xl mx-auto px-6 lg:px-8 py-4 flex items-center justify-between">
           <div className="flex items-center gap-4">
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-teal-500 to-cyan-500 flex items-center justify-center shadow-lg shadow-teal-500/20">
+            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-teal-500 to-cyan-500 flex items-center justify-center shadow-lg shadow-teal-500/25 ring-1 ring-white/10">
               <svg className="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
               </svg>
             </div>
             <div>
-              <h1 className="text-lg font-bold text-white">SAMS</h1>
-              <p className="text-xs text-gray-400">Smart Attendance Management</p>
+              <h1 className="text-lg font-bold text-white tracking-tight">SAMS</h1>
+              <p className="text-xs text-gray-400 font-medium">Smart Attendance Management</p>
             </div>
           </div>
 
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-3">
             {/* Date & Time */}
-            <div className="hidden md:flex flex-col items-end">
-              <span className="text-sm text-gray-300">{currentTime}</span>
+            <div className="hidden md:flex flex-col items-end mr-2">
+              <span className="text-sm text-gray-300 font-medium">{currentTime}</span>
               <span className="text-xs text-gray-500">{formatDate()}</span>
             </div>
 
             {/* Notifications */}
             <Link
               to="/notifications"
-              className="relative w-9 h-9 rounded-lg bg-white/5 border border-white/10 flex items-center justify-center hover:bg-white/10 transition-colors"
+              className="relative w-9 h-9 rounded-lg bg-white/[0.04] border border-white/10 flex items-center justify-center hover:bg-white/[0.08] hover:border-white/20 transition-all duration-300"
             >
               <svg className="w-4 h-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={ICONS.bell} />
               </svg>
-              <span className="absolute -top-1 -right-1 w-3 h-3 bg-red-500 rounded-full border-2 border-slate-900" />
+              <span className="absolute -top-1 -right-1 w-3 h-3 bg-red-500 rounded-full border-2 border-slate-900 shadow-lg shadow-red-500/30" />
             </Link>
 
             {/* Profile */}
             <Link
               to="/profile"
-              className={`relative w-9 h-9 rounded-lg border flex items-center justify-center hover:bg-white/10 transition-colors ${
+              className={`relative w-9 h-9 rounded-lg border flex items-center justify-center hover:bg-white/[0.08] transition-all duration-300 ${
                 location.pathname === '/profile'
                   ? 'bg-white/10 border-teal-500/50 text-teal-400'
-                  : 'bg-white/5 border-white/10 text-gray-400'
+                  : 'bg-white/[0.04] border-white/10 text-gray-400'
               }`}
               title="Profile"
             >
@@ -528,10 +608,10 @@ const DashboardPage: React.FC = () => {
             {/* Settings */}
             <Link
               to="/settings"
-              className={`relative w-9 h-9 rounded-lg border flex items-center justify-center hover:bg-white/10 transition-colors ${
+              className={`relative w-9 h-9 rounded-lg border flex items-center justify-center hover:bg-white/[0.08] transition-all duration-300 ${
                 location.pathname === '/settings'
                   ? 'bg-white/10 border-teal-500/50 text-teal-400'
-                  : 'bg-white/5 border-white/10 text-gray-400'
+                  : 'bg-white/[0.04] border-white/10 text-gray-400'
               }`}
               title="Settings"
             >
@@ -541,13 +621,13 @@ const DashboardPage: React.FC = () => {
             </Link>
 
             {/* User avatar & logout */}
-            <div className="flex items-center gap-3">
-              <div className="w-9 h-9 rounded-full bg-gradient-to-br from-teal-500 to-cyan-500 flex items-center justify-center text-white text-sm font-bold shadow-lg shadow-teal-500/20">
+            <div className="flex items-center gap-3 ml-1">
+              <div className="w-9 h-9 rounded-full bg-gradient-to-br from-teal-500 to-cyan-500 flex items-center justify-center text-white text-sm font-bold shadow-lg shadow-teal-500/25 ring-2 ring-white/10">
                 {user?.fullName?.charAt(0)?.toUpperCase() || 'U'}
               </div>
               <button
                 onClick={handleLogout}
-                className="text-sm text-gray-400 hover:text-red-400 px-3 py-1.5 rounded-lg hover:bg-red-500/10 border border-transparent hover:border-red-500/20 transition-all duration-200"
+                className="text-sm text-gray-400 hover:text-red-400 px-3 py-1.5 rounded-lg hover:bg-red-500/10 border border-transparent hover:border-red-500/20 transition-all duration-300"
               >
                 Sign Out
               </button>
@@ -556,28 +636,39 @@ const DashboardPage: React.FC = () => {
         </div>
       </header>
 
+
       {/* Main Content */}
-      <main className="max-w-7xl mx-auto px-6 py-8">
-        {/* Welcome Section */}
-        <div className="mb-8" style={{ animation: 'fadeInUp 0.5s ease-out forwards' }}>
-          <div className="flex flex-col sm:flex-row sm:items-center gap-3 mb-2">
-            <h2 className="text-3xl font-bold text-white">
-              Welcome back, {user?.fullName?.split(' ')[0] || 'User'}
-            </h2>
-            <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold text-white bg-gradient-to-r from-teal-500 to-cyan-500 shadow-lg shadow-teal-500/20 w-fit">
-              {getRoleLabel(user?.role)}
-            </span>
+      <main className="relative max-w-7xl mx-auto px-6 lg:px-8 py-10">
+
+        {/* Welcome Banner */}
+        <div className="relative mb-10 rounded-2xl overflow-hidden border border-white/[0.08] bg-white/[0.02] backdrop-blur-md p-8 lg:p-10" style={{ animation: 'fadeInUp 0.5s ease-out forwards' }}>
+          {/* Banner gradient background */}
+          <div className="absolute inset-0 bg-gradient-to-br from-teal-500/[0.06] via-blue-500/[0.04] to-purple-500/[0.06]" />
+          <div className="absolute top-0 right-0 w-64 h-64 bg-gradient-to-bl from-teal-500/10 to-transparent rounded-full blur-2xl -translate-y-1/2 translate-x-1/4" />
+          <div className="relative z-10 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+            <div>
+              <div className="flex flex-col sm:flex-row sm:items-center gap-3 mb-2">
+                <h2 className="text-3xl lg:text-4xl font-bold text-white tracking-tight">
+                  Welcome back, {user?.fullName?.split(' ')[0] || 'User'}
+                </h2>
+                <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold text-white bg-gradient-to-r from-teal-500 to-cyan-500 shadow-lg shadow-teal-500/20 w-fit ring-1 ring-white/20">
+                  {getRoleLabel(user?.role)}
+                </span>
+              </div>
+              <p className="text-gray-400 text-base max-w-lg">
+                {getRoleGreeting(user?.role)}
+              </p>
+            </div>
+            <div className="hidden lg:flex flex-col items-end">
+              <div className="text-2xl font-bold text-white/90 tracking-tight">{currentTime}</div>
+              <div className="text-sm text-gray-400">{formatDate()}</div>
+            </div>
           </div>
-          <p className="text-gray-400">
-            {user?.role === UserRole.SCHOOL_ADMIN && 'Manage your school operations from this dashboard.'}
-            {user?.role === UserRole.TEACHER && "Here's your teaching overview for today."}
-            {user?.role === UserRole.STUDENT && "Track your attendance and stay on top of your schedule."}
-            {user?.role === UserRole.HOD && 'Monitor your department performance at a glance.'}
-          </p>
         </div>
 
-        {/* Stats Grid */}
-        <section className="mb-8">
+        {/* Stats Section */}
+        <section className="mb-10">
+          <SectionHeader title="Overview" icon={ICONS.chart} gradient="from-teal-500 to-cyan-500" />
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
             {statsLoading
               ? [1, 2, 3, 4].map((i) => <SkeletonCard key={i} />)
@@ -586,12 +677,10 @@ const DashboardPage: React.FC = () => {
           </div>
         </section>
 
-        {/* Quick Actions */}
-        <section className="mb-8">
-          <h3 className="text-lg font-semibold text-white mb-4" style={{ animation: 'fadeInUp 0.5s ease-out 0.3s forwards', opacity: 0 }}>
-            Quick Actions
-          </h3>
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
+        {/* Quick Actions Section */}
+        <section className="mb-10">
+          <SectionHeader title="Quick Actions" icon={ICONS.trending} gradient="from-blue-500 to-indigo-500" />
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
             {quickActions.map((action, i) => (
               <QuickActionButton key={action.to} action={action} index={i} />
             ))}
@@ -599,109 +688,112 @@ const DashboardPage: React.FC = () => {
         </section>
 
         {/* Bottom Grid: Schedule + Activity/Info */}
-        <section className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {/* Today's Schedule - shown for all roles */}
-          <TodaySchedule entries={schedule} loading={scheduleLoading} />
+        <section>
+          <SectionHeader title="Today's Schedule" icon={ICONS.calendar} gradient="from-purple-500 to-pink-500" />
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {/* Today's Schedule - shown for all roles */}
+            <TodaySchedule entries={schedule} loading={scheduleLoading} />
 
-          {/* Right panel varies by role */}
-          {user?.role === UserRole.SCHOOL_ADMIN && <ActivityFeed />}
+            {/* Right panel varies by role */}
+            {user?.role === UserRole.SCHOOL_ADMIN && <ActivityFeed />}
 
-          {user?.role === UserRole.TEACHER && (
-            <div className="rounded-2xl border border-white/10 bg-white/5 backdrop-blur-sm p-6" style={{ animation: 'fadeInUp 0.5s ease-out 0.7s forwards', opacity: 0 }}>
-              <div className="flex items-center gap-3 mb-5">
-                <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-green-500 to-emerald-500 flex items-center justify-center">
-                  <svg className="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={ICONS.academic} />
-                  </svg>
+            {user?.role === UserRole.TEACHER && (
+              <div className="rounded-2xl border border-white/10 bg-white/[0.03] backdrop-blur-md p-6 min-h-[280px]" style={{ animation: 'fadeInUp 0.5s ease-out 0.7s forwards', opacity: 0 }}>
+                <div className="flex items-center gap-3 mb-5">
+                  <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-green-500 to-emerald-500 flex items-center justify-center shadow-lg shadow-green-500/20">
+                    <svg className="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={ICONS.academic} />
+                    </svg>
+                  </div>
+                  <h3 className="text-lg font-semibold text-white">Class Overview</h3>
                 </div>
-                <h3 className="text-lg font-semibold text-white">Class Overview</h3>
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between p-3 rounded-xl bg-white/[0.03] border border-white/5">
+                    <span className="text-sm text-gray-300">Sessions This Week</span>
+                    <span className="text-sm font-semibold text-teal-400">—</span>
+                  </div>
+                  <div className="flex items-center justify-between p-3 rounded-xl bg-white/[0.03] border border-white/5">
+                    <span className="text-sm text-gray-300">Average Attendance</span>
+                    <span className="text-sm font-semibold text-blue-400">—</span>
+                  </div>
+                  <div className="flex items-center justify-between p-3 rounded-xl bg-white/[0.03] border border-white/5">
+                    <span className="text-sm text-gray-300">Students At Risk</span>
+                    <span className="text-sm font-semibold text-orange-400">—</span>
+                  </div>
+                  <div className="flex items-center justify-between p-3 rounded-xl bg-white/[0.03] border border-white/5">
+                    <span className="text-sm text-gray-300">Completion Rate</span>
+                    <span className="text-sm font-semibold text-purple-400">—</span>
+                  </div>
+                </div>
               </div>
-              <div className="space-y-4">
-                <div className="flex items-center justify-between p-3 rounded-xl bg-white/5">
-                  <span className="text-sm text-gray-300">Sessions This Week</span>
-                  <span className="text-sm font-semibold text-teal-400">—</span>
-                </div>
-                <div className="flex items-center justify-between p-3 rounded-xl bg-white/5">
-                  <span className="text-sm text-gray-300">Average Attendance</span>
-                  <span className="text-sm font-semibold text-blue-400">—</span>
-                </div>
-                <div className="flex items-center justify-between p-3 rounded-xl bg-white/5">
-                  <span className="text-sm text-gray-300">Students At Risk</span>
-                  <span className="text-sm font-semibold text-orange-400">—</span>
-                </div>
-                <div className="flex items-center justify-between p-3 rounded-xl bg-white/5">
-                  <span className="text-sm text-gray-300">Completion Rate</span>
-                  <span className="text-sm font-semibold text-purple-400">—</span>
-                </div>
-              </div>
-            </div>
-          )}
+            )}
 
-          {user?.role === UserRole.STUDENT && (
-            <div className="rounded-2xl border border-white/10 bg-white/5 backdrop-blur-sm p-6" style={{ animation: 'fadeInUp 0.5s ease-out 0.7s forwards', opacity: 0 }}>
-              <div className="flex items-center gap-3 mb-5">
-                <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-orange-500 to-amber-500 flex items-center justify-center">
-                  <svg className="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={ICONS.fire} />
-                  </svg>
+            {user?.role === UserRole.STUDENT && (
+              <div className="rounded-2xl border border-white/10 bg-white/[0.03] backdrop-blur-md p-6 min-h-[280px]" style={{ animation: 'fadeInUp 0.5s ease-out 0.7s forwards', opacity: 0 }}>
+                <div className="flex items-center gap-3 mb-5">
+                  <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-orange-500 to-amber-500 flex items-center justify-center shadow-lg shadow-orange-500/20">
+                    <svg className="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={ICONS.fire} />
+                    </svg>
+                  </div>
+                  <h3 className="text-lg font-semibold text-white">Attendance Streak</h3>
                 </div>
-                <h3 className="text-lg font-semibold text-white">Attendance Streak</h3>
-              </div>
-              <div className="text-center py-6">
-                <div className="text-5xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-orange-400 to-amber-400 mb-2">
-                  —
+                <div className="text-center py-6">
+                  <div className="text-5xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-orange-400 to-amber-400 mb-2">
+                    —
+                  </div>
+                  <p className="text-sm text-gray-400">consecutive days present</p>
                 </div>
-                <p className="text-sm text-gray-400">consecutive days present</p>
+                <div className="grid grid-cols-7 gap-1.5 mt-4">
+                  {Array.from({ length: 14 }).map((_, i) => (
+                    <div
+                      key={i}
+                      className={`w-full aspect-square rounded-md ${i < 10 ? 'bg-teal-500/40 border border-teal-500/20' : 'bg-white/[0.05] border border-white/5'}`}
+                      title={`Day ${i + 1}`}
+                    />
+                  ))}
+                </div>
+                <p className="text-xs text-gray-500 mt-3 text-center">Last 14 days</p>
               </div>
-              <div className="grid grid-cols-7 gap-1 mt-4">
-                {Array.from({ length: 14 }).map((_, i) => (
-                  <div
-                    key={i}
-                    className={`w-full aspect-square rounded-sm ${i < 10 ? 'bg-teal-500/40' : 'bg-white/10'}`}
-                    title={`Day ${i + 1}`}
-                  />
-                ))}
-              </div>
-              <p className="text-xs text-gray-500 mt-3 text-center">Last 14 days</p>
-            </div>
-          )}
+            )}
 
-          {user?.role === UserRole.HOD && (
-            <div className="rounded-2xl border border-white/10 bg-white/5 backdrop-blur-sm p-6" style={{ animation: 'fadeInUp 0.5s ease-out 0.7s forwards', opacity: 0 }}>
-              <div className="flex items-center gap-3 mb-5">
-                <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-indigo-500 to-blue-500 flex items-center justify-center">
-                  <svg className="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={ICONS.building} />
-                  </svg>
+            {user?.role === UserRole.HOD && (
+              <div className="rounded-2xl border border-white/10 bg-white/[0.03] backdrop-blur-md p-6 min-h-[280px]" style={{ animation: 'fadeInUp 0.5s ease-out 0.7s forwards', opacity: 0 }}>
+                <div className="flex items-center gap-3 mb-5">
+                  <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-indigo-500 to-blue-500 flex items-center justify-center shadow-lg shadow-indigo-500/20">
+                    <svg className="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={ICONS.building} />
+                    </svg>
+                  </div>
+                  <h3 className="text-lg font-semibold text-white">Department Overview</h3>
                 </div>
-                <h3 className="text-lg font-semibold text-white">Department Overview</h3>
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between p-3 rounded-xl bg-white/[0.03] border border-white/5">
+                    <span className="text-sm text-gray-300">Total Classes</span>
+                    <span className="text-sm font-semibold text-teal-400">—</span>
+                  </div>
+                  <div className="flex items-center justify-between p-3 rounded-xl bg-white/[0.03] border border-white/5">
+                    <span className="text-sm text-gray-300">Avg. Attendance</span>
+                    <span className="text-sm font-semibold text-blue-400">—</span>
+                  </div>
+                  <div className="flex items-center justify-between p-3 rounded-xl bg-white/[0.03] border border-white/5">
+                    <span className="text-sm text-gray-300">High Risk Students</span>
+                    <span className="text-sm font-semibold text-red-400">—</span>
+                  </div>
+                  <div className="flex items-center justify-between p-3 rounded-xl bg-white/[0.03] border border-white/5">
+                    <span className="text-sm text-gray-300">Active Sessions</span>
+                    <span className="text-sm font-semibold text-purple-400">—</span>
+                  </div>
+                </div>
               </div>
-              <div className="space-y-4">
-                <div className="flex items-center justify-between p-3 rounded-xl bg-white/5">
-                  <span className="text-sm text-gray-300">Total Classes</span>
-                  <span className="text-sm font-semibold text-teal-400">—</span>
-                </div>
-                <div className="flex items-center justify-between p-3 rounded-xl bg-white/5">
-                  <span className="text-sm text-gray-300">Avg. Attendance</span>
-                  <span className="text-sm font-semibold text-blue-400">—</span>
-                </div>
-                <div className="flex items-center justify-between p-3 rounded-xl bg-white/5">
-                  <span className="text-sm text-gray-300">High Risk Students</span>
-                  <span className="text-sm font-semibold text-red-400">—</span>
-                </div>
-                <div className="flex items-center justify-between p-3 rounded-xl bg-white/5">
-                  <span className="text-sm text-gray-300">Active Sessions</span>
-                  <span className="text-sm font-semibold text-purple-400">—</span>
-                </div>
-              </div>
-            </div>
-          )}
+            )}
+          </div>
         </section>
       </main>
 
       {/* Footer */}
-      <footer className="border-t border-white/5 mt-12 py-6">
-        <div className="max-w-7xl mx-auto px-6 text-center">
+      <footer className="relative border-t border-white/[0.05] mt-16 py-8">
+        <div className="max-w-7xl mx-auto px-6 lg:px-8 text-center">
           <p className="text-xs text-gray-500">© 2025 SAMS · Developed by Denis Macharia</p>
         </div>
       </footer>
