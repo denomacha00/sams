@@ -86,7 +86,7 @@ const generateLinkSchema = zod_1.z.object({
     classId: zod_1.z.string().optional(),
     expiryDays: zod_1.z.number().int().min(7).max(365).optional(),
     maxUses: zod_1.z.number().int().min(1).optional(),
-    targetRole: zod_1.z.enum(['TEACHER', 'STUDENT']).optional(),
+    targetRole: zod_1.z.enum(['TEACHER', 'STUDENT', 'HOD']).optional(),
 });
 const registerViaLinkSchema = zod_1.z.object({
     fullName: zod_1.z.string().min(1).max(200),

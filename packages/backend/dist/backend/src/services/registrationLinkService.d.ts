@@ -2,7 +2,7 @@ import { UserRole } from '@sams/shared';
 export interface GenerateLinkOptions {
     expiryDays?: number;
     maxUses?: number;
-    targetRole?: 'TEACHER' | 'STUDENT';
+    targetRole?: 'TEACHER' | 'STUDENT' | 'HOD';
 }
 export interface RegisterViaLinkData {
     fullName: string;

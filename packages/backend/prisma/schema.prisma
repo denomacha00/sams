@@ -165,8 +165,9 @@ model Department {
   name      String
   createdAt DateTime @default(now())
 
-  users   User[]
-  classes Class[]
+  users             User[]
+  classes           Class[]
+  registrationLinks RegistrationLink[]
 
   @@unique([schoolId, name])
 }
@@ -261,18 +262,20 @@ model AttendanceRecord {
 }
 
 model RegistrationLink {
-  id          String   @id @default(cuid())
-  schoolId    String
-  school      School   @relation(fields: [schoolId], references: [id])
-  classId     String?
-  class       Class?   @relation(fields: [classId], references: [id])
-  targetRole  UserRole
-  token       String   @unique @default(cuid())
-  expiresAt   DateTime
-  maxUses     Int
-  useCount    Int      @default(0)
-  createdById String
-  createdAt   DateTime @default(now())
+  id           String      @id @default(cuid())
+  schoolId     String
+  school       School      @relation(fields: [schoolId], references: [id])
+  departmentId String?
+  department   Department? @relation(fields: [departmentId], references: [id])
+  classId      String?
+  class        Class?      @relation(fields: [classId], references: [id])
+  targetRole   UserRole
+  token        String      @unique @default(cuid())
+  expiresAt    DateTime
+  maxUses      Int
+  useCount     Int         @default(0)
+  createdById  String
+  createdAt    DateTime    @default(now())
 
   @@index([schoolId])
 }

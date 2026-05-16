@@ -50,6 +50,7 @@ const updateUserSchema = z.object({
 
 const generateLinkSchema = z.object({
   classId: z.string().optional(),
+  departmentId: z.string().optional(),
   expiryDays: z.number().int().min(7).max(365).optional(),
   maxUses: z.number().int().min(1).optional(),
   targetRole: z.enum(['TEACHER', 'STUDENT', 'HOD']).optional(),
@@ -364,12 +365,14 @@ registrationLinksRouter.post('/', async (req: Request, res: Response): Promise<v
   try {
     // Determine classId: use body classId, especially when targetRole is STUDENT
     const classId = parsed.data.classId || undefined;
+    // Use body departmentId if provided (admin selecting dept for HOD), otherwise use creator's dept
+    const departmentId = parsed.data.departmentId || req.user.departmentId;
 
     const link = await registrationLinkService.generateLink(
       req.user.sub,
       req.user.role,
       req.schoolId,
-      req.user.departmentId,
+      departmentId,
       classId,
       {
         expiryDays: parsed.data.expiryDays,

@@ -118,6 +118,14 @@ const RegistrationLinksPage: React.FC = () => {
         }
       }
 
+      // For HOD links or TEACHER/STUDENT links, include departmentId
+      if (targetRole === 'HOD' && selectedDept) {
+        payload.departmentId = selectedDept;
+      }
+      if ((targetRole === 'TEACHER' || targetRole === 'STUDENT') && selectedDept) {
+        payload.departmentId = selectedDept;
+      }
+
       await apiClient.post('/registration-links', payload);
       setShowModal(false);
       setTargetRole(isHOD ? 'TEACHER' : 'STUDENT');
@@ -313,10 +321,10 @@ const RegistrationLinksPage: React.FC = () => {
                 </div>
               )}
 
-              {/* SCHOOL_ADMIN: Department (for Students and Teachers) */}
-              {!isHOD && (targetRole === 'STUDENT' || targetRole === 'TEACHER') && (
+              {/* SCHOOL_ADMIN: Department (for HODs, Students and Teachers) */}
+              {!isHOD && (targetRole === 'HOD' || targetRole === 'STUDENT' || targetRole === 'TEACHER') && (
                 <div>
-                  <label className="block text-sm text-gray-300 mb-1">Department {targetRole === 'STUDENT' ? '*' : '(optional)'}</label>
+                  <label className="block text-sm text-gray-300 mb-1">Department {targetRole === 'HOD' ? '*' : targetRole === 'STUDENT' ? '*' : '(optional)'}</label>
                   <select
                     value={selectedDept}
                     onChange={(e) => { setSelectedDept(e.target.value); setSelectedClass(''); }}
