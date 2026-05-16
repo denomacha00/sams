@@ -55,7 +55,7 @@ notificationsRouter.get('/', async (req: Request, res: Response): Promise<void> 
       if (n.senderId === null) {
         senderName = 'System';
       } else if (senderMap.has(n.senderId)) {
-        senderName = senderMap.get(n.senderId)!;
+        senderName = senderMap.get(n.senderId) || 'Unknown';
       } else {
         senderName = 'Deleted User';
       }
