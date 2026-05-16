@@ -15,6 +15,12 @@ interface User {
   createdAt: string;
 }
 
+interface Department {
+  id: string;
+  name: string;
+  classes?: { id: string; name: string }[];
+}
+
 interface UserFormData {
   fullName: string;
   email: string;
@@ -39,6 +45,7 @@ const emptyForm: UserFormData = {
 
 const UserManagementPage: React.FC = () => {
   const [users, setUsers] = useState<User[]>([]);
+  const [departments, setDepartments] = useState<Department[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('ALL');
   const [showModal, setShowModal] = useState(false);
@@ -49,6 +56,7 @@ const UserManagementPage: React.FC = () => {
 
   useEffect(() => {
     fetchUsers();
+    fetchDepartments();
   }, []);
 
   const fetchUsers = async () => {
@@ -61,6 +69,17 @@ const UserManagementPage: React.FC = () => {
       setLoading(false);
     }
   };
+
+  const fetchDepartments = async () => {
+    try {
+      const { data } = await apiClient.get('/departments');
+      setDepartments(Array.isArray(data) ? data : (data.departments || []));
+    } catch (err) {
+      console.error('Failed to fetch departments:', err);
+    }
+  };
+
+  const classesForDept = departments.find(d => d.id === formData.departmentId)?.classes || [];
 
   const filteredUsers = activeTab === 'ALL'
     ? users
@@ -320,24 +339,31 @@ const UserManagementPage: React.FC = () => {
 
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm text-gray-300 mb-1">Department ID</label>
-                  <input
-                    type="text"
+                  <label className="block text-sm text-gray-300 mb-1">Department</label>
+                  <select
                     value={formData.departmentId}
-                    onChange={(e) => setFormData({ ...formData, departmentId: e.target.value })}
-                    className="w-full px-4 py-2.5 rounded-xl bg-white/5 border border-white/10 text-white placeholder-gray-500 focus:outline-none focus:border-cyan-500/50 transition-colors"
-                    placeholder="Department ID"
-                  />
+                    onChange={(e) => setFormData({ ...formData, departmentId: e.target.value, classId: '' })}
+                    className="w-full px-4 py-2.5 rounded-xl bg-white/5 border border-white/10 text-white focus:outline-none focus:border-cyan-500/50 transition-colors"
+                  >
+                    <option value="" className="bg-slate-800">-- No Department --</option>
+                    {departments.map(d => (
+                      <option key={d.id} value={d.id} className="bg-slate-800">{d.name}</option>
+                    ))}
+                  </select>
                 </div>
                 <div>
-                  <label className="block text-sm text-gray-300 mb-1">Class ID</label>
-                  <input
-                    type="text"
+                  <label className="block text-sm text-gray-300 mb-1">Class</label>
+                  <select
                     value={formData.classId}
                     onChange={(e) => setFormData({ ...formData, classId: e.target.value })}
-                    className="w-full px-4 py-2.5 rounded-xl bg-white/5 border border-white/10 text-white placeholder-gray-500 focus:outline-none focus:border-cyan-500/50 transition-colors"
-                    placeholder="Class ID"
-                  />
+                    disabled={!formData.departmentId}
+                    className="w-full px-4 py-2.5 rounded-xl bg-white/5 border border-white/10 text-white focus:outline-none focus:border-cyan-500/50 transition-colors disabled:opacity-50"
+                  >
+                    <option value="" className="bg-slate-800">-- No Class --</option>
+                    {classesForDept.map(c => (
+                      <option key={c.id} value={c.id} className="bg-slate-800">{c.name}</option>
+                    ))}
+                  </select>
                 </div>
               </div>
 
