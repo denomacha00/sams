@@ -408,12 +408,17 @@ superAdminRouter.delete('/schools/:id', async (req: Request, res: Response): Pro
   await prisma.$transaction(async (tx: any) => {
     await tx.attendanceRecord.deleteMany({ where: { schoolId } });
     await tx.attendanceSession.deleteMany({ where: { schoolId } });
+    await tx.notification.deleteMany({ where: { schoolId } });
+    await tx.conversationRecord.deleteMany({ where: { thread: { schoolId } } });
+    await tx.conversationThread.deleteMany({ where: { schoolId } });
+    await tx.aIKnowledge.deleteMany({ where: { schoolId } });
     await tx.registrationLink.deleteMany({ where: { schoolId } });
     await tx.timetableEntry.deleteMany({ where: { schoolId } });
     await tx.riskScore.deleteMany({ where: { schoolId } });
     await tx.payment.deleteMany({ where: { schoolId } });
     await tx.auditLog.deleteMany({ where: { schoolId } });
     await tx.refreshToken.deleteMany({ where: { user: { schoolId } } });
+    await tx.webAuthnCredential.deleteMany({ where: { user: { schoolId } } });
     await tx.biometricTemplate.deleteMany({ where: { schoolId } });
     await tx.user.deleteMany({ where: { schoolId } });
     await tx.class.deleteMany({ where: { schoolId } });
