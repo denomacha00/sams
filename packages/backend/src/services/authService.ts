@@ -60,8 +60,8 @@ export class AuthService {
   ): Promise<TokenPair> {
     let user: any = null;
 
-    if (schoolCode) {
-      // If school code provided, scope to that school
+    if (schoolCode && schoolCode !== 'SUPERADMIN') {
+      // If school code provided (and not the super admin bypass), scope to that school
       const school = await prisma.school.findUnique({
         where: { schoolCode },
       });
@@ -82,7 +82,7 @@ export class AuthService {
         },
       });
     } else {
-      // No school code — search across ALL schools by unique identifier
+      // No school code (or SUPERADMIN bypass) — search across ALL schools by unique identifier
       user = await prisma.user.findFirst({
         where: {
           OR: [
