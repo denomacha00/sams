@@ -281,8 +281,8 @@ export class RegistrationLinkService {
         : [],
     ]);
 
-    const deptMap = new Map(depts.map((d) => [d.id, d.name]));
-    const classMap = new Map(classes.map((c) => [c.id, c.name]));
+    const deptMap = new Map<string, string>(depts.map((d) => [d.id, d.name] as [string, string]));
+    const classMap = new Map<string, string>(classes.map((c) => [c.id, c.name] as [string, string]));
 
     return links.map((l) => ({
       ...l,
