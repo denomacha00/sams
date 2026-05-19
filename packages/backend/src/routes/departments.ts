@@ -13,8 +13,31 @@ export const classesRouter = Router();
 // ─── Departments ──────────────────────────────────────────────────────────────
 
 departmentsRouter.get('/', async (req: Request, res: Response): Promise<void> => {
-  const departments = await prisma.department.findMany({ where: { schoolId: req.schoolId }, include: { classes: true } });
-  res.json(departments);
+  const departments = await prisma.department.findMany({
+    where: { schoolId: req.schoolId },
+    include: {
+      classes: true,
+    },
+  });
+
+  // Enrich with HOD info — find users with role HOD for each department
+  const hodUsers = await prisma.user.findMany({
+    where: { schoolId: req.schoolId, role: 'HOD' },
+    select: { id: true, fullName: true, departmentId: true },
+  });
+
+  const hodByDept = new Map(hodUsers.map((u) => [u.departmentId, { id: u.id, name: u.fullName }]));
+
+  const enriched = departments.map((d) => {
+    const hod = hodByDept.get(d.id);
+    return {
+      ...d,
+      hodId: hod?.id ?? null,
+      hodName: hod?.name ?? null,
+    };
+  });
+
+  res.json(enriched);
 });
 
 departmentsRouter.post('/', requirePermission('manage:users'), async (req: Request, res: Response): Promise<void> => {

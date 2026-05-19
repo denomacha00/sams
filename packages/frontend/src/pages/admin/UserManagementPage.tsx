@@ -18,6 +18,8 @@ interface User {
 interface Department {
   id: string;
   name: string;
+  hodId?: string | null;
+  hodName?: string | null;
   classes?: { id: string; name: string }[];
 }
 
@@ -53,6 +55,22 @@ const UserManagementPage: React.FC = () => {
   const [formData, setFormData] = useState<UserFormData>(emptyForm);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
+  const [hodWarning, setHodWarning] = useState<string | null>(null);
+
+  // Derived: existing HOD for selected department
+  const existingHodForDept = departments.find(d => d.id === formData.departmentId)?.hodName ?? null;
+  const existingHodIdForDept = departments.find(d => d.id === formData.departmentId)?.hodId ?? null;
+
+  // Validation: check if role requires dept/class
+  const getRoleRequirements = (role: string) => {
+    switch (role) {
+      case 'HOD': return { needsDept: true, needsClass: false };
+      case 'TEACHER': return { needsDept: true, needsClass: true };
+      case 'STUDENT': return { needsDept: true, needsClass: true };
+      default: return { needsDept: false, needsClass: false };
+    }
+  };
+  const { needsDept, needsClass } = getRoleRequirements(formData.role);
 
   useEffect(() => {
     fetchUsers();
@@ -73,9 +91,26 @@ const UserManagementPage: React.FC = () => {
   const fetchDepartments = async () => {
     try {
       const { data } = await apiClient.get('/departments');
-      setDepartments(Array.isArray(data) ? data : (data.departments || []));
+      const depts = Array.isArray(data) ? data : (data.departments || []);
+      // Enrich with HOD info from users list
+      setDepartments(depts);
     } catch (err) {
       console.error('Failed to fetch departments:', err);
+    }
+  };
+
+  // When dept changes and role is HOD, check for existing HOD
+  const handleDeptChange = (deptId: string) => {
+    setFormData({ ...formData, departmentId: deptId, classId: '' });
+    if (formData.role === 'HOD' && deptId) {
+      const dept = departments.find(d => d.id === deptId);
+      if (dept?.hodId && dept.hodId !== editingUser?.id) {
+        setHodWarning(`${dept.hodName || 'Someone'} is already HOD of this department. Saving will replace them.`);
+      } else {
+        setHodWarning(null);
+      }
+    } else {
+      setHodWarning(null);
     }
   };
 
@@ -89,6 +124,7 @@ const UserManagementPage: React.FC = () => {
     setEditingUser(null);
     setFormData(emptyForm);
     setError('');
+    setHodWarning(null);
     setShowModal(true);
   };
 
@@ -105,6 +141,7 @@ const UserManagementPage: React.FC = () => {
       classId: user.classId || '',
     });
     setError('');
+    setHodWarning(null);
     setShowModal(true);
   };
 
@@ -112,6 +149,18 @@ const UserManagementPage: React.FC = () => {
     e.preventDefault();
     setSubmitting(true);
     setError('');
+
+    // Validate dept/class requirements
+    if (needsDept && !formData.departmentId) {
+      setError(`A department is required for ${formData.role} role. Please create a department first.`);
+      setSubmitting(false);
+      return;
+    }
+    if (needsClass && !formData.classId) {
+      setError(`A class is required for ${formData.role} role. Please select a class.`);
+      setSubmitting(false);
+      return;
+    }
 
     try {
       const payload: any = {
@@ -315,7 +364,10 @@ const UserManagementPage: React.FC = () => {
                   <label className="block text-sm text-gray-300 mb-1">Role *</label>
                   <select
                     value={formData.role}
-                    onChange={(e) => setFormData({ ...formData, role: e.target.value })}
+                    onChange={(e) => {
+                      setFormData({ ...formData, role: e.target.value, departmentId: '', classId: '' });
+                      setHodWarning(null);
+                    }}
                     className="w-full px-4 py-2.5 rounded-xl bg-white/5 border border-white/10 text-white focus:outline-none focus:border-cyan-500/50 transition-colors"
                   >
                     <option value="STUDENT" className="bg-slate-800">Student</option>
@@ -339,31 +391,51 @@ const UserManagementPage: React.FC = () => {
 
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm text-gray-300 mb-1">Department</label>
-                  <select
-                    value={formData.departmentId}
-                    onChange={(e) => setFormData({ ...formData, departmentId: e.target.value, classId: '' })}
-                    className="w-full px-4 py-2.5 rounded-xl bg-white/5 border border-white/10 text-white focus:outline-none focus:border-cyan-500/50 transition-colors"
-                  >
-                    <option value="" className="bg-slate-800">-- No Department --</option>
-                    {departments.map(d => (
-                      <option key={d.id} value={d.id} className="bg-slate-800">{d.name}</option>
-                    ))}
-                  </select>
+                  <label className="block text-sm text-gray-300 mb-1">
+                    Department {needsDept ? '*' : ''}
+                  </label>
+                  {departments.length === 0 ? (
+                    <div className="w-full px-4 py-2.5 rounded-xl bg-red-500/10 border border-red-500/20 text-red-300 text-sm">
+                      No departments yet — create one first
+                    </div>
+                  ) : (
+                    <select
+                      value={formData.departmentId}
+                      onChange={(e) => handleDeptChange(e.target.value)}
+                      className="w-full px-4 py-2.5 rounded-xl bg-white/5 border border-white/10 text-white focus:outline-none focus:border-cyan-500/50 transition-colors"
+                    >
+                      <option value="" className="bg-slate-800">-- Select Department --</option>
+                      {departments.map(d => (
+                        <option key={d.id} value={d.id} className="bg-slate-800">
+                          {d.name}{d.hodName && formData.role === 'HOD' ? ` (HOD: ${d.hodName})` : ''}
+                        </option>
+                      ))}
+                    </select>
+                  )}
+                  {hodWarning && (
+                    <p className="text-xs text-amber-400 mt-1">⚠ {hodWarning}</p>
+                  )}
                 </div>
                 <div>
-                  <label className="block text-sm text-gray-300 mb-1">Class</label>
+                  <label className="block text-sm text-gray-300 mb-1">
+                    Class {needsClass ? '*' : ''}
+                  </label>
                   <select
                     value={formData.classId}
                     onChange={(e) => setFormData({ ...formData, classId: e.target.value })}
-                    disabled={!formData.departmentId}
+                    disabled={!formData.departmentId || formData.role === 'HOD'}
                     className="w-full px-4 py-2.5 rounded-xl bg-white/5 border border-white/10 text-white focus:outline-none focus:border-cyan-500/50 transition-colors disabled:opacity-50"
                   >
-                    <option value="" className="bg-slate-800">-- No Class --</option>
+                    <option value="" className="bg-slate-800">
+                      {formData.role === 'HOD' ? '-- N/A for HOD --' : '-- Select Class --'}
+                    </option>
                     {classesForDept.map(c => (
                       <option key={c.id} value={c.id} className="bg-slate-800">{c.name}</option>
                     ))}
                   </select>
+                  {needsClass && formData.departmentId && classesForDept.length === 0 && (
+                    <p className="text-xs text-yellow-400 mt-1">No classes in this department yet</p>
+                  )}
                 </div>
               </div>
 

@@ -9,11 +9,14 @@ interface RegistrationLink {
   token: string;
   targetRole: string;
   classId?: string;
+  departmentId?: string;
   schoolId: string;
   useCount: number;
   maxUses: number;
   expiresAt: string;
   createdAt: string;
+  className?: string;
+  departmentName?: string;
 }
 
 interface Department {
@@ -173,11 +176,16 @@ const RegistrationLinksPage: React.FC = () => {
     }
   };
 
-  // Determine if the generate button should be disabled for HOD + STUDENT with no classes
+  // Determine if the generate button should be disabled
   const isGenerateDisabled = () => {
     if (submitting) return true;
+    // HOD creating student link needs a class
     if (isHOD && targetRole === 'STUDENT' && hodClasses.length === 0) return true;
     if (isHOD && targetRole === 'STUDENT' && !selectedClass) return true;
+    // Admin creating any link needs a department
+    if (!isHOD && targetRole !== 'SCHOOL_ADMIN' && !selectedDept) return true;
+    // Student links need a class too
+    if (!isHOD && targetRole === 'STUDENT' && !selectedClass) return true;
     return false;
   };
 
@@ -213,6 +221,7 @@ const RegistrationLinksPage: React.FC = () => {
                 <tr className="border-b border-white/10">
                   <th className="text-left px-6 py-4 text-sm font-semibold text-white">Link</th>
                   <th className="text-left px-6 py-4 text-sm font-semibold text-white">For</th>
+                  <th className="text-left px-6 py-4 text-sm font-semibold text-white">Dept / Class</th>
                   <th className="text-left px-6 py-4 text-sm font-semibold text-white">Uses</th>
                   <th className="text-left px-6 py-4 text-sm font-semibold text-white">Expires</th>
                   <th className="text-left px-6 py-4 text-sm font-semibold text-white">Status</th>
@@ -221,9 +230,9 @@ const RegistrationLinksPage: React.FC = () => {
               </thead>
               <tbody>
                 {loading ? (
-                  <tr><td colSpan={6} className="px-6 py-12 text-center text-gray-400">Loading...</td></tr>
+                  <tr><td colSpan={7} className="px-6 py-12 text-center text-gray-400">Loading...</td></tr>
                 ) : links.length === 0 ? (
-                  <tr><td colSpan={6} className="px-6 py-12 text-center text-gray-400">No registration links yet. Click "Generate Link" to create one.</td></tr>
+                  <tr><td colSpan={7} className="px-6 py-12 text-center text-gray-400">No registration links yet. Click "Generate Link" to create one.</td></tr>
                 ) : (
                   links.map((link) => {
                     const status = getLinkStatus(link);
@@ -236,6 +245,19 @@ const RegistrationLinksPage: React.FC = () => {
                           <span className={`inline-flex px-2.5 py-1 rounded-full text-xs font-semibold ${getRoleBadge(link.targetRole)}`}>
                             {link.targetRole}
                           </span>
+                        </td>
+                        <td className="px-6 py-4">
+                          <div className="flex flex-col gap-0.5">
+                            {link.departmentName && (
+                              <span className="text-xs text-gray-300">{link.departmentName}</span>
+                            )}
+                            {link.className && (
+                              <span className="text-xs text-teal-400">{link.className}</span>
+                            )}
+                            {!link.departmentName && !link.className && (
+                              <span className="text-xs text-gray-600">—</span>
+                            )}
+                          </div>
                         </td>
                         <td className="px-6 py-4 text-sm text-gray-300">{link.useCount} / {link.maxUses}</td>
                         <td className="px-6 py-4 text-sm text-gray-400">{new Date(link.expiresAt).toLocaleDateString()}</td>
@@ -324,24 +346,34 @@ const RegistrationLinksPage: React.FC = () => {
               {/* SCHOOL_ADMIN: Department (for HODs, Students and Teachers) */}
               {!isHOD && (targetRole === 'HOD' || targetRole === 'STUDENT' || targetRole === 'TEACHER') && (
                 <div>
-                  <label className="block text-sm text-gray-300 mb-1">Department {targetRole === 'HOD' ? '*' : targetRole === 'STUDENT' ? '*' : '(optional)'}</label>
-                  <select
-                    value={selectedDept}
-                    onChange={(e) => { setSelectedDept(e.target.value); setSelectedClass(''); }}
-                    className="w-full px-4 py-2.5 rounded-xl bg-white/5 border border-white/10 text-white focus:outline-none focus:border-cyan-500/50 transition-colors"
-                  >
-                    <option value="" className="bg-slate-800">-- Select Department --</option>
-                    {departments.map(d => (
-                      <option key={d.id} value={d.id} className="bg-slate-800">{d.name}</option>
-                    ))}
-                  </select>
+                  <label className="block text-sm text-gray-300 mb-1">
+                    Department *
+                  </label>
+                  {departments.length === 0 ? (
+                    <div className="w-full px-4 py-2.5 rounded-xl bg-red-500/10 border border-red-500/20 text-red-300 text-sm">
+                      No departments yet — create one in Departments first
+                    </div>
+                  ) : (
+                    <select
+                      value={selectedDept}
+                      onChange={(e) => { setSelectedDept(e.target.value); setSelectedClass(''); }}
+                      className="w-full px-4 py-2.5 rounded-xl bg-white/5 border border-white/10 text-white focus:outline-none focus:border-cyan-500/50 transition-colors"
+                    >
+                      <option value="" className="bg-slate-800">-- Select Department --</option>
+                      {departments.map(d => (
+                        <option key={d.id} value={d.id} className="bg-slate-800">{d.name}</option>
+                      ))}
+                    </select>
+                  )}
                 </div>
               )}
 
-              {/* SCHOOL_ADMIN: Class (only for Students) */}
-              {!isHOD && targetRole === 'STUDENT' && selectedDept && (
+              {/* SCHOOL_ADMIN: Class (for Students and Teachers) */}
+              {!isHOD && (targetRole === 'STUDENT' || targetRole === 'TEACHER') && selectedDept && (
                 <div>
-                  <label className="block text-sm text-gray-300 mb-1">Class *</label>
+                  <label className="block text-sm text-gray-300 mb-1">
+                    Class {targetRole === 'STUDENT' ? '*' : '(optional — leave blank for any class)'}
+                  </label>
                   <select
                     value={selectedClass}
                     onChange={(e) => setSelectedClass(e.target.value)}

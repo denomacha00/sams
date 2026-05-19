@@ -339,9 +339,20 @@ const SettingsPage: React.FC = () => {
               </div>
               <div>
                 <h3 className="text-lg font-semibold text-white">Fingerprint Sign-In</h3>
-                <p className="text-xs text-gray-400">Register your fingerprint for quick authentication</p>
+                <p className="text-xs text-gray-400">
+                  {isStudent
+                    ? 'Register your fingerprint to sign in to your account'
+                    : 'Register your fingerprint for quick sign-in'}
+                </p>
               </div>
             </div>
+            {isStudent && (
+              <div className="mb-4 p-3 bg-blue-500/10 border border-blue-500/20 rounded-xl">
+                <p className="text-xs text-blue-300">
+                  <span className="font-semibold">Note:</span> Your fingerprint is used for signing in to this app only. For attendance, use the Face Enrollment below — a teacher scans your face on their device to mark you present.
+                </p>
+              </div>
+            )}
             {fingerprintRegistered ? (
               <div className="flex items-center gap-3 p-3 bg-emerald-500/10 border border-emerald-400/20 rounded-xl">
                 <svg className="w-5 h-5 text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>

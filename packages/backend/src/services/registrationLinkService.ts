@@ -252,21 +252,43 @@ export class RegistrationLinkService {
    * Requirements: 4.1, 4.3, 4.4
    */
   async getLinksForUser(userId: string, userRole: UserRole, schoolId: string) {
+    let links;
+
     if (userRole === UserRole.SCHOOL_ADMIN) {
-      return prisma.registrationLink.findMany({
+      links = await prisma.registrationLink.findMany({
         where: { schoolId },
         orderBy: { createdAt: 'desc' },
       });
-    }
-
-    if (userRole === UserRole.HOD || userRole === UserRole.TEACHER) {
-      return prisma.registrationLink.findMany({
+    } else if (userRole === UserRole.HOD || userRole === UserRole.TEACHER) {
+      links = await prisma.registrationLink.findMany({
         where: { schoolId, createdById: userId },
         orderBy: { createdAt: 'desc' },
       });
+    } else {
+      throw new AppError(403, 'FORBIDDEN', 'You do not have permission to access registration links');
     }
 
-    throw new AppError(403, 'FORBIDDEN', 'You do not have permission to access registration links');
+    // Enrich with department and class names
+    const deptIds = [...new Set(links.map((l) => l.departmentId).filter(Boolean))] as string[];
+    const classIds = [...new Set(links.map((l) => l.classId).filter(Boolean))] as string[];
+
+    const [depts, classes] = await Promise.all([
+      deptIds.length > 0
+        ? prisma.department.findMany({ where: { id: { in: deptIds } }, select: { id: true, name: true } })
+        : [],
+      classIds.length > 0
+        ? prisma.class.findMany({ where: { id: { in: classIds } }, select: { id: true, name: true } })
+        : [],
+    ]);
+
+    const deptMap = new Map(depts.map((d) => [d.id, d.name]));
+    const classMap = new Map(classes.map((c) => [c.id, c.name]));
+
+    return links.map((l) => ({
+      ...l,
+      departmentName: l.departmentId ? (deptMap.get(l.departmentId) ?? null) : null,
+      className: l.classId ? (classMap.get(l.classId) ?? null) : null,
+    }));
   }
 
   /**
