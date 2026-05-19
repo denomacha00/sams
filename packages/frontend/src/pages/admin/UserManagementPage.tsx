@@ -65,7 +65,7 @@ const UserManagementPage: React.FC = () => {
   const getRoleRequirements = (role: string) => {
     switch (role) {
       case 'HOD': return { needsDept: true, needsClass: false };
-      case 'TEACHER': return { needsDept: true, needsClass: true };
+      case 'TEACHER': return { needsDept: true, needsClass: false }; // teacher can teach multiple classes
       case 'STUDENT': return { needsDept: true, needsClass: true };
       default: return { needsDept: false, needsClass: false };
     }
@@ -269,14 +269,21 @@ const UserManagementPage: React.FC = () => {
                       <td className="px-6 py-4 text-sm text-white">{u.fullName}</td>
                       <td className="px-6 py-4 text-sm text-gray-400">{u.email || '—'}</td>
                       <td className="px-6 py-4">
-                        <span className={`inline-flex px-2 py-1 rounded-full text-xs font-medium ${
-                          u.role === 'HOD' ? 'bg-orange-500/20 text-orange-300' :
-                          u.role === 'TEACHER' ? 'bg-green-500/20 text-green-300' :
-                          u.role === 'STUDENT' ? 'bg-blue-500/20 text-blue-300' :
-                          'bg-purple-500/20 text-purple-300'
-                        }`}>
-                          {u.role}
-                        </span>
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <span className={`inline-flex px-2 py-1 rounded-full text-xs font-medium ${
+                            u.role === 'HOD' ? 'bg-orange-500/20 text-orange-300' :
+                            u.role === 'TEACHER' ? 'bg-green-500/20 text-green-300' :
+                            u.role === 'STUDENT' ? 'bg-blue-500/20 text-blue-300' :
+                            'bg-purple-500/20 text-purple-300'
+                          }`}>
+                            {u.role}
+                          </span>
+                          {u.role === 'TEACHER' && u.classId && (
+                            <span className="inline-flex px-2 py-1 rounded-full text-xs font-medium bg-teal-500/20 text-teal-300">
+                              Class Teacher
+                            </span>
+                          )}
+                        </div>
                       </td>
                       <td className="px-6 py-4 text-sm text-gray-400">{u.admissionNumber || '—'}</td>
                       <td className="px-6 py-4">
@@ -418,8 +425,13 @@ const UserManagementPage: React.FC = () => {
                 </div>
                 <div>
                   <label className="block text-sm text-gray-300 mb-1">
-                    Class {needsClass ? '*' : ''}
+                    Class {needsClass ? '*' : formData.role === 'TEACHER' ? '(optional — teacher can teach multiple)' : ''}
                   </label>
+                  {formData.role === 'TEACHER' && (
+                    <p className="text-xs text-teal-400 mb-1">
+                      Setting a class here makes this teacher the <strong>Class Teacher</strong> for that class.
+                    </p>
+                  )}
                   <select
                     value={formData.classId}
                     onChange={(e) => setFormData({ ...formData, classId: e.target.value })}

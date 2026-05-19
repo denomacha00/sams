@@ -33,12 +33,15 @@ interface ClassItem {
 const RegistrationLinksPage: React.FC = () => {
   const { user } = useAuthStore();
   const isHOD = user?.role === UserRole.HOD;
+  const isTeacher = user?.role === UserRole.TEACHER;
 
   const [links, setLinks] = useState<RegistrationLink[]>([]);
   const [departments, setDepartments] = useState<Department[]>([]);
   const [hodClasses, setHodClasses] = useState<ClassItem[]>([]);
+  const [teacherClasses, setTeacherClasses] = useState<ClassItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
+  // Teachers can only generate STUDENT links; HOD can do TEACHER or STUDENT
   const [targetRole, setTargetRole] = useState(isHOD ? 'TEACHER' : 'STUDENT');
   const [selectedDept, setSelectedDept] = useState('');
   const [selectedClass, setSelectedClass] = useState('');
@@ -51,7 +54,9 @@ const RegistrationLinksPage: React.FC = () => {
 
   useEffect(() => {
     fetchLinks();
-    if (isHOD) {
+    if (isTeacher) {
+      fetchTeacherClasses();
+    } else if (isHOD) {
       fetchHodClasses();
     } else {
       fetchDepartments();
@@ -78,7 +83,21 @@ const RegistrationLinksPage: React.FC = () => {
     }
   };
 
-  const fetchHodClasses = async () => {
+  // Fetch classes in the teacher's department
+  const fetchTeacherClasses = async () => {
+    setLoadingClasses(true);
+    try {
+      if (user?.departmentId) {
+        const { data } = await apiClient.get(`/departments/${user.departmentId}/classes`);
+        setTeacherClasses(Array.isArray(data) ? data : []);
+      }
+    } catch (err) {
+      console.error('Failed to fetch teacher classes:', err);
+      setTeacherClasses([]);
+    } finally {
+      setLoadingClasses(false);
+    }
+  };  const fetchHodClasses = async () => {
     setLoadingClasses(true);
     try {
       if (user?.departmentId) {
@@ -110,23 +129,25 @@ const RegistrationLinksPage: React.FC = () => {
       const payload: Record<string, unknown> = {
         expiryDays,
         maxUses,
-        targetRole,
+        targetRole: isTeacher ? 'STUDENT' : targetRole,
       };
 
-      if (targetRole === 'STUDENT') {
+      if (isTeacher) {
+        // Teacher generates student links — use their dept and selected class
+        payload.classId = selectedClass;
+        payload.departmentId = user?.departmentId;
+      } else if (targetRole === 'STUDENT') {
+        payload.classId = selectedClass || undefined;
         if (isHOD) {
-          payload.classId = selectedClass || undefined;
+          // HOD's dept is set server-side
         } else {
-          payload.classId = selectedClass || undefined;
+          payload.departmentId = selectedDept || undefined;
         }
-      }
-
-      // For HOD links or TEACHER/STUDENT links, include departmentId
-      if (targetRole === 'HOD' && selectedDept) {
-        payload.departmentId = selectedDept;
-      }
-      if ((targetRole === 'TEACHER' || targetRole === 'STUDENT') && selectedDept) {
-        payload.departmentId = selectedDept;
+      } else {
+        // HOD links or TEACHER links
+        if (targetRole === 'HOD' && selectedDept) payload.departmentId = selectedDept;
+        if (targetRole === 'TEACHER' && selectedDept) payload.departmentId = selectedDept;
+        if (targetRole === 'TEACHER' && selectedClass) payload.classId = selectedClass;
       }
 
       await apiClient.post('/registration-links', payload);
@@ -179,13 +200,16 @@ const RegistrationLinksPage: React.FC = () => {
   // Determine if the generate button should be disabled
   const isGenerateDisabled = () => {
     if (submitting) return true;
+    // Teacher: must pick a class from their dept
+    if (isTeacher && !selectedClass) return true;
+    if (isTeacher && teacherClasses.length === 0) return true;
     // HOD creating student link needs a class
     if (isHOD && targetRole === 'STUDENT' && hodClasses.length === 0) return true;
     if (isHOD && targetRole === 'STUDENT' && !selectedClass) return true;
     // Admin creating any link needs a department
-    if (!isHOD && targetRole !== 'SCHOOL_ADMIN' && !selectedDept) return true;
-    // Student links need a class too
-    if (!isHOD && targetRole === 'STUDENT' && !selectedClass) return true;
+    if (!isHOD && !isTeacher && targetRole !== 'SCHOOL_ADMIN' && !selectedDept) return true;
+    // Student links need a class too (teacher links don't — teacher teaches multiple classes)
+    if (!isHOD && !isTeacher && targetRole === 'STUDENT' && !selectedClass) return true;
     return false;
   };
 
@@ -196,10 +220,10 @@ const RegistrationLinksPage: React.FC = () => {
         <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <Link
-              to={isHOD ? '/dashboard' : '/admin'}
+              to={isHOD ? '/dashboard' : isTeacher ? '/dashboard' : '/admin'}
               className="text-gray-400 hover:text-cyan-400 transition-colors"
             >
-              ← {isHOD ? 'Dashboard' : 'Admin'}
+              ← {isHOD || isTeacher ? 'Dashboard' : 'Admin'}
             </Link>
             <h1 className="text-lg font-bold text-white">Registration Links</h1>
           </div>
@@ -293,28 +317,58 @@ const RegistrationLinksPage: React.FC = () => {
             )}
 
             <form onSubmit={handleGenerate} className="space-y-4">
-              {/* Target Role */}
-              <div>
-                <label className="block text-sm text-gray-300 mb-1">Who is this link for? *</label>
-                <select
-                  value={targetRole}
-                  onChange={(e) => { setTargetRole(e.target.value); setSelectedDept(''); setSelectedClass(''); }}
-                  className="w-full px-4 py-2.5 rounded-xl bg-white/5 border border-white/10 text-white focus:outline-none focus:border-cyan-500/50 transition-colors"
-                >
-                  {isHOD ? (
-                    <>
-                      <option value="TEACHER" className="bg-slate-800">Teachers</option>
-                      <option value="STUDENT" className="bg-slate-800">Students</option>
-                    </>
+              {/* Target Role — teachers can only generate student links */}
+              {!isTeacher && (
+                <div>
+                  <label className="block text-sm text-gray-300 mb-1">Who is this link for? *</label>
+                  <select
+                    value={targetRole}
+                    onChange={(e) => { setTargetRole(e.target.value); setSelectedDept(''); setSelectedClass(''); }}
+                    className="w-full px-4 py-2.5 rounded-xl bg-white/5 border border-white/10 text-white focus:outline-none focus:border-cyan-500/50 transition-colors"
+                  >
+                    {isHOD ? (
+                      <>
+                        <option value="TEACHER" className="bg-slate-800">Teachers</option>
+                        <option value="STUDENT" className="bg-slate-800">Students</option>
+                      </>
+                    ) : (
+                      <>
+                        <option value="STUDENT" className="bg-slate-800">Students</option>
+                        <option value="TEACHER" className="bg-slate-800">Teachers</option>
+                        <option value="HOD" className="bg-slate-800">HODs (Heads of Department)</option>
+                      </>
+                    )}
+                  </select>
+                </div>
+              )}
+
+              {/* Teacher: pick a class from their department */}
+              {isTeacher && (
+                <div>
+                  <p className="text-xs text-teal-400 mb-3">Generating a student registration link for your department</p>
+                  <label className="block text-sm text-gray-300 mb-1">Class *</label>
+                  {loadingClasses ? (
+                    <div className="w-full px-4 py-2.5 rounded-xl bg-white/5 border border-white/10 text-gray-400 text-sm">
+                      Loading classes...
+                    </div>
+                  ) : teacherClasses.length === 0 ? (
+                    <div className="w-full px-4 py-2.5 rounded-xl bg-red-500/10 border border-red-500/20 text-red-300 text-sm">
+                      No classes in your department yet. Ask your HOD to create classes first.
+                    </div>
                   ) : (
-                    <>
-                      <option value="STUDENT" className="bg-slate-800">Students</option>
-                      <option value="TEACHER" className="bg-slate-800">Teachers</option>
-                      <option value="HOD" className="bg-slate-800">HODs (Heads of Department)</option>
-                    </>
+                    <select
+                      value={selectedClass}
+                      onChange={(e) => setSelectedClass(e.target.value)}
+                      className="w-full px-4 py-2.5 rounded-xl bg-white/5 border border-white/10 text-white focus:outline-none focus:border-cyan-500/50 transition-colors"
+                    >
+                      <option value="" className="bg-slate-800">-- Select Class --</option>
+                      {teacherClasses.map(c => (
+                        <option key={c.id} value={c.id} className="bg-slate-800">{c.name}</option>
+                      ))}
+                    </select>
                   )}
-                </select>
-              </div>
+                </div>
+              )}
 
               {/* HOD: Class picker when STUDENT is selected */}
               {isHOD && targetRole === 'STUDENT' && (
