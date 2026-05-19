@@ -3,18 +3,35 @@ import apiClient from '../services/apiClient';
 import { useAuthStore } from '../store/authStore';
 import { UserRole } from '@sams/shared';
 
-interface ReportData {
+interface StudentEntry {
+  studentId: string;
+  studentName: string;
+  fullName?: string;
+  attendancePercentage: number;
   totalExpected: number;
   totalPresent: number;
   totalLate: number;
   totalExcused: number;
   totalAbsent: number;
-  attendancePercentage: number;
-  students?: Array<{
-    studentId: string;
-    fullName: string;
-    attendancePercentage: number;
-  }>;
+}
+
+interface ReportData {
+  // Student report fields
+  totalExpected?: number;
+  totalPresent?: number;
+  totalLate?: number;
+  totalExcused?: number;
+  totalAbsent?: number;
+  attendancePercentage?: number;
+  // Class / dept / school report fields
+  averageAttendancePercentage?: number;
+  totalSessions?: number;
+  students?: StudentEntry[];
+  // Computed display fields (normalised below)
+  _displayPercentage?: number;
+  _displayPresent?: number;
+  _displayAbsent?: number;
+  _displaySessions?: number;
 }
 
 const ReportsPage: React.FC = () => {
@@ -75,6 +92,122 @@ const ReportsPage: React.FC = () => {
     }
   };
 
+  /** Normalise the various backend response shapes into a single display shape */
+  const normaliseReport = (data: any): ReportData => {
+    // Student report: { studentId, studentName, totalExpected, totalPresent, totalLate, totalExcused, totalAbsent, attendancePercentage }
+    if ('studentName' in data) {
+      return {
+        ...data,
+        _displayPercentage: data.attendancePercentage ?? 0,
+        _displayPresent: data.totalPresent ?? 0,
+        _displayAbsent: data.totalAbsent ?? 0,
+        _displaySessions: data.totalExpected ?? 0,
+        students: undefined,
+      };
+    }
+    // Class report: { classId, className, totalSessions, students: StudentReportData[], averageAttendancePercentage }
+    if ('className' in data) {
+      const students: StudentEntry[] = (data.students ?? []).map((s: any) => ({
+        studentId: s.studentId,
+        studentName: s.studentName,
+        fullName: s.studentName,
+        attendancePercentage: s.attendancePercentage ?? 0,
+        totalExpected: s.totalExpected ?? 0,
+        totalPresent: s.totalPresent ?? 0,
+        totalLate: s.totalLate ?? 0,
+        totalExcused: s.totalExcused ?? 0,
+        totalAbsent: s.totalAbsent ?? 0,
+      }));
+      const totals = students.reduce(
+        (acc, s) => ({
+          present: acc.present + s.totalPresent,
+          absent: acc.absent + s.totalAbsent,
+          sessions: acc.sessions + s.totalExpected,
+        }),
+        { present: 0, absent: 0, sessions: 0 },
+      );
+      return {
+        ...data,
+        attendancePercentage: data.averageAttendancePercentage ?? 0,
+        totalPresent: totals.present,
+        totalAbsent: totals.absent,
+        totalExpected: totals.sessions,
+        _displayPercentage: data.averageAttendancePercentage ?? 0,
+        _displayPresent: totals.present,
+        _displayAbsent: totals.absent,
+        _displaySessions: data.totalSessions ?? totals.sessions,
+        students,
+      };
+    }
+    // Department report: { departmentId, departmentName, classes: ClassReportData[], averageAttendancePercentage }
+    if ('departmentName' in data) {
+      const allStudents: StudentEntry[] = (data.classes ?? []).flatMap((cls: any) =>
+        (cls.students ?? []).map((s: any) => ({
+          studentId: s.studentId,
+          studentName: s.studentName,
+          fullName: s.studentName,
+          attendancePercentage: s.attendancePercentage ?? 0,
+          totalExpected: s.totalExpected ?? 0,
+          totalPresent: s.totalPresent ?? 0,
+          totalLate: s.totalLate ?? 0,
+          totalExcused: s.totalExcused ?? 0,
+          totalAbsent: s.totalAbsent ?? 0,
+        })),
+      );
+      const totals = allStudents.reduce(
+        (acc, s) => ({ present: acc.present + s.totalPresent, absent: acc.absent + s.totalAbsent, sessions: acc.sessions + s.totalExpected }),
+        { present: 0, absent: 0, sessions: 0 },
+      );
+      return {
+        ...data,
+        attendancePercentage: data.averageAttendancePercentage ?? 0,
+        totalPresent: totals.present,
+        totalAbsent: totals.absent,
+        totalExpected: totals.sessions,
+        _displayPercentage: data.averageAttendancePercentage ?? 0,
+        _displayPresent: totals.present,
+        _displayAbsent: totals.absent,
+        _displaySessions: totals.sessions,
+        students: allStudents,
+      };
+    }
+    // School report: { schoolId, schoolName, departments: DepartmentReportData[], averageAttendancePercentage }
+    if ('schoolName' in data) {
+      const allStudents: StudentEntry[] = (data.departments ?? []).flatMap((dept: any) =>
+        (dept.classes ?? []).flatMap((cls: any) =>
+          (cls.students ?? []).map((s: any) => ({
+            studentId: s.studentId,
+            studentName: s.studentName,
+            fullName: s.studentName,
+            attendancePercentage: s.attendancePercentage ?? 0,
+            totalExpected: s.totalExpected ?? 0,
+            totalPresent: s.totalPresent ?? 0,
+            totalLate: s.totalLate ?? 0,
+            totalExcused: s.totalExcused ?? 0,
+            totalAbsent: s.totalAbsent ?? 0,
+          })),
+        ),
+      );
+      const totals = allStudents.reduce(
+        (acc, s) => ({ present: acc.present + s.totalPresent, absent: acc.absent + s.totalAbsent, sessions: acc.sessions + s.totalExpected }),
+        { present: 0, absent: 0, sessions: 0 },
+      );
+      return {
+        ...data,
+        attendancePercentage: data.averageAttendancePercentage ?? 0,
+        totalPresent: totals.present,
+        totalAbsent: totals.absent,
+        totalExpected: totals.sessions,
+        _displayPercentage: data.averageAttendancePercentage ?? 0,
+        _displayPresent: totals.present,
+        _displayAbsent: totals.absent,
+        _displaySessions: totals.sessions,
+        students: allStudents,
+      };
+    }
+    return data;
+  };
+
   const fetchReport = async () => {
     const endpoint = getReportEndpoint();
     if (!endpoint) {
@@ -87,7 +220,7 @@ const ReportsPage: React.FC = () => {
       const { data } = await apiClient.get(
         `${endpoint}?from=${dateFrom}T00:00:00.000Z&to=${dateTo}T23:59:59.999Z`
       );
-      setReport(data);
+      setReport(normaliseReport(data));
     } catch (err: any) {
       const msg = err.response?.data?.error || err.response?.data?.message || 'Failed to load report';
       setError(msg);
@@ -124,6 +257,11 @@ const ReportsPage: React.FC = () => {
   };
 
   const atRiskCount = report?.students?.filter((s) => s.attendancePercentage < 60).length || 0;
+
+  const displayPercentage = report?._displayPercentage ?? report?.attendancePercentage ?? 0;
+  const displayPresent = report?._displayPresent ?? report?.totalPresent ?? 0;
+  const displaySessions = report?._displaySessions ?? report?.totalExpected ?? 0;
+  const displayAbsent = report?._displayAbsent ?? report?.totalAbsent ?? 0;
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 p-6">
@@ -199,21 +337,21 @@ const ReportsPage: React.FC = () => {
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-6">
               <div className="backdrop-blur-xl bg-white/5 border border-white/10 rounded-2xl p-5 text-center">
                 <p className="text-3xl font-bold text-emerald-400">
-                  {report.attendancePercentage.toFixed(1)}%
+                  {displayPercentage.toFixed(1)}%
                 </p>
                 <p className="text-xs text-gray-400 mt-1 uppercase tracking-wider">Avg Attendance</p>
               </div>
               <div className="backdrop-blur-xl bg-white/5 border border-white/10 rounded-2xl p-5 text-center">
-                <p className="text-3xl font-bold text-blue-400">{report.totalPresent + report.totalLate + report.totalAbsent + report.totalExcused}</p>
+                <p className="text-3xl font-bold text-blue-400">{displaySessions}</p>
                 <p className="text-xs text-gray-400 mt-1 uppercase tracking-wider">Total Sessions</p>
               </div>
               <div className="backdrop-blur-xl bg-white/5 border border-white/10 rounded-2xl p-5 text-center">
-                <p className="text-3xl font-bold text-purple-400">{report.totalPresent}</p>
+                <p className="text-3xl font-bold text-purple-400">{displayPresent}</p>
                 <p className="text-xs text-gray-400 mt-1 uppercase tracking-wider">Present</p>
               </div>
               <div className="backdrop-blur-xl bg-white/5 border border-white/10 rounded-2xl p-5 text-center">
-                <p className="text-3xl font-bold text-red-400">{atRiskCount}</p>
-                <p className="text-xs text-gray-400 mt-1 uppercase tracking-wider">At-Risk</p>
+                <p className="text-3xl font-bold text-red-400">{atRiskCount > 0 ? atRiskCount : displayAbsent}</p>
+                <p className="text-xs text-gray-400 mt-1 uppercase tracking-wider">{atRiskCount > 0 ? 'At-Risk' : 'Absent'}</p>
               </div>
             </div>
 
@@ -236,9 +374,9 @@ const ReportsPage: React.FC = () => {
                           <td className="py-3 px-2">
                             <div className="flex items-center gap-3">
                               <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-xs font-bold text-white">
-                                {s.fullName.charAt(0)}
+                                {(s.studentName || s.fullName || '?').charAt(0)}
                               </div>
-                              <span className="font-medium text-white text-sm">{s.fullName}</span>
+                              <span className="font-medium text-white text-sm">{s.studentName || s.fullName}</span>
                             </div>
                           </td>
                           <td className="py-3 px-2 text-right">

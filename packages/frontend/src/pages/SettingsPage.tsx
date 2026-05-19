@@ -1,8 +1,22 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuthStore } from '../store/authStore';
 import apiClient from '../services/apiClient';
 import { UserRole } from '@sams/shared';
+
+interface SentNotification {
+  id: string;
+  title: string;
+  message: string;
+  batchId: string | null;
+  createdAt: string;
+  updatedAt: string | null;
+  recipientCount: number;
+}
+
+function isWithin24Hours(createdAt: string): boolean {
+  return Date.now() - new Date(createdAt).getTime() < 24 * 60 * 60 * 1000;
+}
 
 const SettingsPage: React.FC = () => {
   const user = useAuthStore((s) => s.user);
@@ -22,6 +36,72 @@ const SettingsPage: React.FC = () => {
   // Biometric face enrollment state
   const [bioLoading, setBioLoading] = useState(false);
   const [bioEnrolled, setBioEnrolled] = useState(false);
+
+  // Sent notifications state
+  const canSend = user && ['SCHOOL_ADMIN', 'HOD', 'TEACHER'].includes(user.role);
+  const isAdmin = user && ['SCHOOL_ADMIN', 'HOD'].includes(user.role);
+  const [sentNotifs, setSentNotifs] = useState<SentNotification[]>([]);
+  const [sentLoading, setSentLoading] = useState(false);
+  const [editingNotif, setEditingNotif] = useState<SentNotification | null>(null);
+  const [editMsg, setEditMsg] = useState('');
+  const [editSaving, setEditSaving] = useState(false);
+  const [editErr, setEditErr] = useState<string | null>(null);
+  const [deletingNotif, setDeletingNotif] = useState<SentNotification | null>(null);
+  const [deleteConfirming, setDeleteConfirming] = useState(false);
+  const [deleteErr, setDeleteErr] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (canSend) {
+      setSentLoading(true);
+      apiClient.get('/notifications/sent')
+        .then(({ data }) => setSentNotifs(data))
+        .catch(() => {})
+        .finally(() => setSentLoading(false));
+    }
+  }, [canSend]);
+
+  const handleEditSave = async () => {
+    if (!editingNotif) return;
+    setEditSaving(true);
+    setEditErr(null);
+    try {
+      await apiClient.patch(`/notifications/${editingNotif.id}`, { message: editMsg.trim() });
+      setSentNotifs((prev) =>
+        prev.map((n) => {
+          if (editingNotif.batchId && n.batchId === editingNotif.batchId) {
+            return { ...n, message: editMsg.trim(), updatedAt: new Date().toISOString() };
+          }
+          if (n.id === editingNotif.id) return { ...n, message: editMsg.trim(), updatedAt: new Date().toISOString() };
+          return n;
+        }),
+      );
+      setEditingNotif(null);
+    } catch (err: any) {
+      setEditErr(err.response?.data?.error || err.response?.data?.message || 'Failed to save');
+    } finally {
+      setEditSaving(false);
+    }
+  };
+
+  const handleDeleteConfirm = async () => {
+    if (!deletingNotif) return;
+    setDeleteConfirming(true);
+    setDeleteErr(null);
+    try {
+      if (deletingNotif.batchId) {
+        await apiClient.delete(`/notifications/batch/${deletingNotif.batchId}`);
+        setSentNotifs((prev) => prev.filter((n) => n.batchId !== deletingNotif.batchId));
+      } else {
+        await apiClient.delete(`/notifications/batch/${deletingNotif.id}`);
+        setSentNotifs((prev) => prev.filter((n) => n.id !== deletingNotif.id));
+      }
+      setDeletingNotif(null);
+    } catch (err: any) {
+      setDeleteErr(err.response?.data?.error || err.response?.data?.message || 'Failed to delete');
+    } finally {
+      setDeleteConfirming(false);
+    }
+  };
 
   const clearMessages = () => { setSuccess(null); setError(null); };
 
@@ -280,6 +360,153 @@ const SettingsPage: React.FC = () => {
                 </button>
               </div>
             )}
+          </div>
+        )}
+
+        {/* Sent Notifications Section (for senders: SCHOOL_ADMIN, HOD, TEACHER) */}
+        {canSend && (
+          <>
+            <div className="mb-4 mt-2">
+              <h2 className="text-lg font-semibold text-white flex items-center gap-2">
+                <svg className="w-5 h-5 text-teal-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
+                </svg>
+                Sent Notifications
+              </h2>
+              <p className="text-xs text-gray-500 mt-1">Manage messages you've sent</p>
+            </div>
+
+            <div className="backdrop-blur-xl bg-white/5 border border-white/10 rounded-2xl p-6 mb-6">
+              {sentLoading ? (
+                <div className="flex items-center justify-center py-8">
+                  <svg className="animate-spin h-6 w-6 text-teal-400" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                  </svg>
+                </div>
+              ) : sentNotifs.length === 0 ? (
+                <p className="text-sm text-gray-500 text-center py-6">No sent notifications yet.</p>
+              ) : (
+                <div className="space-y-3">
+                  {sentNotifs.map((notif) => {
+                    const canModify = isAdmin || isWithin24Hours(notif.createdAt);
+                    const expired = !isAdmin && !isWithin24Hours(notif.createdAt);
+                    return (
+                      <div key={notif.id} className="p-4 rounded-xl bg-white/[0.04] border border-white/10">
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2 flex-wrap mb-1">
+                              <span className="text-xs font-semibold text-gray-300 uppercase tracking-wider">{notif.title}</span>
+                              <span className="text-xs px-2 py-0.5 rounded-full bg-teal-500/10 text-teal-400 border border-teal-500/20">
+                                {notif.recipientCount} recipient{notif.recipientCount !== 1 ? 's' : ''}
+                              </span>
+                              {notif.updatedAt && (
+                                <span className="text-xs text-amber-400/70 italic">edited</span>
+                              )}
+                              {expired && (
+                                <span className="text-xs text-gray-600 italic">window expired</span>
+                              )}
+                            </div>
+                            <p className="text-sm text-gray-300 line-clamp-2">{notif.message}</p>
+                            <p className="text-xs text-gray-600 mt-1">{new Date(notif.createdAt).toLocaleString()}</p>
+                          </div>
+                          <div className="flex items-center gap-1 flex-shrink-0">
+                            <button
+                              onClick={() => { if (canModify) { setEditingNotif(notif); setEditMsg(notif.message); setEditErr(null); } }}
+                              disabled={!canModify}
+                              className={`p-1.5 rounded-lg transition-all ${canModify ? 'hover:bg-white/10 text-gray-400 hover:text-teal-400' : 'text-gray-700 cursor-not-allowed'}`}
+                              aria-label="Edit notification"
+                            >
+                              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                              </svg>
+                            </button>
+                            <button
+                              onClick={() => { if (canModify) { setDeletingNotif(notif); setDeleteErr(null); } }}
+                              disabled={!canModify}
+                              className={`p-1.5 rounded-lg transition-all ${canModify ? 'hover:bg-white/10 text-gray-400 hover:text-red-400' : 'text-gray-700 cursor-not-allowed'}`}
+                              aria-label="Delete notification"
+                            >
+                              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                              </svg>
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          </>
+        )}
+
+        {/* Edit Notification Modal */}
+        {editingNotif && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setEditingNotif(null)} />
+            <div className="relative w-full max-w-lg bg-slate-800/95 backdrop-blur-xl border border-white/10 rounded-2xl p-6 shadow-2xl">
+              <h2 className="text-lg font-semibold text-white mb-4">Edit Notification</h2>
+              {editErr && (
+                <div className="mb-4 p-3 bg-red-500/20 border border-red-400/30 rounded-xl">
+                  <p className="text-sm text-red-300">{editErr}</p>
+                </div>
+              )}
+              <div className="mb-4">
+                <label className="block text-sm font-semibold text-gray-300 mb-1.5">Message</label>
+                <textarea
+                  value={editMsg}
+                  onChange={(e) => setEditMsg(e.target.value)}
+                  rows={5}
+                  maxLength={1000}
+                  className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-teal-500/40 focus:border-teal-400 transition-all resize-none"
+                />
+                <p className="text-xs text-gray-500 mt-1 text-right">{editMsg.length}/1000</p>
+              </div>
+              <div className="flex gap-3 justify-end">
+                <button onClick={() => setEditingNotif(null)} className="px-4 py-2 text-sm font-medium text-gray-300 bg-white/5 border border-white/10 rounded-xl hover:bg-white/10 transition-all">
+                  Cancel
+                </button>
+                <button
+                  onClick={handleEditSave}
+                  disabled={editSaving || editMsg.trim().length < 1}
+                  className="px-4 py-2 text-sm font-semibold text-white bg-gradient-to-r from-teal-500 to-cyan-600 rounded-xl hover:from-teal-400 hover:to-cyan-500 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+                >
+                  {editSaving ? 'Saving...' : 'Save Changes'}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Delete Confirmation Modal */}
+        {deletingNotif && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setDeletingNotif(null)} />
+            <div className="relative w-full max-w-md bg-slate-800/95 backdrop-blur-xl border border-white/10 rounded-2xl p-6 shadow-2xl">
+              <h2 className="text-lg font-semibold text-white mb-2">Delete Notification</h2>
+              <p className="text-sm text-gray-400 mb-6">
+                This will remove the message for all {deletingNotif.recipientCount} recipient{deletingNotif.recipientCount !== 1 ? 's' : ''}. This cannot be undone.
+              </p>
+              {deleteErr && (
+                <div className="mb-4 p-3 bg-red-500/20 border border-red-400/30 rounded-xl">
+                  <p className="text-sm text-red-300">{deleteErr}</p>
+                </div>
+              )}
+              <div className="flex gap-3 justify-end">
+                <button onClick={() => setDeletingNotif(null)} className="px-4 py-2 text-sm font-medium text-gray-300 bg-white/5 border border-white/10 rounded-xl hover:bg-white/10 transition-all">
+                  Cancel
+                </button>
+                <button
+                  onClick={handleDeleteConfirm}
+                  disabled={deleteConfirming}
+                  className="px-4 py-2 text-sm font-semibold text-white bg-gradient-to-r from-red-500 to-rose-600 rounded-xl hover:from-red-400 hover:to-rose-500 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+                >
+                  {deleteConfirming ? 'Deleting...' : 'Delete'}
+                </button>
+              </div>
+            </div>
           </div>
         )}
 

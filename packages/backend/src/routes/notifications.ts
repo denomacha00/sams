@@ -23,6 +23,49 @@ const editNotificationSchema = z.object({
 export const notificationsRouter = Router();
 
 /**
+ * GET /api/v1/notifications/sent
+ * Get notifications sent by the current user, with recipient count per batch.
+ */
+notificationsRouter.get('/sent', async (req: Request, res: Response): Promise<void> => {
+  try {
+    const senderId = req.user.sub;
+
+    // Get distinct batches sent by this user (one representative notification per batch)
+    const sentNotifications = await prisma.notification.findMany({
+      where: { senderId },
+      orderBy: { createdAt: 'desc' },
+      take: 100,
+    });
+
+    // Group by batchId, keeping only the first (representative) per batch
+    const seen = new Set<string>();
+    const batches: any[] = [];
+    for (const n of sentNotifications) {
+      const key = n.batchId ?? n.id;
+      if (!seen.has(key)) {
+        seen.add(key);
+        batches.push(n);
+      }
+    }
+
+    // For each batch, count recipients
+    const enriched = await Promise.all(
+      batches.map(async (n) => {
+        const recipientCount = n.batchId
+          ? await prisma.notification.count({ where: { batchId: n.batchId } })
+          : 1;
+        return { ...n, recipientCount };
+      }),
+    );
+
+    res.status(200).json(enriched);
+  } catch (err) {
+    if (err instanceof AppError) throw err;
+    throw new AppError(500, 'INTERNAL_ERROR', 'Failed to fetch sent notifications');
+  }
+});
+
+/**
  * GET /api/v1/notifications
  * Get the current user's in-app notifications with sender name resolution.
  */
