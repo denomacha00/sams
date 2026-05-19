@@ -92,10 +92,10 @@ superAdminRouter.post('/licenses', async (req: Request, res: Response): Promise<
     },
   });
 
-  // Audit log
+  // Audit log — super admin is not in the User table so actorId must be null
   await auditService.log({
     eventType: 'LICENSE_ACTIVATION',
-    actorId: req.user?.sub,
+    actorId: undefined,
     actorRole: req.user?.role,
     resourceSnapshot: {
       action: 'LICENSE_GENERATED',
@@ -181,7 +181,7 @@ superAdminRouter.post('/licenses/:id/revoke', async (req: Request, res: Response
   // Audit log
   await auditService.log({
     eventType: 'LICENSE_ACTIVATION',
-    actorId: req.user?.sub,
+    actorId: undefined, // super admin not in User table
     actorRole: req.user?.role,
     resourceSnapshot: {
       action: 'LICENSE_REVOKED',
@@ -348,7 +348,7 @@ superAdminRouter.post('/schools/:id/unsuspend', async (req: Request, res: Respon
   // Audit log
   await auditService.log({
     eventType: 'SCHOOL_SUSPENDED',
-    actorId: req.user?.sub,
+    actorId: undefined, // super admin not in User table
     actorRole: req.user?.role,
     schoolId,
     resourceSnapshot: {
@@ -431,7 +431,7 @@ superAdminRouter.delete('/schools/:id', async (req: Request, res: Response): Pro
   try {
     await auditService.log({
       eventType: 'SCHOOL_SUSPENDED',
-      actorId: req.user?.sub,
+      actorId: undefined, // super admin not in User table
       actorRole: req.user?.role,
       resourceSnapshot: {
         schoolId,
@@ -637,7 +637,7 @@ superAdminRouter.post('/ai-action', async (req: Request, res: Response): Promise
 
         await auditService.log({
           eventType: 'LICENSE_ACTIVATION',
-          actorId: req.user?.sub,
+          actorId: undefined, // super admin not in User table
           actorRole: req.user?.role,
           resourceSnapshot: {
             action: 'LICENSE_GENERATED_VIA_AI',
@@ -718,7 +718,7 @@ superAdminRouter.post('/ai-action', async (req: Request, res: Response): Promise
 
         await auditService.log({
           eventType: 'SCHOOL_SUSPENDED',
-          actorId: req.user?.sub,
+          actorId: undefined, // super admin not in User table
           actorRole: req.user?.role,
           schoolId: school.id,
           resourceSnapshot: {
