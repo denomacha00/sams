@@ -87,6 +87,7 @@ class RegistrationLinkService {
         const link = await index_1.prisma.registrationLink.create({
             data: {
                 schoolId,
+                departmentId: departmentId ?? null,
                 classId: (classId && classId.length > 10) ? classId : null,
                 targetRole,
                 token,
@@ -169,7 +170,7 @@ class RegistrationLinkService {
                 admissionNumber: admissionNumber ?? null,
                 passwordHash,
                 classId: link.classId ?? null,
-                departmentId: null,
+                departmentId: link.departmentId ?? null,
             },
         });
         // Increment useCount

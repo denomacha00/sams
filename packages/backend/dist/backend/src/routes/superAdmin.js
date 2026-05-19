@@ -342,12 +342,17 @@ exports.superAdminRouter.delete('/schools/:id', async (req, res) => {
     await index_1.prisma.$transaction(async (tx) => {
         await tx.attendanceRecord.deleteMany({ where: { schoolId } });
         await tx.attendanceSession.deleteMany({ where: { schoolId } });
+        await tx.notification.deleteMany({ where: { schoolId } });
+        await tx.conversationRecord.deleteMany({ where: { thread: { schoolId } } });
+        await tx.conversationThread.deleteMany({ where: { schoolId } });
+        await tx.aIKnowledge.deleteMany({ where: { schoolId } });
         await tx.registrationLink.deleteMany({ where: { schoolId } });
         await tx.timetableEntry.deleteMany({ where: { schoolId } });
         await tx.riskScore.deleteMany({ where: { schoolId } });
         await tx.payment.deleteMany({ where: { schoolId } });
         await tx.auditLog.deleteMany({ where: { schoolId } });
         await tx.refreshToken.deleteMany({ where: { user: { schoolId } } });
+        await tx.webAuthnCredential.deleteMany({ where: { user: { schoolId } } });
         await tx.biometricTemplate.deleteMany({ where: { schoolId } });
         await tx.user.deleteMany({ where: { schoolId } });
         await tx.class.deleteMany({ where: { schoolId } });
@@ -355,18 +360,23 @@ exports.superAdminRouter.delete('/schools/:id', async (req, res) => {
         await tx.licenseKey.updateMany({ where: { usedBySchoolId: schoolId }, data: { usedBySchoolId: null, usedAt: null } });
         await tx.school.delete({ where: { id: schoolId } });
     });
-    // Audit log
-    await auditService_1.auditService.log({
-        eventType: 'SCHOOL_SUSPENDED',
-        actorId: req.user?.sub,
-        actorRole: req.user?.role,
-        resourceSnapshot: {
-            schoolId,
-            schoolName: school.name,
-            action: 'SCHOOL_DELETED',
-            deletedAt: new Date().toISOString(),
-        },
-    });
+    // Audit log — wrapped in try-catch since the school no longer exists
+    try {
+        await auditService_1.auditService.log({
+            eventType: 'SCHOOL_SUSPENDED',
+            actorId: req.user?.sub,
+            actorRole: req.user?.role,
+            resourceSnapshot: {
+                schoolId,
+                schoolName: school.name,
+                action: 'SCHOOL_DELETED',
+                deletedAt: new Date().toISOString(),
+            },
+        });
+    }
+    catch {
+        // School was deleted, audit log may fail — that's ok
+    }
     res.json({ message: 'School deleted successfully', schoolId });
 });
 // ─── GET /super/revenue — Aggregate payment totals by plan tier ───────────────
@@ -407,7 +417,9 @@ exports.superAdminRouter.get('/audit-logs', async (req, res) => {
     if (!filters.limit)
         filters.limit = 50;
     const logs = await auditService_1.auditService.query(filters);
-    res.json({ logs, count: logs.length });
+    // Serialize BigInt values to strings for JSON compatibility
+    const serializedLogs = JSON.parse(JSON.stringify(logs, (_, v) => typeof v === 'bigint' ? v.toString() : v));
+    res.json({ logs: serializedLogs, count: serializedLogs.length });
 });
 // ─── AI Knowledge Base CRUD ────────────────────────────────────────────────────
 const aiKnowledgeSchema = zod_1.z.object({

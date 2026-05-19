@@ -1,1 +1,1 @@
-{"version":3,"file":"schoolAdminHandlers.d.ts","sourceRoot":"","sources":["../../../../../../src/services/ai/handlers/schoolAdminHandlers.ts"],"names":[],"mappings":"AAAA,OAAO,KAAK,EAAE,gBAAgB,EAAiB,MAAM,uBAAuB,CAAC;AAsG7E,eAAO,MAAM,kBAAkB,EAAE,gBAAgB,EA8FhD,CAAC"}
+{"version":3,"file":"schoolAdminHandlers.d.ts","sourceRoot":"","sources":["../../../../../../src/services/ai/handlers/schoolAdminHandlers.ts"],"names":[],"mappings":"AAAA,OAAO,KAAK,EAAE,gBAAgB,EAAiB,MAAM,uBAAuB,CAAC;AAiI7E,eAAO,MAAM,kBAAkB,EAAE,gBAAgB,EAiHhD,CAAC"}

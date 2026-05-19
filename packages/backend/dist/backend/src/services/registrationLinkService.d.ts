@@ -33,6 +33,7 @@ export declare class RegistrationLinkService {
      * Requirements: 4.6, 4.7, 4.8
      */
     generateLink(creatorId: string, creatorRole: UserRole, schoolId: string, departmentId?: string, classId?: string, options?: GenerateLinkOptions): Promise<{
+        departmentId: string | null;
         id: string;
         schoolId: string;
         createdAt: Date;
@@ -51,6 +52,7 @@ export declare class RegistrationLinkService {
      * Requirements: 4.8
      */
     resolveLink(token: string): Promise<{
+        departmentId: string | null;
         id: string;
         schoolId: string;
         createdAt: Date;
@@ -103,6 +105,7 @@ export declare class RegistrationLinkService {
      * Requirements: 4.1, 4.3, 4.4
      */
     getLinksForUser(userId: string, userRole: UserRole, schoolId: string): Promise<{
+        departmentId: string | null;
         id: string;
         schoolId: string;
         createdAt: Date;

@@ -145,6 +145,24 @@ async function buildSystemPrompt(user) {
         // If knowledge fetch fails, continue without it (graceful degradation)
         console.error('[AI] Failed to fetch knowledge base:', err);
     }
+    // For SUPER_ADMIN, inject real-time system stats into the prompt
+    let systemDataSection = '';
+    if (user.role === 'SUPER_ADMIN') {
+        try {
+            const { prisma } = await Promise.resolve().then(() => __importStar(require('../index')));
+            const [schoolCount, userCount, studentCount, teacherCount, sessionCount] = await Promise.all([
+                prisma.school.count(),
+                prisma.user.count(),
+                prisma.user.count({ where: { role: 'STUDENT' } }),
+                prisma.user.count({ where: { role: 'TEACHER' } }),
+                prisma.attendanceSession.count(),
+            ]);
+            systemDataSection = `\n\nREAL-TIME SYSTEM DATA (from database - use these exact numbers when asked):\n- Total Schools: ${schoolCount}\n- Total Users: ${userCount}\n- Total Students: ${studentCount}\n- Total Teachers: ${teacherCount}\n- Total Attendance Sessions: ${sessionCount}`;
+        }
+        catch {
+            // If stats fetch fails, continue without them
+        }
+    }
     return `You are SAMS AI — a smart, helpful assistant built into the Smart Attendance Management System (SAMS). You were developed by Denis Macharia.
 
 You can help with:
@@ -170,9 +188,15 @@ SENSITIVE DATA RULES — strictly enforce these:
 - System-wide stats (total schools, revenue): ONLY SUPER_ADMIN can see these.
 - School admin actions (manage users, classes, departments): ONLY SCHOOL_ADMIN and above.
 
+CRITICAL — NEVER MAKE UP DATA:
+- When asked about numbers (how many students, teachers, schools, attendance rates), NEVER guess or invent numbers.
+- If you don't have the actual data from a database query, say "Let me check that for you" and explain that the action system will handle it.
+- NEVER say things like "you have 150 students" unless you received that exact number from a database query result.
+- For data questions, always defer to the action handlers which query the real database.
+
 If the user asks for something above their permission level, politely tell them they don't have access and suggest who to contact.
 
-Be concise, friendly, and helpful. Address the user by their name. Answer in plain language.${knowledgeSection}`;
+Be concise, friendly, and helpful. Address the user by their name. Answer in plain language.${knowledgeSection}${systemDataSection}`;
 }
 // ─── Function-Calling Tools ───────────────────────────────────────────────────
 /**

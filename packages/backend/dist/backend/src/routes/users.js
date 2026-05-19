@@ -84,6 +84,7 @@ const updateUserSchema = zod_1.z.object({
 });
 const generateLinkSchema = zod_1.z.object({
     classId: zod_1.z.string().optional(),
+    departmentId: zod_1.z.string().optional(),
     expiryDays: zod_1.z.number().int().min(7).max(365).optional(),
     maxUses: zod_1.z.number().int().min(1).optional(),
     targetRole: zod_1.z.enum(['TEACHER', 'STUDENT', 'HOD']).optional(),
@@ -378,7 +379,9 @@ exports.registrationLinksRouter.post('/', async (req, res) => {
     try {
         // Determine classId: use body classId, especially when targetRole is STUDENT
         const classId = parsed.data.classId || undefined;
-        const link = await registrationLinkService_1.registrationLinkService.generateLink(req.user.sub, req.user.role, req.schoolId, req.user.departmentId, classId, {
+        // Use body departmentId if provided (admin selecting dept for HOD), otherwise use creator's dept
+        const departmentId = parsed.data.departmentId || req.user.departmentId;
+        const link = await registrationLinkService_1.registrationLinkService.generateLink(req.user.sub, req.user.role, req.schoolId, departmentId, classId, {
             expiryDays: parsed.data.expiryDays,
             maxUses: parsed.data.maxUses,
             targetRole: parsed.data.targetRole,
