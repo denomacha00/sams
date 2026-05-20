@@ -414,8 +414,8 @@ const RegistrationLinksPage: React.FC = () => {
                     Department *
                   </label>
                   {departments.length === 0 ? (
-                    <div className="w-full px-4 py-2.5 rounded-xl bg-red-500/10 border border-red-500/20 text-red-300 text-sm">
-                      No departments yet — create one in Departments first
+                    <div className="w-full px-4 py-2.5 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-300 text-sm">
+                      No departments found. Create departments first in the Departments section.
                     </div>
                   ) : (
                     <select

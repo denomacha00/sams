@@ -15,6 +15,12 @@ interface Notification {
   batchId: string | null;
 }
 
+interface Department {
+  id: string;
+  name: string;
+  classes?: { id: string; name: string }[];
+}
+
 type Scope = 'school' | 'department' | 'class';
 type Channel = 'inapp' | 'sms';
 
@@ -45,8 +51,18 @@ const NotificationsPage: React.FC = () => {
   const [showSendForm, setShowSendForm] = useState(false);
 
   // Send form state
-  const [scope, setScope] = useState<Scope>('class');
-  const [targetId, setTargetId] = useState('');
+  const [scope, setScope] = useState<Scope>(() => {
+    if (!user) return 'class';
+    if (user.role === 'TEACHER') return 'class';
+    if (user.role === 'HOD') return 'department';
+    return 'school';
+  });
+  const [targetId, setTargetId] = useState(() => {
+    if (!user) return '';
+    if (user.role === 'HOD') return user.departmentId || '';
+    if (user.role === 'TEACHER') return user.classId || '';
+    return '';
+  });
   const [message, setMessage] = useState('');
   const [channels, setChannels] = useState<Channel[]>(['inapp']);
   const [sending, setSending] = useState(false);
@@ -66,9 +82,42 @@ const NotificationsPage: React.FC = () => {
 
   const canSend = user && ['SCHOOL_ADMIN', 'HOD', 'TEACHER'].includes(user.role);
 
+  // Departments and classes for the send form
+  const [departments, setDepartments] = useState<Department[]>([]);
+  const [classes, setClasses] = useState<{ id: string; name: string }[]>([]);
+
   useEffect(() => {
     fetchNotifications();
+    if (user && ['SCHOOL_ADMIN', 'HOD', 'TEACHER'].includes(user.role)) {
+      fetchScopeData();
+    }
   }, []);
+
+  const fetchScopeData = async () => {
+    try {
+      if (user?.role === 'SCHOOL_ADMIN') {
+        const { data } = await apiClient.get('/departments');
+        const depts: Department[] = Array.isArray(data) ? data : (data.departments || []);
+        // Fetch classes for each department
+        const deptsWithClasses = await Promise.all(
+          depts.map(async (d) => {
+            try {
+              const { data: classData } = await apiClient.get(`/departments/${d.id}/classes`);
+              return { ...d, classes: Array.isArray(classData) ? classData : [] };
+            } catch {
+              return { ...d, classes: [] };
+            }
+          })
+        );
+        setDepartments(deptsWithClasses);
+      } else if ((user?.role === 'HOD' || user?.role === 'TEACHER') && user.departmentId) {
+        const { data } = await apiClient.get(`/departments/${user.departmentId}/classes`);
+        setClasses(Array.isArray(data) ? data : []);
+      }
+    } catch {
+      // ignore
+    }
+  };
 
   const fetchNotifications = async () => {
     try {
@@ -262,7 +311,7 @@ const NotificationsPage: React.FC = () => {
                 <label className="block text-sm font-semibold text-gray-300 mb-1.5">Recipient Scope</label>
                 <select
                   value={scope}
-                  onChange={(e) => setScope(e.target.value as Scope)}
+                  onChange={(e) => { setScope(e.target.value as Scope); setTargetId(''); }}
                   className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:ring-2 focus:ring-teal-500/40 focus:border-teal-400 transition-all"
                 >
                   {getScopeOptions().map((s) => (
@@ -276,15 +325,39 @@ const NotificationsPage: React.FC = () => {
               {scope !== 'school' && (
                 <div>
                   <label className="block text-sm font-semibold text-gray-300 mb-1.5">
-                    Target ID ({scope === 'department' ? 'Department' : 'Class'} ID)
+                    {scope === 'department' ? 'Department' : 'Class'}
                   </label>
-                  <input
-                    type="text"
-                    value={targetId}
-                    onChange={(e) => setTargetId(e.target.value)}
-                    className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-teal-500/40 focus:border-teal-400 transition-all"
-                    placeholder={`Enter ${scope} ID`}
-                  />
+                  {scope === 'department' && (
+                    <select
+                      value={targetId}
+                      onChange={(e) => setTargetId(e.target.value)}
+                      className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:ring-2 focus:ring-teal-500/40 focus:border-teal-400 transition-all"
+                    >
+                      <option value="" className="bg-slate-800">-- Select Department --</option>
+                      {departments.map((d) => (
+                        <option key={d.id} value={d.id} className="bg-slate-800">{d.name}</option>
+                      ))}
+                    </select>
+                  )}
+                  {scope === 'class' && (
+                    <select
+                      value={targetId}
+                      onChange={(e) => setTargetId(e.target.value)}
+                      className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:ring-2 focus:ring-teal-500/40 focus:border-teal-400 transition-all"
+                    >
+                      <option value="" className="bg-slate-800">-- Select Class --</option>
+                      {/* School admin: show classes from selected dept */}
+                      {user?.role === 'SCHOOL_ADMIN' && departments.flatMap((d) =>
+                        (d.classes || []).map((c) => (
+                          <option key={c.id} value={c.id} className="bg-slate-800">{d.name} — {c.name}</option>
+                        ))
+                      )}
+                      {/* HOD/Teacher: show classes from their department */}
+                      {(user?.role === 'HOD' || user?.role === 'TEACHER') && classes.map((c) => (
+                        <option key={c.id} value={c.id} className="bg-slate-800">{c.name}</option>
+                      ))}
+                    </select>
+                  )}
                 </div>
               )}
 
