@@ -22,6 +22,8 @@ interface RegistrationLink {
 interface Department {
   id: string;
   name: string;
+  hodId?: string | null;
+  hodName?: string | null;
   classes?: ClassItem[];
 }
 
@@ -77,7 +79,19 @@ const RegistrationLinksPage: React.FC = () => {
   const fetchDepartments = async () => {
     try {
       const { data } = await apiClient.get('/departments');
-      setDepartments(Array.isArray(data) ? data : (data.departments || []));
+      const depts: Department[] = Array.isArray(data) ? data : (data.departments || []);
+      // Fetch classes for each department
+      const deptsWithClasses = await Promise.all(
+        depts.map(async (d) => {
+          try {
+            const { data: classData } = await apiClient.get(`/departments/${d.id}/classes`);
+            return { ...d, classes: Array.isArray(classData) ? classData : [] };
+          } catch {
+            return { ...d, classes: [] };
+          }
+        })
+      );
+      setDepartments(deptsWithClasses);
     } catch (err) {
       console.error('Failed to fetch departments:', err);
     }
@@ -418,16 +432,25 @@ const RegistrationLinksPage: React.FC = () => {
                       No departments found. Create departments first in the Departments section.
                     </div>
                   ) : (
-                    <select
-                      value={selectedDept}
-                      onChange={(e) => { setSelectedDept(e.target.value); setSelectedClass(''); }}
-                      className="w-full px-4 py-2.5 rounded-xl bg-white/5 border border-white/10 text-white focus:outline-none focus:border-cyan-500/50 transition-colors"
-                    >
-                      <option value="" className="bg-slate-800">-- Select Department --</option>
-                      {departments.map(d => (
-                        <option key={d.id} value={d.id} className="bg-slate-800">{d.name}</option>
-                      ))}
-                    </select>
+                    <>
+                      <select
+                        value={selectedDept}
+                        onChange={(e) => { setSelectedDept(e.target.value); setSelectedClass(''); }}
+                        className="w-full px-4 py-2.5 rounded-xl bg-white/5 border border-white/10 text-white focus:outline-none focus:border-cyan-500/50 transition-colors"
+                      >
+                        <option value="" className="bg-slate-800">-- Select Department --</option>
+                        {departments.map(d => (
+                          <option key={d.id} value={d.id} className="bg-slate-800">
+                            {d.name}{targetRole === 'HOD' && d.hodName ? ` ⚠ HOD: ${d.hodName}` : ''}
+                          </option>
+                        ))}
+                      </select>
+                      {targetRole === 'HOD' && selectedDept && departments.find(d => d.id === selectedDept)?.hodName && (
+                        <p className="text-xs text-amber-400 mt-1">
+                          ⚠ This department already has a HOD ({departments.find(d => d.id === selectedDept)?.hodName}). The new HOD link will replace them when used.
+                        </p>
+                      )}
+                    </>
                   )}
                 </div>
               )}

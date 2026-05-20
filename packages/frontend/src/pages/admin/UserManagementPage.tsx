@@ -91,9 +91,19 @@ const UserManagementPage: React.FC = () => {
   const fetchDepartments = async () => {
     try {
       const { data } = await apiClient.get('/departments');
-      const depts = Array.isArray(data) ? data : (data.departments || []);
-      // Enrich with HOD info from users list
-      setDepartments(depts);
+      const depts: Department[] = Array.isArray(data) ? data : (data.departments || []);
+      // Fetch classes for each department
+      const deptsWithClasses = await Promise.all(
+        depts.map(async (d) => {
+          try {
+            const { data: classData } = await apiClient.get(`/departments/${d.id}/classes`);
+            return { ...d, classes: Array.isArray(classData) ? classData : [] };
+          } catch {
+            return { ...d, classes: [] };
+          }
+        })
+      );
+      setDepartments(deptsWithClasses);
     } catch (err) {
       console.error('Failed to fetch departments:', err);
     }
