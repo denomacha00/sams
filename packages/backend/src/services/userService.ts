@@ -66,6 +66,11 @@ export class UserService {
       await licenseService.checkStudentLimit(schoolId);
     }
 
+    // Teachers and HODs must be assigned to a department
+    if ((data.role === UserRole.TEACHER || data.role === UserRole.HOD) && !data.departmentId) {
+      throw new AppError(400, 'DEPARTMENT_REQUIRED', 'Teachers and HODs must be assigned to a department');
+    }
+
     // Hash the password
     const passwordHash = await bcrypt.hash(data.password, BCRYPT_ROUNDS);
 

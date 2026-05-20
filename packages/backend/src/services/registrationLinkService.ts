@@ -210,6 +210,11 @@ export class RegistrationLinkService {
       await licenseService.checkStudentLimit(link.schoolId);
     }
 
+    // Teachers must have a department (from the link)
+    if (link.targetRole === UserRole.TEACHER && !(link as any).departmentId) {
+      throw new AppError(400, 'DEPARTMENT_REQUIRED', 'This registration link is missing department information. Please contact your HOD.');
+    }
+
     // Hash the provided password
     const passwordHash = await bcrypt.hash(password, BCRYPT_ROUNDS);
 
