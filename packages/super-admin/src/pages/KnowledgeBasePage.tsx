@@ -20,6 +20,8 @@ const KnowledgeBasePage: React.FC = () => {
   const [formData, setFormData] = useState({ title: '', content: '', category: 'general' });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
+  const [deleteTarget, setDeleteTarget] = useState<KnowledgeEntry | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
   const fetchEntries = async () => {
     try {
@@ -67,14 +69,17 @@ const KnowledgeBasePage: React.FC = () => {
     setShowForm(true);
   };
 
-  const handleDelete = async (id: string) => {
-    if (!confirm('Are you sure you want to delete this knowledge entry?')) return;
-
+  const handleDeleteConfirm = async () => {
+    if (!deleteTarget) return;
+    setDeleting(true);
     try {
-      await apiClient.delete(`/super/ai-knowledge/${id}`);
+      await apiClient.delete(`/super/ai-knowledge/${deleteTarget.id}`);
+      setDeleteTarget(null);
       await fetchEntries();
     } catch (err: any) {
       setError(err.response?.data?.error || 'Failed to delete entry');
+    } finally {
+      setDeleting(false);
     }
   };
 
@@ -228,7 +233,7 @@ const KnowledgeBasePage: React.FC = () => {
                       Edit
                     </button>
                     <button
-                      onClick={() => void handleDelete(entry.id)}
+                      onClick={() => setDeleteTarget(entry)}
                       className="text-sm text-red-400 hover:text-red-300 transition-colors"
                     >
                       Delete
@@ -241,6 +246,35 @@ const KnowledgeBasePage: React.FC = () => {
         </div>
       )}
     </div>
+
+    {/* Delete Confirmation Modal */}
+    {deleteTarget && (
+      <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+        <div className="absolute inset-0 bg-black/60" onClick={() => setDeleteTarget(null)} />
+        <div className="relative w-full max-w-sm rounded-xl border border-gray-700 bg-gray-800 shadow-2xl p-6">
+          <h3 className="text-lg font-bold text-white mb-2">Delete Entry</h3>
+          <p className="text-sm text-gray-300 mb-6">
+            Are you sure you want to delete <span className="font-semibold text-white">"{deleteTarget.title}"</span>? This cannot be undone.
+          </p>
+          <div className="flex justify-end gap-3">
+            <button
+              onClick={() => setDeleteTarget(null)}
+              className="px-4 py-2 text-sm text-gray-400 hover:text-white hover:bg-gray-700 rounded-lg transition-colors"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={() => void handleDeleteConfirm()}
+              disabled={deleting}
+              className="px-4 py-2 text-sm font-medium text-white bg-red-600 hover:bg-red-700 disabled:opacity-50 rounded-lg transition-colors"
+            >
+              {deleting ? 'Deleting...' : 'Delete'}
+            </button>
+          </div>
+        </div>
+      </div>
+    )}
+  </div>
   );
 };
 
