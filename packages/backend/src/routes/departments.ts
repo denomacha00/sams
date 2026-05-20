@@ -71,17 +71,57 @@ departmentsRouter.delete('/:id', requirePermission('manage:users'), async (req: 
   res.status(204).send();
 });
 
+departmentsRouter.get('/:id/teachers', async (req: Request, res: Response): Promise<void> => {
+  const user = req.user;
+  if (user.role === 'TEACHER' || user.role === 'STUDENT') {
+    res.status(403).json({ error: 'Forbidden', code: 'FORBIDDEN' });
+    return;
+  }
+  const deptId = String(req.params.id);
+  const dept = await prisma.department.findUnique({ where: { id: deptId } });
+  if (!dept || dept.schoolId !== req.schoolId) {
+    res.status(404).json({ error: 'Not found', code: 'NOT_FOUND' });
+    return;
+  }
+  if (user.role === 'HOD' && user.departmentId !== deptId) {
+    res.status(403).json({ error: 'Forbidden', code: 'FORBIDDEN' });
+    return;
+  }
+  const teachers = await prisma.user.findMany({
+    where: { schoolId: req.schoolId, departmentId: deptId, role: 'TEACHER' },
+    select: { id: true, fullName: true, email: true, phone: true },
+  });
+  res.json(teachers);
+});
+
 departmentsRouter.get('/:id/classes', async (req: Request, res: Response): Promise<void> => {
   const id = String(req.params.id);
-  const classes = await prisma.class.findMany({ where: { departmentId: id, schoolId: req.schoolId } });
-  res.json(classes);
+  const classes = await prisma.class.findMany({
+    where: { departmentId: id, schoolId: req.schoolId },
+    include: { classTeacher: { select: { fullName: true } } },
+  });
+  const enriched = classes.map((c) => ({
+    ...c,
+    classTeacherName: c.classTeacher?.fullName ?? null,
+  }));
+  res.json(enriched);
 });
 
 // ─── Classes ──────────────────────────────────────────────────────────────────
 
 classesRouter.get('/', async (req: Request, res: Response): Promise<void> => {
-  const classes = await prisma.class.findMany({ where: { schoolId: req.schoolId }, include: { department: true } });
-  res.json(classes);
+  const classes = await prisma.class.findMany({
+    where: { schoolId: req.schoolId },
+    include: {
+      department: true,
+      classTeacher: { select: { fullName: true } },
+    },
+  });
+  const enriched = classes.map((c) => ({
+    ...c,
+    classTeacherName: c.classTeacher?.fullName ?? null,
+  }));
+  res.json(enriched);
 });
 
 classesRouter.post('/', requirePermission('manage:users'), async (req: Request, res: Response): Promise<void> => {
@@ -111,4 +151,59 @@ classesRouter.delete('/:id', requirePermission('manage:users'), async (req: Requ
   if (!cls || cls.schoolId !== req.schoolId) { res.status(404).json({ error: 'Not found', code: 'NOT_FOUND' }); return; }
   await prisma.class.delete({ where: { id } });
   res.status(204).send();
+});
+
+classesRouter.post('/:id/assign-teacher', async (req: Request, res: Response): Promise<void> => {
+  const user = req.user;
+
+  // Reject TEACHER and STUDENT callers
+  if (user.role === 'TEACHER' || user.role === 'STUDENT') {
+    res.status(403).json({ error: 'Forbidden', code: 'FORBIDDEN' });
+    return;
+  }
+
+  // Validate teacherId present in body
+  const { teacherId } = req.body;
+  if (!teacherId) {
+    res.status(400).json({ error: 'teacherId is required', code: 'VALIDATION_ERROR' });
+    return;
+  }
+
+  // Look up the class; return 404 if not in req.schoolId
+  const cls = await prisma.class.findUnique({ where: { id: String(req.params.id) } });
+  if (!cls || cls.schoolId !== req.schoolId) {
+    res.status(404).json({ error: 'Class not found', code: 'NOT_FOUND' });
+    return;
+  }
+
+  // Look up the teacher; return 404 if not in req.schoolId or not role TEACHER
+  const teacher = await prisma.user.findUnique({ where: { id: String(teacherId) } });
+  if (!teacher || teacher.schoolId !== req.schoolId || teacher.role !== 'TEACHER') {
+    res.status(404).json({ error: 'Teacher not found', code: 'NOT_FOUND' });
+    return;
+  }
+
+  // For HOD: enforce department scope
+  if (user.role === 'HOD') {
+    if (cls.departmentId !== user.departmentId) {
+      res.status(403).json({ error: 'Forbidden', code: 'FORBIDDEN' });
+      return;
+    }
+    if (teacher.departmentId !== user.departmentId) {
+      res.status(403).json({ error: 'Forbidden', code: 'FORBIDDEN' });
+      return;
+    }
+  }
+
+  // Assign the class teacher
+  const updated = await prisma.class.update({
+    where: { id: cls.id },
+    data: { classTeacherId: String(teacherId) },
+    include: { classTeacher: { select: { fullName: true } } },
+  });
+
+  res.json({
+    ...updated,
+    classTeacherName: updated.classTeacher?.fullName ?? null,
+  });
 });

@@ -149,7 +149,7 @@ async function buildSystemPrompt(user) {
     let systemDataSection = '';
     if (user.role === 'SUPER_ADMIN') {
         try {
-            const { prisma } = await Promise.resolve().then(() => __importStar(require('../index')));
+            const { prisma } = await Promise.resolve().then(() => __importStar(require('../../index')));
             const [schoolCount, userCount, studentCount, teacherCount, sessionCount] = await Promise.all([
                 prisma.school.count(),
                 prisma.user.count(),

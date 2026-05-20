@@ -9,6 +9,7 @@ import AISAMSWidget from './components/AISAMSWidget';
 import FloatingAI from './components/FloatingAI';
 import LoginPage from './pages/LoginPage';
 import ForgotPasswordPage from './pages/ForgotPasswordPage';
+import ResetPasswordPage from './pages/ResetPasswordPage';
 import ActivationPage from './pages/ActivationPage';
 import RegisterPage from './pages/RegisterPage';
 import DashboardPage from './pages/DashboardPage';
@@ -25,6 +26,9 @@ import ProfilePage from './pages/ProfilePage';
 import NotificationsPage from './pages/NotificationsPage';
 import TimetableViewPage from './pages/TimetableViewPage';
 import LinkAttendancePage from './pages/LinkAttendancePage';
+
+// HOD pages
+import DepartmentManagementPage from './pages/hod/DepartmentManagementPage';
 
 // Admin pages
 import AdminDashboardPage from './pages/admin/AdminDashboardPage';
@@ -45,7 +49,7 @@ const AISAMSWidgetGuard: React.FC = () => {
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
   const location = useLocation();
 
-  const publicPaths = ['/login', '/activate', '/register', '/forgot-password'];
+  const publicPaths = ['/login', '/activate', '/register', '/forgot-password', '/reset-password'];
   const isPublicPage = publicPaths.some((p) => location.pathname.startsWith(p));
 
   if (!isAuthenticated || isPublicPage) return null;
@@ -66,6 +70,7 @@ ReactDOM.createRoot(document.getElementById('root') as HTMLElement).render(
         {/* Public routes */}
         <Route path="/login" element={<LoginPage />} />
         <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+        <Route path="/reset-password" element={<ResetPasswordPage />} />
         <Route path="/activate" element={<ActivationPage />} />
         <Route path="/register/:token" element={<RegisterPage />} />
 
@@ -92,9 +97,18 @@ ReactDOM.createRoot(document.getElementById('root') as HTMLElement).render(
         <Route element={<AuthGuard allowedRoles={[UserRole.SCHOOL_ADMIN, UserRole.HOD]} />}>
           <Route path="/admin" element={<AdminDashboardPage />} />
           <Route path="/admin/users" element={<UserManagementPage />} />
-          <Route path="/admin/links" element={<RegistrationLinksPage />} />
           <Route path="/admin/timetable" element={<TimetablePage />} />
           <Route path="/admin/departments" element={<DepartmentsPage />} />
+        </Route>
+
+        {/* Registration Links — accessible to SCHOOL_ADMIN, HOD, and TEACHER */}
+        <Route element={<AuthGuard allowedRoles={[UserRole.SCHOOL_ADMIN, UserRole.HOD, UserRole.TEACHER]} />}>
+          <Route path="/admin/links" element={<RegistrationLinksPage />} />
+        </Route>
+
+        {/* HOD-only routes */}
+        <Route element={<AuthGuard allowedRoles={[UserRole.HOD]} />}>
+          <Route path="/hod/department" element={<DepartmentManagementPage />} />
         </Route>
 
         {/* Default redirect */}

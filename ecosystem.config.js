@@ -26,9 +26,11 @@ module.exports = {
       log_date_format: 'YYYY-MM-DD HH:mm:ss Z',
       merge_logs: true,
       // Graceful shutdown
-      kill_timeout: 5000,
-      listen_timeout: 10000,
+      kill_timeout: 8000,
+      listen_timeout: 15000,
       shutdown_with_message: true,
+      // Zero-downtime reload: wait for process.send('ready') before killing old instance
+      wait_ready: true,
       // Restart policy
       max_restarts: 10,
       min_uptime: '10s',

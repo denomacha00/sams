@@ -7,6 +7,7 @@ interface Department {
   name: string;
   createdAt: string;
   classes?: ClassItem[];
+  teachers?: TeacherItem[];
 }
 
 interface ClassItem {
@@ -14,6 +15,15 @@ interface ClassItem {
   name: string;
   capacity: number;
   departmentId: string;
+  classTeacherId: string | null;
+  classTeacherName: string | null;
+}
+
+interface TeacherItem {
+  id: string;
+  fullName: string;
+  email: string | null;
+  phone: string | null;
 }
 
 const DepartmentsPage: React.FC = () => {
@@ -38,41 +48,45 @@ const DepartmentsPage: React.FC = () => {
   const fetchDepartments = async () => {
     try {
       const { data } = await apiClient.get('/departments');
-      const depts = data.departments || data || [];
-      // Fetch classes for each department
-      const deptsWithClasses = await Promise.all(
-        depts.map(async (dept: Department) => {
-          try {
-            const classRes = await apiClient.get(`/departments/${dept.id}/classes`);
-            return { ...dept, classes: classRes.data.classes || classRes.data || [] };
-          } catch {
-            return { ...dept, classes: [] };
+      const depts: Department[] = data.departments || data || [];
+
+      // Fetch enriched classes (includes classTeacherName) and teachers for each dept in parallel
+      const deptsWithData = await Promise.all(
+        depts.map(async (dept) => {
+          const [classRes, teacherRes] = await Promise.allSettled([
+            apiClient.get(`/departments/${dept.id}/classes`),
+            apiClient.get(`/departments/${dept.id}/teachers`),
+          ]);
+
+          // Classes: use enriched GET /classes filtered by dept if dept classes don't have classTeacherName
+          let classes: ClassItem[] = [];
+          if (classRes.status === 'fulfilled') {
+            const raw = classRes.value.data.classes || classRes.value.data || [];
+            // If classTeacherName is missing, fetch from enriched /classes endpoint
+            if (raw.length > 0 && raw[0].classTeacherName === undefined) {
+              try {
+                const enrichedRes = await apiClient.get('/classes');
+                const allClasses: ClassItem[] = enrichedRes.data.classes || enrichedRes.data || [];
+                classes = allClasses.filter((c) => c.departmentId === dept.id);
+              } catch {
+                classes = raw;
+              }
+            } else {
+              classes = raw;
+            }
           }
+
+          const teachers: TeacherItem[] = teacherRes.status === 'fulfilled'
+            ? (teacherRes.value.data || [])
+            : [];
+
+          return { ...dept, classes, teachers };
         })
       );
-      setDepartments(deptsWithClasses);
+
+      setDepartments(deptsWithData);
     } catch (err) {
-      // Fallback: try fetching from a combined endpoint
-      try {
-        const { data } = await apiClient.get('/classes');
-        const classes = data.classes || data || [];
-        // Group by department
-        const deptMap: Record<string, Department> = {};
-        classes.forEach((c: any) => {
-          if (!deptMap[c.departmentId]) {
-            deptMap[c.departmentId] = {
-              id: c.departmentId,
-              name: c.department?.name || c.departmentId,
-              createdAt: '',
-              classes: [],
-            };
-          }
-          deptMap[c.departmentId].classes!.push(c);
-        });
-        setDepartments(Object.values(deptMap));
-      } catch {
-        console.error('Failed to fetch departments');
-      }
+      console.error('Failed to fetch departments', err);
     } finally {
       setLoading(false);
     }
@@ -264,6 +278,25 @@ const DepartmentsPage: React.FC = () => {
                 {/* Classes List */}
                 {expandedDepts.has(dept.id) && (
                   <div className="px-6 py-3">
+                    {/* Teachers in this department */}
+                    {dept.teachers && dept.teachers.length > 0 && (
+                      <div className="mb-4">
+                        <h4 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Teachers ({dept.teachers.length})</h4>
+                        <div className="flex flex-wrap gap-2">
+                          {dept.teachers.map((teacher) => (
+                            <div key={teacher.id} className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-indigo-500/10 border border-indigo-500/20">
+                              <div className="w-5 h-5 rounded-full bg-indigo-500/30 flex items-center justify-center">
+                                <span className="text-xs font-semibold text-indigo-300">{teacher.fullName.charAt(0)}</span>
+                              </div>
+                              <span className="text-xs text-indigo-200">{teacher.fullName}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Classes */}
+                    <h4 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Classes ({dept.classes?.length || 0})</h4>
                     {(!dept.classes || dept.classes.length === 0) ? (
                       <p className="text-gray-500 text-sm py-3">No classes in this department</p>
                     ) : (
@@ -273,6 +306,13 @@ const DepartmentsPage: React.FC = () => {
                             <div>
                               <p className="text-white text-sm font-medium">{cls.name}</p>
                               <p className="text-gray-500 text-xs">Capacity: {cls.capacity}</p>
+                              <p className="text-xs mt-0.5">
+                                {cls.classTeacherName ? (
+                                  <span className="text-teal-400">Class Teacher: {cls.classTeacherName}</span>
+                                ) : (
+                                  <span className="text-gray-600 italic">No class teacher assigned</span>
+                                )}
+                              </p>
                             </div>
                             <div className="flex items-center gap-3">
                               <button

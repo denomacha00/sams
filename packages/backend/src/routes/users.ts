@@ -1,4 +1,4 @@
-import { Router, type Request, type Response } from 'express';
+import { Router, type Request, type Response, type NextFunction } from 'express';
 import { z } from 'zod';
 import path from 'path';
 import fs from 'fs';
@@ -79,7 +79,7 @@ export const usersRouter = Router();
  * PATCH /api/v1/users/me
  * Update the authenticated user's own profile.
  */
-usersRouter.patch('/me', async (req: Request, res: Response): Promise<void> => {
+usersRouter.patch('/me', async (req: Request, res: Response, next: NextFunction): Promise<void> => {
   const parsed = updateMeSchema.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({
@@ -125,8 +125,7 @@ usersRouter.patch('/me', async (req: Request, res: Response): Promise<void> => {
 
     res.status(200).json(updated);
   } catch (err) {
-    if (err instanceof AppError) throw err;
-    throw new AppError(500, 'INTERNAL_ERROR', 'Failed to update profile');
+    next(err instanceof AppError ? err : new AppError(500, 'INTERNAL_ERROR', 'Failed to update profile'));
   }
 });
 
@@ -134,7 +133,7 @@ usersRouter.patch('/me', async (req: Request, res: Response): Promise<void> => {
  * POST /api/v1/users/me/password
  * Change the authenticated user's password.
  */
-usersRouter.post('/me/password', async (req: Request, res: Response): Promise<void> => {
+usersRouter.post('/me/password', async (req: Request, res: Response, next: NextFunction): Promise<void> => {
   const schema = z.object({
     currentPassword: z.string().min(1),
     newPassword: z.string().min(8),
@@ -170,8 +169,7 @@ usersRouter.post('/me/password', async (req: Request, res: Response): Promise<vo
 
     res.status(200).json({ message: 'Password changed successfully' });
   } catch (err) {
-    if (err instanceof AppError) throw err;
-    throw new AppError(500, 'INTERNAL_ERROR', 'Failed to change password');
+    next(err instanceof AppError ? err : new AppError(500, 'INTERNAL_ERROR', 'Failed to change password'));
   }
 });
 
@@ -179,7 +177,7 @@ usersRouter.post('/me/password', async (req: Request, res: Response): Promise<vo
  * POST /api/v1/users/me/avatar
  * Upload and resize profile picture (200x200 JPEG).
  */
-usersRouter.post('/me/avatar', upload.single('avatar'), async (req: Request, res: Response): Promise<void> => {
+usersRouter.post('/me/avatar', upload.single('avatar'), async (req: Request, res: Response, next: NextFunction): Promise<void> => {
   try {
     if (!req.file) {
       throw new AppError(400, 'NO_FILE', 'No image file provided');
@@ -208,8 +206,7 @@ usersRouter.post('/me/avatar', upload.single('avatar'), async (req: Request, res
 
     res.status(200).json({ avatarUrl });
   } catch (err) {
-    if (err instanceof AppError) throw err;
-    throw new AppError(500, 'INTERNAL_ERROR', 'Failed to upload avatar');
+    next(err instanceof AppError ? err : new AppError(500, 'INTERNAL_ERROR', 'Failed to upload avatar'));
   }
 });
 
@@ -217,7 +214,7 @@ usersRouter.post('/me/avatar', upload.single('avatar'), async (req: Request, res
  * GET /api/v1/users
  * List users scoped to the authenticated user's school.
  */
-usersRouter.get('/', requirePermission('manage:users'), async (req: Request, res: Response): Promise<void> => {
+usersRouter.get('/', requirePermission('manage:users'), async (req: Request, res: Response, next: NextFunction): Promise<void> => {
   try {
     const filters = {
       role: req.query.role as UserRole | undefined,
@@ -228,8 +225,7 @@ usersRouter.get('/', requirePermission('manage:users'), async (req: Request, res
     const users = await userService.listUsers(req.schoolId, filters);
     res.status(200).json(users);
   } catch (err) {
-    if (err instanceof AppError) throw err;
-    throw new AppError(500, 'INTERNAL_ERROR', 'Failed to list users');
+    next(err instanceof AppError ? err : new AppError(500, 'INTERNAL_ERROR', 'Failed to list users'));
   }
 });
 
@@ -237,7 +233,7 @@ usersRouter.get('/', requirePermission('manage:users'), async (req: Request, res
  * POST /api/v1/users
  * Create a new user within the school.
  */
-usersRouter.post('/', requirePermission('manage:users'), async (req: Request, res: Response): Promise<void> => {
+usersRouter.post('/', requirePermission('manage:users'), async (req: Request, res: Response, next: NextFunction): Promise<void> => {
   const parsed = createUserSchema.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({
@@ -252,8 +248,7 @@ usersRouter.post('/', requirePermission('manage:users'), async (req: Request, re
     const user = await userService.createUser(req.schoolId, parsed.data);
     res.status(201).json(user);
   } catch (err) {
-    if (err instanceof AppError) throw err;
-    throw new AppError(500, 'INTERNAL_ERROR', 'Failed to create user');
+    next(err instanceof AppError ? err : new AppError(500, 'INTERNAL_ERROR', 'Failed to create user'));
   }
 });
 
@@ -261,13 +256,12 @@ usersRouter.post('/', requirePermission('manage:users'), async (req: Request, re
  * GET /api/v1/users/:id
  * Get a single user by ID.
  */
-usersRouter.get('/:id', async (req: Request, res: Response): Promise<void> => {
+usersRouter.get('/:id', async (req: Request, res: Response, next: NextFunction): Promise<void> => {
   try {
     const user = await userService.getUser(req.schoolId, req.params.id as string);
     res.status(200).json(user);
   } catch (err) {
-    if (err instanceof AppError) throw err;
-    throw new AppError(500, 'INTERNAL_ERROR', 'Failed to get user');
+    next(err instanceof AppError ? err : new AppError(500, 'INTERNAL_ERROR', 'Failed to get user'));
   }
 });
 
@@ -275,7 +269,7 @@ usersRouter.get('/:id', async (req: Request, res: Response): Promise<void> => {
  * PUT /api/v1/users/:id
  * Update a user.
  */
-usersRouter.put('/:id', requirePermission('manage:users'), async (req: Request, res: Response): Promise<void> => {
+usersRouter.put('/:id', requirePermission('manage:users'), async (req: Request, res: Response, next: NextFunction): Promise<void> => {
   const parsed = updateUserSchema.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({
@@ -290,8 +284,7 @@ usersRouter.put('/:id', requirePermission('manage:users'), async (req: Request, 
     const user = await userService.updateUser(req.schoolId, req.params.id as string, parsed.data as Parameters<typeof userService.updateUser>[2]);
     res.status(200).json(user);
   } catch (err) {
-    if (err instanceof AppError) throw err;
-    throw new AppError(500, 'INTERNAL_ERROR', 'Failed to update user');
+    next(err instanceof AppError ? err : new AppError(500, 'INTERNAL_ERROR', 'Failed to update user'));
   }
 });
 
@@ -299,13 +292,12 @@ usersRouter.put('/:id', requirePermission('manage:users'), async (req: Request, 
  * DELETE /api/v1/users/:id
  * Delete a user.
  */
-usersRouter.delete('/:id', requirePermission('manage:users'), async (req: Request, res: Response): Promise<void> => {
+usersRouter.delete('/:id', requirePermission('manage:users'), async (req: Request, res: Response, next: NextFunction): Promise<void> => {
   try {
     await userService.deleteUser(req.schoolId, req.params.id as string);
     res.status(204).send();
   } catch (err) {
-    if (err instanceof AppError) throw err;
-    throw new AppError(500, 'INTERNAL_ERROR', 'Failed to delete user');
+    next(err instanceof AppError ? err : new AppError(500, 'INTERNAL_ERROR', 'Failed to delete user'));
   }
 });
 
@@ -345,7 +337,7 @@ registrationLinksRouter.get('/', async (req: Request, res: Response): Promise<vo
  * POST /api/v1/registration-links
  * Generate a registration link. Requires manage:users permission.
  */
-registrationLinksRouter.post('/', async (req: Request, res: Response): Promise<void> => {
+registrationLinksRouter.post('/', async (req: Request, res: Response, next: NextFunction): Promise<void> => {
   // Allow SCHOOL_ADMIN, HOD, and TEACHER to generate links
   const allowedRoles = ['SCHOOL_ADMIN', 'HOD', 'TEACHER'];
   if (!req.user || !allowedRoles.includes(req.user.role)) {
@@ -382,9 +374,8 @@ registrationLinksRouter.post('/', async (req: Request, res: Response): Promise<v
     );
     res.status(201).json(link);
   } catch (err) {
-    if (err instanceof AppError) throw err;
     console.error('[RegistrationLinks] Error:', err);
-    throw new AppError(500, 'INTERNAL_ERROR', 'Failed to generate registration link');
+    next(err instanceof AppError ? err : new AppError(500, 'INTERNAL_ERROR', 'Failed to generate registration link'));
   }
 });
 
@@ -392,7 +383,7 @@ registrationLinksRouter.post('/', async (req: Request, res: Response): Promise<v
  * GET /api/v1/registration-links/:token
  * Resolve a registration link (public, no auth).
  */
-registrationLinksRouter.get('/:token', async (req: Request, res: Response): Promise<void> => {
+registrationLinksRouter.get('/:token', async (req: Request, res: Response, next: NextFunction): Promise<void> => {
   try {
     const link = await registrationLinkService.resolveLink(req.params.token as string);
     
@@ -412,6 +403,12 @@ registrationLinksRouter.get('/:token', async (req: Request, res: Response): Prom
       });
       className = classRecord?.name;
       departmentName = classRecord?.department?.name;
+    } else if (link.departmentId) {
+      const dept = await prisma.department.findUnique({
+        where: { id: link.departmentId },
+        select: { name: true },
+      });
+      departmentName = dept?.name ?? undefined;
     }
     
     res.status(200).json({
@@ -422,8 +419,7 @@ registrationLinksRouter.get('/:token', async (req: Request, res: Response): Prom
       departmentName,
     });
   } catch (err) {
-    if (err instanceof AppError) throw err;
-    throw new AppError(500, 'INTERNAL_ERROR', 'Failed to resolve registration link');
+    next(err instanceof AppError ? err : new AppError(500, 'INTERNAL_ERROR', 'Failed to resolve registration link'));
   }
 });
 
@@ -434,7 +430,7 @@ registrationLinksRouter.get('/:token', async (req: Request, res: Response): Prom
  * - HOD can only delete links they created
  * - Returns 403 if ownership check fails, 404 if not found
  */
-registrationLinksRouter.delete('/:id', async (req: Request, res: Response): Promise<void> => {
+registrationLinksRouter.delete('/:id', async (req: Request, res: Response, next: NextFunction): Promise<void> => {
   if (!req.user || !req.schoolId) {
     res.status(401).json({ error: 'Unauthorized', code: 'UNAUTHORIZED' });
     return;
@@ -448,8 +444,7 @@ registrationLinksRouter.delete('/:id', async (req: Request, res: Response): Prom
     );
     res.status(204).send();
   } catch (err) {
-    if (err instanceof AppError) throw err;
-    throw new AppError(500, 'INTERNAL_ERROR', 'Failed to delete registration link');
+    next(err instanceof AppError ? err : new AppError(500, 'INTERNAL_ERROR', 'Failed to delete registration link'));
   }
 });
 
@@ -457,7 +452,7 @@ registrationLinksRouter.delete('/:id', async (req: Request, res: Response): Prom
  * POST /api/v1/registration-links/:token/register
  * Self-register via a registration link (public, no auth).
  */
-registrationLinksRouter.post('/:token/register', async (req: Request, res: Response): Promise<void> => {
+registrationLinksRouter.post('/:token/register', async (req: Request, res: Response, next: NextFunction): Promise<void> => {
   const parsed = registerViaLinkSchema.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({
@@ -475,7 +470,6 @@ registrationLinksRouter.post('/:token/register', async (req: Request, res: Respo
     );
     res.status(201).json(user);
   } catch (err) {
-    if (err instanceof AppError) throw err;
-    throw new AppError(500, 'INTERNAL_ERROR', 'Failed to register via link');
+    next(err instanceof AppError ? err : new AppError(500, 'INTERNAL_ERROR', 'Failed to register via link'));
   }
 });

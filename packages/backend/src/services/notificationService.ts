@@ -94,16 +94,29 @@ export class NotificationService {
   /**
    * Send an email via Nodemailer using SMTP credentials from environment variables.
    * From address is always "SAMS" <noreply@sams.ke>.
+   * If SMTP credentials are not configured, logs a warning and skips silently.
    *
    * Requirements: 18.2, 18.3, 18.5
    */
   async sendEmail(to: string, subject: string, html: string): Promise<void> {
-    await this.transporter.sendMail({
-      from: '"SAMS" <noreply@sams.ke>',
-      to,
-      subject,
-      html,
-    });
+    // Skip silently if SMTP is not configured — avoids crashing the process
+    if (!process.env.SMTP_USER || !process.env.SMTP_PASS) {
+      console.warn(`[Email] SMTP not configured — skipping email to ${to} (subject: ${subject})`);
+      return;
+    }
+
+    try {
+      const fromAddress = process.env.SMTP_USER ?? 'noreply@sams.ke';
+      await this.transporter.sendMail({
+        from: `"SAMS" <${fromAddress}>`,
+        to,
+        subject,
+        html,
+      });
+    } catch (err) {
+      // Log but do not propagate — email failure should never crash the server
+      console.error(`[Email] Failed to send email to ${to}:`, err instanceof Error ? err.message : err);
+    }
   }
 
   /**

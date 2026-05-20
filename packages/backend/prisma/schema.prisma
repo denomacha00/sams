@@ -142,6 +142,7 @@ model User {
   conversationThreads ConversationThread[]
   conversationRecords ConversationRecord[]
   knowledgeEntries  AIKnowledge[]
+  classesAsTeacher  Class[]             @relation("ClassTeacher")
 
   @@unique([schoolId, admissionNumber])
   @@index([schoolId, role])
@@ -173,14 +174,16 @@ model Department {
 }
 
 model Class {
-  id           String   @id @default(cuid())
-  schoolId     String
-  school       School   @relation(fields: [schoolId], references: [id])
-  departmentId String
-  department   Department @relation(fields: [departmentId], references: [id])
-  name         String
-  capacity     Int      @default(50)
-  createdAt    DateTime @default(now())
+  id             String   @id @default(cuid())
+  schoolId       String
+  school         School   @relation(fields: [schoolId], references: [id])
+  departmentId   String
+  department     Department @relation(fields: [departmentId], references: [id])
+  name           String
+  capacity       Int      @default(50)
+  classTeacherId String?
+  classTeacher   User?    @relation("ClassTeacher", fields: [classTeacherId], references: [id])
+  createdAt      DateTime @default(now())
 
   users             User[]
   timetableEntries  TimetableEntry[]

@@ -45,7 +45,7 @@ const ForgotPasswordPage: React.FC = () => {
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
               </svg>
               <p className="text-emerald-200 font-medium">Reset link sent!</p>
-              <p className="text-emerald-300/70 text-sm mt-1">Check your phone/email for the temporary password.</p>
+              <p className="text-emerald-300/70 text-sm mt-1">Check your email or phone for the password reset link.</p>
               <Link to="/login" className="inline-block mt-4 text-sm text-teal-400 hover:text-teal-300 font-semibold transition-colors">
                 ← Back to Login
               </Link>

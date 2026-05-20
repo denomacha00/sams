@@ -219,9 +219,23 @@ sams/
 - CSV export
 - Role-based access control on all reports
 
----
+### 5.9 Password Reset Flow
+- User visits `/forgot-password` and enters school code + identifier (username/email/phone/ADM)
+- Backend generates a secure 32-byte random token (1 hour expiry)
+- Reset link sent via email (`/reset-password?token=...`) and SMS
+- User clicks link → lands on `/reset-password` page
+- Enters and confirms new password (min 8 chars)
+- Token validated server-side, password updated, token cleared
+- User auto-redirected to login after 3 seconds
 
-## 6. Database Schema
+### 5.10 Super Admin Panel
+- Accessible at `super.smart-managment.com`
+- Separate React SPA (`packages/super-admin`)
+- Host-restricted: only accessible via `super.smart-managment.com` (configurable via `SUPER_ADMIN_HOST`)
+- Features: license management, school management, system analytics, revenue, audit logs, AI knowledge base, AI action execution
+- AI assistant can execute admin actions via natural language
+
+---
 
 ### Core Models
 - **School** — Multi-tenant root entity
@@ -256,7 +270,8 @@ sams/
 - `POST /api/v1/auth/login` — Login (username/phone/email/ADM + password)
 - `POST /api/v1/auth/refresh` — Refresh token pair
 - `POST /api/v1/auth/logout` — Invalidate refresh token
-- `POST /api/v1/auth/forgot-password` — Generate temp password
+- `POST /api/v1/auth/forgot-password` — Send password reset link via email/SMS
+- `POST /api/v1/auth/reset-password` — Validate reset token and set new password
 
 ### School Activation
 - `POST /api/v1/activate` — Activate school with license key
@@ -316,11 +331,18 @@ sams/
 
 ### Super Admin
 - `POST /api/v1/super/licenses` — Generate license
+- `GET /api/v1/super/licenses` — List all license keys
+- `POST /api/v1/super/licenses/:id/revoke` — Revoke a license
 - `GET /api/v1/super/schools` — List all schools
+- `GET /api/v1/super/schools/:id` — Get school details
 - `POST /api/v1/super/schools/:id/suspend` — Suspend school
+- `POST /api/v1/super/schools/:id/unsuspend` — Unsuspend school
 - `POST /api/v1/super/schools/:id/extend` — Extend license
+- `DELETE /api/v1/super/schools/:id` — Delete school and all data
 - `GET /api/v1/super/analytics` — System stats
 - `GET /api/v1/super/revenue` — Revenue breakdown
+- `GET /api/v1/super/audit-logs` — Query audit logs
+- `GET/POST/PUT/DELETE /api/v1/super/ai-knowledge` — Manage AI knowledge base
 - `POST /api/v1/super/ai-action` — AI-executed admin actions
 
 ---
@@ -372,11 +394,13 @@ Can execute via natural language:
 ```bash
 cd /var/www/sams
 git pull origin main
-npm ci
-npx prisma generate --schema=packages/backend/prisma/schema.prisma
-npm run build --workspaces --if-present
-pm2 restart sams-api
+cd packages/backend && npm run build
+cd /var/www/sams/packages/frontend && npm run build
+cd /var/www/sams && pm2 reload sams-api --update-env
+pm2 save
 ```
+
+> Use `pm2 reload` (not `pm2 restart`) for zero-downtime deploys. The backend signals PM2 with `process.send('ready')` after startup, and `wait_ready: true` in ecosystem.config.js ensures the old instance is only killed after the new one is healthy.
 
 ### CI/CD Pipeline
 - GitHub Actions on push to main
@@ -414,24 +438,38 @@ JWT_SECRET=<64+ char secret>
 JWT_REFRESH_SECRET=<64+ char secret>
 QR_SECRET=<secret for QR JWT signing>
 LICENSE_SECRET=<HMAC secret for license keys>
-OPENAI_API_KEY=<Groq API key>
-OPENAI_BASE_URL=https://api.groq.com/openai/v1
-OPENAI_MODEL=llama3-70b-8192
-OPENAI_FALLBACK_KEY=<OpenRouter API key>
-OPENAI_FALLBACK_URL=https://openrouter.ai/api/v1
-OPENAI_FALLBACK_MODEL=meta-llama/llama-3.1-8b-instruct:free
+OPENAI_API_KEY=<Groq/OpenRouter API key>
+OPENAI_BASE_URL=https://openrouter.ai/api/v1
+OPENAI_MODEL=meta-llama/llama-3.1-8b-instruct
+VISION_MODEL=meta-llama/llama-4-scout-17b-16e-instruct
+OPENAI_FALLBACK_KEY=<Groq API key>
+OPENAI_FALLBACK_URL=https://api.groq.com/openai/v1
+OPENAI_FALLBACK_MODEL=llama-3.3-70b-versatile
 BIOMETRIC_MASTER_KEY=<master key for biometric encryption>
+BIOMETRIC_ENCRYPTION_KEY=<32-byte hex AES-256 key>
+BIOMETRIC_CONFIDENCE_THRESHOLD=0.6
 MPESA_CONSUMER_KEY=<Daraja consumer key>
 MPESA_CONSUMER_SECRET=<Daraja consumer secret>
 MPESA_SHORTCODE=<business shortcode>
 MPESA_PASSKEY=<Daraja passkey>
-MPESA_CALLBACK_URL=https://smart-managment.com/api/v1/payments/callback
+MPESA_CALLBACK_URL=https://api.smart-managment.com/api/v1/payments/callback
+MPESA_ALLOWED_IPS=<comma-separated Safaricom IPs>
+MPESA_BASE_URL=https://sandbox.safaricom.co.ke
 AT_API_KEY=<Africa's Talking API key>
 AT_USERNAME=<Africa's Talking username>
+AT_SENDER_ID=SAMS
 SMTP_HOST=smtp.gmail.com
 SMTP_PORT=587
-SMTP_USER=<email>
-SMTP_PASS=<app password>
+SMTP_USER=<gmail address>
+SMTP_PASS=<gmail app password>
+APP_URL=https://app.smart-managment.com
+SUPER_ADMIN_HOST=super.smart-managment.com
+SUPER_ADMIN_HOST_CHECK=enabled
+CONVERSATION_MASTER_KEY=<32+ char key for encrypting AI conversation history>
+ATTENDANCE_THRESHOLD_PERCENT=75
+LICENSE_EXPIRY_WARNING_DAYS=7
+NODE_ENV=production
+PORT=3001
 ```
 
 ---

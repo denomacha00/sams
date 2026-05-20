@@ -1,1 +1,56 @@
-node_modules
+# Dependencies
+node_modules/
+
+# Build outputs
+dist/
+build/
+
+# TypeScript compiled output (source files only in git)
+packages/backend/src/**/*.js
+packages/backend/src/**/*.js.map
+packages/backend/src/**/*.d.ts
+packages/backend/src/**/*.d.ts.map
+packages/backend/scripts/*.js
+packages/backend/scripts/*.js.map
+packages/backend/scripts/*.d.ts
+packages/backend/scripts/*.d.ts.map
+packages/backend/vitest.config.js
+packages/backend/vitest.config.js.map
+packages/backend/vitest.config.d.ts
+packages/backend/vitest.config.d.ts.map
+packages/frontend/src/**/*.js
+packages/frontend/src/**/*.js.map
+packages/frontend/src/**/*.d.ts
+packages/frontend/src/**/*.d.ts.map
+packages/frontend/vite.config.js
+packages/frontend/vite.config.js.map
+packages/frontend/vite.config.d.ts
+packages/frontend/vite.config.d.ts.map
+packages/super-admin/src/**/*.js
+packages/super-admin/src/**/*.js.map
+packages/super-admin/src/**/*.d.ts
+packages/super-admin/src/**/*.d.ts.map
+packages/super-admin/vite.config.js
+packages/super-admin/vite.config.js.map
+packages/super-admin/vite.config.d.ts
+packages/super-admin/vite.config.d.ts.map
+packages/shared/src/**/*.js
+packages/shared/src/**/*.js.map
+packages/shared/src/**/*.d.ts
+packages/shared/src/**/*.d.ts.map
+
+# Environment files
+.env
+.env.local
+.env.production
+
+# Logs
+*.log
+logs/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Editor
+.vscode/

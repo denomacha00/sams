@@ -30,6 +30,11 @@ const forgotPasswordSchema = z.object({
   identifier: z.string().min(1),
 });
 
+const resetPasswordSchema = z.object({
+  token: z.string().min(1),
+  newPassword: z.string().min(8),
+});
+
 // ─── Error Code → HTTP Status Mapping ────────────────────────────────────────
 
 function errorCodeToStatus(code: string): number {
@@ -154,7 +159,7 @@ authRouter.post('/logout', authenticate, async (req: Request, res: Response): Pr
 
 /**
  * POST /api/v1/auth/forgot-password
- * Generate a temporary password and send via SMS/email.
+ * Generate a reset token and send a reset link via email/SMS.
  */
 authRouter.post('/forgot-password', async (req: Request, res: Response): Promise<void> => {
   const parsed = forgotPasswordSchema.safeParse(req.body);
@@ -174,7 +179,6 @@ authRouter.post('/forgot-password', async (req: Request, res: Response): Promise
     // Find school
     const school = await prisma.school.findUnique({ where: { schoolCode } });
     if (!school) {
-      // Don't reveal whether school exists
       res.status(200).json({ message: 'If the account exists, a reset link has been sent.' });
       return;
     }
@@ -193,39 +197,50 @@ authRouter.post('/forgot-password', async (req: Request, res: Response): Promise
     });
 
     if (!user) {
-      // Don't reveal whether user exists
       res.status(200).json({ message: 'If the account exists, a reset link has been sent.' });
       return;
     }
 
-    // Generate a temporary password
-    const tempPassword = crypto.randomBytes(4).toString('hex'); // 8-char hex string
-    const passwordHash = await bcrypt.hash(tempPassword, 12);
+    // Generate a secure reset token (valid for 1 hour)
+    const resetToken = crypto.randomBytes(32).toString('hex');
+    const resetExpires = new Date(Date.now() + 60 * 60 * 1000); // 1 hour
 
-    // Store the new password hash and set a reset token for tracking
     await prisma.user.update({
       where: { id: user.id },
       data: {
-        passwordHash,
-        passwordResetToken: crypto.randomBytes(32).toString('hex'),
-        passwordResetExpires: new Date(Date.now() + 24 * 60 * 60 * 1000), // 24 hours
+        passwordResetToken: resetToken,
+        passwordResetExpires: resetExpires,
       },
     });
 
-    // Send temporary password via SMS if phone exists
-    if (user.phone) {
-      await notificationService.sendSMS(
-        user.phone,
-        `SAMS Password Reset: Your temporary password is ${tempPassword}. Please login and change it immediately.`,
-      );
-    }
+    const appUrl = process.env.APP_URL || 'https://app.smart-managment.com';
+    const resetLink = `${appUrl}/reset-password?token=${resetToken}`;
 
-    // Send via email if email exists
+    // Send reset link via email if available
     if (user.email) {
       await notificationService.sendEmail(
         user.email,
         'SAMS Password Reset',
-        `<p>Your temporary password is: <strong>${tempPassword}</strong></p><p>Please login and change your password immediately.</p>`,
+        `
+        <div style="font-family: sans-serif; max-width: 480px; margin: 0 auto;">
+          <h2 style="color: #0d9488;">Reset Your Password</h2>
+          <p>You requested a password reset for your SAMS account.</p>
+          <p>Click the button below to set a new password. This link expires in <strong>1 hour</strong>.</p>
+          <a href="${resetLink}" style="display:inline-block;margin:16px 0;padding:12px 24px;background:#0d9488;color:#fff;border-radius:8px;text-decoration:none;font-weight:bold;">
+            Reset Password
+          </a>
+          <p style="color:#666;font-size:13px;">Or copy this link: ${resetLink}</p>
+          <p style="color:#999;font-size:12px;">If you didn't request this, ignore this email. Your password won't change.</p>
+        </div>
+        `,
+      );
+    }
+
+    // Send reset link via SMS if available
+    if (user.phone) {
+      await notificationService.sendSMS(
+        user.phone,
+        `SAMS Password Reset: Click this link to reset your password (expires in 1 hour): ${resetLink}`,
       );
     }
 
@@ -234,6 +249,64 @@ authRouter.post('/forgot-password', async (req: Request, res: Response): Promise
     console.error('[Auth] Forgot password error:', err);
     res.status(500).json({
       error: 'Failed to process password reset',
+      code: 'INTERNAL_ERROR',
+      requestId: req.id,
+    });
+  }
+});
+
+/**
+ * POST /api/v1/auth/reset-password
+ * Validate reset token and set a new password.
+ */
+authRouter.post('/reset-password', async (req: Request, res: Response): Promise<void> => {
+  const parsed = resetPasswordSchema.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({
+      error: 'Validation failed',
+      code: 'VALIDATION_ERROR',
+      details: parsed.error.flatten().fieldErrors,
+      requestId: req.id,
+    });
+    return;
+  }
+
+  const { token, newPassword } = parsed.data;
+
+  try {
+    // Find user with this token that hasn't expired
+    const user = await prisma.user.findFirst({
+      where: {
+        passwordResetToken: token,
+        passwordResetExpires: { gt: new Date() },
+      },
+    });
+
+    if (!user) {
+      res.status(400).json({
+        error: 'Reset link is invalid or has expired. Please request a new one.',
+        code: 'INVALID_RESET_TOKEN',
+        requestId: req.id,
+      });
+      return;
+    }
+
+    // Hash the new password and clear the reset token
+    const passwordHash = await bcrypt.hash(newPassword, 12);
+    await prisma.user.update({
+      where: { id: user.id },
+      data: {
+        passwordHash,
+        passwordResetToken: null,
+        passwordResetExpires: null,
+      },
+    });
+
+    res.status(200).json({ message: 'Password reset successfully. You can now log in.' });
+  } catch (err) {
+    console.error('[Auth] Reset password error:', err);
+    res.status(500).json({
+      error: 'Failed to reset password',
       code: 'INTERNAL_ERROR',
       requestId: req.id,
     });

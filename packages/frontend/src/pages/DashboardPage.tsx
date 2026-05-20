@@ -296,6 +296,7 @@ function getQuickActions(role?: UserRole): QuickAction[] {
     case UserRole.HOD:
       return [
         { to: '/reports', label: 'View Reports', icon: ICONS.chart, gradient: 'from-teal-500 to-cyan-500' },
+        { to: '/hod/department', label: 'Department Management', icon: ICONS.building, gradient: 'from-indigo-500 to-blue-500' },
         { to: '/risk-scores', label: 'Risk Scores', icon: ICONS.warning, gradient: 'from-orange-500 to-red-500' },
         { to: '/admin/links', label: 'Registration Links', icon: ICONS.link, gradient: 'from-emerald-500 to-teal-500' },
         { to: '/admin/users', label: 'Manage Users', icon: ICONS.users, gradient: 'from-blue-500 to-indigo-500' },

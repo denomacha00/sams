@@ -20,6 +20,44 @@ const editNotificationSchema = zod_1.z.object({
 // ─── Router ───────────────────────────────────────────────────────────────────
 exports.notificationsRouter = (0, express_1.Router)();
 /**
+ * GET /api/v1/notifications/sent
+ * Get notifications sent by the current user, with recipient count per batch.
+ */
+exports.notificationsRouter.get('/sent', async (req, res) => {
+    try {
+        const senderId = req.user.sub;
+        // Get distinct batches sent by this user (one representative notification per batch)
+        const sentNotifications = await index_1.prisma.notification.findMany({
+            where: { senderId },
+            orderBy: { createdAt: 'desc' },
+            take: 100,
+        });
+        // Group by batchId, keeping only the first (representative) per batch
+        const seen = new Set();
+        const batches = [];
+        for (const n of sentNotifications) {
+            const key = n.batchId ?? n.id;
+            if (!seen.has(key)) {
+                seen.add(key);
+                batches.push(n);
+            }
+        }
+        // For each batch, count recipients
+        const enriched = await Promise.all(batches.map(async (n) => {
+            const recipientCount = n.batchId
+                ? await index_1.prisma.notification.count({ where: { batchId: n.batchId } })
+                : 1;
+            return { ...n, recipientCount };
+        }));
+        res.status(200).json(enriched);
+    }
+    catch (err) {
+        if (err instanceof errors_1.AppError)
+            throw err;
+        throw new errors_1.AppError(500, 'INTERNAL_ERROR', 'Failed to fetch sent notifications');
+    }
+});
+/**
  * GET /api/v1/notifications
  * Get the current user's in-app notifications with sender name resolution.
  */
@@ -117,14 +155,17 @@ exports.notificationsRouter.patch('/:id', async (req, res) => {
         if (!notification) {
             throw new errors_1.AppError(404, 'NOT_FOUND', 'Notification not found');
         }
-        // Verify sender ownership
-        if (notification.senderId !== req.user.sub) {
+        // Verify sender ownership (admins can edit any notification)
+        const isAdmin = req.user.role === 'SCHOOL_ADMIN' || req.user.role === 'HOD';
+        if (!isAdmin && notification.senderId !== req.user.sub) {
             throw new errors_1.AppError(403, 'FORBIDDEN', 'You can only edit notifications you sent');
         }
-        // Check 24-hour modification window
-        const hoursSinceCreation = (Date.now() - notification.createdAt.getTime()) / (1000 * 60 * 60);
-        if (hoursSinceCreation > 24) {
-            throw new errors_1.AppError(403, 'WINDOW_EXPIRED', 'Notifications can only be edited within 24 hours of sending');
+        // Check 24-hour modification window (admins bypass this)
+        if (!isAdmin) {
+            const hoursSinceCreation = (Date.now() - notification.createdAt.getTime()) / (1000 * 60 * 60);
+            if (hoursSinceCreation > 24) {
+                throw new errors_1.AppError(403, 'WINDOW_EXPIRED', 'Notifications can only be edited within 24 hours of sending');
+            }
         }
         // Update all notifications in the same batch from the same sender
         const now = new Date();
@@ -191,16 +232,19 @@ exports.notificationsRouter.delete('/batch/:batchId', async (req, res) => {
         if (!batchNotification) {
             throw new errors_1.AppError(404, 'NOT_FOUND', 'Batch not found');
         }
-        // Verify sender ownership
-        if (batchNotification.senderId !== req.user.sub) {
+        // Verify sender ownership (admins can delete any notification)
+        const isAdmin = req.user.role === 'SCHOOL_ADMIN' || req.user.role === 'HOD';
+        if (!isAdmin && batchNotification.senderId !== req.user.sub) {
             throw new errors_1.AppError(403, 'FORBIDDEN', 'You can only delete notifications you sent');
         }
-        // Check 24-hour modification window
-        const hoursSinceCreation = (Date.now() - batchNotification.createdAt.getTime()) / (1000 * 60 * 60);
-        if (hoursSinceCreation > 24) {
-            throw new errors_1.AppError(403, 'WINDOW_EXPIRED', 'Notifications can only be deleted within 24 hours of sending');
+        // Check 24-hour modification window (admins bypass this)
+        if (!isAdmin) {
+            const hoursSinceCreation = (Date.now() - batchNotification.createdAt.getTime()) / (1000 * 60 * 60);
+            if (hoursSinceCreation > 24) {
+                throw new errors_1.AppError(403, 'WINDOW_EXPIRED', 'Notifications can only be deleted within 24 hours of sending');
+            }
         }
-        // Delete all notifications matching batchId and senderId
+        // Delete all notifications matching batchId
         await index_1.prisma.notification.deleteMany({
             where: {
                 batchId,
