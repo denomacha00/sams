@@ -10,6 +10,7 @@ import FloatingAI from './components/FloatingAI';
 import LoginPage from './pages/LoginPage';
 import ForgotPasswordPage from './pages/ForgotPasswordPage';
 import ResetPasswordPage from './pages/ResetPasswordPage';
+import ClassStudentsPage from './pages/ClassStudentsPage';
 import ActivationPage from './pages/ActivationPage';
 import RegisterPage from './pages/RegisterPage';
 import DashboardPage from './pages/DashboardPage';
@@ -77,6 +78,7 @@ ReactDOM.createRoot(document.getElementById('root') as HTMLElement).render(
         {/* Protected routes — any authenticated user */}
         <Route element={<AuthGuard />}>
           <Route path="/dashboard" element={<DashboardPage />} />
+          <Route path="/class/students" element={<ClassStudentsPage />} />
           <Route path="/attend/:token" element={<LinkAttendancePage />} />
           <Route path="/sessions" element={<SessionPage />} />
           <Route path="/sessions/scan" element={<QRScanPage />} />
