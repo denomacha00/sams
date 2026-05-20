@@ -200,7 +200,8 @@ const RegistrationLinksPage: React.FC = () => {
   // Determine if the generate button should be disabled
   const isGenerateDisabled = () => {
     if (submitting) return true;
-    // Teacher: must pick a class from their dept
+    // Teacher: must be in a department and pick a class
+    if (isTeacher && !user?.departmentId) return true;
     if (isTeacher && !selectedClass) return true;
     if (isTeacher && teacherClasses.length === 0) return true;
     // HOD creating student link needs a class
@@ -345,27 +346,36 @@ const RegistrationLinksPage: React.FC = () => {
               {/* Teacher: pick a class from their department */}
               {isTeacher && (
                 <div>
-                  <p className="text-xs text-teal-400 mb-3">Generating a student registration link for your department</p>
-                  <label className="block text-sm text-gray-300 mb-1">Class *</label>
-                  {loadingClasses ? (
-                    <div className="w-full px-4 py-2.5 rounded-xl bg-white/5 border border-white/10 text-gray-400 text-sm">
-                      Loading classes...
-                    </div>
-                  ) : teacherClasses.length === 0 ? (
-                    <div className="w-full px-4 py-2.5 rounded-xl bg-red-500/10 border border-red-500/20 text-red-300 text-sm">
-                      No classes in your department yet. Ask your HOD to create classes first.
+                  {!user?.departmentId ? (
+                    <div className="w-full px-4 py-3 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-300 text-sm">
+                      <p className="font-semibold mb-1">Department not assigned</p>
+                      <p className="text-xs text-amber-400/80">You need to be assigned to a department before generating student registration links. Please contact your School Admin.</p>
                     </div>
                   ) : (
-                    <select
-                      value={selectedClass}
-                      onChange={(e) => setSelectedClass(e.target.value)}
-                      className="w-full px-4 py-2.5 rounded-xl bg-white/5 border border-white/10 text-white focus:outline-none focus:border-cyan-500/50 transition-colors"
-                    >
-                      <option value="" className="bg-slate-800">-- Select Class --</option>
-                      {teacherClasses.map(c => (
-                        <option key={c.id} value={c.id} className="bg-slate-800">{c.name}</option>
-                      ))}
-                    </select>
+                    <>
+                      <p className="text-xs text-teal-400 mb-3">Generating a student registration link for your department</p>
+                      <label className="block text-sm text-gray-300 mb-1">Class *</label>
+                      {loadingClasses ? (
+                        <div className="w-full px-4 py-2.5 rounded-xl bg-white/5 border border-white/10 text-gray-400 text-sm">
+                          Loading classes...
+                        </div>
+                      ) : teacherClasses.length === 0 ? (
+                        <div className="w-full px-4 py-2.5 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-300 text-sm">
+                          No classes in your department yet. Ask your HOD to create classes first.
+                        </div>
+                      ) : (
+                        <select
+                          value={selectedClass}
+                          onChange={(e) => setSelectedClass(e.target.value)}
+                          className="w-full px-4 py-2.5 rounded-xl bg-white/5 border border-white/10 text-white focus:outline-none focus:border-cyan-500/50 transition-colors"
+                        >
+                          <option value="" className="bg-slate-800">-- Select Class --</option>
+                          {teacherClasses.map(c => (
+                            <option key={c.id} value={c.id} className="bg-slate-800">{c.name}</option>
+                          ))}
+                        </select>
+                      )}
+                    </>
                   )}
                 </div>
               )}

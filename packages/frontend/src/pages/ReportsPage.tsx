@@ -52,7 +52,10 @@ const ReportsPage: React.FC = () => {
       case UserRole.STUDENT:
         return user.id ? `/reports/student/${user.id}` : null;
       case UserRole.TEACHER:
-        return user.classId ? `/reports/class/${user.classId}` : '/reports/school';
+        // Try class report first, then department report, then school
+        if (user.classId) return `/reports/class/${user.classId}`;
+        if (user.departmentId) return `/reports/department/${user.departmentId}`;
+        return null;
       case UserRole.HOD:
         return user.departmentId ? `/reports/department/${user.departmentId}` : '/reports/school';
       case UserRole.SCHOOL_ADMIN:
@@ -67,7 +70,9 @@ const ReportsPage: React.FC = () => {
       case UserRole.STUDENT:
         return `student:${user.id}`;
       case UserRole.TEACHER:
-        return user.classId ? `class:${user.classId}` : 'school';
+        if (user.classId) return `class:${user.classId}`;
+        if (user.departmentId) return `department:${user.departmentId}`;
+        return 'school';
       case UserRole.HOD:
         return user.departmentId ? `department:${user.departmentId}` : 'school';
       case UserRole.SCHOOL_ADMIN:
@@ -82,7 +87,9 @@ const ReportsPage: React.FC = () => {
       case UserRole.STUDENT:
         return 'Personal Report';
       case UserRole.TEACHER:
-        return 'Class Report';
+        if (user?.classId) return 'Class Report';
+        if (user?.departmentId) return 'Department Report';
+        return 'Report';
       case UserRole.HOD:
         return 'Department Report';
       case UserRole.SCHOOL_ADMIN:
