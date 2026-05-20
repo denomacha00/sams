@@ -50,6 +50,7 @@ const UserManagementPage: React.FC = () => {
   const [departments, setDepartments] = useState<Department[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('ALL');
+  const [searchQuery, setSearchQuery] = useState('');
   const [showModal, setShowModal] = useState(false);
   const [editingUser, setEditingUser] = useState<User | null>(null);
   const [formData, setFormData] = useState<UserFormData>(emptyForm);
@@ -126,9 +127,17 @@ const UserManagementPage: React.FC = () => {
 
   const classesForDept = departments.find(d => d.id === formData.departmentId)?.classes || [];
 
-  const filteredUsers = activeTab === 'ALL'
-    ? users
-    : users.filter((u) => u.role === activeTab);
+  const filteredUsers = users.filter((u) => {
+    const matchesTab = activeTab === 'ALL' || u.role === activeTab;
+    if (!searchQuery.trim()) return matchesTab;
+    const q = searchQuery.toLowerCase();
+    return matchesTab && (
+      u.fullName.toLowerCase().includes(q) ||
+      (u.admissionNumber?.toLowerCase().includes(q)) ||
+      (u.email?.toLowerCase().includes(q)) ||
+      (u.phone?.includes(q))
+    );
+  });
 
   const openAddModal = () => {
     setEditingUser(null);
@@ -234,7 +243,7 @@ const UserManagementPage: React.FC = () => {
 
       <main className="max-w-7xl mx-auto px-6 py-8">
         {/* Tabs */}
-        <div className="flex gap-2 mb-6">
+        <div className="flex gap-2 mb-4">
           {tabs.map((tab) => (
             <button
               key={tab}
@@ -250,6 +259,30 @@ const UserManagementPage: React.FC = () => {
           ))}
         </div>
 
+        {/* Search */}
+        <div className="mb-6">
+          <div className="relative">
+            <svg className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+            </svg>
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Search by name, admission number, email or phone..."
+              className="w-full pl-11 pr-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-teal-500/40 focus:border-teal-400 transition-all"
+            />
+            {searchQuery && (
+              <button onClick={() => setSearchQuery('')} className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-white">
+                ✕
+              </button>
+            )}
+          </div>
+          {searchQuery && (
+            <p className="text-xs text-gray-400 mt-1">{filteredUsers.length} result{filteredUsers.length !== 1 ? 's' : ''} found</p>
+          )}
+        </div>
+
         {/* Table */}
         <div className="backdrop-blur-xl bg-white/5 border border-white/10 rounded-2xl overflow-hidden">
           <div className="overflow-x-auto">
@@ -260,6 +293,7 @@ const UserManagementPage: React.FC = () => {
                   <th className="text-left px-6 py-4 text-sm font-semibold text-white">Email</th>
                   <th className="text-left px-6 py-4 text-sm font-semibold text-white">Role</th>
                   <th className="text-left px-6 py-4 text-sm font-semibold text-white">Adm No.</th>
+                  <th className="text-left px-6 py-4 text-sm font-semibold text-white">Dept / Class</th>
                   <th className="text-left px-6 py-4 text-sm font-semibold text-white">Status</th>
                   <th className="text-right px-6 py-4 text-sm font-semibold text-white">Actions</th>
                 </tr>
@@ -267,11 +301,13 @@ const UserManagementPage: React.FC = () => {
               <tbody>
                 {loading ? (
                   <tr>
-                    <td colSpan={6} className="px-6 py-12 text-center text-gray-400">Loading...</td>
+                    <td colSpan={7} className="px-6 py-12 text-center text-gray-400">Loading...</td>
                   </tr>
                 ) : filteredUsers.length === 0 ? (
                   <tr>
-                    <td colSpan={6} className="px-6 py-12 text-center text-gray-400">No users found</td>
+                    <td colSpan={7} className="px-6 py-12 text-center text-gray-400">
+                      {searchQuery ? `No users found matching "${searchQuery}"` : 'No users found'}
+                    </td>
                   </tr>
                 ) : (
                   filteredUsers.map((u) => (
@@ -296,6 +332,21 @@ const UserManagementPage: React.FC = () => {
                         </div>
                       </td>
                       <td className="px-6 py-4 text-sm text-gray-400">{u.admissionNumber || '—'}</td>
+                      <td className="px-6 py-4">
+                        <div className="flex flex-col gap-0.5">
+                          {u.departmentId && (
+                            <span className="text-xs text-gray-300">
+                              {departments.find(d => d.id === u.departmentId)?.name || u.departmentId}
+                            </span>
+                          )}
+                          {u.classId && (
+                            <span className="text-xs text-teal-400">
+                              {departments.flatMap(d => d.classes || []).find(c => c.id === u.classId)?.name || u.classId}
+                            </span>
+                          )}
+                          {!u.departmentId && !u.classId && <span className="text-xs text-gray-600">—</span>}
+                        </div>
+                      </td>
                       <td className="px-6 py-4">
                         <span className={`inline-flex px-2 py-1 rounded-full text-xs font-medium ${
                           u.isLocked ? 'bg-red-500/20 text-red-300' : 'bg-green-500/20 text-green-300'

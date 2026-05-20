@@ -6,6 +6,8 @@ interface Department {
   id: string;
   name: string;
   createdAt: string;
+  hodId?: string | null;
+  hodName?: string | null;
   classes?: ClassItem[];
   teachers?: TeacherItem[];
 }
@@ -40,6 +42,14 @@ const DepartmentsPage: React.FC = () => {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
   const [expandedDepts, setExpandedDepts] = useState<Set<string>>(new Set());
+
+  // HOD assignment state
+  const [showHodModal, setShowHodModal] = useState(false);
+  const [hodDept, setHodDept] = useState<Department | null>(null);
+  const [hodUsers, setHodUsers] = useState<{ id: string; fullName: string }[]>([]);
+  const [selectedHodId, setSelectedHodId] = useState('');
+  const [hodSubmitting, setHodSubmitting] = useState(false);
+  const [hodError, setHodError] = useState('');
 
   useEffect(() => {
     fetchDepartments();
@@ -197,6 +207,47 @@ const DepartmentsPage: React.FC = () => {
     }
   };
 
+  const openHodModal = async (dept: Department) => {
+    setHodDept(dept);
+    setSelectedHodId(dept.hodId || '');
+    setHodError('');
+    // Fetch HOD-eligible users (teachers in this department + existing HODs)
+    try {
+      const { data } = await apiClient.get('/users', { params: { role: 'HOD' } });
+      const allHods = data.users || data || [];
+      // Also get teachers in this department
+      const { data: teacherData } = await apiClient.get(`/departments/${dept.id}/teachers`);
+      const teachers = teacherData || [];
+      // Combine: existing HODs + teachers in this dept (who could be promoted)
+      const combined = [...allHods, ...teachers.filter((t: any) => !allHods.find((h: any) => h.id === t.id))];
+      setHodUsers(combined.map((u: any) => ({ id: u.id, fullName: u.fullName })));
+    } catch {
+      setHodUsers([]);
+    }
+    setShowHodModal(true);
+  };
+
+  const handleHodAssign = async () => {
+    if (!hodDept) return;
+    setHodSubmitting(true);
+    setHodError('');
+    try {
+      // Update the selected user's departmentId and role to HOD
+      if (selectedHodId) {
+        await apiClient.put(`/users/${selectedHodId}`, {
+          departmentId: hodDept.id,
+          role: 'HOD',
+        });
+      }
+      setShowHodModal(false);
+      fetchDepartments();
+    } catch (err: any) {
+      setHodError(err.response?.data?.error || 'Failed to assign HOD');
+    } finally {
+      setHodSubmitting(false);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900">
       {/* Header */}
@@ -250,10 +301,25 @@ const DepartmentsPage: React.FC = () => {
                     </svg>
                     <div>
                       <h3 className="text-white font-semibold">{dept.name}</h3>
-                      <p className="text-xs text-gray-400">{dept.classes?.length || 0} classes</p>
+                      <div className="flex items-center gap-3 mt-0.5">
+                        <p className="text-xs text-gray-400">{dept.classes?.length || 0} classes · {dept.teachers?.length || 0} teachers</p>
+                        {dept.hodName ? (
+                          <span className="text-xs text-orange-300 bg-orange-500/10 border border-orange-500/20 px-2 py-0.5 rounded-full">
+                            HOD: {dept.hodName}
+                          </span>
+                        ) : (
+                          <span className="text-xs text-gray-500 italic">No HOD assigned</span>
+                        )}
+                      </div>
                     </div>
                   </button>
                   <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => openHodModal(dept)}
+                      className="px-3 py-1.5 rounded-lg bg-orange-500/10 border border-orange-500/20 text-orange-300 text-xs hover:bg-orange-500/20 transition-colors"
+                    >
+                      {dept.hodName ? 'Change HOD' : 'Assign HOD'}
+                    </button>
                     <button
                       onClick={() => openAddClassModal(dept.id)}
                       className="px-3 py-1.5 rounded-lg bg-white/5 border border-white/10 text-cyan-400 text-xs hover:bg-white/10 transition-colors"
@@ -443,6 +509,61 @@ const DepartmentsPage: React.FC = () => {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* HOD Assignment Modal */}
+      {showHodModal && hodDept && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
+          <div className="backdrop-blur-xl bg-slate-800/90 border border-white/10 rounded-2xl p-8 w-full max-w-md mx-4 shadow-2xl">
+            <h3 className="text-xl font-bold text-white mb-2">
+              {hodDept.hodName ? 'Change HOD' : 'Assign HOD'}
+            </h3>
+            <p className="text-sm text-gray-400 mb-6">
+              Department: <span className="text-white font-medium">{hodDept.name}</span>
+              {hodDept.hodName && <span className="text-orange-300 ml-2">(Current: {hodDept.hodName})</span>}
+            </p>
+
+            {hodError && (
+              <div className="mb-4 p-3 rounded-lg bg-red-500/10 border border-red-500/20 text-red-300 text-sm">
+                {hodError}
+              </div>
+            )}
+
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm text-gray-300 mb-1">Select HOD *</label>
+                <select
+                  value={selectedHodId}
+                  onChange={(e) => setSelectedHodId(e.target.value)}
+                  className="w-full px-4 py-2.5 rounded-xl bg-white/5 border border-white/10 text-white focus:outline-none focus:border-cyan-500/50 transition-colors"
+                >
+                  <option value="" className="bg-slate-800">-- Select a user --</option>
+                  {hodUsers.map(u => (
+                    <option key={u.id} value={u.id} className="bg-slate-800">{u.fullName}</option>
+                  ))}
+                </select>
+                <p className="text-xs text-gray-500 mt-1">Shows existing HODs and teachers in this department</p>
+              </div>
+
+              <div className="flex gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setShowHodModal(false)}
+                  className="flex-1 px-4 py-2.5 rounded-xl bg-white/5 border border-white/10 text-gray-300 hover:bg-white/10 transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleHodAssign}
+                  disabled={hodSubmitting || !selectedHodId}
+                  className="flex-1 px-4 py-2.5 rounded-xl bg-gradient-to-r from-orange-500 to-amber-500 text-white font-semibold hover:from-orange-400 hover:to-amber-400 transition-all disabled:opacity-50"
+                >
+                  {hodSubmitting ? 'Assigning...' : 'Assign HOD'}
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       )}
