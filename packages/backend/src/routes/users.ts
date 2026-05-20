@@ -60,6 +60,7 @@ const registerViaLinkSchema = z.object({
   fullName: z.string().min(1).max(200),
   username: z.string().min(3).max(50),
   phone: z.string().min(9).max(15).optional(),
+  email: z.string().email().optional(),
   password: z.string().min(8),
   admissionNumber: z.string().min(1).max(50).optional(),
 });

@@ -17,6 +17,7 @@ const RegisterPage: React.FC = () => {
   const [linkMeta, setLinkMeta] = useState<LinkMeta | null>(null);
   const [fullName, setFullName] = useState('');
   const [username, setUsername] = useState('');
+  const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
   const [admissionNumber, setAdmissionNumber] = useState('');
   const [password, setPassword] = useState('');
@@ -61,6 +62,7 @@ const RegisterPage: React.FC = () => {
         fullName,
         username,
         phone: phone || undefined,
+        email: email || undefined,
         password,
         admissionNumber: isStudent ? admissionNumber : undefined,
       });
@@ -377,6 +379,20 @@ const RegisterPage: React.FC = () => {
                 className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-teal-500/40 focus:border-teal-400 transition-all"
                 placeholder="Choose a username"
               />
+            </div>
+
+            <div>
+              <label className="block text-sm font-semibold text-gray-300 mb-1.5">
+                Email <span className="text-gray-500 font-normal">(optional)</span>
+              </label>
+              <input
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-teal-500/40 focus:border-teal-400 transition-all"
+                placeholder="your@email.com"
+              />
+              <p className="text-xs text-gray-500 mt-1">Used for password reset and notifications</p>
             </div>
 
             <div>

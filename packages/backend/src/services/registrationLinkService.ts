@@ -25,6 +25,7 @@ export interface RegisterViaLinkData {
   fullName: string;
   username: string;
   phone?: string;
+  email?: string;
   password: string;
   admissionNumber?: string; // Required for students
 }
@@ -175,7 +176,7 @@ export class RegistrationLinkService {
    * Requirements: 4.9
    */
   async registerViaLink(token: string, data: RegisterViaLinkData) {
-    const { fullName, username, phone, password, admissionNumber } = data;
+    const { fullName, username, phone, email, password, admissionNumber } = data;
 
     // Validate the link
     const link = await this.resolveLink(token);
@@ -220,6 +221,7 @@ export class RegistrationLinkService {
         fullName,
         username,
         phone: phone ?? null,
+        email: email ?? null,
         admissionNumber: admissionNumber ?? null,
         passwordHash,
         classId: link.classId ?? null,
