@@ -129,12 +129,27 @@ async function buildSystemPrompt(user) {
     // Fetch custom knowledge base entries (scoped to user's role)
     let knowledgeSection = '';
     try {
-        // Skip knowledge fetch for guest/unauthenticated users
         if (user.schoolId && user.schoolId !== 'guest' && user.schoolId !== 'none') {
+            // Authenticated user — fetch school-scoped + global super admin knowledge
             const { knowledgeService } = await Promise.resolve().then(() => __importStar(require('../knowledgeService')));
             const knowledgeEntries = await knowledgeService.getForAIContext(user);
             if (knowledgeEntries.length > 0) {
                 const formatted = knowledgeEntries
+                    .map((entry) => `- [${entry.title}]: ${entry.content}`)
+                    .join('\n');
+                knowledgeSection = `\n\nCustom Knowledge:\n${formatted}`;
+            }
+        }
+        else {
+            // Guest/unauthenticated user — fetch only global super admin knowledge entries
+            const { prisma } = await Promise.resolve().then(() => __importStar(require('../../index')));
+            const globalEntries = await prisma.aIKnowledge.findMany({
+                where: { createdBy: { role: 'SUPER_ADMIN' } },
+                select: { title: true, content: true },
+                orderBy: { createdAt: 'desc' },
+            });
+            if (globalEntries.length > 0) {
+                const formatted = globalEntries
                     .map((entry) => `- [${entry.title}]: ${entry.content}`)
                     .join('\n');
                 knowledgeSection = `\n\nCustom Knowledge:\n${formatted}`;

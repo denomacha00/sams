@@ -120,8 +120,9 @@ export class NotificationService {
   }
 
   /**
-   * Send an in-app notification to a specific user via Socket.io.
+   * Send an in-app notification to a specific user via Socket.io AND persist to DB.
    * Emits the `notification:new` event to the user's personal room `user:{userId}`.
+   * Also writes to the Notification table so offline users see it on next load.
    *
    * Requirements: 18.1
    */
@@ -129,6 +130,32 @@ export class NotificationService {
     userId: string,
     notification: InAppNotification,
   ): Promise<void> {
+    // Persist to DB so the notification survives if the user is offline
+    try {
+      // Look up the user's schoolId for the DB record
+      const { prisma } = require('../index');
+      const user = await prisma.user.findUnique({
+        where: { id: userId },
+        select: { schoolId: true },
+      });
+
+      if (user) {
+        await prisma.notification.create({
+          data: {
+            schoolId: user.schoolId,
+            userId,
+            title: notification.title,
+            message: notification.message,
+            type: notification.type,
+          },
+        });
+      }
+    } catch (err) {
+      // Never let DB failure block the socket emit
+      console.error('[NotificationService] Failed to persist in-app notification:', err);
+    }
+
+    // Emit via Socket.io for real-time delivery (user may be online)
     io.to(`user:${userId}`).emit('notification:new', {
       ...notification,
       timestamp: new Date().toISOString(),

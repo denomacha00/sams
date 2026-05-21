@@ -18,13 +18,15 @@ export declare class NotificationService {
     /**
      * Send an email via Nodemailer using SMTP credentials from environment variables.
      * From address is always "SAMS" <noreply@sams.ke>.
+     * If SMTP credentials are not configured, logs a warning and skips silently.
      *
      * Requirements: 18.2, 18.3, 18.5
      */
     sendEmail(to: string, subject: string, html: string): Promise<void>;
     /**
-     * Send an in-app notification to a specific user via Socket.io.
+     * Send an in-app notification to a specific user via Socket.io AND persist to DB.
      * Emits the `notification:new` event to the user's personal room `user:{userId}`.
+     * Also writes to the Notification table so offline users see it on next load.
      *
      * Requirements: 18.1
      */

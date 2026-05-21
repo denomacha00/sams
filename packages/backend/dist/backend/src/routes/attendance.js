@@ -292,20 +292,43 @@ exports.attendanceRouter.get('/', async (req, res) => {
         const where = { schoolId: req.schoolId };
         // Scope based on role
         if (req.user.role === shared_1.UserRole.STUDENT) {
+            // Students can only see their own records — always enforce this
             where.studentId = req.user.sub;
         }
         else if (req.user.role === shared_1.UserRole.TEACHER) {
-            // Teachers see records from their sessions
+            // Teachers can only see records from sessions they own.
+            // A sessionId filter is required — without it we scope to their sessions only.
             if (req.query.sessionId) {
+                // Verify the session belongs to this teacher before returning records
+                const session = await index_1.prisma.attendanceSession.findFirst({
+                    where: { id: req.query.sessionId, teacherId: req.user.sub, schoolId: req.schoolId },
+                    select: { id: true },
+                });
+                if (!session) {
+                    // Session not found or doesn't belong to this teacher — return empty
+                    res.status(200).json([]);
+                    return;
+                }
                 where.sessionId = req.query.sessionId;
             }
+            else {
+                // No sessionId provided — scope to all sessions owned by this teacher
+                const teacherSessions = await index_1.prisma.attendanceSession.findMany({
+                    where: { teacherId: req.user.sub, schoolId: req.schoolId },
+                    select: { id: true },
+                });
+                const sessionIds = teacherSessions.map((s) => s.id);
+                if (sessionIds.length === 0) {
+                    res.status(200).json([]);
+                    return;
+                }
+                where.sessionId = { in: sessionIds };
+            }
         }
-        // Additional filters from query params
+        // HOD and SCHOOL_ADMIN: can filter by studentId, sessionId, status from query params
+        // Additional filters from query params (non-student roles only)
         if (req.query.studentId && req.user.role !== shared_1.UserRole.STUDENT) {
             where.studentId = req.query.studentId;
-        }
-        if (req.query.sessionId) {
-            where.sessionId = req.query.sessionId;
         }
         if (req.query.status) {
             where.status = req.query.status;

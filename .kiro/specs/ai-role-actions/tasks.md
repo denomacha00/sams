@@ -76,11 +76,11 @@ Extend the SAMS AI action system from SUPER_ADMIN-only to a unified role-aware p
     - Mock the OpenAI engine
     - _Requirements: 6.3, 6.4, 6.5, 6.6_
 
-- [~] 5. Checkpoint - Ensure all handler files compile
+- [ ] 5. Checkpoint - Ensure all handler files compile
   - Ensure all tests pass, ask the user if questions arise.
 
 - [ ] 6. Refactor Action Intent Detector
-  - [-] 6.1 Refactor `actionIntentDetector.ts` to be role-aware and async
+  - [ ] 6.1 Refactor `actionIntentDetector.ts` to be role-aware and async
     - Replace hardcoded `ACTION_PATTERNS` array with registry lookups via `getActionsForRole(role)`
     - Change `detect()` signature to `async detect(message: string, userRole: UserRole): Promise<DetectedAction>`
     - Add LLM fallback path: if no regex match, call `classifyIntent` with role-scoped candidates
@@ -95,7 +95,7 @@ Extend the SAMS AI action system from SUPER_ADMIN-only to a unified role-aware p
     - _Requirements: 6.1, 6.2, 6.3, 6.6_
 
 - [ ] 7. Refactor AI Service
-  - [-] 7.1 Refactor `aiService.ts` to use unified `executeAction`
+  - [ ] 7.1 Refactor `aiService.ts` to use unified `executeAction`
     - Replace `executeSuperAdminAction` with generic `executeAction(user, pendingAction)`
     - Move action detection from SUPER_ADMIN-only block to all authenticated users
     - Add `await` to `actionIntentDetector.detect()` call (now async)
@@ -119,11 +119,11 @@ Extend the SAMS AI action system from SUPER_ADMIN-only to a unified role-aware p
     - Ensure audit log entries include: actorId, actorRole, action type, affected resource or denial reason
     - _Requirements: 8.4, 9.5_
 
-- [~] 9. Checkpoint - Full integration verification
+- [ ] 9. Checkpoint - Full integration verification
   - Ensure all tests pass, ask the user if questions arise.
 
 - [ ] 10. Integration wiring and backward compatibility
-  - [~] 10.1 Update `ai.ts` route to pass full user payload for role detection
+  - [ ] 10.1 Update `ai.ts` route to pass full user payload for role detection
     - Ensure the AI route handler passes the complete `AccessTokenPayload` (including `role`, `schoolId`, `departmentId`, `classId`) to `aiService.query()`
     - Verify the confirmation flow works for all roles (not just SUPER_ADMIN)
     - _Requirements: 9.2, 10.3_
@@ -136,7 +136,7 @@ Extend the SAMS AI action system from SUPER_ADMIN-only to a unified role-aware p
     - Test SUPER_ADMIN: existing actions still work unchanged
     - _Requirements: 2.1, 3.2, 4.2, 5.2, 10.1, 10.3_
 
-- [~] 11. Final checkpoint - Ensure all tests pass
+- [ ] 11. Final checkpoint - Ensure all tests pass
   - Ensure all tests pass, ask the user if questions arise.
 
 ## Notes

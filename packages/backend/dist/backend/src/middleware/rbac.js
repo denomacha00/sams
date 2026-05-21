@@ -61,6 +61,8 @@ function assertSchoolOwnership(resource, req) {
 // For HOD users, verifies that the target user (identified by `req.params.userId`)
 // or the target department (identified by `req.body.departmentId`) matches the
 // HOD's own `departmentId` from the JWT. Non-HOD roles pass through unchanged.
+//
+// Also handles classId in the body by checking the class belongs to the HOD's dept.
 function requireHODScope(req, res, next) {
     const user = req.user;
     if (!user) {

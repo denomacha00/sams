@@ -9,6 +9,31 @@ const errors_1 = require("../middleware/errors");
 // ─── Router ───────────────────────────────────────────────────────────────────
 exports.riskScoresRouter = (0, express_1.Router)();
 /**
+ * GET /api/v1/risk-scores/me
+ * Get the authenticated student's own risk score.
+ * Only accessible to STUDENT role.
+ */
+exports.riskScoresRouter.get('/me', async (req, res) => {
+    if (req.user.role !== shared_1.UserRole.STUDENT) {
+        res.status(403).json({ error: 'Forbidden', code: 'FORBIDDEN' });
+        return;
+    }
+    try {
+        const score = await riskService_1.riskService.computeRiskScore(req.schoolId, req.user.sub);
+        res.status(200).json(score);
+    }
+    catch (err) {
+        if (err instanceof errors_1.AppError) {
+            res.status(err.statusCode).json({
+                error: err.message,
+                code: err.code,
+            });
+            return;
+        }
+        throw new errors_1.AppError(500, 'INTERNAL_ERROR', 'Failed to get risk score');
+    }
+});
+/**
  * GET /api/v1/risk-scores
  * List risk scores scoped to the requesting user's permitted scope.
  * - School Admin: all scores for the school (optionally filtered by departmentId query param)
@@ -43,8 +68,15 @@ exports.riskScoresRouter.get('/:studentId', (0, rbac_1.requirePermission)('view:
         res.status(200).json(score);
     }
     catch (err) {
-        if (err instanceof errors_1.AppError)
-            throw err;
+        if (err instanceof errors_1.AppError) {
+            // Surface known errors (404 student not found, 403 forbidden) properly
+            res.status(err.statusCode).json({
+                error: err.message,
+                code: err.code,
+                requestId: req.id,
+            });
+            return;
+        }
         throw new errors_1.AppError(500, 'INTERNAL_ERROR', 'Failed to get risk score');
     }
 });

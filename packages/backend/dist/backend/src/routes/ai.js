@@ -208,9 +208,20 @@ exports.aiRouter.post('/query', async (req, res) => {
         }
         // Authenticated user — full access
         if (req.user) {
-            const result = await aiService_1.aiService.query(req.user, question.trim(), { threadId, confirmAction, pendingAction });
-            const response = { ...result };
-            res.status(200).json(response);
+            try {
+                const result = await aiService_1.aiService.query(req.user, question.trim(), { threadId, confirmAction, pendingAction });
+                const response = { ...result };
+                res.status(200).json(response);
+            }
+            catch (aiErr) {
+                // AI service errors should never surface as 500 — return a graceful fallback
+                console.error('[AI] Query error for authenticated user:', aiErr.message);
+                res.status(200).json({
+                    answer: 'I\'m having trouble connecting to the AI service right now. Please try again in a moment, or check that the AI API key is configured correctly.',
+                    intent: 'fallback',
+                    engine: 'local',
+                });
+            }
             return;
         }
         // Unauthenticated user — check if it's a data query

@@ -35,6 +35,10 @@ class UserService {
         if (data.role === shared_1.UserRole.STUDENT) {
             await licenseService_1.licenseService.checkStudentLimit(schoolId);
         }
+        // Teachers and HODs must be assigned to a department
+        if ((data.role === shared_1.UserRole.TEACHER || data.role === shared_1.UserRole.HOD) && !data.departmentId) {
+            throw new errors_1.AppError(400, 'DEPARTMENT_REQUIRED', 'Teachers and HODs must be assigned to a department');
+        }
         // Hash the password
         const passwordHash = await bcrypt_1.default.hash(data.password, BCRYPT_ROUNDS);
         const user = await index_1.prisma.user.create({
@@ -92,6 +96,15 @@ class UserService {
         if (user.schoolId !== schoolId) {
             throw new errors_1.AppError(403, 'FORBIDDEN', 'Access to this resource is not allowed');
         }
+        // Delete dependent records before deleting the user (foreign key constraints)
+        await index_1.prisma.$transaction([
+            index_1.prisma.notification.deleteMany({ where: { userId } }),
+            index_1.prisma.notification.updateMany({ where: { senderId: userId }, data: { senderId: null } }),
+            index_1.prisma.refreshToken.deleteMany({ where: { userId } }),
+            index_1.prisma.attendanceRecord.deleteMany({ where: { studentId: userId } }),
+            index_1.prisma.conversationRecord.deleteMany({ where: { thread: { userId } } }),
+            index_1.prisma.conversationThread.deleteMany({ where: { userId } }),
+        ]);
         await index_1.prisma.user.delete({ where: { id: userId } });
     }
     /**

@@ -58,6 +58,10 @@ class RegistrationLinkService {
                     throw new errors_1.AppError(403, 'FORBIDDEN', 'Your role cannot generate registration links');
             }
         }
+        // TEACHER links must have a departmentId — teachers belong to a department
+        if (targetRole === shared_1.UserRole.TEACHER && !departmentId) {
+            throw new errors_1.AppError(400, 'DEPARTMENT_REQUIRED', 'A department must be selected for teacher registration links');
+        }
         // HOD + STUDENT: require classId and validate department ownership
         if (creatorRole === shared_1.UserRole.HOD && targetRole === shared_1.UserRole.STUDENT) {
             if (!classId) {
@@ -88,7 +92,7 @@ class RegistrationLinkService {
             data: {
                 schoolId,
                 departmentId: departmentId ?? null,
-                classId: (classId && classId.length > 10) ? classId : null,
+                classId: classId ?? null,
                 targetRole,
                 token,
                 expiresAt,
@@ -129,7 +133,7 @@ class RegistrationLinkService {
      * Requirements: 4.9
      */
     async registerViaLink(token, data) {
-        const { fullName, username, phone, password, admissionNumber } = data;
+        const { fullName, username, phone, email, password, admissionNumber } = data;
         // Validate the link
         const link = await this.resolveLink(token);
         // Check for duplicate username globally
@@ -157,6 +161,10 @@ class RegistrationLinkService {
         if (link.targetRole === shared_1.UserRole.STUDENT) {
             await licenseService_1.licenseService.checkStudentLimit(link.schoolId);
         }
+        // Teachers must have a department (from the link)
+        if (link.targetRole === shared_1.UserRole.TEACHER && !link.departmentId) {
+            throw new errors_1.AppError(400, 'DEPARTMENT_REQUIRED', 'This registration link is missing department information. Please contact your HOD.');
+        }
         // Hash the provided password
         const passwordHash = await bcrypt_1.default.hash(password, BCRYPT_ROUNDS);
         // Create the user
@@ -167,6 +175,7 @@ class RegistrationLinkService {
                 fullName,
                 username,
                 phone: phone ?? null,
+                email: email ?? null,
                 admissionNumber: admissionNumber ?? null,
                 passwordHash,
                 classId: link.classId ?? null,
@@ -196,19 +205,40 @@ class RegistrationLinkService {
      * Requirements: 4.1, 4.3, 4.4
      */
     async getLinksForUser(userId, userRole, schoolId) {
+        let links;
         if (userRole === shared_1.UserRole.SCHOOL_ADMIN) {
-            return index_1.prisma.registrationLink.findMany({
+            links = await index_1.prisma.registrationLink.findMany({
                 where: { schoolId },
                 orderBy: { createdAt: 'desc' },
             });
         }
-        if (userRole === shared_1.UserRole.HOD || userRole === shared_1.UserRole.TEACHER) {
-            return index_1.prisma.registrationLink.findMany({
+        else if (userRole === shared_1.UserRole.HOD || userRole === shared_1.UserRole.TEACHER) {
+            links = await index_1.prisma.registrationLink.findMany({
                 where: { schoolId, createdById: userId },
                 orderBy: { createdAt: 'desc' },
             });
         }
-        throw new errors_1.AppError(403, 'FORBIDDEN', 'You do not have permission to access registration links');
+        else {
+            throw new errors_1.AppError(403, 'FORBIDDEN', 'You do not have permission to access registration links');
+        }
+        // Enrich with department and class names
+        const deptIds = [...new Set(links.map((l) => l.departmentId).filter(Boolean))];
+        const classIds = [...new Set(links.map((l) => l.classId).filter(Boolean))];
+        const [depts, classes] = await Promise.all([
+            deptIds.length > 0
+                ? index_1.prisma.department.findMany({ where: { id: { in: deptIds } }, select: { id: true, name: true } })
+                : [],
+            classIds.length > 0
+                ? index_1.prisma.class.findMany({ where: { id: { in: classIds } }, select: { id: true, name: true } })
+                : [],
+        ]);
+        const deptMap = new Map(depts.map((d) => [d.id, d.name]));
+        const classMap = new Map(classes.map((c) => [c.id, c.name]));
+        return links.map((l) => ({
+            ...l,
+            departmentName: l.departmentId ? (deptMap.get(l.departmentId) ?? null) : null,
+            className: l.classId ? (classMap.get(l.classId) ?? null) : null,
+        }));
     }
     /**
      * Delete a registration link with ownership-based access control.

@@ -8,6 +8,7 @@ export interface RegisterViaLinkData {
     fullName: string;
     username: string;
     phone?: string;
+    email?: string;
     password: string;
     admissionNumber?: string;
 }
@@ -104,19 +105,7 @@ export declare class RegistrationLinkService {
      *
      * Requirements: 4.1, 4.3, 4.4
      */
-    getLinksForUser(userId: string, userRole: UserRole, schoolId: string): Promise<{
-        departmentId: string | null;
-        id: string;
-        schoolId: string;
-        createdAt: Date;
-        token: string;
-        classId: string | null;
-        expiresAt: Date;
-        targetRole: import(".prisma/client").$Enums.UserRole;
-        maxUses: number;
-        useCount: number;
-        createdById: string;
-    }[]>;
+    getLinksForUser(userId: string, userRole: UserRole, schoolId: string): Promise<any>;
     /**
      * Delete a registration link with ownership-based access control.
      *

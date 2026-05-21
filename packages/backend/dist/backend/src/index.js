@@ -63,16 +63,26 @@ const PUBLIC_PATHS = [
     '/api/v1/auth/login',
     '/api/v1/auth/refresh',
     '/api/v1/auth/forgot-password',
+    '/api/v1/auth/reset-password',
     '/api/v1/activate',
-    '/api/v1/registration-links/',
     '/api/v1/payments/callback',
     '/api/v1/ai/query',
 ];
-function isPublicPath(path) {
-    return PUBLIC_PATHS.some((pub) => path === pub || path.startsWith(pub + '/') || path.startsWith(pub));
+// Registration link public paths: only token resolution and self-registration
+// are public. List/create/delete require authentication.
+const PUBLIC_REGISTRATION_LINK_PATHS = [
+    { method: 'GET', pattern: /^\/api\/v1\/registration-links\/[^/]+$/ }, // GET /:token
+    { method: 'POST', pattern: /^\/api\/v1\/registration-links\/[^/]+\/register$/ }, // POST /:token/register
+];
+function isPublicPath(path, method) {
+    if (PUBLIC_PATHS.some((pub) => path === pub || path.startsWith(pub + '/') || path.startsWith(pub))) {
+        return true;
+    }
+    // Check registration link public paths
+    return PUBLIC_REGISTRATION_LINK_PATHS.some((p) => (!method || p.method === method) && p.pattern.test(path));
 }
 app.use('/api/v1', (req, res, next) => {
-    if (isPublicPath(req.baseUrl + req.path)) {
+    if (isPublicPath(req.baseUrl + req.path, req.method)) {
         next();
         return;
     }
@@ -133,6 +143,10 @@ async function start() {
             }
             (0, qrRefresh_1.startQRRefreshJob)();
             (0, notifications_2.startNotificationJob)();
+            // Signal PM2 that this instance is ready (enables zero-downtime cluster reload)
+            if (process.send) {
+                process.send('ready');
+            }
         });
     }
     catch (err) {

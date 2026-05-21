@@ -205,10 +205,13 @@ authRouter.post('/forgot-password', async (req: Request, res: Response): Promise
     const resetToken = crypto.randomBytes(32).toString('hex');
     const resetExpires = new Date(Date.now() + 60 * 60 * 1000); // 1 hour
 
+    // Store SHA-256 hash of the token — raw token is never stored
+    const resetTokenHash = crypto.createHash('sha256').update(resetToken).digest('hex');
+
     await prisma.user.update({
       where: { id: user.id },
       data: {
-        passwordResetToken: resetToken,
+        passwordResetToken: resetTokenHash,
         passwordResetExpires: resetExpires,
       },
     });
@@ -274,10 +277,13 @@ authRouter.post('/reset-password', async (req: Request, res: Response): Promise<
   const { token, newPassword } = parsed.data;
 
   try {
-    // Find user with this token that hasn't expired
+    // Hash the incoming token to compare against the stored hash
+    const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
+
+    // Find user with this token hash that hasn't expired
     const user = await prisma.user.findFirst({
       where: {
-        passwordResetToken: token,
+        passwordResetToken: tokenHash,
         passwordResetExpires: { gt: new Date() },
       },
     });

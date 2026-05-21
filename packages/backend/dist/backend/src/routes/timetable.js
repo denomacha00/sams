@@ -50,8 +50,9 @@ exports.timetableRouter.get('/', async (req, res) => {
 /**
  * POST /api/v1/timetable
  * Create a new timetable entry.
+ * HOD scope guard ensures HODs can only create entries for their own department's classes.
  */
-exports.timetableRouter.post('/', (0, rbac_1.requirePermission)('manage:timetable'), async (req, res) => {
+exports.timetableRouter.post('/', (0, rbac_1.requirePermission)('manage:timetable'), rbac_1.requireHODScope, async (req, res) => {
     const parsed = createTimetableSchema.safeParse(req.body);
     if (!parsed.success) {
         res.status(400).json({
@@ -75,8 +76,9 @@ exports.timetableRouter.post('/', (0, rbac_1.requirePermission)('manage:timetabl
 /**
  * PUT /api/v1/timetable/:id
  * Update a timetable entry.
+ * HOD scope guard ensures HODs can only update entries for their own department's classes.
  */
-exports.timetableRouter.put('/:id', (0, rbac_1.requirePermission)('manage:timetable'), async (req, res) => {
+exports.timetableRouter.put('/:id', (0, rbac_1.requirePermission)('manage:timetable'), rbac_1.requireHODScope, async (req, res) => {
     const parsed = updateTimetableSchema.safeParse(req.body);
     if (!parsed.success) {
         res.status(400).json({
@@ -99,8 +101,9 @@ exports.timetableRouter.put('/:id', (0, rbac_1.requirePermission)('manage:timeta
 /**
  * DELETE /api/v1/timetable/:id
  * Delete a timetable entry.
+ * HOD scope guard ensures HODs can only delete entries for their own department's classes.
  */
-exports.timetableRouter.delete('/:id', (0, rbac_1.requirePermission)('manage:timetable'), async (req, res) => {
+exports.timetableRouter.delete('/:id', (0, rbac_1.requirePermission)('manage:timetable'), rbac_1.requireHODScope, async (req, res) => {
     try {
         await timetableService_1.timetableService.deleteEntry(req.schoolId, req.params.id);
         res.status(204).send();

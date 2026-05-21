@@ -137,18 +137,18 @@ exports.notificationsRouter.patch('/:id/read', async (req, res) => {
  * Updates all notifications sharing the same batchId and senderId.
  */
 exports.notificationsRouter.patch('/:id', async (req, res) => {
-    const parsed = editNotificationSchema.safeParse(req.body);
-    if (!parsed.success) {
-        res.status(400).json({
-            error: 'Validation failed',
-            code: 'VALIDATION_ERROR',
-            details: parsed.error.flatten().fieldErrors,
-        });
-        return;
-    }
-    const { message } = parsed.data;
-    const id = String(req.params.id);
     try {
+        const parsed = editNotificationSchema.safeParse(req.body);
+        if (!parsed.success) {
+            res.status(400).json({
+                error: 'Validation failed',
+                code: 'VALIDATION_ERROR',
+                details: parsed.error.flatten().fieldErrors,
+            });
+            return;
+        }
+        const { message } = parsed.data;
+        const id = String(req.params.id);
         const notification = await index_1.prisma.notification.findUnique({
             where: { id },
         });
@@ -171,35 +171,21 @@ exports.notificationsRouter.patch('/:id', async (req, res) => {
         const now = new Date();
         if (notification.batchId) {
             await index_1.prisma.notification.updateMany({
-                where: {
-                    batchId: notification.batchId,
-                    senderId: notification.senderId,
-                },
-                data: {
-                    message,
-                    updatedAt: now,
-                },
+                where: { batchId: notification.batchId, senderId: notification.senderId },
+                data: { message, updatedAt: now },
             });
         }
         else {
-            // If no batchId, just update this single notification
             await index_1.prisma.notification.update({
                 where: { id },
-                data: {
-                    message,
-                    updatedAt: now,
-                },
+                data: { message, updatedAt: now },
             });
         }
-        // Fetch the updated notification to return
         const updated = await index_1.prisma.notification.findUnique({ where: { id } });
         // Emit socket event to affected recipients for real-time update
         if (notification.batchId) {
             const affectedNotifications = await index_1.prisma.notification.findMany({
-                where: {
-                    batchId: notification.batchId,
-                    senderId: notification.senderId,
-                },
+                where: { batchId: notification.batchId, senderId: notification.senderId },
                 select: { userId: true },
             });
             for (const n of affectedNotifications) {
@@ -245,12 +231,15 @@ exports.notificationsRouter.delete('/batch/:batchId', async (req, res) => {
             }
         }
         // Delete all notifications matching batchId
-        await index_1.prisma.notification.deleteMany({
-            where: {
-                batchId,
-                senderId: req.user.sub,
-            },
-        });
+        // Admins can delete any batch; others can only delete their own
+        if (isAdmin) {
+            await index_1.prisma.notification.deleteMany({ where: { batchId } });
+        }
+        else {
+            await index_1.prisma.notification.deleteMany({
+                where: { batchId, senderId: req.user.sub },
+            });
+        }
         res.status(204).send();
     }
     catch (err) {
@@ -267,21 +256,21 @@ exports.notificationsRouter.delete('/batch/:batchId', async (req, res) => {
  * Teacher can send to: their class students
  */
 exports.notificationsRouter.post('/send', async (req, res) => {
-    const allowedRoles = ['SCHOOL_ADMIN', 'HOD', 'TEACHER'];
-    if (!allowedRoles.includes(req.user.role)) {
-        throw new errors_1.AppError(403, 'FORBIDDEN', 'You do not have permission to send notifications');
-    }
-    const parsed = sendNotificationSchema.safeParse(req.body);
-    if (!parsed.success) {
-        res.status(400).json({
-            error: 'Validation failed',
-            code: 'VALIDATION_ERROR',
-            details: parsed.error.flatten().fieldErrors,
-        });
-        return;
-    }
-    const { scope, targetId, message, channels } = parsed.data;
     try {
+        const allowedRoles = ['SCHOOL_ADMIN', 'HOD', 'TEACHER'];
+        if (!allowedRoles.includes(req.user.role)) {
+            throw new errors_1.AppError(403, 'FORBIDDEN', 'You do not have permission to send notifications');
+        }
+        const parsed = sendNotificationSchema.safeParse(req.body);
+        if (!parsed.success) {
+            res.status(400).json({
+                error: 'Validation failed',
+                code: 'VALIDATION_ERROR',
+                details: parsed.error.flatten().fieldErrors,
+            });
+            return;
+        }
+        const { scope, targetId, message, channels } = parsed.data;
         // Generate a batchId for this send operation
         const batchId = (0, cuid2_1.createId)();
         // Build the user filter based on scope
@@ -306,10 +295,27 @@ exports.notificationsRouter.post('/send', async (req, res) => {
             if (scope === 'department' && targetId !== req.user.departmentId) {
                 throw new errors_1.AppError(403, 'FORBIDDEN', 'HODs can only send to their own department');
             }
+            // HOD can only target classes within their own department
+            if (scope === 'class' && targetId) {
+                const classRecord = await index_1.prisma.class.findUnique({
+                    where: { id: targetId },
+                    select: { departmentId: true },
+                });
+                if (!classRecord || classRecord.departmentId !== req.user.departmentId) {
+                    throw new errors_1.AppError(403, 'FORBIDDEN', 'HODs can only send to classes in their own department');
+                }
+            }
         }
         else if (req.user.role === 'TEACHER') {
             if (scope !== 'class') {
                 throw new errors_1.AppError(403, 'FORBIDDEN', 'Teachers can only send to their class');
+            }
+            // Teacher can only send to their own assigned class
+            if (!req.user.classId) {
+                throw new errors_1.AppError(403, 'FORBIDDEN', 'You are not assigned to a class');
+            }
+            if (targetId !== req.user.classId) {
+                throw new errors_1.AppError(403, 'FORBIDDEN', 'Teachers can only send notifications to their own class');
             }
         }
         // Get target users

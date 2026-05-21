@@ -69,23 +69,46 @@ export const useAuthStore = create<AuthState>()(
           });
           // Decode user info from JWT
           const tokenPayload = JSON.parse(atob(data.accessToken.split('.')[1]));
-          const user = {
+
+          // Build a partial user from the JWT first so the app is immediately usable
+          const partialUser = {
             id: tokenPayload.sub,
-            fullName: identifier,
+            fullName: identifier, // temporary — will be replaced by the profile fetch below
             email: identifier.includes('@') ? identifier : undefined,
             role: tokenPayload.role,
             schoolId: tokenPayload.schoolId,
             departmentId: tokenPayload.departmentId,
             classId: tokenPayload.classId,
           };
+
           set({
-            user,
+            user: partialUser,
             accessToken: data.accessToken,
             refreshToken: data.refreshToken,
             isAuthenticated: true,
             loading: false,
             error: null,
           });
+
+          // Fetch the real user profile to get the actual fullName, avatarUrl, etc.
+          // This runs after the state is set so the app can render immediately.
+          try {
+            const { data: me } = await apiClient.get('/users/me');
+            set((state) => ({
+              user: state.user
+                ? {
+                    ...state.user,
+                    fullName: me.fullName ?? state.user.fullName,
+                    username: me.username,
+                    email: me.email ?? state.user.email,
+                    phone: me.phone,
+                    avatarUrl: me.avatarUrl,
+                  }
+                : state.user,
+            }));
+          } catch {
+            // Profile fetch failure is non-fatal — user is still logged in
+          }
         } catch (err: any) {
           const message =
             err.response?.data?.error ||

@@ -139,6 +139,16 @@ export class UserService {
       throw new AppError(403, 'FORBIDDEN', 'Access to this resource is not allowed');
     }
 
+    // Delete dependent records before deleting the user (foreign key constraints)
+    await prisma.$transaction([
+      prisma.notification.deleteMany({ where: { userId } }),
+      prisma.notification.updateMany({ where: { senderId: userId }, data: { senderId: null } }),
+      prisma.refreshToken.deleteMany({ where: { userId } }),
+      prisma.attendanceRecord.deleteMany({ where: { studentId: userId } }),
+      prisma.conversationRecord.deleteMany({ where: { thread: { userId } } }),
+      prisma.conversationThread.deleteMany({ where: { userId } }),
+    ]);
+
     await prisma.user.delete({ where: { id: userId } });
   }
 

@@ -7,8 +7,11 @@ export interface QRTokenPayload {
 export declare class SessionService {
     /**
      * Start a new attendance session for a teacher.
-     * Validates that the timetable entry belongs to the teacher, creates the
-     * session with an initial QR token, and returns the session record.
+     * Validates that the timetable entry belongs to the teacher and that the
+     * current time falls within the scheduled slot (±30 min tolerance).
+     * Creates the session with an initial QR token and returns the session record.
+     *
+     * Requirements: 17.3
      */
     startSession(teacherId: string, schoolId: string, timetableEntryId: string, location: {
         lat: number;

@@ -62,6 +62,9 @@ function setupAttendanceSocket(io) {
             return;
         // Join school room for scoped broadcasts
         socket.join(`school:${user.schoolId}`);
+        // Join personal user room so in-app notifications can be delivered
+        // even when the user is not in a specific session room.
+        socket.join(`user:${user.sub}`);
         // ─── Handle session:join ────────────────────────────────────────────
         // Join a specific session room. Verifies the teacher owns the session
         // and replays missed events from Redis since `lastSeen` timestamp.

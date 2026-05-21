@@ -35,8 +35,8 @@ class AuthService {
      */
     async login(schoolCode, identifier, password) {
         let user = null;
-        if (schoolCode) {
-            // If school code provided, scope to that school
+        if (schoolCode && schoolCode !== 'SUPERADMIN') {
+            // If school code provided (and not the super admin bypass), scope to that school
             const school = await index_1.prisma.school.findUnique({
                 where: { schoolCode },
             });
@@ -56,7 +56,7 @@ class AuthService {
             });
         }
         else {
-            // No school code — search across ALL schools by unique identifier
+            // No school code (or SUPERADMIN bypass) — search across ALL schools by unique identifier
             user = await index_1.prisma.user.findFirst({
                 where: {
                     OR: [

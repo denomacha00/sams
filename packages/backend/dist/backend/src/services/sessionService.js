@@ -17,8 +17,11 @@ const DEFAULT_LATE_THRESHOLD_MIN = 15;
 class SessionService {
     /**
      * Start a new attendance session for a teacher.
-     * Validates that the timetable entry belongs to the teacher, creates the
-     * session with an initial QR token, and returns the session record.
+     * Validates that the timetable entry belongs to the teacher and that the
+     * current time falls within the scheduled slot (±30 min tolerance).
+     * Creates the session with an initial QR token and returns the session record.
+     *
+     * Requirements: 17.3
      */
     async startSession(teacherId, schoolId, timetableEntryId, location) {
         // Validate timetable entry belongs to teacher and school
@@ -32,11 +35,44 @@ class SessionService {
         if (!timetableEntry) {
             throw new errors_1.AppError(403, 'TIMETABLE_NOT_FOUND', 'Timetable entry not found or does not belong to this teacher');
         }
+        // Validate the current day matches the scheduled day of week
+        // dayOfWeek: 0=Monday … 6=Sunday (matches JS getDay() adjusted: Sun=0 → 6, Mon=1 → 0)
+        const now = new Date();
+        // JS getDay(): 0=Sunday, 1=Monday … 6=Saturday
+        // Our schema: 0=Monday … 6=Sunday
+        const jsDayOfWeek = now.getDay(); // 0=Sun, 1=Mon, …, 6=Sat
+        const schemaDayOfWeek = jsDayOfWeek === 0 ? 6 : jsDayOfWeek - 1; // convert to 0=Mon … 6=Sun
+        if (schemaDayOfWeek !== timetableEntry.dayOfWeek) {
+            const dayNames = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+            throw new errors_1.AppError(400, 'WRONG_DAY', `This class is scheduled for ${dayNames[timetableEntry.dayOfWeek]}, not today`);
+        }
+        // Validate the current time is within the scheduled slot (with ±30 min tolerance)
+        const TOLERANCE_MINUTES = 30;
+        const currentMinutes = now.getHours() * 60 + now.getMinutes();
+        const [startHour, startMin] = timetableEntry.startTime.split(':').map(Number);
+        const [endHour, endMin] = timetableEntry.endTime.split(':').map(Number);
+        const scheduledStart = startHour * 60 + startMin;
+        const scheduledEnd = endHour * 60 + endMin;
+        const windowStart = scheduledStart - TOLERANCE_MINUTES;
+        const windowEnd = scheduledEnd + TOLERANCE_MINUTES;
+        if (currentMinutes < windowStart || currentMinutes > windowEnd) {
+            throw new errors_1.AppError(400, 'OUTSIDE_SCHEDULED_TIME', `Session can only be started within 30 minutes of the scheduled time (${timetableEntry.startTime}–${timetableEntry.endTime})`);
+        }
+        // Check if there's already an active session for this timetable entry today
+        const existingSession = await index_1.prisma.attendanceSession.findFirst({
+            where: {
+                timetableEntryId,
+                isActive: true,
+            },
+        });
+        if (existingSession) {
+            throw new errors_1.AppError(409, 'SESSION_ALREADY_ACTIVE', 'An active session already exists for this timetable entry');
+        }
         // Generate initial QR token
         const nonce = (0, cuid2_1.createId)();
-        const now = Math.floor(Date.now() / 1000);
+        const nowUnix = Math.floor(Date.now() / 1000);
         const sessionId = (0, cuid2_1.createId)();
-        const qrToken = jsonwebtoken_1.default.sign({ sessionId, nonce, iat: now, exp: now + QR_EXPIRY_SECONDS }, QR_SECRET);
+        const qrToken = jsonwebtoken_1.default.sign({ sessionId, nonce, iat: nowUnix, exp: nowUnix + QR_EXPIRY_SECONDS }, QR_SECRET);
         // Create the attendance session
         const session = await index_1.prisma.attendanceSession.create({
             data: {

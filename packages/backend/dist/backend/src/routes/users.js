@@ -93,6 +93,7 @@ const registerViaLinkSchema = zod_1.z.object({
     fullName: zod_1.z.string().min(1).max(200),
     username: zod_1.z.string().min(3).max(50),
     phone: zod_1.z.string().min(9).max(15).optional(),
+    email: zod_1.z.string().email().optional(),
     password: zod_1.z.string().min(8),
     admissionNumber: zod_1.z.string().min(1).max(50).optional(),
 });
@@ -105,10 +106,40 @@ const updateMeSchema = zod_1.z.object({
 // ─── Router ───────────────────────────────────────────────────────────────────
 exports.usersRouter = (0, express_1.Router)();
 /**
+ * GET /api/v1/users/me
+ * Get the authenticated user's own profile.
+ */
+exports.usersRouter.get('/me', async (req, res, next) => {
+    try {
+        const user = await index_1.prisma.user.findUnique({
+            where: { id: req.user.sub },
+            select: {
+                id: true,
+                username: true,
+                fullName: true,
+                email: true,
+                phone: true,
+                role: true,
+                avatarUrl: true,
+                schoolId: true,
+                departmentId: true,
+                classId: true,
+            },
+        });
+        if (!user) {
+            throw new errors_1.AppError(404, 'USER_NOT_FOUND', 'User not found');
+        }
+        res.status(200).json(user);
+    }
+    catch (err) {
+        next(err instanceof errors_1.AppError ? err : new errors_1.AppError(500, 'INTERNAL_ERROR', 'Failed to get profile'));
+    }
+});
+/**
  * PATCH /api/v1/users/me
  * Update the authenticated user's own profile.
  */
-exports.usersRouter.patch('/me', async (req, res) => {
+exports.usersRouter.patch('/me', async (req, res, next) => {
     const parsed = updateMeSchema.safeParse(req.body);
     if (!parsed.success) {
         res.status(400).json({
@@ -151,16 +182,14 @@ exports.usersRouter.patch('/me', async (req, res) => {
         res.status(200).json(updated);
     }
     catch (err) {
-        if (err instanceof errors_1.AppError)
-            throw err;
-        throw new errors_1.AppError(500, 'INTERNAL_ERROR', 'Failed to update profile');
+        next(err instanceof errors_1.AppError ? err : new errors_1.AppError(500, 'INTERNAL_ERROR', 'Failed to update profile'));
     }
 });
 /**
  * POST /api/v1/users/me/password
  * Change the authenticated user's password.
  */
-exports.usersRouter.post('/me/password', async (req, res) => {
+exports.usersRouter.post('/me/password', async (req, res, next) => {
     const schema = zod_1.z.object({
         currentPassword: zod_1.z.string().min(1),
         newPassword: zod_1.z.string().min(8),
@@ -192,16 +221,14 @@ exports.usersRouter.post('/me/password', async (req, res) => {
         res.status(200).json({ message: 'Password changed successfully' });
     }
     catch (err) {
-        if (err instanceof errors_1.AppError)
-            throw err;
-        throw new errors_1.AppError(500, 'INTERNAL_ERROR', 'Failed to change password');
+        next(err instanceof errors_1.AppError ? err : new errors_1.AppError(500, 'INTERNAL_ERROR', 'Failed to change password'));
     }
 });
 /**
  * POST /api/v1/users/me/avatar
  * Upload and resize profile picture (200x200 JPEG).
  */
-exports.usersRouter.post('/me/avatar', upload.single('avatar'), async (req, res) => {
+exports.usersRouter.post('/me/avatar', upload.single('avatar'), async (req, res, next) => {
     try {
         if (!req.file) {
             throw new errors_1.AppError(400, 'NO_FILE', 'No image file provided');
@@ -226,36 +253,42 @@ exports.usersRouter.post('/me/avatar', upload.single('avatar'), async (req, res)
         res.status(200).json({ avatarUrl });
     }
     catch (err) {
-        if (err instanceof errors_1.AppError)
-            throw err;
-        throw new errors_1.AppError(500, 'INTERNAL_ERROR', 'Failed to upload avatar');
+        next(err instanceof errors_1.AppError ? err : new errors_1.AppError(500, 'INTERNAL_ERROR', 'Failed to upload avatar'));
     }
 });
 /**
  * GET /api/v1/users
  * List users scoped to the authenticated user's school.
+ * HOD scope guard automatically filters to their department.
  */
-exports.usersRouter.get('/', (0, rbac_1.requirePermission)('manage:users'), async (req, res) => {
+exports.usersRouter.get('/', (0, rbac_1.requirePermission)('manage:users'), async (req, res, next) => {
     try {
         const filters = {
             role: req.query.role,
             departmentId: req.query.departmentId,
             classId: req.query.classId,
         };
+        // HOD can only see users in their own department
+        if (req.user.role === shared_1.UserRole.HOD) {
+            if (!req.user.departmentId) {
+                res.status(403).json({ error: 'Forbidden', code: 'FORBIDDEN' });
+                return;
+            }
+            filters.departmentId = req.user.departmentId;
+        }
         const users = await userService_1.userService.listUsers(req.schoolId, filters);
         res.status(200).json(users);
     }
     catch (err) {
-        if (err instanceof errors_1.AppError)
-            throw err;
-        throw new errors_1.AppError(500, 'INTERNAL_ERROR', 'Failed to list users');
+        next(err instanceof errors_1.AppError ? err : new errors_1.AppError(500, 'INTERNAL_ERROR', 'Failed to list users'));
     }
 });
 /**
  * POST /api/v1/users
  * Create a new user within the school.
+ * HOD can only create users in their own department.
  */
-exports.usersRouter.post('/', (0, rbac_1.requirePermission)('manage:users'), async (req, res) => {
+exports.usersRouter.post('/', (0, rbac_1.requirePermission)('manage:users'), async (req, res, next) => {
     const parsed = createUserSchema.safeParse(req.body);
     if (!parsed.success) {
         res.status(400).json({
@@ -266,35 +299,51 @@ exports.usersRouter.post('/', (0, rbac_1.requirePermission)('manage:users'), asy
         return;
     }
     try {
+        // HOD can only create users in their own department
+        if (req.user.role === shared_1.UserRole.HOD) {
+            if (!req.user.departmentId) {
+                throw new errors_1.AppError(403, 'FORBIDDEN', 'HOD must be assigned to a department');
+            }
+            if (parsed.data.departmentId && parsed.data.departmentId !== req.user.departmentId) {
+                throw new errors_1.AppError(403, 'FORBIDDEN', 'HODs can only create users in their own department');
+            }
+            // Force departmentId to HOD's own department
+            parsed.data.departmentId = req.user.departmentId;
+        }
         const user = await userService_1.userService.createUser(req.schoolId, parsed.data);
         res.status(201).json(user);
     }
     catch (err) {
-        if (err instanceof errors_1.AppError)
-            throw err;
-        throw new errors_1.AppError(500, 'INTERNAL_ERROR', 'Failed to create user');
+        next(err instanceof errors_1.AppError ? err : new errors_1.AppError(500, 'INTERNAL_ERROR', 'Failed to create user'));
     }
 });
 /**
  * GET /api/v1/users/:id
  * Get a single user by ID.
+ * Requires manage:users permission — prevents students/teachers from fetching arbitrary profiles.
+ * HOD can only fetch users in their own department.
  */
-exports.usersRouter.get('/:id', async (req, res) => {
+exports.usersRouter.get('/:id', (0, rbac_1.requirePermission)('manage:users'), async (req, res, next) => {
     try {
         const user = await userService_1.userService.getUser(req.schoolId, req.params.id);
+        // HOD can only view users in their own department
+        if (req.user.role === shared_1.UserRole.HOD) {
+            if (!req.user.departmentId || user.departmentId !== req.user.departmentId) {
+                throw new errors_1.AppError(403, 'FORBIDDEN', 'HODs can only view users in their own department');
+            }
+        }
         res.status(200).json(user);
     }
     catch (err) {
-        if (err instanceof errors_1.AppError)
-            throw err;
-        throw new errors_1.AppError(500, 'INTERNAL_ERROR', 'Failed to get user');
+        next(err instanceof errors_1.AppError ? err : new errors_1.AppError(500, 'INTERNAL_ERROR', 'Failed to get user'));
     }
 });
 /**
  * PUT /api/v1/users/:id
  * Update a user.
+ * HOD can only update users in their own department.
  */
-exports.usersRouter.put('/:id', (0, rbac_1.requirePermission)('manage:users'), async (req, res) => {
+exports.usersRouter.put('/:id', (0, rbac_1.requirePermission)('manage:users'), async (req, res, next) => {
     const parsed = updateUserSchema.safeParse(req.body);
     if (!parsed.success) {
         res.status(400).json({
@@ -305,28 +354,49 @@ exports.usersRouter.put('/:id', (0, rbac_1.requirePermission)('manage:users'), a
         return;
     }
     try {
+        // HOD scope: verify the target user is in their department
+        if (req.user.role === shared_1.UserRole.HOD) {
+            if (!req.user.departmentId) {
+                throw new errors_1.AppError(403, 'FORBIDDEN', 'HOD must be assigned to a department');
+            }
+            const targetUser = await userService_1.userService.getUser(req.schoolId, req.params.id);
+            if (targetUser.departmentId !== req.user.departmentId) {
+                throw new errors_1.AppError(403, 'FORBIDDEN', 'HODs can only update users in their own department');
+            }
+            // HOD cannot move a user to a different department
+            if (parsed.data.departmentId && parsed.data.departmentId !== req.user.departmentId) {
+                throw new errors_1.AppError(403, 'FORBIDDEN', 'HODs cannot move users to a different department');
+            }
+        }
         const user = await userService_1.userService.updateUser(req.schoolId, req.params.id, parsed.data);
         res.status(200).json(user);
     }
     catch (err) {
-        if (err instanceof errors_1.AppError)
-            throw err;
-        throw new errors_1.AppError(500, 'INTERNAL_ERROR', 'Failed to update user');
+        next(err instanceof errors_1.AppError ? err : new errors_1.AppError(500, 'INTERNAL_ERROR', 'Failed to update user'));
     }
 });
 /**
  * DELETE /api/v1/users/:id
  * Delete a user.
+ * HOD can only delete users in their own department.
  */
-exports.usersRouter.delete('/:id', (0, rbac_1.requirePermission)('manage:users'), async (req, res) => {
+exports.usersRouter.delete('/:id', (0, rbac_1.requirePermission)('manage:users'), async (req, res, next) => {
     try {
+        // HOD scope: verify the target user is in their department
+        if (req.user.role === shared_1.UserRole.HOD) {
+            if (!req.user.departmentId) {
+                throw new errors_1.AppError(403, 'FORBIDDEN', 'HOD must be assigned to a department');
+            }
+            const targetUser = await userService_1.userService.getUser(req.schoolId, req.params.id);
+            if (targetUser.departmentId !== req.user.departmentId) {
+                throw new errors_1.AppError(403, 'FORBIDDEN', 'HODs can only delete users in their own department');
+            }
+        }
         await userService_1.userService.deleteUser(req.schoolId, req.params.id);
         res.status(204).send();
     }
     catch (err) {
-        if (err instanceof errors_1.AppError)
-            throw err;
-        throw new errors_1.AppError(500, 'INTERNAL_ERROR', 'Failed to delete user');
+        next(err instanceof errors_1.AppError ? err : new errors_1.AppError(500, 'INTERNAL_ERROR', 'Failed to delete user'));
     }
 });
 // ─── Registration Links ───────────────────────────────────────────────────────
@@ -360,7 +430,7 @@ exports.registrationLinksRouter.get('/', async (req, res) => {
  * POST /api/v1/registration-links
  * Generate a registration link. Requires manage:users permission.
  */
-exports.registrationLinksRouter.post('/', async (req, res) => {
+exports.registrationLinksRouter.post('/', async (req, res, next) => {
     // Allow SCHOOL_ADMIN, HOD, and TEACHER to generate links
     const allowedRoles = ['SCHOOL_ADMIN', 'HOD', 'TEACHER'];
     if (!req.user || !allowedRoles.includes(req.user.role)) {
@@ -389,17 +459,15 @@ exports.registrationLinksRouter.post('/', async (req, res) => {
         res.status(201).json(link);
     }
     catch (err) {
-        if (err instanceof errors_1.AppError)
-            throw err;
         console.error('[RegistrationLinks] Error:', err);
-        throw new errors_1.AppError(500, 'INTERNAL_ERROR', 'Failed to generate registration link');
+        next(err instanceof errors_1.AppError ? err : new errors_1.AppError(500, 'INTERNAL_ERROR', 'Failed to generate registration link'));
     }
 });
 /**
  * GET /api/v1/registration-links/:token
  * Resolve a registration link (public, no auth).
  */
-exports.registrationLinksRouter.get('/:token', async (req, res) => {
+exports.registrationLinksRouter.get('/:token', async (req, res, next) => {
     try {
         const link = await registrationLinkService_1.registrationLinkService.resolveLink(req.params.token);
         // Fetch school and class names for the frontend display
@@ -417,6 +485,13 @@ exports.registrationLinksRouter.get('/:token', async (req, res) => {
             className = classRecord?.name;
             departmentName = classRecord?.department?.name;
         }
+        else if (link.departmentId) {
+            const dept = await index_1.prisma.department.findUnique({
+                where: { id: link.departmentId },
+                select: { name: true },
+            });
+            departmentName = dept?.name ?? undefined;
+        }
         res.status(200).json({
             ...link,
             schoolName: school?.name,
@@ -426,9 +501,7 @@ exports.registrationLinksRouter.get('/:token', async (req, res) => {
         });
     }
     catch (err) {
-        if (err instanceof errors_1.AppError)
-            throw err;
-        throw new errors_1.AppError(500, 'INTERNAL_ERROR', 'Failed to resolve registration link');
+        next(err instanceof errors_1.AppError ? err : new errors_1.AppError(500, 'INTERNAL_ERROR', 'Failed to resolve registration link'));
     }
 });
 /**
@@ -438,7 +511,7 @@ exports.registrationLinksRouter.get('/:token', async (req, res) => {
  * - HOD can only delete links they created
  * - Returns 403 if ownership check fails, 404 if not found
  */
-exports.registrationLinksRouter.delete('/:id', async (req, res) => {
+exports.registrationLinksRouter.delete('/:id', async (req, res, next) => {
     if (!req.user || !req.schoolId) {
         res.status(401).json({ error: 'Unauthorized', code: 'UNAUTHORIZED' });
         return;
@@ -448,16 +521,14 @@ exports.registrationLinksRouter.delete('/:id', async (req, res) => {
         res.status(204).send();
     }
     catch (err) {
-        if (err instanceof errors_1.AppError)
-            throw err;
-        throw new errors_1.AppError(500, 'INTERNAL_ERROR', 'Failed to delete registration link');
+        next(err instanceof errors_1.AppError ? err : new errors_1.AppError(500, 'INTERNAL_ERROR', 'Failed to delete registration link'));
     }
 });
 /**
  * POST /api/v1/registration-links/:token/register
  * Self-register via a registration link (public, no auth).
  */
-exports.registrationLinksRouter.post('/:token/register', async (req, res) => {
+exports.registrationLinksRouter.post('/:token/register', async (req, res, next) => {
     const parsed = registerViaLinkSchema.safeParse(req.body);
     if (!parsed.success) {
         res.status(400).json({
@@ -472,9 +543,7 @@ exports.registrationLinksRouter.post('/:token/register', async (req, res) => {
         res.status(201).json(user);
     }
     catch (err) {
-        if (err instanceof errors_1.AppError)
-            throw err;
-        throw new errors_1.AppError(500, 'INTERNAL_ERROR', 'Failed to register via link');
+        next(err instanceof errors_1.AppError ? err : new errors_1.AppError(500, 'INTERNAL_ERROR', 'Failed to register via link'));
     }
 });
 //# sourceMappingURL=users.js.map

@@ -42,6 +42,9 @@ export enum AuditEventType {
   ROLE_CHANGED = 'ROLE_CHANGED',
   CONFLICT_RESOLVED = 'CONFLICT_RESOLVED',
   SMS_RETRY = 'SMS_RETRY',
+  // AI action audit events (must match schema.prisma AuditEventType enum)
+  AI_ACTION_EXECUTED = 'AI_ACTION_EXECUTED',
+  AI_ACTION_DENIED = 'AI_ACTION_DENIED',
 }
 
 export enum PaymentStatus {

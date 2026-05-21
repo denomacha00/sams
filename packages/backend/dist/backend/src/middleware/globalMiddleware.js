@@ -59,8 +59,17 @@ function applyGlobalMiddleware(app) {
     // 1. Security headers
     app.use((0, helmet_1.default)());
     // 2. CORS — origin controlled via environment variable
+    // NOTE: When credentials:true, origin MUST be an explicit domain (not '*').
+    // In production set CORS_ORIGIN to your frontend domain, e.g. https://app.smart-managment.com
+    const corsOrigin = process.env.CORS_ORIGIN;
     app.use((0, cors_1.default)({
-        origin: process.env.CORS_ORIGIN ?? '*',
+        origin: corsOrigin && corsOrigin !== '*'
+            ? corsOrigin
+            : (origin, callback) => {
+                // In development allow all origins; in production this path should not be hit
+                // because CORS_ORIGIN should be set to the real domain.
+                callback(null, origin || '*');
+            },
         methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
         allowedHeaders: ['Content-Type', 'Authorization', 'X-Request-Id'],
         credentials: true,

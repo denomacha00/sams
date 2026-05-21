@@ -89,6 +89,11 @@ export class RegistrationLinkService {
       }
     }
 
+    // TEACHER links must have a departmentId — teachers belong to a department
+    if (targetRole === UserRole.TEACHER && !departmentId) {
+      throw new AppError(400, 'DEPARTMENT_REQUIRED', 'A department must be selected for teacher registration links');
+    }
+
     // HOD + STUDENT: require classId and validate department ownership
     if (creatorRole === UserRole.HOD && targetRole === UserRole.STUDENT) {
       if (!classId) {
@@ -127,7 +132,7 @@ export class RegistrationLinkService {
       data: {
         schoolId,
         departmentId: departmentId ?? null,
-        classId: (classId && classId.length > 10) ? classId : null,
+        classId: classId ?? null,
         targetRole,
         token,
         expiresAt,

@@ -8,7 +8,8 @@ export default defineConfig({
   resolve: {
     alias: {
       '@': path.resolve(__dirname, './src'),
-      '@sams/shared': path.resolve(__dirname, '../shared/src/index.ts'),
+      // Types only — utils use Node.js crypto which cannot run in the browser
+      '@sams/shared': path.resolve(__dirname, '../shared/src/types/index.ts'),
     },
   },
   server: {

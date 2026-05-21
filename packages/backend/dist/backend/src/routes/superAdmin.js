@@ -73,10 +73,10 @@ exports.superAdminRouter.post('/licenses', async (req, res) => {
             expiresAt: expiryDate,
         },
     });
-    // Audit log
+    // Audit log — super admin is not in the User table so actorId must be null
     await auditService_1.auditService.log({
         eventType: 'LICENSE_ACTIVATION',
-        actorId: req.user?.sub,
+        actorId: undefined,
         actorRole: req.user?.role,
         resourceSnapshot: {
             action: 'LICENSE_GENERATED',
@@ -151,7 +151,7 @@ exports.superAdminRouter.post('/licenses/:id/revoke', async (req, res) => {
     // Audit log
     await auditService_1.auditService.log({
         eventType: 'LICENSE_ACTIVATION',
-        actorId: req.user?.sub,
+        actorId: undefined, // super admin not in User table
         actorRole: req.user?.role,
         resourceSnapshot: {
             action: 'LICENSE_REVOKED',
@@ -293,7 +293,7 @@ exports.superAdminRouter.post('/schools/:id/unsuspend', async (req, res) => {
     // Audit log
     await auditService_1.auditService.log({
         eventType: 'SCHOOL_SUSPENDED',
-        actorId: req.user?.sub,
+        actorId: undefined, // super admin not in User table
         actorRole: req.user?.role,
         schoolId,
         resourceSnapshot: {
@@ -364,7 +364,7 @@ exports.superAdminRouter.delete('/schools/:id', async (req, res) => {
     try {
         await auditService_1.auditService.log({
             eventType: 'SCHOOL_SUSPENDED',
-            actorId: req.user?.sub,
+            actorId: undefined, // super admin not in User table
             actorRole: req.user?.role,
             resourceSnapshot: {
                 schoolId,
@@ -540,7 +540,7 @@ exports.superAdminRouter.post('/ai-action', async (req, res) => {
                 });
                 await auditService_1.auditService.log({
                     eventType: 'LICENSE_ACTIVATION',
-                    actorId: req.user?.sub,
+                    actorId: undefined, // super admin not in User table
                     actorRole: req.user?.role,
                     resourceSnapshot: {
                         action: 'LICENSE_GENERATED_VIA_AI',
@@ -608,7 +608,7 @@ exports.superAdminRouter.post('/ai-action', async (req, res) => {
                 });
                 await auditService_1.auditService.log({
                     eventType: 'SCHOOL_SUSPENDED',
-                    actorId: req.user?.sub,
+                    actorId: undefined, // super admin not in User table
                     actorRole: req.user?.role,
                     schoolId: school.id,
                     resourceSnapshot: {

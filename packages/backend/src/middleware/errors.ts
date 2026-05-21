@@ -20,6 +20,20 @@ export class AppError extends Error {
     // Restore prototype chain (required when extending built-ins in TypeScript)
     Object.setPrototypeOf(this, new.target.prototype);
   }
+
+  /**
+   * Type guard that works across module boundaries and Vitest module isolation.
+   * Prefer this over `instanceof AppError` in tests and cross-module error handling.
+   */
+  static isAppError(err: unknown): err is AppError {
+    return (
+      typeof err === 'object' &&
+      err !== null &&
+      (err as AppError).name === 'AppError' &&
+      typeof (err as AppError).statusCode === 'number' &&
+      typeof (err as AppError).code === 'string'
+    );
+  }
 }
 
 // ─── errorHandler ─────────────────────────────────────────────────────────────

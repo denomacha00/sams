@@ -81,24 +81,63 @@ class NotificationService {
     /**
      * Send an email via Nodemailer using SMTP credentials from environment variables.
      * From address is always "SAMS" <noreply@sams.ke>.
+     * If SMTP credentials are not configured, logs a warning and skips silently.
      *
      * Requirements: 18.2, 18.3, 18.5
      */
     async sendEmail(to, subject, html) {
-        await this.transporter.sendMail({
-            from: '"SAMS" <noreply@sams.ke>',
-            to,
-            subject,
-            html,
-        });
+        // Skip silently if SMTP is not configured — avoids crashing the process
+        if (!process.env.SMTP_USER || !process.env.SMTP_PASS) {
+            console.warn(`[Email] SMTP not configured — skipping email to ${to} (subject: ${subject})`);
+            return;
+        }
+        try {
+            const fromAddress = process.env.SMTP_USER ?? 'noreply@sams.ke';
+            await this.transporter.sendMail({
+                from: `"SAMS" <${fromAddress}>`,
+                to,
+                subject,
+                html,
+            });
+        }
+        catch (err) {
+            // Log but do not propagate — email failure should never crash the server
+            console.error(`[Email] Failed to send email to ${to}:`, err instanceof Error ? err.message : err);
+        }
     }
     /**
-     * Send an in-app notification to a specific user via Socket.io.
+     * Send an in-app notification to a specific user via Socket.io AND persist to DB.
      * Emits the `notification:new` event to the user's personal room `user:{userId}`.
+     * Also writes to the Notification table so offline users see it on next load.
      *
      * Requirements: 18.1
      */
     async sendInApp(userId, notification) {
+        // Persist to DB so the notification survives if the user is offline
+        try {
+            // Look up the user's schoolId for the DB record
+            const { prisma } = require('../index');
+            const user = await prisma.user.findUnique({
+                where: { id: userId },
+                select: { schoolId: true },
+            });
+            if (user) {
+                await prisma.notification.create({
+                    data: {
+                        schoolId: user.schoolId,
+                        userId,
+                        title: notification.title,
+                        message: notification.message,
+                        type: notification.type,
+                    },
+                });
+            }
+        }
+        catch (err) {
+            // Never let DB failure block the socket emit
+            console.error('[NotificationService] Failed to persist in-app notification:', err);
+        }
+        // Emit via Socket.io for real-time delivery (user may be online)
         index_1.io.to(`user:${userId}`).emit('notification:new', {
             ...notification,
             timestamp: new Date().toISOString(),
