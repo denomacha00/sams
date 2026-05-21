@@ -306,8 +306,9 @@ attendanceRouter.put('/:id', requirePermission('mark:attendance'), async (req: R
 /**
  * POST /api/v1/attendance/sync
  * Sync offline attendance records.
+ * Only teachers, HODs, and admins can sync — students cannot forge records.
  */
-attendanceRouter.post('/sync', async (req: Request, res: Response): Promise<void> => {
+attendanceRouter.post('/sync', requirePermission('mark:attendance'), async (req: Request, res: Response): Promise<void> => {
   const parsed = syncSchema.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({

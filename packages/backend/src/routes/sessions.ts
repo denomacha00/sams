@@ -1,5 +1,6 @@
 import { Router, type Request, type Response } from 'express';
 import { z } from 'zod';
+import { UserRole } from '@sams/shared';
 import { requirePermission } from '../middleware/rbac';
 import { sessionService } from '../services/sessionService';
 import { prisma } from '../index';
@@ -51,9 +52,16 @@ sessionsRouter.post('/', requirePermission('start:session'), async (req: Request
 /**
  * GET /api/v1/sessions
  * List sessions scoped to the school.
+ * Students cannot list sessions — they scan QR codes directly.
  */
 sessionsRouter.get('/', async (req: Request, res: Response): Promise<void> => {
   try {
+    // Students cannot enumerate sessions
+    if (req.user.role === UserRole.STUDENT) {
+      res.status(403).json({ error: 'Forbidden', code: 'FORBIDDEN' });
+      return;
+    }
+
     const where: Record<string, unknown> = { schoolId: req.schoolId };
 
     if (req.query.classId) {
@@ -102,9 +110,16 @@ sessionsRouter.get('/:id', async (req: Request, res: Response): Promise<void> =>
 /**
  * GET /api/v1/sessions/:id/qr
  * Get the current active QR token for a session.
+ * Only teachers, HODs, and admins can retrieve QR tokens — not students.
  */
 sessionsRouter.get('/:id/qr', async (req: Request, res: Response): Promise<void> => {
   try {
+    // Students cannot retrieve QR tokens directly
+    if (req.user.role === UserRole.STUDENT) {
+      res.status(403).json({ error: 'Forbidden', code: 'FORBIDDEN' });
+      return;
+    }
+
     const qrToken = await sessionService.getActiveQR(req.params.id as string);
 
     if (!qrToken) {

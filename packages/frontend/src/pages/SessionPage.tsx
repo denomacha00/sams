@@ -89,7 +89,10 @@ const SessionPage: React.FC = () => {
     });
     socketRef.current = socket;
 
-    socket.emit('join:session', { sessionId: activeSession.id });
+    // Backend expects 'session:join' (not 'join:session')
+    socket.emit('session:join', { sessionId: activeSession.id });
+    // Also subscribe to QR refresh events
+    socket.emit('qr:subscribe', { sessionId: activeSession.id });
 
     socket.on('qr:refresh', (data: { sessionId: string; qrToken: string }) => {
       if (data.sessionId === activeSession.id) {
@@ -99,14 +102,21 @@ const SessionPage: React.FC = () => {
       }
     });
 
-    socket.on('attendance:update', (record: AttendanceRecord) => {
+    // Backend emits 'attendance:new' and 'attendance:updated' (not 'attendance:update')
+    const handleAttendanceRecord = (record: AttendanceRecord) => {
       setActiveSession((prev) => {
         if (!prev) return null;
         const exists = prev.records.find((r) => r.id === record.id);
-        if (exists) return prev;
+        if (exists) {
+          // Update existing record
+          return { ...prev, records: prev.records.map((r) => r.id === record.id ? record : r) };
+        }
         return { ...prev, records: [...prev.records, record] };
       });
-    });
+    };
+
+    socket.on('attendance:new', handleAttendanceRecord);
+    socket.on('attendance:updated', handleAttendanceRecord);
 
     return () => {
       socket.disconnect();

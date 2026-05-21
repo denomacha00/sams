@@ -211,11 +211,12 @@ notificationsRouter.patch('/:id', async (req: Request, res: Response): Promise<v
         select: { userId: true },
       });
       for (const n of affectedNotifications) {
+        // Fire and forget — don't block the response
         notificationService.sendInApp(n.userId, {
           title: 'Notification Updated',
           message,
           type: 'NOTIFICATION_UPDATED',
-        });
+        }).catch(() => {});
       }
     }
 

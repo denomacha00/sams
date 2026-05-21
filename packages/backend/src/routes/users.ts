@@ -294,6 +294,10 @@ usersRouter.post('/', requirePermission('manage:users'), async (req: Request, re
       if (!req.user.departmentId) {
         throw new AppError(403, 'FORBIDDEN', 'HOD must be assigned to a department');
       }
+      // HODs cannot create SCHOOL_ADMIN or other HODs
+      if (parsed.data.role === UserRole.SCHOOL_ADMIN || parsed.data.role === UserRole.HOD) {
+        throw new AppError(403, 'FORBIDDEN', 'HODs can only create TEACHER and STUDENT accounts');
+      }
       if (parsed.data.departmentId && parsed.data.departmentId !== req.user.departmentId) {
         throw new AppError(403, 'FORBIDDEN', 'HODs can only create users in their own department');
       }
