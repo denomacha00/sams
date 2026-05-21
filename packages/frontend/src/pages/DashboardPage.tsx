@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
+import { io as socketIo } from 'socket.io-client';
 import { useAuthStore } from '../store/authStore';
 import { UserRole } from '@sams/shared';
 import apiClient from '../services/apiClient';
@@ -614,10 +615,12 @@ function useTodaySchedule(): { entries: TimetableEntry[]; loading: boolean } {
 
 const DashboardPage: React.FC = () => {
   const user = useAuthStore((s) => s.user);
+  const accessToken = useAuthStore((s) => s.accessToken);
   const logout = useAuthStore((s) => s.logout);
   const navigate = useNavigate();
   const location = useLocation();
   const [currentTime, setCurrentTime] = useState(formatTime());
+  const [unreadCount, setUnreadCount] = useState(0);
 
   const { stats, loading: statsLoading } = useDashboardStats(user ?? undefined);
   const { entries: schedule, loading: scheduleLoading } = useTodaySchedule();
@@ -627,6 +630,23 @@ const DashboardPage: React.FC = () => {
     const interval = setInterval(() => setCurrentTime(formatTime()), 60000);
     return () => clearInterval(interval);
   }, []);
+
+  // Fetch unread notification count on mount
+  useEffect(() => {
+    apiClient.get('/notifications/unread-count')
+      .then(({ data }) => setUnreadCount(data.count ?? 0))
+      .catch(() => {});
+  }, []);
+
+  // Real-time: increment badge on new notification
+  useEffect(() => {
+    if (!accessToken) return;
+    const socket = socketIo(import.meta.env.VITE_WS_URL || window.location.origin, {
+      auth: { token: accessToken },
+    });
+    socket.on('notification:new', () => setUnreadCount((c: number) => c + 1));
+    return () => { socket.disconnect(); };
+  }, [accessToken]);
 
   const handleLogout = async () => {
     await logout();
@@ -703,7 +723,11 @@ const DashboardPage: React.FC = () => {
               <svg className="w-4 h-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={ICONS.bell} />
               </svg>
-              <span className="absolute -top-1 -right-1 w-3 h-3 bg-red-500 rounded-full border-2 border-slate-900 shadow-lg shadow-red-500/30" />
+              {unreadCount > 0 && (
+                <span className="absolute -top-1.5 -right-1.5 min-w-[1.1rem] h-[1.1rem] px-0.5 bg-red-500 rounded-full border-2 border-slate-900 shadow-lg shadow-red-500/30 flex items-center justify-center text-[9px] font-bold text-white">
+                  {unreadCount > 99 ? '99+' : unreadCount}
+                </span>
+              )}
             </Link>
 
             {/* Profile */}
