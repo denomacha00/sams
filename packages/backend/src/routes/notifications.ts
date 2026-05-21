@@ -91,7 +91,9 @@ notificationsRouter.get('/', async (req: Request, res: Response): Promise<void> 
         })
       : [];
 
-    const senderMap = new Map(senders.map((s) => [s.id, { name: s.fullName, role: s.role }]));
+    const senderMap = new Map<string, { name: string; role: string }>(
+      senders.map((s) => [s.id, { name: s.fullName, role: s.role }])
+    );
 
     const enrichedNotifications = notifications.map((n) => {
       let senderName: string;
@@ -99,12 +101,14 @@ notificationsRouter.get('/', async (req: Request, res: Response): Promise<void> 
 
       if (n.senderId === null) {
         senderName = 'System';
-      } else if (senderMap.has(n.senderId)) {
-        const sender = senderMap.get(n.senderId)!;
-        senderName = sender.name || 'Unknown';
-        senderRole = sender.role;
       } else {
-        senderName = 'Deleted User';
+        const sender = senderMap.get(n.senderId);
+        if (sender) {
+          senderName = sender.name || 'Unknown';
+          senderRole = sender.role;
+        } else {
+          senderName = 'Deleted User';
+        }
       }
 
       return {
