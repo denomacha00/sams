@@ -12,6 +12,7 @@ interface Notification {
   updatedAt: string | null;
   senderId: string | null;
   senderName: string | null;
+  senderRole: string | null;
   batchId: string | null;
 }
 
@@ -42,6 +43,35 @@ function getDisplaySenderName(notification: Notification): string {
   if (notification.senderId === null) return 'System';
   if (!notification.senderName || notification.senderName === 'Deleted User') return 'Deleted User';
   return notification.senderName;
+}
+
+/** Format a role string into a readable label */
+function formatRole(role: string | null): string {
+  if (!role) return '';
+  switch (role) {
+    case 'SUPER_ADMIN': return 'Super Admin';
+    case 'SCHOOL_ADMIN': return 'Admin';
+    case 'HOD': return 'HOD';
+    case 'TEACHER': return 'Teacher';
+    case 'STUDENT': return 'Student';
+    default: return role;
+  }
+}
+
+/** Format a date string to a readable date + time */
+function formatDateTime(dateStr: string): string {
+  const d = new Date(dateStr);
+  const now = new Date();
+  const isToday = d.toDateString() === now.toDateString();
+  const yesterday = new Date(now);
+  yesterday.setDate(yesterday.getDate() - 1);
+  const isYesterday = d.toDateString() === yesterday.toDateString();
+
+  const time = d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
+  if (isToday) return `Today at ${time}`;
+  if (isYesterday) return `Yesterday at ${time}`;
+  return `${d.toLocaleDateString([], { day: 'numeric', month: 'short', year: 'numeric' })} at ${time}`;
 }
 
 const NotificationsPage: React.FC = () => {
@@ -424,6 +454,7 @@ const NotificationsPage: React.FC = () => {
           <div className="space-y-3">
             {notifications.map((notif) => {
               const senderDisplay = truncateName(getDisplaySenderName(notif));
+              const roleDisplay = formatRole(notif.senderRole);
               const isOwn = isOwnNotification(notif);
               const isAdmin = user && ['SCHOOL_ADMIN', 'HOD'].includes(user.role);
               const canModify = isOwn && (isAdmin || isWithin24Hours(notif.createdAt));
@@ -448,9 +479,6 @@ const NotificationsPage: React.FC = () => {
                         <h3 className={`text-sm font-semibold ${notif.read ? 'text-gray-400' : 'text-white'}`}>
                           {notif.title}
                         </h3>
-                        <span className="text-xs px-2 py-0.5 rounded-full bg-white/10 text-gray-400 border border-white/5">
-                          {senderDisplay}
-                        </span>
                         {notif.updatedAt && (
                           <span className="text-xs text-amber-400/70 italic">edited</span>
                         )}
@@ -458,6 +486,28 @@ const NotificationsPage: React.FC = () => {
                       <p className={`text-sm mt-1.5 ${notif.read ? 'text-gray-500' : 'text-gray-300'}`}>
                         {notif.message}
                       </p>
+                      {/* Sender info + timestamp */}
+                      <div className="flex items-center gap-2 mt-2 flex-wrap">
+                        <div className="flex items-center gap-1.5">
+                          <div className="w-5 h-5 rounded-full bg-gradient-to-br from-teal-500 to-cyan-600 flex items-center justify-center text-[10px] font-bold text-white flex-shrink-0">
+                            {senderDisplay.charAt(0).toUpperCase()}
+                          </div>
+                          <span className="text-xs text-gray-400 font-medium">{senderDisplay}</span>
+                          {roleDisplay && (
+                            <span className="text-xs px-1.5 py-0.5 rounded-full bg-white/10 text-gray-500 border border-white/5">
+                              {roleDisplay}
+                            </span>
+                          )}
+                        </div>
+                        <span className="text-gray-600 text-xs">·</span>
+                        <span className="text-xs text-gray-500">{formatDateTime(notif.createdAt)}</span>
+                        {notif.updatedAt && (
+                          <>
+                            <span className="text-gray-600 text-xs">·</span>
+                            <span className="text-xs text-amber-400/60">edited {formatDateTime(notif.updatedAt)}</span>
+                          </>
+                        )}
+                      </div>
                     </div>
                     <div className="flex items-center gap-2 flex-shrink-0">
                       {/* Edit/Delete controls for own notifications */}
@@ -513,9 +563,6 @@ const NotificationsPage: React.FC = () => {
                           </div>
                         </div>
                       )}
-                      <span className="text-xs text-gray-500 ml-2">
-                        {new Date(notif.createdAt).toLocaleDateString()}
-                      </span>
                     </div>
                   </div>
                 </div>

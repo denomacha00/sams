@@ -87,18 +87,22 @@ notificationsRouter.get('/', async (req: Request, res: Response): Promise<void> 
     const senders = senderIds.length > 0
       ? await prisma.user.findMany({
           where: { id: { in: senderIds } },
-          select: { id: true, fullName: true },
+          select: { id: true, fullName: true, role: true },
         })
       : [];
 
-    const senderMap = new Map(senders.map((s) => [s.id, s.fullName]));
+    const senderMap = new Map(senders.map((s) => [s.id, { name: s.fullName, role: s.role }]));
 
     const enrichedNotifications = notifications.map((n) => {
       let senderName: string;
+      let senderRole: string | null = null;
+
       if (n.senderId === null) {
         senderName = 'System';
       } else if (senderMap.has(n.senderId)) {
-        senderName = (senderMap.get(n.senderId) as string) || 'Unknown';
+        const sender = senderMap.get(n.senderId)!;
+        senderName = sender.name || 'Unknown';
+        senderRole = sender.role;
       } else {
         senderName = 'Deleted User';
       }
@@ -107,6 +111,7 @@ notificationsRouter.get('/', async (req: Request, res: Response): Promise<void> 
         ...n,
         senderId: n.senderId,
         senderName,
+        senderRole,
         batchId: n.batchId,
         updatedAt: n.updatedAt,
       };
