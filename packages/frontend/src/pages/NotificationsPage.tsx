@@ -187,6 +187,8 @@ const NotificationsPage: React.FC = () => {
       setSendSuccess(true);
       setMessage('');
       setTargetId('');
+      // Refresh the notifications list so the sender sees it too
+      await fetchNotifications();
       setTimeout(() => setSendSuccess(false), 3000);
     } catch (err: any) {
       setSendError(err.response?.data?.error || 'Failed to send notification');

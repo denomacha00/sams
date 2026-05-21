@@ -233,8 +233,9 @@ export class AttendanceService {
       throw new AppError(400, 'SESSION_ENDED', 'Attendance session has ended');
     }
 
-    // 3. Validate GPS proximity
-    if (session.locationLat != null && session.locationLng != null) {
+    // 3. Validate GPS proximity (skip if no real GPS coords provided)
+    const hasGPS = gpsCoords.lat !== 0 || gpsCoords.lng !== 0;
+    if (hasGPS && session.locationLat != null && session.locationLng != null) {
       const distance = haversineDistance(
         gpsCoords.lat,
         gpsCoords.lng,

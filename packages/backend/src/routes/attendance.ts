@@ -14,7 +14,7 @@ const qrScanSchema = z.object({
   gpsCoords: z.object({
     lat: z.number().min(-90).max(90),
     lng: z.number().min(-180).max(180),
-  }),
+  }).optional(),
 });
 
 const manualSchema = z.object({
@@ -85,7 +85,7 @@ attendanceRouter.post('/qr', async (req: Request, res: Response): Promise<void> 
       req.user.sub,
       req.schoolId,
       parsed.data.qrToken,
-      parsed.data.gpsCoords,
+      parsed.data.gpsCoords ?? { lat: 0, lng: 0 },
     );
     res.status(201).json(record);
   } catch (err) {

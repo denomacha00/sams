@@ -1,6 +1,6 @@
 import nodemailer from 'nodemailer';
 import AfricasTalking from 'africastalking';
-import { io } from '../index';
+import { io, prisma } from '../index';
 import { auditService } from './auditService';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -132,8 +132,6 @@ export class NotificationService {
   ): Promise<void> {
     // Persist to DB so the notification survives if the user is offline
     try {
-      // Look up the user's schoolId for the DB record
-      const { prisma } = require('../index');
       const user = await prisma.user.findUnique({
         where: { id: userId },
         select: { schoolId: true },
