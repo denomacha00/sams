@@ -26,7 +26,9 @@ departmentsRouter.get('/', async (req: Request, res: Response): Promise<void> =>
     select: { id: true, fullName: true, departmentId: true },
   });
 
-  const hodByDept = new Map(hodUsers.map((u) => [u.departmentId, { id: u.id, name: u.fullName }]));
+  const hodByDept = new Map<string, { id: string; name: string }>(
+    hodUsers.map((u) => [u.departmentId as string, { id: u.id, name: u.fullName }]),
+  );
 
   const enriched = departments.map((d) => {
     const hod = hodByDept.get(d.id);

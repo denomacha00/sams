@@ -22,10 +22,10 @@ riskScoresRouter.get('/me', async (req: Request, res: Response): Promise<void> =
     const score = await riskService.computeRiskScore(req.schoolId, req.user.sub);
     res.status(200).json(score);
   } catch (err) {
-    if (AppError.isAppError(err)) {
-      res.status((err as AppError).statusCode).json({
-        error: (err as AppError).message,
-        code: (err as AppError).code,
+    if (err instanceof AppError) {
+      res.status(err.statusCode).json({
+        error: err.message,
+        code: err.code,
       });
       return;
     }
@@ -68,11 +68,11 @@ riskScoresRouter.get('/:studentId', requirePermission('view:risk'), async (req: 
     const score = await riskService.computeRiskScore(req.schoolId, req.params.studentId as string);
     res.status(200).json(score);
   } catch (err) {
-    if (AppError.isAppError(err)) {
+    if (err instanceof AppError) {
       // Surface known errors (404 student not found, 403 forbidden) properly
-      res.status((err as AppError).statusCode).json({
-        error: (err as AppError).message,
-        code: (err as AppError).code,
+      res.status(err.statusCode).json({
+        error: err.message,
+        code: err.code,
         requestId: req.id,
       });
       return;
