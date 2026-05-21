@@ -53,12 +53,17 @@ const SessionPage: React.FC = () => {
   const [linkTimeRemaining, setLinkTimeRemaining] = useState<number>(0);
   const linkTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  // Fetch timetable entries
+  // Fetch timetable entries — filter to today's day by default
   useEffect(() => {
     const fetchEntries = async () => {
       try {
-        const { data } = await apiClient.get('/timetable');
-        setTimetableEntries(data);
+        // JS getDay(): 0=Sun, 1=Mon … 6=Sat → schema: 0=Mon … 6=Sun
+        const jsDayOfWeek = new Date().getDay();
+        const schemaDayOfWeek = jsDayOfWeek === 0 ? 6 : jsDayOfWeek - 1;
+        const { data } = await apiClient.get('/timetable', {
+          params: { dayOfWeek: schemaDayOfWeek },
+        });
+        setTimetableEntries(Array.isArray(data) ? data : []);
       } catch {
         // ignore
       }

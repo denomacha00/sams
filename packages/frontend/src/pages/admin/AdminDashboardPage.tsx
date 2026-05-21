@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuthStore } from '../../store/authStore';
+import { UserRole } from '@sams/shared';
 import apiClient from '../../services/apiClient';
 
 interface DashboardStats {
@@ -12,6 +13,8 @@ interface DashboardStats {
 
 const AdminDashboardPage: React.FC = () => {
   const user = useAuthStore((s) => s.user);
+  const isHOD = user?.role === UserRole.HOD;
+
   const [stats, setStats] = useState<DashboardStats>({
     totalStudents: 0,
     totalTeachers: 0,
@@ -26,19 +29,27 @@ const AdminDashboardPage: React.FC = () => {
 
   const fetchStats = async () => {
     try {
-      const { data } = await apiClient.get('/users');
-      const users = data.users || data || [];
-      const totalStudents = users.filter((u: any) => u.role === 'STUDENT').length;
-      const totalTeachers = users.filter((u: any) => u.role === 'TEACHER').length;
-      const totalHODs = users.filter((u: any) => u.role === 'HOD').length;
+      // Use separate role-filtered queries — avoids loading all users into memory
+      // HOD will only see their department's users (backend enforces this)
+      const [studentsRes, teachersRes, hodsRes, sessionsRes] = await Promise.allSettled([
+        apiClient.get('/users', { params: { role: 'STUDENT' } }),
+        apiClient.get('/users', { params: { role: 'TEACHER' } }),
+        isHOD ? Promise.resolve({ data: [] }) : apiClient.get('/users', { params: { role: 'HOD' } }),
+        apiClient.get('/sessions', { params: { isActive: true } }),
+      ]);
 
-      let activeSessions = 0;
-      try {
-        const sessionsRes = await apiClient.get('/sessions?active=true');
-        activeSessions = (sessionsRes.data.sessions || sessionsRes.data || []).length;
-      } catch {
-        activeSessions = 0;
-      }
+      const totalStudents = studentsRes.status === 'fulfilled'
+        ? (Array.isArray(studentsRes.value.data) ? studentsRes.value.data.length : 0)
+        : 0;
+      const totalTeachers = teachersRes.status === 'fulfilled'
+        ? (Array.isArray(teachersRes.value.data) ? teachersRes.value.data.length : 0)
+        : 0;
+      const totalHODs = hodsRes.status === 'fulfilled'
+        ? (Array.isArray(hodsRes.value.data) ? hodsRes.value.data.length : 0)
+        : 0;
+      const activeSessions = sessionsRes.status === 'fulfilled'
+        ? (Array.isArray(sessionsRes.value.data) ? sessionsRes.value.data.length : 0)
+        : 0;
 
       setStats({ totalStudents, totalTeachers, totalHODs, activeSessions });
     } catch (err) {
@@ -49,18 +60,46 @@ const AdminDashboardPage: React.FC = () => {
   };
 
   const statCards = [
-    { label: 'Total Students', value: stats.totalStudents, icon: 'M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197m13.5-9a2.5 2.5 0 11-5 0 2.5 2.5 0 015 0z', color: 'from-blue-500 to-cyan-500' },
-    { label: 'Total Teachers', value: stats.totalTeachers, icon: 'M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16', color: 'from-green-500 to-emerald-500' },
-    { label: 'Total HODs', value: stats.totalHODs, icon: 'M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z', color: 'from-orange-500 to-amber-500' },
-    { label: 'Active Sessions', value: stats.activeSessions, icon: 'M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z', color: 'from-purple-500 to-pink-500' },
+    {
+      label: isHOD ? 'Dept. Students' : 'Total Students',
+      value: stats.totalStudents,
+      icon: 'M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197m13.5-9a2.5 2.5 0 11-5 0 2.5 2.5 0 015 0z',
+      color: 'from-blue-500 to-cyan-500',
+    },
+    {
+      label: isHOD ? 'Dept. Teachers' : 'Total Teachers',
+      value: stats.totalTeachers,
+      icon: 'M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16',
+      color: 'from-green-500 to-emerald-500',
+    },
+    ...(!isHOD ? [{
+      label: 'Total HODs',
+      value: stats.totalHODs,
+      icon: 'M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z',
+      color: 'from-orange-500 to-amber-500',
+    }] : []),
+    {
+      label: 'Active Sessions',
+      value: stats.activeSessions,
+      icon: 'M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z',
+      color: 'from-purple-500 to-pink-500',
+    },
   ];
 
-  const quickActions = [
-    { to: '/admin/users', label: 'Manage Users', icon: 'M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z', color: 'from-blue-500 to-cyan-500' },
-    { to: '/admin/links', label: 'Registration Links', icon: 'M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1', color: 'from-green-500 to-emerald-500' },
-    { to: '/admin/timetable', label: 'Timetable', icon: 'M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z', color: 'from-orange-500 to-amber-500' },
-    { to: '/admin/departments', label: 'Departments', icon: 'M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4', color: 'from-purple-500 to-pink-500' },
-  ];
+  // HOD gets a focused set of quick actions (no school-wide items)
+  const quickActions = isHOD
+    ? [
+        { to: '/admin/users', label: 'Manage Dept. Users', icon: 'M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z', color: 'from-blue-500 to-cyan-500' },
+        { to: '/admin/links', label: 'Registration Links', icon: 'M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1', color: 'from-green-500 to-emerald-500' },
+        { to: '/admin/timetable', label: 'Dept. Timetable', icon: 'M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z', color: 'from-orange-500 to-amber-500' },
+        { to: '/hod/department', label: 'Department', icon: 'M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4', color: 'from-purple-500 to-pink-500' },
+      ]
+    : [
+        { to: '/admin/users', label: 'Manage Users', icon: 'M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z', color: 'from-blue-500 to-cyan-500' },
+        { to: '/admin/links', label: 'Registration Links', icon: 'M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1', color: 'from-green-500 to-emerald-500' },
+        { to: '/admin/timetable', label: 'Timetable', icon: 'M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z', color: 'from-orange-500 to-amber-500' },
+        { to: '/admin/departments', label: 'Departments', icon: 'M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4', color: 'from-purple-500 to-pink-500' },
+      ];
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900">
@@ -74,8 +113,8 @@ const AdminDashboardPage: React.FC = () => {
               </svg>
             </div>
             <div>
-              <h1 className="text-lg font-bold text-white">SAMS Admin</h1>
-              <p className="text-xs text-gray-400">School Administration Panel</p>
+              <h1 className="text-lg font-bold text-white">SAMS {isHOD ? 'HOD Panel' : 'Admin'}</h1>
+              <p className="text-xs text-gray-400">{isHOD ? 'Department Administration' : 'School Administration Panel'}</p>
             </div>
           </div>
           <div className="flex items-center gap-4">
@@ -90,8 +129,8 @@ const AdminDashboardPage: React.FC = () => {
       <main className="max-w-7xl mx-auto px-6 py-10">
         {/* Welcome */}
         <div className="mb-10">
-          <h2 className="text-3xl font-bold text-white mb-2">Admin Dashboard</h2>
-          <p className="text-gray-400">Overview of your school's system</p>
+          <h2 className="text-3xl font-bold text-white mb-2">{isHOD ? 'Department Dashboard' : 'Admin Dashboard'}</h2>
+          <p className="text-gray-400">{isHOD ? 'Overview of your department' : "Overview of your school's system"}</p>
         </div>
 
         {/* Stats Cards */}

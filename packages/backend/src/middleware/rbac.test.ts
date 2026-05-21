@@ -1,7 +1,8 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import type { Request, Response, NextFunction } from 'express';
 import { UserRole } from '@sams/shared';
-import { requirePermission, enforceSchoolScope, ROLE_PERMISSIONS, type Permission } from './rbac';
+import { requirePermission, enforceSchoolScope, ROLE_PERMISSIONS, assertSchoolOwnership, requireHODScope, requireStudentSelf, type Permission, type AuthRequest } from './rbac';
+import { AppError } from './errors';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -244,9 +245,6 @@ describe('enforceSchoolScope', () => {
 
 // ─── assertSchoolOwnership ────────────────────────────────────────────────────
 
-import { assertSchoolOwnership, requireHODScope, requireStudentSelf, type AuthRequest } from './rbac';
-import { AppError } from './errors';
-
 describe('assertSchoolOwnership', () => {
   it('does not throw when resource.schoolId matches req.schoolId', () => {
     const req = { schoolId: 'school-a', user: { sub: 'u1', schoolId: 'school-a', role: UserRole.TEACHER, iat: 0, exp: 9999 } } as unknown as AuthRequest;
@@ -255,7 +253,7 @@ describe('assertSchoolOwnership', () => {
 
   it('throws AppError 403 when resource.schoolId differs from req.schoolId', () => {
     const req = { schoolId: 'school-a', user: { sub: 'u1', schoolId: 'school-a', role: UserRole.TEACHER, iat: 0, exp: 9999 } } as unknown as AuthRequest;
-    expect(() => assertSchoolOwnership({ schoolId: 'school-b' }, req)).toThrow(AppError);
+    expect(() => assertSchoolOwnership({ schoolId: 'school-b' }, req)).toThrow();
   });
 
   it('thrown AppError has statusCode 403 and code FORBIDDEN', () => {
@@ -264,9 +262,12 @@ describe('assertSchoolOwnership', () => {
       assertSchoolOwnership({ schoolId: 'school-b' }, req);
       expect.fail('should have thrown');
     } catch (err) {
-      expect(err).toBeInstanceOf(AppError);
-      expect((err as AppError).statusCode).toBe(403);
-      expect((err as AppError).code).toBe('FORBIDDEN');
+      // Use the static type guard — works across module boundaries unlike instanceof
+      expect(AppError.isAppError(err)).toBe(true);
+      if (AppError.isAppError(err)) {
+        expect(err.statusCode).toBe(403);
+        expect(err.code).toBe('FORBIDDEN');
+      }
     }
   });
 });

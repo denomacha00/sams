@@ -77,6 +77,38 @@ const updateMeSchema = z.object({
 export const usersRouter = Router();
 
 /**
+ * GET /api/v1/users/me
+ * Get the authenticated user's own profile.
+ */
+usersRouter.get('/me', async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+  try {
+    const user = await prisma.user.findUnique({
+      where: { id: req.user.sub },
+      select: {
+        id: true,
+        username: true,
+        fullName: true,
+        email: true,
+        phone: true,
+        role: true,
+        avatarUrl: true,
+        schoolId: true,
+        departmentId: true,
+        classId: true,
+      },
+    });
+
+    if (!user) {
+      throw new AppError(404, 'USER_NOT_FOUND', 'User not found');
+    }
+
+    res.status(200).json(user);
+  } catch (err) {
+    next(err instanceof AppError ? err : new AppError(500, 'INTERNAL_ERROR', 'Failed to get profile'));
+  }
+});
+
+/**
  * PATCH /api/v1/users/me
  * Update the authenticated user's own profile.
  */
@@ -214,14 +246,24 @@ usersRouter.post('/me/avatar', upload.single('avatar'), async (req: Request, res
 /**
  * GET /api/v1/users
  * List users scoped to the authenticated user's school.
+ * HOD scope guard automatically filters to their department.
  */
 usersRouter.get('/', requirePermission('manage:users'), async (req: Request, res: Response, next: NextFunction): Promise<void> => {
   try {
-    const filters = {
+    const filters: { role?: UserRole; departmentId?: string; classId?: string } = {
       role: req.query.role as UserRole | undefined,
       departmentId: req.query.departmentId as string | undefined,
       classId: req.query.classId as string | undefined,
     };
+
+    // HOD can only see users in their own department
+    if (req.user.role === UserRole.HOD) {
+      if (!req.user.departmentId) {
+        res.status(403).json({ error: 'Forbidden', code: 'FORBIDDEN' });
+        return;
+      }
+      filters.departmentId = req.user.departmentId;
+    }
 
     const users = await userService.listUsers(req.schoolId, filters);
     res.status(200).json(users);
@@ -233,6 +275,7 @@ usersRouter.get('/', requirePermission('manage:users'), async (req: Request, res
 /**
  * POST /api/v1/users
  * Create a new user within the school.
+ * HOD can only create users in their own department.
  */
 usersRouter.post('/', requirePermission('manage:users'), async (req: Request, res: Response, next: NextFunction): Promise<void> => {
   const parsed = createUserSchema.safeParse(req.body);
@@ -246,6 +289,18 @@ usersRouter.post('/', requirePermission('manage:users'), async (req: Request, re
   }
 
   try {
+    // HOD can only create users in their own department
+    if (req.user.role === UserRole.HOD) {
+      if (!req.user.departmentId) {
+        throw new AppError(403, 'FORBIDDEN', 'HOD must be assigned to a department');
+      }
+      if (parsed.data.departmentId && parsed.data.departmentId !== req.user.departmentId) {
+        throw new AppError(403, 'FORBIDDEN', 'HODs can only create users in their own department');
+      }
+      // Force departmentId to HOD's own department
+      parsed.data.departmentId = req.user.departmentId;
+    }
+
     const user = await userService.createUser(req.schoolId, parsed.data);
     res.status(201).json(user);
   } catch (err) {
@@ -256,10 +311,20 @@ usersRouter.post('/', requirePermission('manage:users'), async (req: Request, re
 /**
  * GET /api/v1/users/:id
  * Get a single user by ID.
+ * Requires manage:users permission — prevents students/teachers from fetching arbitrary profiles.
+ * HOD can only fetch users in their own department.
  */
-usersRouter.get('/:id', async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+usersRouter.get('/:id', requirePermission('manage:users'), async (req: Request, res: Response, next: NextFunction): Promise<void> => {
   try {
     const user = await userService.getUser(req.schoolId, req.params.id as string);
+
+    // HOD can only view users in their own department
+    if (req.user.role === UserRole.HOD) {
+      if (!req.user.departmentId || (user as any).departmentId !== req.user.departmentId) {
+        throw new AppError(403, 'FORBIDDEN', 'HODs can only view users in their own department');
+      }
+    }
+
     res.status(200).json(user);
   } catch (err) {
     next(err instanceof AppError ? err : new AppError(500, 'INTERNAL_ERROR', 'Failed to get user'));
@@ -269,6 +334,7 @@ usersRouter.get('/:id', async (req: Request, res: Response, next: NextFunction):
 /**
  * PUT /api/v1/users/:id
  * Update a user.
+ * HOD can only update users in their own department.
  */
 usersRouter.put('/:id', requirePermission('manage:users'), async (req: Request, res: Response, next: NextFunction): Promise<void> => {
   const parsed = updateUserSchema.safeParse(req.body);
@@ -282,6 +348,21 @@ usersRouter.put('/:id', requirePermission('manage:users'), async (req: Request, 
   }
 
   try {
+    // HOD scope: verify the target user is in their department
+    if (req.user.role === UserRole.HOD) {
+      if (!req.user.departmentId) {
+        throw new AppError(403, 'FORBIDDEN', 'HOD must be assigned to a department');
+      }
+      const targetUser = await userService.getUser(req.schoolId, req.params.id as string);
+      if ((targetUser as any).departmentId !== req.user.departmentId) {
+        throw new AppError(403, 'FORBIDDEN', 'HODs can only update users in their own department');
+      }
+      // HOD cannot move a user to a different department
+      if (parsed.data.departmentId && parsed.data.departmentId !== req.user.departmentId) {
+        throw new AppError(403, 'FORBIDDEN', 'HODs cannot move users to a different department');
+      }
+    }
+
     const user = await userService.updateUser(req.schoolId, req.params.id as string, parsed.data as Parameters<typeof userService.updateUser>[2]);
     res.status(200).json(user);
   } catch (err) {
@@ -292,9 +373,21 @@ usersRouter.put('/:id', requirePermission('manage:users'), async (req: Request, 
 /**
  * DELETE /api/v1/users/:id
  * Delete a user.
+ * HOD can only delete users in their own department.
  */
 usersRouter.delete('/:id', requirePermission('manage:users'), async (req: Request, res: Response, next: NextFunction): Promise<void> => {
   try {
+    // HOD scope: verify the target user is in their department
+    if (req.user.role === UserRole.HOD) {
+      if (!req.user.departmentId) {
+        throw new AppError(403, 'FORBIDDEN', 'HOD must be assigned to a department');
+      }
+      const targetUser = await userService.getUser(req.schoolId, req.params.id as string);
+      if ((targetUser as any).departmentId !== req.user.departmentId) {
+        throw new AppError(403, 'FORBIDDEN', 'HODs can only delete users in their own department');
+      }
+    }
+
     await userService.deleteUser(req.schoolId, req.params.id as string);
     res.status(204).send();
   } catch (err) {

@@ -78,21 +78,28 @@ ReactDOM.createRoot(document.getElementById('root') as HTMLElement).render(
         {/* Protected routes — any authenticated user */}
         <Route element={<AuthGuard />}>
           <Route path="/dashboard" element={<DashboardPage />} />
-          <Route path="/class/students" element={<ClassStudentsPage />} />
           <Route path="/attend/:token" element={<LinkAttendancePage />} />
-          <Route path="/sessions" element={<SessionPage />} />
-          <Route path="/sessions/scan" element={<QRScanPage />} />
-          <Route path="/attendance" element={<ManualAttendancePage />} />
-          <Route path="/biometric/enroll" element={<BiometricEnrollPage />} />
-          <Route path="/biometric/attendance" element={<BiometricAttendancePage />} />
           <Route path="/timetable" element={<TimetableViewPage />} />
           <Route path="/reports" element={<ReportsPage />} />
-          <Route path="/risk-scores" element={<RiskScorePage />} />
           <Route path="/ai" element={<AIAssistantPage />} />
           <Route path="/profile" element={<ProfilePage />} />
           <Route path="/settings" element={<SettingsPage />} />
           <Route path="/notifications" element={<NotificationsPage />} />
+        </Route>
+
+        {/* Teacher + HOD + Admin routes */}
+        <Route element={<AuthGuard allowedRoles={[UserRole.SCHOOL_ADMIN, UserRole.HOD, UserRole.TEACHER]} />}>
+          <Route path="/sessions" element={<SessionPage />} />
+          <Route path="/attendance" element={<ManualAttendancePage />} />
+          <Route path="/biometric/enroll" element={<BiometricEnrollPage />} />
+          <Route path="/biometric/attendance" element={<BiometricAttendancePage />} />
+          <Route path="/class/students" element={<ClassStudentsPage />} />
           <Route path="/admin/knowledge" element={<KnowledgeManagementPage />} />
+        </Route>
+
+        {/* Student-only routes */}
+        <Route element={<AuthGuard allowedRoles={[UserRole.STUDENT]} />}>
+          <Route path="/sessions/scan" element={<QRScanPage />} />
         </Route>
 
         {/* Admin routes — restricted to SCHOOL_ADMIN and HOD roles */}
@@ -101,6 +108,7 @@ ReactDOM.createRoot(document.getElementById('root') as HTMLElement).render(
           <Route path="/admin/users" element={<UserManagementPage />} />
           <Route path="/admin/timetable" element={<TimetablePage />} />
           <Route path="/admin/departments" element={<DepartmentsPage />} />
+          <Route path="/risk-scores" element={<RiskScorePage />} />
         </Route>
 
         {/* Registration Links — accessible to SCHOOL_ADMIN, HOD, and TEACHER */}

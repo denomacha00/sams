@@ -1,5 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
+import { useAuthStore } from '../../store/authStore';
+import { UserRole } from '@sams/shared';
 import apiClient from '../../services/apiClient';
 
 interface User {
@@ -46,6 +48,9 @@ const emptyForm: UserFormData = {
 };
 
 const UserManagementPage: React.FC = () => {
+  const currentUser = useAuthStore((s) => s.user);
+  const isHOD = currentUser?.role === UserRole.HOD;
+
   const [users, setUsers] = useState<User[]>([]);
   const [departments, setDepartments] = useState<Department[]>([]);
   const [loading, setLoading] = useState(true);
@@ -219,7 +224,8 @@ const UserManagementPage: React.FC = () => {
     }
   };
 
-  const tabs = ['ALL', 'HOD', 'TEACHER', 'STUDENT'];
+  // HOD can only manage TEACHER and STUDENT roles in their department
+  const tabs = isHOD ? ['ALL', 'TEACHER', 'STUDENT'] : ['ALL', 'HOD', 'TEACHER', 'STUDENT'];
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900">
@@ -230,7 +236,9 @@ const UserManagementPage: React.FC = () => {
             <Link to="/admin" className="text-gray-400 hover:text-cyan-400 transition-colors">
               ← Admin
             </Link>
-            <h1 className="text-lg font-bold text-white">User Management</h1>
+            <h1 className="text-lg font-bold text-white">
+              {isHOD ? 'Department User Management' : 'User Management'}
+            </h1>
           </div>
           <button
             onClick={openAddModal}
@@ -440,7 +448,8 @@ const UserManagementPage: React.FC = () => {
                   >
                     <option value="STUDENT" className="bg-slate-800">Student</option>
                     <option value="TEACHER" className="bg-slate-800">Teacher</option>
-                    <option value="HOD" className="bg-slate-800">HOD</option>
+                    {/* HOD users cannot create other HODs — only SCHOOL_ADMIN can */}
+                    {!isHOD && <option value="HOD" className="bg-slate-800">HOD</option>}
                   </select>
                 </div>
                 <div>

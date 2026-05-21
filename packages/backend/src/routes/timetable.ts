@@ -1,6 +1,6 @@
 import { Router, type Request, type Response } from 'express';
 import { z } from 'zod';
-import { requirePermission } from '../middleware/rbac';
+import { requirePermission, requireHODScope } from '../middleware/rbac';
 import { timetableService } from '../services/timetableService';
 import { AppError } from '../middleware/errors';
 
@@ -53,8 +53,9 @@ timetableRouter.get('/', async (req: Request, res: Response): Promise<void> => {
 /**
  * POST /api/v1/timetable
  * Create a new timetable entry.
+ * HOD scope guard ensures HODs can only create entries for their own department's classes.
  */
-timetableRouter.post('/', requirePermission('manage:timetable'), async (req: Request, res: Response): Promise<void> => {
+timetableRouter.post('/', requirePermission('manage:timetable'), requireHODScope, async (req: Request, res: Response): Promise<void> => {
   const parsed = createTimetableSchema.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({
@@ -78,8 +79,9 @@ timetableRouter.post('/', requirePermission('manage:timetable'), async (req: Req
 /**
  * PUT /api/v1/timetable/:id
  * Update a timetable entry.
+ * HOD scope guard ensures HODs can only update entries for their own department's classes.
  */
-timetableRouter.put('/:id', requirePermission('manage:timetable'), async (req: Request, res: Response): Promise<void> => {
+timetableRouter.put('/:id', requirePermission('manage:timetable'), requireHODScope, async (req: Request, res: Response): Promise<void> => {
   const parsed = updateTimetableSchema.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({
@@ -102,8 +104,9 @@ timetableRouter.put('/:id', requirePermission('manage:timetable'), async (req: R
 /**
  * DELETE /api/v1/timetable/:id
  * Delete a timetable entry.
+ * HOD scope guard ensures HODs can only delete entries for their own department's classes.
  */
-timetableRouter.delete('/:id', requirePermission('manage:timetable'), async (req: Request, res: Response): Promise<void> => {
+timetableRouter.delete('/:id', requirePermission('manage:timetable'), requireHODScope, async (req: Request, res: Response): Promise<void> => {
   try {
     await timetableService.deleteEntry(req.schoolId, req.params.id as string);
     res.status(204).send();

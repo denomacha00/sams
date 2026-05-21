@@ -230,32 +230,100 @@ const TodaySchedule: React.FC<{ entries: TimetableEntry[]; loading: boolean }> =
 
 // ─── Activity Feed Component ─────────────────────────────────────────────────
 
-const ActivityFeed: React.FC = () => (
-  <div className="rounded-2xl border border-white/10 bg-white/[0.03] backdrop-blur-md p-6 min-h-[280px]" style={{ animation: 'fadeInUp 0.5s ease-out 0.7s forwards', opacity: 0 }}>
-    <div className="flex items-center gap-3 mb-5">
-      <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center shadow-lg shadow-purple-500/20">
-        <svg className="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={ICONS.trending} />
-        </svg>
-      </div>
-      <h3 className="text-lg font-semibold text-white">Recent Activity</h3>
-    </div>
-    <div className="space-y-3">
-      {[
-        { text: 'New student registered', time: '2 min ago', color: 'bg-green-500' },
-        { text: 'Attendance session completed', time: '15 min ago', color: 'bg-blue-500' },
-        { text: 'Report generated', time: '1 hour ago', color: 'bg-purple-500' },
-        { text: 'Timetable updated', time: '3 hours ago', color: 'bg-orange-500' },
-      ].map((item, i) => (
-        <div key={i} className="flex items-center gap-3 p-3 rounded-xl bg-white/[0.02] hover:bg-white/[0.05] border border-white/5 hover:border-white/10 transition-all duration-300">
-          <div className={`w-2.5 h-2.5 rounded-full ${item.color} shadow-sm`} />
-          <p className="text-sm text-gray-300 flex-1">{item.text}</p>
-          <span className="text-xs text-gray-500 font-medium">{item.time}</span>
+interface ActivityItem {
+  id: string;
+  message: string;
+  createdAt: string;
+  type: string;
+}
+
+const ActivityFeed: React.FC = () => {
+  const [items, setItems] = useState<ActivityItem[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    let cancelled = false;
+    apiClient.get('/notifications/sent')
+      .then(({ data }) => {
+        if (!cancelled) {
+          const list: ActivityItem[] = (Array.isArray(data) ? data : []).slice(0, 5).map((n: any) => ({
+            id: n.id,
+            message: n.message ?? n.title ?? 'Notification sent',
+            createdAt: n.createdAt,
+            type: n.type ?? 'MESSAGE',
+          }));
+          setItems(list);
+        }
+      })
+      .catch(() => {
+        // Silently fail — activity feed is non-critical
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => { cancelled = true; };
+  }, []);
+
+  const typeColor: Record<string, string> = {
+    MESSAGE: 'bg-blue-500',
+    NOTIFICATION_UPDATED: 'bg-purple-500',
+    SYSTEM: 'bg-gray-500',
+  };
+
+  const formatRelative = (iso: string): string => {
+    const diff = Date.now() - new Date(iso).getTime();
+    const mins = Math.floor(diff / 60000);
+    if (mins < 1) return 'just now';
+    if (mins < 60) return `${mins} min ago`;
+    const hrs = Math.floor(mins / 60);
+    if (hrs < 24) return `${hrs} hour${hrs > 1 ? 's' : ''} ago`;
+    const days = Math.floor(hrs / 24);
+    return `${days} day${days > 1 ? 's' : ''} ago`;
+  };
+
+  return (
+    <div className="rounded-2xl border border-white/10 bg-white/[0.03] backdrop-blur-md p-6 min-h-[280px]" style={{ animation: 'fadeInUp 0.5s ease-out 0.7s forwards', opacity: 0 }}>
+      <div className="flex items-center gap-3 mb-5">
+        <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center shadow-lg shadow-purple-500/20">
+          <svg className="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={ICONS.trending} />
+          </svg>
         </div>
-      ))}
+        <h3 className="text-lg font-semibold text-white">Recent Activity</h3>
+      </div>
+      {loading ? (
+        <div className="space-y-3">
+          {[1, 2, 3].map((i) => (
+            <div key={i} className="animate-pulse flex items-center gap-3 p-3 rounded-xl bg-white/5">
+              <div className="w-2.5 h-2.5 rounded-full bg-white/10 shrink-0" />
+              <div className="flex-1 h-3 bg-white/10 rounded" />
+              <div className="w-16 h-3 bg-white/10 rounded" />
+            </div>
+          ))}
+        </div>
+      ) : items.length === 0 ? (
+        <div className="flex flex-col items-center justify-center py-8">
+          <div className="w-10 h-10 rounded-full bg-white/5 flex items-center justify-center mb-3">
+            <svg className="w-5 h-5 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d={ICONS.bell} />
+            </svg>
+          </div>
+          <p className="text-gray-500 text-sm">No recent activity</p>
+        </div>
+      ) : (
+        <div className="space-y-3">
+          {items.map((item) => (
+            <div key={item.id} className="flex items-center gap-3 p-3 rounded-xl bg-white/[0.02] hover:bg-white/[0.05] border border-white/5 hover:border-white/10 transition-all duration-300">
+              <div className={`w-2.5 h-2.5 rounded-full ${typeColor[item.type] ?? 'bg-gray-500'} shadow-sm shrink-0`} />
+              <p className="text-sm text-gray-300 flex-1 truncate">{item.message}</p>
+              <span className="text-xs text-gray-500 font-medium shrink-0">{formatRelative(item.createdAt)}</span>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
-  </div>
-);
+  );
+};
 
 
 // ─── Role-specific config ────────────────────────────────────────────────────
@@ -349,7 +417,8 @@ function getDefaultStats(role?: UserRole): StatCard[] {
 
 // ─── Data Fetching Hooks ─────────────────────────────────────────────────────
 
-function useDashboardStats(role?: UserRole): DashboardStats {
+function useDashboardStats(user?: { id: string; role?: UserRole; classId?: string; departmentId?: string }): DashboardStats {
+  const role = user?.role;
   const [stats, setStats] = useState<StatCard[]>(getDefaultStats(role));
   const [loading, setLoading] = useState(true);
 
@@ -360,16 +429,25 @@ function useDashboardStats(role?: UserRole): DashboardStats {
       try {
         switch (role) {
           case UserRole.SCHOOL_ADMIN: {
-            const [usersRes, sessionsRes, reportsRes] = await Promise.allSettled([
-              apiClient.get('/users', { params: { limit: 1 } }),
-              apiClient.get('/sessions', { params: { active: true } }),
+            const [usersStudentRes, usersTeacherRes, sessionsRes, reportsRes] = await Promise.allSettled([
+              apiClient.get('/users', { params: { role: 'STUDENT' } }),
+              apiClient.get('/users', { params: { role: 'TEACHER' } }),
+              apiClient.get('/sessions', { params: { isActive: true } }),
               apiClient.get('/reports/school'),
             ]);
 
-            const totalStudents = usersRes.status === 'fulfilled' ? (usersRes.value.data.meta?.totalStudents ?? usersRes.value.data.total ?? '—') : '—';
-            const totalTeachers = usersRes.status === 'fulfilled' ? (usersRes.value.data.meta?.totalTeachers ?? '—') : '—';
-            const activeSessions = sessionsRes.status === 'fulfilled' ? (sessionsRes.value.data.length ?? sessionsRes.value.data.total ?? 0) : '—';
-            const attendanceRate = reportsRes.status === 'fulfilled' ? `${Math.round(reportsRes.value.data.averageAttendancePercentage ?? 0)}%` : '—';
+            const totalStudents = usersStudentRes.status === 'fulfilled'
+              ? (Array.isArray(usersStudentRes.value.data) ? usersStudentRes.value.data.length : '—')
+              : '—';
+            const totalTeachers = usersTeacherRes.status === 'fulfilled'
+              ? (Array.isArray(usersTeacherRes.value.data) ? usersTeacherRes.value.data.length : '—')
+              : '—';
+            const activeSessions = sessionsRes.status === 'fulfilled'
+              ? (Array.isArray(sessionsRes.value.data) ? sessionsRes.value.data.length : 0)
+              : '—';
+            const attendanceRate = reportsRes.status === 'fulfilled'
+              ? `${Math.round(reportsRes.value.data.averageAttendancePercentage ?? 0)}%`
+              : '—';
 
             if (!cancelled) {
               setStats([
@@ -382,15 +460,27 @@ function useDashboardStats(role?: UserRole): DashboardStats {
             break;
           }
           case UserRole.TEACHER: {
+            // Use classId from JWT to get the correct class report
+            const classId = user?.classId;
             const [studentsRes, sessionsRes, reportsRes] = await Promise.allSettled([
-              apiClient.get('/users', { params: { role: 'STUDENT', limit: 1 } }),
-              apiClient.get('/sessions', { params: { today: true } }),
-              apiClient.get('/reports/class'),
+              classId
+                ? apiClient.get('/users', { params: { role: 'STUDENT', classId } })
+                : apiClient.get('/users', { params: { role: 'STUDENT' } }),
+              apiClient.get('/sessions', { params: { teacherId: user?.id } }),
+              classId
+                ? apiClient.get(`/reports/class/${classId}`)
+                : Promise.reject(new Error('No classId')),
             ]);
 
-            const myStudents = studentsRes.status === 'fulfilled' ? (studentsRes.value.data.total ?? '—') : '—';
-            const todaySessions = sessionsRes.status === 'fulfilled' ? (sessionsRes.value.data.length ?? 0) : '—';
-            const attendanceRate = reportsRes.status === 'fulfilled' ? `${Math.round(reportsRes.value.data.averageAttendancePercentage ?? 0)}%` : '—';
+            const myStudents = studentsRes.status === 'fulfilled'
+              ? (Array.isArray(studentsRes.value.data) ? studentsRes.value.data.length : '—')
+              : '—';
+            const todaySessions = sessionsRes.status === 'fulfilled'
+              ? (Array.isArray(sessionsRes.value.data) ? sessionsRes.value.data.length : 0)
+              : '—';
+            const attendanceRate = reportsRes.status === 'fulfilled'
+              ? `${Math.round(reportsRes.value.data.averageAttendancePercentage ?? 0)}%`
+              : '—';
 
             if (!cancelled) {
               setStats([
@@ -403,16 +493,27 @@ function useDashboardStats(role?: UserRole): DashboardStats {
             break;
           }
           case UserRole.STUDENT: {
+            const studentId = user?.id;
             const [reportsRes, timetableRes, riskRes] = await Promise.allSettled([
-              apiClient.get('/reports/student'),
-              apiClient.get('/timetable', { params: { today: true } }),
+              studentId
+                ? apiClient.get(`/reports/student/${studentId}`)
+                : Promise.reject(new Error('No studentId')),
+              apiClient.get('/timetable'),
               apiClient.get('/risk-scores/me'),
             ]);
 
-            const attendancePct = reportsRes.status === 'fulfilled' ? `${Math.round(reportsRes.value.data.attendancePercentage ?? 0)}%` : '—';
-            const classesToday = timetableRes.status === 'fulfilled' ? (timetableRes.value.data.length ?? 0) : '—';
-            const riskScore = riskRes.status === 'fulfilled' ? (riskRes.value.data.riskLevel ?? '—') : '—';
-            const daysPresent = reportsRes.status === 'fulfilled' ? (reportsRes.value.data.totalPresent ?? '—') : '—';
+            const attendancePct = reportsRes.status === 'fulfilled'
+              ? `${Math.round(reportsRes.value.data.attendancePercentage ?? 0)}%`
+              : '—';
+            const classesToday = timetableRes.status === 'fulfilled'
+              ? (Array.isArray(timetableRes.value.data) ? timetableRes.value.data.length : 0)
+              : '—';
+            const riskScore = riskRes.status === 'fulfilled'
+              ? (riskRes.value.data.riskLevel ?? '—')
+              : '—';
+            const daysPresent = reportsRes.status === 'fulfilled'
+              ? (reportsRes.value.data.totalPresent ?? '—')
+              : '—';
 
             if (!cancelled) {
               setStats([
@@ -425,16 +526,28 @@ function useDashboardStats(role?: UserRole): DashboardStats {
             break;
           }
           case UserRole.HOD: {
-            const [usersRes, reportsRes, riskRes] = await Promise.allSettled([
-              apiClient.get('/users', { params: { limit: 1 } }),
-              apiClient.get('/reports/department'),
-              apiClient.get('/risk-scores', { params: { level: 'HIGH' } }),
+            const departmentId = user?.departmentId;
+            const [usersStudentRes, usersTeacherRes, reportsRes, riskRes] = await Promise.allSettled([
+              apiClient.get('/users', { params: { role: 'STUDENT' } }),
+              apiClient.get('/users', { params: { role: 'TEACHER' } }),
+              departmentId
+                ? apiClient.get(`/reports/department/${departmentId}`)
+                : Promise.reject(new Error('No departmentId')),
+              apiClient.get('/risk-scores'),
             ]);
 
-            const deptStudents = usersRes.status === 'fulfilled' ? (usersRes.value.data.meta?.totalStudents ?? '—') : '—';
-            const deptTeachers = usersRes.status === 'fulfilled' ? (usersRes.value.data.meta?.totalTeachers ?? '—') : '—';
-            const attendanceRate = reportsRes.status === 'fulfilled' ? `${Math.round(reportsRes.value.data.averageAttendancePercentage ?? 0)}%` : '—';
-            const atRisk = riskRes.status === 'fulfilled' ? (riskRes.value.data.length ?? 0) : '—';
+            const deptStudents = usersStudentRes.status === 'fulfilled'
+              ? (Array.isArray(usersStudentRes.value.data) ? usersStudentRes.value.data.length : '—')
+              : '—';
+            const deptTeachers = usersTeacherRes.status === 'fulfilled'
+              ? (Array.isArray(usersTeacherRes.value.data) ? usersTeacherRes.value.data.length : '—')
+              : '—';
+            const attendanceRate = reportsRes.status === 'fulfilled'
+              ? `${Math.round(reportsRes.value.data.averageAttendancePercentage ?? 0)}%`
+              : '—';
+            const atRisk = riskRes.status === 'fulfilled'
+              ? (Array.isArray(riskRes.value.data) ? riskRes.value.data.length : 0)
+              : '—';
 
             if (!cancelled) {
               setStats([
@@ -456,7 +569,7 @@ function useDashboardStats(role?: UserRole): DashboardStats {
 
     fetchStats();
     return () => { cancelled = true; };
-  }, [role]);
+  }, [role, user?.id, user?.classId, user?.departmentId]);
 
   return { stats, loading };
 }
@@ -506,7 +619,7 @@ const DashboardPage: React.FC = () => {
   const location = useLocation();
   const [currentTime, setCurrentTime] = useState(formatTime());
 
-  const { stats, loading: statsLoading } = useDashboardStats(user?.role);
+  const { stats, loading: statsLoading } = useDashboardStats(user ?? undefined);
   const { entries: schedule, loading: scheduleLoading } = useTodaySchedule();
 
   // Update clock every minute
