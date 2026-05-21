@@ -51,6 +51,8 @@ const syncSchema = z.object({
 const linkGenerateSchema = z.object({
   sessionId: z.string().min(1),
   expiryMinutes: z.number().int().min(1).max(60).default(5),
+  requireGps: z.boolean().default(true),
+  gpsRadiusM: z.number().int().min(10).max(10000).default(100),
 });
 
 const linkAttendanceSchema = z.object({
@@ -58,7 +60,7 @@ const linkAttendanceSchema = z.object({
   gpsCoords: z.object({
     lat: z.number().min(-90).max(90),
     lng: z.number().min(-180).max(180),
-  }),
+  }).optional(),
 });
 
 // ─── Router ───────────────────────────────────────────────────────────────────
@@ -175,6 +177,8 @@ attendanceRouter.post('/link/generate', requirePermission('start:session'), asyn
       parsed.data.sessionId,
       req.schoolId,
       parsed.data.expiryMinutes,
+      parsed.data.requireGps,
+      parsed.data.gpsRadiusM,
     );
     res.status(201).json(result);
   } catch (err) {
@@ -203,7 +207,7 @@ attendanceRouter.post('/link', async (req: Request, res: Response): Promise<void
       req.user.sub,
       req.schoolId,
       parsed.data.linkToken,
-      parsed.data.gpsCoords,
+      parsed.data.gpsCoords ?? { lat: 0, lng: 0 },
     );
     res.status(201).json(record);
   } catch (err) {
@@ -223,9 +227,9 @@ attendanceRouter.get('/link/:token/info', async (req: Request, res: Response): P
     // Verify the token JWT, extract sessionId
     const QR_SECRET = process.env.QR_SECRET ?? 'qr-secret-dev';
 
-    let payload: { sessionId: string; type?: string; exp?: number };
+    let payload: { sessionId: string; type?: string; exp?: number; requireGps?: boolean; gpsRadiusM?: number };
     try {
-      payload = jwt.verify(token, QR_SECRET) as unknown as { sessionId: string; type?: string; exp?: number };
+      payload = jwt.verify(token, QR_SECRET) as unknown as { sessionId: string; type?: string; exp?: number; requireGps?: boolean; gpsRadiusM?: number };
     } catch {
       res.status(200).json({ valid: false, error: 'INVALID' });
       return;
@@ -266,6 +270,8 @@ attendanceRouter.get('/link/:token/info', async (req: Request, res: Response): P
       className: session.class?.name ?? null,
       teacherName: session.teacher?.fullName ?? null,
       expiresAt,
+      requireGps: payload.requireGps ?? true,
+      gpsRadiusM: payload.gpsRadiusM ?? 100,
     });
   } catch (err) {
     if (err instanceof AppError) throw err;

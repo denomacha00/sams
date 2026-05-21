@@ -49,6 +49,8 @@ const SessionPage: React.FC = () => {
   const [linkExpiresAt, setLinkExpiresAt] = useState<string>('');
   const [linkLoading, setLinkLoading] = useState(false);
   const [expiryMinutes, setExpiryMinutes] = useState<number>(5);
+  const [requireGps, setRequireGps] = useState<boolean>(true);
+  const [gpsRadiusM, setGpsRadiusM] = useState<number>(100);
   const [linkCopied, setLinkCopied] = useState(false);
   const [linkTimeRemaining, setLinkTimeRemaining] = useState<number>(0);
   const linkTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -169,6 +171,8 @@ const SessionPage: React.FC = () => {
       const { data } = await apiClient.post('/attendance/link/generate', {
         sessionId: activeSession.id,
         expiryMinutes,
+        requireGps,
+        gpsRadiusM: requireGps ? gpsRadiusM : 100,
       });
       setLinkUrl(data.linkUrl);
       setLinkToken(data.linkToken);
@@ -411,15 +415,11 @@ const SessionPage: React.FC = () => {
             )}
           </div>
 
-          {/* Distance info */}
-          <p className="text-xs text-gray-400 mb-4">
-            Students must be within <span className="text-purple-300 font-medium">{activeSession.locationRadiusM}m</span> to mark attendance via link.
-          </p>
-
           {/* Expiry selector and generate button */}
           {(!linkUrl || linkTimeRemaining <= 0) && (
-            <div className="flex items-end gap-3 mb-4">
-              <div className="flex-1">
+            <div className="space-y-4 mb-4">
+              {/* Expiry */}
+              <div>
                 <label htmlFor="expiryMinutes" className="block text-xs font-semibold text-gray-300 uppercase tracking-wider mb-2">
                   Link Expiry
                 </label>
@@ -436,13 +436,61 @@ const SessionPage: React.FC = () => {
                   <option value={60} className="bg-slate-800">60 minutes</option>
                 </select>
               </div>
+
+              {/* GPS toggle */}
+              <div className="flex items-center justify-between p-3 bg-white/5 border border-white/10 rounded-xl">
+                <div>
+                  <p className="text-sm font-medium text-white">Require GPS</p>
+                  <p className="text-xs text-gray-400 mt-0.5">
+                    {requireGps ? 'Students must be physically present' : 'No location check — use for permissions/excused'}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setRequireGps((v) => !v)}
+                  className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors duration-200 focus:outline-none ${
+                    requireGps ? 'bg-purple-600' : 'bg-white/20'
+                  }`}
+                >
+                  <span
+                    className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform duration-200 ${
+                      requireGps ? 'translate-x-6' : 'translate-x-1'
+                    }`}
+                  />
+                </button>
+              </div>
+
+              {/* GPS radius — only shown when GPS is on */}
+              {requireGps && (
+                <div>
+                  <label htmlFor="gpsRadiusM" className="block text-xs font-semibold text-gray-300 uppercase tracking-wider mb-2">
+                    Allowed Radius (meters)
+                  </label>
+                  <div className="flex items-center gap-3">
+                    <input
+                      id="gpsRadiusM"
+                      type="number"
+                      min={10}
+                      max={10000}
+                      value={gpsRadiusM}
+                      onChange={(e) => setGpsRadiusM(Math.max(10, Math.min(10000, parseInt(e.target.value) || 100)))}
+                      className="flex-1 bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:ring-2 focus:ring-purple-500/50 transition-all duration-200"
+                    />
+                    <span className="text-sm text-gray-400 shrink-0">m</span>
+                  </div>
+                  <p className="text-xs text-gray-500 mt-1">
+                    Students outside this radius will be rejected. Typical classroom: 50–150m.
+                  </p>
+                </div>
+              )}
+
               <button
                 onClick={generateLink}
                 disabled={linkLoading}
-                className="bg-gradient-to-r from-blue-600 to-purple-600 text-white font-semibold py-3 px-5 rounded-xl shadow-lg shadow-purple-500/25 hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200"
+                className="w-full bg-gradient-to-r from-blue-600 to-purple-600 text-white font-semibold py-3 px-5 rounded-xl shadow-lg shadow-purple-500/25 hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200"
               >
                 {linkLoading ? (
-                  <span className="flex items-center gap-2">
+                  <span className="flex items-center justify-center gap-2">
                     <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24">
                       <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
                       <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
@@ -457,6 +505,26 @@ const SessionPage: React.FC = () => {
           {/* Generated link display */}
           {linkUrl && (
             <div className="space-y-3">
+              {/* GPS badge */}
+              <div className="flex items-center gap-2">
+                {requireGps ? (
+                  <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-purple-500/20 border border-purple-500/30 text-purple-300">
+                    <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+                    </svg>
+                    GPS required · {gpsRadiusM}m radius
+                  </span>
+                ) : (
+                  <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-yellow-500/20 border border-yellow-500/30 text-yellow-300">
+                    <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21" />
+                    </svg>
+                    No GPS check
+                  </span>
+                )}
+              </div>
+
               {/* Link URL display */}
               <div className="flex items-center gap-2 bg-white/5 border border-white/10 rounded-xl p-3">
                 <div className="flex-1 truncate text-sm text-gray-300 font-mono">

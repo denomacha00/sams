@@ -10,6 +10,8 @@ interface SessionInfo {
   className?: string;
   teacherName?: string;
   expiresAt?: string;
+  requireGps?: boolean;
+  gpsRadiusM?: number;
   error?: string; // "EXPIRED" | "SESSION_ENDED" | "INVALID"
 }
 
@@ -114,9 +116,11 @@ const LinkAttendancePage: React.FC = () => {
     };
   }, [sessionInfo?.expiresAt, pageState]);
 
-  // Request GPS on page load when info is available
+  // Request GPS on page load when info is available — only if GPS is required
   useEffect(() => {
     if (pageState !== 'info') return;
+    // If the link doesn't require GPS, skip location entirely
+    if (sessionInfo?.requireGps === false) return;
 
     if (!navigator.geolocation) {
       setGpsError('Geolocation is not supported by your browser.');
@@ -148,10 +152,16 @@ const LinkAttendancePage: React.FC = () => {
       },
       { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
     );
-  }, [pageState]);
+  }, [pageState, sessionInfo?.requireGps]);
 
   const handleMarkAttendance = useCallback(async () => {
     if (!token) return;
+
+    // If GPS is not required, submit with zeroed coords (backend will ignore them)
+    if (sessionInfo?.requireGps === false) {
+      submitAttendance({ lat: 0, lng: 0 });
+      return;
+    }
 
     // If no GPS yet, try to get it
     if (!gpsCoords) {
@@ -175,7 +185,7 @@ const LinkAttendancePage: React.FC = () => {
     }
 
     submitAttendance(gpsCoords);
-  }, [token, gpsCoords]);
+  }, [token, gpsCoords, sessionInfo?.requireGps]);
 
   const submitAttendance = async (coords: { lat: number; lng: number }) => {
     setPageState('submitting');
@@ -358,19 +368,35 @@ const LinkAttendancePage: React.FC = () => {
           </div>
 
           {/* GPS status */}
-          {gpsError && (
-            <div className="mb-4 p-3 bg-yellow-500/10 border border-yellow-500/20 rounded-xl">
-              <p className="text-xs text-yellow-300">{gpsError}</p>
-            </div>
-          )}
-
-          {gpsCoords && !gpsError && (
-            <div className="mb-4 p-3 bg-emerald-500/10 border border-emerald-500/20 rounded-xl flex items-center gap-2">
-              <svg className="w-4 h-4 text-emerald-400 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+          {sessionInfo?.requireGps === false ? (
+            <div className="mb-4 p-3 bg-yellow-500/10 border border-yellow-500/20 rounded-xl flex items-center gap-2">
+              <svg className="w-4 h-4 text-yellow-400 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21" />
               </svg>
-              <p className="text-xs text-emerald-300">GPS location acquired</p>
+              <p className="text-xs text-yellow-300">No GPS check — teacher has disabled location verification for this link</p>
             </div>
+          ) : (
+            <>
+              {gpsError && (
+                <div className="mb-4 p-3 bg-yellow-500/10 border border-yellow-500/20 rounded-xl">
+                  <p className="text-xs text-yellow-300">{gpsError}</p>
+                </div>
+              )}
+
+              {gpsCoords && !gpsError && (
+                <div className="mb-4 p-3 bg-emerald-500/10 border border-emerald-500/20 rounded-xl flex items-center gap-2">
+                  <svg className="w-4 h-4 text-emerald-400 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                  </svg>
+                  <p className="text-xs text-emerald-300">
+                    GPS location acquired
+                    {sessionInfo?.gpsRadiusM && (
+                      <span className="text-emerald-400/70"> · must be within {sessionInfo.gpsRadiusM}m</span>
+                    )}
+                  </p>
+                </div>
+              )}
+            </>
           )}
 
           {/* Mark Attendance button */}

@@ -35,6 +35,8 @@ interface LinkTokenPayload {
   sessionId: string;
   type: 'LINK';
   nonce: string;
+  requireGps: boolean;
+  gpsRadiusM: number;
   iat: number;
   exp: number;
 }
@@ -44,13 +46,14 @@ interface LinkTokenPayload {
 export class AttendanceService {
   /**
    * Generate a shareable attendance link for an active session.
-   * Creates a JWT with type 'LINK', stores it on the session record,
-   * and returns the full shareable URL.
+   * Teacher can choose whether to enforce GPS proximity check.
    */
   async generateAttendanceLink(
     sessionId: string,
     schoolId: string,
     expiryMinutes: number = 5,
+    requireGps: boolean = true,
+    gpsRadiusM: number = 100,
   ) {
     // 1. Validate session exists, is active, and belongs to the teacher's school
     const session = await prisma.attendanceSession.findUnique({
@@ -69,13 +72,13 @@ export class AttendanceService {
       throw new AppError(403, 'FORBIDDEN', 'Session does not belong to your school');
     }
 
-    // 2. Generate JWT with type 'LINK'
+    // 2. Generate JWT with type 'LINK' — embed GPS settings in the token
     const nonce = createId();
     const now = Math.floor(Date.now() / 1000);
     const exp = now + expiryMinutes * 60;
 
     const linkToken = jwt.sign(
-      { sessionId, type: 'LINK', nonce, iat: now, exp },
+      { sessionId, type: 'LINK', nonce, requireGps, gpsRadiusM, iat: now, exp },
       QR_SECRET,
     );
 
@@ -138,8 +141,8 @@ export class AttendanceService {
       throw new AppError(400, 'SESSION_ENDED', 'Attendance session has ended');
     }
 
-    // 4. Validate GPS proximity using haversineDistance
-    if (session.locationLat != null && session.locationLng != null) {
+    // 4. Validate GPS proximity — only if the token requires GPS
+    if (payload.requireGps && session.locationLat != null && session.locationLng != null) {
       const distance = haversineDistance(
         gpsCoords.lat,
         gpsCoords.lng,
@@ -147,11 +150,11 @@ export class AttendanceService {
         session.locationLng,
       );
 
-      if (distance > session.locationRadiusM) {
+      if (distance > payload.gpsRadiusM) {
         throw new AppError(
           400,
           'GPS_OUT_OF_RANGE',
-          `Student is ${Math.round(distance)}m away, must be within ${session.locationRadiusM}m`,
+          `Student is ${Math.round(distance)}m away, must be within ${payload.gpsRadiusM}m`,
         );
       }
     }
