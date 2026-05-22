@@ -92,7 +92,7 @@ jobs:
             git pull origin main
             npm ci --production=false
             npm run build --workspaces --if-present
-            cd packages/backend && npx prisma migrate deploy
+            cd packages/backend && npx prisma generate && npx prisma migrate deploy
             npm run create-super-admin || true
             cd ../..
             pm2 reload ecosystem.config.js --env production

@@ -13,7 +13,7 @@
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",
     "prisma:studio": "prisma studio",
-    "create-super-admin": "tsx scripts/create-super-admin.ts",
+    "create-super-admin": "prisma generate && tsx scripts/create-super-admin.ts",
     "lint": "tsc --noEmit"
   },
   "dependencies": {

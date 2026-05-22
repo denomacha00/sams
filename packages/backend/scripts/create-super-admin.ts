@@ -2,7 +2,8 @@
  * Creates or updates the platform Super Admin user.
  *
  * Usage (from packages/backend):
- *   npx tsx scripts/create-super-admin.ts
+ *   npm run create-super-admin
+ *   (runs prisma generate first via package.json script)
  *
  * Reads SUPER_ADMIN_EMAIL, SUPER_ADMIN_PASSWORD, SUPER_ADMIN_USERNAME from .env
  * (or uses defaults from .env.example).
