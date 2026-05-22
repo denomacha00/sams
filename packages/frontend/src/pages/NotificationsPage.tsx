@@ -205,14 +205,18 @@ const NotificationsPage: React.FC = () => {
         return;
       }
 
-      const { data } = await apiClient.post('/notifications/send', {
-        scope,
-        targetId: targetId || undefined,
-        targetRole: targetRole === 'ALL' ? undefined : targetRole,
-        title: title.trim() || undefined,
-        message,
-        channels,
-      });
+      const { data } = await apiClient.post(
+        '/notifications/send',
+        {
+          scope,
+          targetId: targetId || undefined,
+          targetRole: targetRole === 'ALL' ? undefined : targetRole,
+          title: title.trim() || undefined,
+          message,
+          channels,
+        },
+        { timeout: 90_000 },
+      );
 
       const count = data?.recipientCount ?? 0;
       if (count === 0) {
@@ -230,10 +234,15 @@ const NotificationsPage: React.FC = () => {
         setTargetId('');
         setTargetRole('ALL');
       }
-      await fetchNotifications();
+      // Refresh inbox in background — do not block the Send button
+      void fetchNotifications();
       setTimeout(() => setSendSuccess(false), 3000);
     } catch (err: any) {
-      setSendError(err.response?.data?.error || err.response?.data?.message || 'Failed to send notification');
+      if (err.code === 'ECONNABORTED') {
+        setSendError('Request timed out. The message may still have been sent — refresh the page.');
+      } else {
+        setSendError(err.response?.data?.error || err.response?.data?.message || 'Failed to send notification');
+      }
     } finally {
       setSending(false);
     }

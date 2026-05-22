@@ -5,6 +5,10 @@ import { prisma } from '../index';
 import { io } from '../index';
 import { AppError } from '../middleware/errors';
 
+const NOTIFICATION_INSERT_CHUNK = 500;
+/** Cap parallel SMS attempts so whole-school sends do not spawn hundreds of 60s retries */
+const SMS_MAX_RECIPIENTS = 25;
+
 // ─── Validation Schemas ───────────────────────────────────────────────────────
 
 const sendNotificationSchema = z.object({
@@ -424,43 +428,62 @@ notificationsRouter.post('/send', async (req: Request, res: Response): Promise<v
       );
     }
 
-    // ── In-app: bulk insert once (no duplicate via sendInApp) ──────────────
+    // ── In-app: chunked bulk insert (whole-school can be hundreds of rows) ─
     if (channels.includes('inapp')) {
-      await prisma.notification.createMany({
-        data: targetUsers.map((u) => ({
-          schoolId: req.schoolId,
-          userId: u.id,
-          senderId: req.user.sub,
-          batchId,
-          title,
-          message,
-          type: 'MESSAGE',
-        })),
-      });
-
-      // Emit real-time socket event to each recipient (no extra DB write)
-      for (const u of targetUsers) {
-        io.to(`user:${u.id}`).emit('notification:new', {
-          title,
-          message,
-          type: 'MESSAGE',
-          senderId: req.user.sub,
-          batchId,
-          timestamp: new Date().toISOString(),
+      const rows = targetUsers.map((u) => ({
+        schoolId: req.schoolId,
+        userId: u.id,
+        senderId: req.user.sub,
+        batchId,
+        title,
+        message,
+        type: 'MESSAGE',
+      }));
+      for (let i = 0; i < rows.length; i += NOTIFICATION_INSERT_CHUNK) {
+        await prisma.notification.createMany({
+          data: rows.slice(i, i + NOTIFICATION_INSERT_CHUNK),
         });
       }
     }
 
-    // ── SMS: fire-and-forget ───────────────────────────────────────────────
-    if (channels.includes('sms')) {
-      const { notificationService } = await import('../services/notificationService');
-      const usersWithPhone = targetUsers.filter((u) => u.phone);
-      for (const u of usersWithPhone) {
-        notificationService.sendSMS(u.phone!, message).catch(() => {});
-      }
-    }
+    const recipientCount = targetUsers.length;
+    const schoolId = req.schoolId;
+    const senderId = req.user.sub;
+    const payload = {
+      title,
+      message,
+      type: 'MESSAGE' as const,
+      senderId,
+      batchId,
+      timestamp: new Date().toISOString(),
+    };
 
-    res.status(200).json({ success: true, recipientCount: targetUsers.length, batchId });
+    // Respond immediately — do not block on sockets/SMS (fixes "Sending..." forever)
+    res.status(200).json({ success: true, recipientCount, batchId });
+
+    setImmediate(() => {
+      try {
+        if (channels.includes('inapp')) {
+          // One broadcast per school (all connected clients joined school:{id} on connect)
+          io.to(`school:${schoolId}`).emit('notification:new', payload);
+        }
+        if (channels.includes('sms')) {
+          void import('../services/notificationService').then(({ notificationService }) => {
+            const usersWithPhone = targetUsers.filter((u) => u.phone).slice(0, SMS_MAX_RECIPIENTS);
+            if (targetUsers.filter((u) => u.phone).length > SMS_MAX_RECIPIENTS) {
+              console.warn(
+                `[Notifications] SMS capped at ${SMS_MAX_RECIPIENTS} of ${targetUsers.length} users with phone numbers`,
+              );
+            }
+            for (const u of usersWithPhone) {
+              void notificationService.sendSMS(u.phone!, message).catch(() => {});
+            }
+          }).catch((err) => console.error('[Notifications] SMS module load failed:', err));
+        }
+      } catch (bgErr) {
+        console.error('[Notifications] Background delivery error:', bgErr);
+      }
+    });
   } catch (err) {
     if (err instanceof AppError) throw err;
     throw new AppError(500, 'INTERNAL_ERROR', 'Failed to send notification');
