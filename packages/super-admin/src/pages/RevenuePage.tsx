@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import apiClient from '../services/apiClient';
+import { getSuperAdminApiError } from '../utils/apiError';
 
 interface RevenueByTier {
   planTier: string;
@@ -22,13 +23,16 @@ const TIER_COLORS: Record<string, string> = {
 const RevenuePage: React.FC = () => {
   const [revenue, setRevenue] = useState<RevenueData | null>(null);
   const [loading, setLoading] = useState(true);
+  const [apiError, setApiError] = useState<string | null>(null);
 
   useEffect(() => {
     const fetchRevenue = async () => {
       try {
         const { data } = await apiClient.get('/super/revenue');
         setRevenue(data);
+        setApiError(null);
       } catch (err) {
+        setApiError(getSuperAdminApiError(err, 'Failed to load revenue data.'));
         console.error('Failed to fetch revenue:', err);
       } finally {
         setLoading(false);
@@ -47,7 +51,14 @@ const RevenuePage: React.FC = () => {
 
   if (!revenue) {
     return (
-      <div className="text-center text-gray-400 py-12">Failed to load revenue data.</div>
+      <div className="space-y-4">
+        {apiError && (
+          <div className="bg-red-900/50 border border-red-500 text-red-200 px-4 py-3 rounded-lg text-sm">
+            {apiError}
+          </div>
+        )}
+        <div className="text-center text-gray-400 py-12">Failed to load revenue data.</div>
+      </div>
     );
   }
 

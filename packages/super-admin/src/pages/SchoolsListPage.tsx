@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import apiClient from '../services/apiClient';
+import { getSuperAdminApiError } from '../utils/apiError';
 
 interface School {
   id: string;
@@ -19,6 +20,7 @@ interface School {
 const SchoolsListPage: React.FC = () => {
   const [schools, setSchools] = useState<School[]>([]);
   const [loading, setLoading] = useState(true);
+  const [apiError, setApiError] = useState<string | null>(null);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [extendModal, setExtendModal] = useState<{ schoolId: string; schoolName: string } | null>(null);
   const [newExpiry, setNewExpiry] = useState('');
@@ -27,7 +29,9 @@ const SchoolsListPage: React.FC = () => {
     try {
       const { data } = await apiClient.get('/super/schools');
       setSchools(data.schools);
+      setApiError(null);
     } catch (err) {
+      setApiError(getSuperAdminApiError(err, 'Failed to load schools.'));
       console.error('Failed to fetch schools:', err);
     } finally {
       setLoading(false);
@@ -105,6 +109,12 @@ const SchoolsListPage: React.FC = () => {
   return (
     <div className="space-y-6">
       <h1 className="text-2xl font-bold text-white">Schools</h1>
+
+      {apiError && (
+        <div className="bg-red-900/50 border border-red-500 text-red-200 px-4 py-3 rounded-lg text-sm">
+          {apiError}
+        </div>
+      )}
 
       <div className="overflow-x-auto">
         <table className="w-full text-left">

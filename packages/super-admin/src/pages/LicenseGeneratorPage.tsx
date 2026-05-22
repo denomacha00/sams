@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import apiClient from '../services/apiClient';
+import { getSuperAdminApiError } from '../utils/apiError';
 
 const PLAN_TIERS = ['TRIAL', 'BASIC', 'PROFESSIONAL', 'ENTERPRISE'] as const;
 
@@ -27,8 +28,8 @@ const LicenseGeneratorPage: React.FC = () => {
       setGeneratedKey(data.licenseKey);
       setSchoolName('');
       setExpiresAt('');
-    } catch (err: any) {
-      setError(err.response?.data?.error || 'Failed to generate license key');
+    } catch (err: unknown) {
+      setError(getSuperAdminApiError(err, 'Failed to generate license key'));
     } finally {
       setLoading(false);
     }

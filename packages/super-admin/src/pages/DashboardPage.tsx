@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import apiClient from '../services/apiClient';
+import { getSuperAdminApiError } from '../utils/apiError';
 
 interface SchoolSummary {
   id: string;
@@ -22,6 +23,7 @@ const DashboardPage: React.FC = () => {
     byPlanTier: [],
   });
   const [loading, setLoading] = useState(true);
+  const [apiError, setApiError] = useState<string | null>(null);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -32,7 +34,9 @@ const DashboardPage: React.FC = () => {
         ]);
         setSchools(schoolsRes.data.schools);
         setRevenue(revenueRes.data);
-      } catch (err) {
+        setApiError(null);
+      } catch (err: unknown) {
+        setApiError(getSuperAdminApiError(err, 'Failed to load dashboard. Check login and server logs.'));
         console.error('Failed to fetch dashboard data:', err);
       } finally {
         setLoading(false);
@@ -60,6 +64,12 @@ const DashboardPage: React.FC = () => {
   return (
     <div className="space-y-8">
       <h1 className="text-2xl font-bold text-white">Dashboard</h1>
+
+      {apiError && (
+        <div className="bg-red-900/50 border border-red-500 text-red-200 px-4 py-3 rounded-lg text-sm">
+          {apiError}
+        </div>
+      )}
 
       {/* Stats Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">

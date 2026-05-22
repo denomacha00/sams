@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import apiClient from '../services/apiClient';
+import { getSuperAdminApiError } from '../utils/apiError';
 
 export interface SuperAdminUser {
   id: string;
@@ -58,11 +59,11 @@ export const useAuthStore = create<AuthState>()(
             loading: false,
             error: null,
           });
-        } catch (err: any) {
-          const message =
-            err.response?.data?.error ||
-            err.response?.data?.message ||
-            'Login failed. Please try again.';
+        } catch (err: unknown) {
+          const message = getSuperAdminApiError(
+            err,
+            'Login failed. Check email/password, then run: npm run create-super-admin -w @sams/backend',
+          );
           set({ loading: false, error: message, isAuthenticated: false });
           throw err;
         }

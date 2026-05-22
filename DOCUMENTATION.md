@@ -235,6 +235,18 @@ sams/
 - Features: license management, school management, system analytics, revenue, audit logs, AI knowledge base, AI action execution
 - AI assistant can execute admin actions via natural language
 
+**Bootstrap (first deploy or recovery):**
+
+```bash
+cd packages/backend
+# Ensure .env includes SUPER_ADMIN_HOST=super.smart-managment.com
+npm run create-super-admin
+# Optional password reset: SUPER_ADMIN_FORCE_RESET=true npm run create-super-admin
+pm2 reload ecosystem.config.js --env production
+```
+
+Sign in at `https://super.smart-managment.com` (panel sends school code `SUPERADMIN` automatically). Do not set `VITE_API_BASE_URL` to the API subdomain — use same-origin `/api` via nginx.
+
 ---
 
 ### Core Models
@@ -465,6 +477,9 @@ SMTP_PASS=<gmail app password>
 APP_URL=https://app.smart-managment.com
 SUPER_ADMIN_HOST=super.smart-managment.com
 SUPER_ADMIN_HOST_CHECK=enabled
+SUPER_ADMIN_EMAIL=admin@smart-managment.com
+SUPER_ADMIN_PASSWORD=<strong-password>
+SUPER_ADMIN_USERNAME=superadmin
 CONVERSATION_MASTER_KEY=<32+ char key for encrypting AI conversation history>
 ATTENDANCE_THRESHOLD_PERCENT=75
 LICENSE_EXPIRY_WARNING_DAYS=7

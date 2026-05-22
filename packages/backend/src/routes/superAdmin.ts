@@ -21,10 +21,19 @@ const extendLicenseSchema = z.object({
 });
 
 // ─── Host Restriction Middleware ──────────────────────────────────────────────
-// Requirement 2.4, 15.1: Super Admin panel is accessible only via super.sams.ke.
+// Requirement 2.4, 15.1: Super Admin panel is accessible only via super.smart-managment.com.
 // In development/testing, the SUPER_ADMIN_HOST env var can override the allowed host.
 // If SUPER_ADMIN_HOST_CHECK is set to "disabled", the check is skipped entirely
 // (useful for local development and testing).
+
+function getAllowedSuperAdminHosts(): string[] {
+  const fromEnv = process.env.SUPER_ADMIN_HOST || 'super.smart-managment.com';
+  const hosts = fromEnv.split(',').map((h) => h.trim()).filter(Boolean);
+  if (process.env.NODE_ENV !== 'production') {
+    hosts.push('localhost', '127.0.0.1');
+  }
+  return [...new Set(hosts)];
+}
 
 function requireSuperAdminHost(req: Request, res: Response, next: NextFunction): void {
   const hostCheckDisabled = process.env.SUPER_ADMIN_HOST_CHECK === 'disabled';
@@ -33,14 +42,17 @@ function requireSuperAdminHost(req: Request, res: Response, next: NextFunction):
     return;
   }
 
-  const allowedHost = process.env.SUPER_ADMIN_HOST || 'super.sams.ke';
+  const allowedHosts = getAllowedSuperAdminHosts();
   const requestHost = req.hostname;
 
-  if (requestHost !== allowedHost) {
+  if (!allowedHosts.includes(requestHost)) {
     res.status(403).json({
       error: 'Forbidden',
       code: 'HOST_NOT_ALLOWED',
-      message: 'Super Admin routes are only accessible via the Super Admin panel.',
+      message:
+        'Super Admin API must be reached via the Super Admin subdomain (same-origin /api proxy). ' +
+        `Allowed Host: ${allowedHosts.join(', ')}. Received: ${requestHost}. ` +
+        'Set SUPER_ADMIN_HOST on the API server or call /api from super.smart-managment.com, not api.smart-managment.com.',
     });
     return;
   }
@@ -52,7 +64,7 @@ function requireSuperAdminHost(req: Request, res: Response, next: NextFunction):
 
 export const superAdminRouter = Router();
 
-// Task 22.2: Restrict all /super/* routes to SUPER_ADMIN role AND super.sams.ke host
+// Task 22.2: Restrict all /super/* routes to SUPER_ADMIN role AND super admin host
 superAdminRouter.use(requireSuperAdminHost);
 superAdminRouter.use(requirePermission('super:admin'));
 

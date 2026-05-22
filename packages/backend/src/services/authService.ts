@@ -1,6 +1,7 @@
 import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
 import { createId } from '@paralleldrive/cuid2';
+import { UserRole } from '@sams/shared';
 import { prisma } from '../index';
 import { auditService } from './auditService';
 import { notificationService } from './notificationService';
@@ -60,8 +61,19 @@ export class AuthService {
   ): Promise<TokenPair> {
     let user: any = null;
 
-    if (schoolCode && schoolCode !== 'SUPERADMIN') {
-      // If school code provided (and not the super admin bypass), scope to that school
+    if (schoolCode === 'SUPERADMIN') {
+      // Super Admin panel — only match users with SUPER_ADMIN role
+      user = await prisma.user.findFirst({
+        where: {
+          role: UserRole.SUPER_ADMIN,
+          OR: [
+            { email: identifier },
+            { username: identifier },
+            { phone: identifier },
+          ],
+        },
+      });
+    } else if (schoolCode) {
       const school = await prisma.school.findUnique({
         where: { schoolCode },
       });
@@ -82,7 +94,6 @@ export class AuthService {
         },
       });
     } else {
-      // No school code (or SUPERADMIN bypass) — search across ALL schools by unique identifier
       user = await prisma.user.findFirst({
         where: {
           OR: [
