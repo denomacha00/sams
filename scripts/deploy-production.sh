@@ -27,7 +27,7 @@ npm run build -w @sams/backend
 npm run build -w @sams/frontend
 npm run build -w @sams/super-admin
 
-verify_dist() {
+verify_spa_dist() {
   local name="$1"
   local dir="$2"
   if [[ ! -f "$dir/index.html" ]]; then
@@ -43,10 +43,28 @@ verify_dist() {
   echo "    OK $name ($js_count JS bundle(s))"
 }
 
+verify_backend_dist() {
+  local dir="$ROOT/packages/backend/dist"
+  if [[ -f "$dir/index.js" ]]; then
+    echo "    OK Backend ($dir/index.js)"
+    return 0
+  fi
+  # Legacy layout from older tsconfig (nested dist/backend/src)
+  local legacy="$dir/backend/src/index.js"
+  if [[ -f "$legacy" ]]; then
+    echo "    OK Backend ($legacy)"
+    echo "    NOTE: Updating PM2 to use legacy entry path"
+    return 0
+  fi
+  echo "ERROR: Backend build failed — no dist/index.js under $dir" >&2
+  find "$dir" -name 'index.js' 2>/dev/null | head -5 >&2 || true
+  exit 1
+}
+
 echo "==> Verifying build output"
-verify_dist "Main app" "$ROOT/packages/frontend/dist"
-verify_dist "Super Admin" "$ROOT/packages/super-admin/dist"
-verify_dist "Backend" "$ROOT/packages/backend/dist"
+verify_spa_dist "Main app" "$ROOT/packages/frontend/dist"
+verify_spa_dist "Super Admin" "$ROOT/packages/super-admin/dist"
+verify_backend_dist
 
 echo "==> Database & super admin bootstrap"
 cd "$ROOT/packages/backend"
