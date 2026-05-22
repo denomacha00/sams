@@ -91,7 +91,10 @@ jobs:
             cd /var/www/sams
             git pull origin main
             npm ci --production=false
-            npm run build --workspaces --if-present
+            npm run build -w @sams/shared
+            npm run build -w @sams/backend
+            npm run build -w @sams/frontend
+            npm run build -w @sams/super-admin
             cd packages/backend && npx prisma generate && npx prisma migrate deploy
             npm run create-super-admin || true
             cd ../..

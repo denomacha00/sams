@@ -1,9 +1,12 @@
 # Dependencies
 node_modules/
 
-# Build outputs
+# Build outputs (never commit — VPS must run npm run build after pull)
 dist/
 build/
+packages/frontend/dist/
+packages/super-admin/dist/
+packages/backend/dist/
 
 # TypeScript compiled output (source files only in git)
 packages/backend/src/**/*.js
