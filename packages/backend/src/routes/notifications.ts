@@ -342,9 +342,14 @@ notificationsRouter.post('/send', async (req: Request, res: Response): Promise<v
       return;
     }
 
-    const { scope, targetId, targetRole, message, channels } = parsed.data;
+    let { scope, targetId, targetRole, message, channels } = parsed.data;
     const title = parsed.data.title || 'New Message';
     const batchId = createId();
+
+    // Teachers: default to their assigned class when none selected in the UI
+    if (req.user.role === 'TEACHER' && scope === 'class' && !targetId && req.user.classId) {
+      targetId = req.user.classId;
+    }
 
     // ── Build user filter ──────────────────────────────────────────────────
     const userFilter: any = { schoolId: req.schoolId };
@@ -403,8 +408,20 @@ notificationsRouter.post('/send', async (req: Request, res: Response): Promise<v
     });
 
     if (targetUsers.length === 0) {
-      res.status(200).json({ success: true, recipientCount: 0, batchId });
+      res.status(200).json({
+        success: false,
+        recipientCount: 0,
+        batchId,
+        warning:
+          'No users matched this target. Check that students/teachers are assigned to the selected class or department, and that the role filter is not too narrow.',
+      });
       return;
+    }
+
+    if (!channels.includes('inapp') && channels.includes('sms')) {
+      console.warn(
+        `[Notifications] Send by ${req.user.sub}: SMS-only (no in-app). ${targetUsers.length} target(s); AT sandbox may not deliver to real numbers.`,
+      );
     }
 
     // ── In-app: bulk insert once (no duplicate via sendInApp) ──────────────

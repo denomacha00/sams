@@ -102,6 +102,15 @@ const NotificationsPage: React.FC = () => {
     if (canSend) fetchScopeData();
   }, []);
 
+  // Teachers: pre-select their class so send is not submitted with an empty target
+  useEffect(() => {
+    if (user?.role === 'TEACHER' && user.classId) {
+      setScope('class');
+      setTargetId(user.classId);
+      setTargetRole('STUDENT');
+    }
+  }, [user?.role, user?.classId]);
+
   // Real-time socket listener
   useEffect(() => {
     if (!accessToken) return;
@@ -188,7 +197,15 @@ const NotificationsPage: React.FC = () => {
     setSendError(null);
     setSendSuccess(false);
     try {
-      await apiClient.post('/notifications/send', {
+      if (!channels.includes('inapp') && channels.includes('sms')) {
+        setSendError(
+          'SMS-only is selected. In-app messages will not appear in SAMS unless you also check In-App. Sandbox SMS only delivers to Africa\'s Talking test numbers.',
+        );
+        setSending(false);
+        return;
+      }
+
+      const { data } = await apiClient.post('/notifications/send', {
         scope,
         targetId: targetId || undefined,
         targetRole: targetRole === 'ALL' ? undefined : targetRole,
@@ -196,15 +213,27 @@ const NotificationsPage: React.FC = () => {
         message,
         channels,
       });
+
+      const count = data?.recipientCount ?? 0;
+      if (count === 0) {
+        setSendError(
+          data?.warning ||
+            'No recipients matched. Assign users to the selected class/department, or widen the role filter.',
+        );
+        return;
+      }
+
       setSendSuccess(true);
       setMessage('');
       setTitle('');
-      setTargetId('');
-      setTargetRole('ALL');
+      if (user?.role !== 'TEACHER') {
+        setTargetId('');
+        setTargetRole('ALL');
+      }
       await fetchNotifications();
       setTimeout(() => setSendSuccess(false), 3000);
     } catch (err: any) {
-      setSendError(err.response?.data?.error || 'Failed to send notification');
+      setSendError(err.response?.data?.error || err.response?.data?.message || 'Failed to send notification');
     } finally {
       setSending(false);
     }
@@ -342,7 +371,9 @@ const NotificationsPage: React.FC = () => {
             <h2 className="text-lg font-semibold text-white mb-4">Send Notification</h2>
             {sendSuccess && (
               <div className="mb-4 p-3 bg-emerald-500/20 border border-emerald-400/30 rounded-xl">
-                <p className="text-sm text-emerald-300 text-center">Message sent successfully!</p>
+                <p className="text-sm text-emerald-300 text-center">
+                  Message delivered in-app. Recipients see it under Notifications (bell icon).
+                </p>
               </div>
             )}
             {sendError && (
