@@ -79,7 +79,7 @@ This plan implements hierarchically scoped knowledge entries for the SAMS AI Kno
     - **Property 10: Cross-Reference Validation** — verify departmentId/classId belong to correct school/department
     - **Validates: Requirements 7.1, 7.2, 7.3, 7.4, 7.5**
 
-- [~] 4. Checkpoint - Ensure Knowledge Service tests pass
+- [ ] 4. Checkpoint - Ensure Knowledge Service tests pass
   - Ensure all tests pass, ask the user if questions arise.
 
 - [x] 5. Backend Knowledge Routes
@@ -117,7 +117,7 @@ This plan implements hierarchically scoped knowledge entries for the SAMS AI Kno
     - **Property 6: Scoped AI Knowledge Retrieval** — verify buildSystemPrompt includes only entries matching user's scope
     - **Validates: Requirements 4.1, 4.2, 4.3, 4.4, 4.5, 4.6, 4.7**
 
-- [~] 7. Checkpoint - Ensure backend tests pass
+- [ ] 7. Checkpoint - Ensure backend tests pass
   - Ensure all tests pass, ask the user if questions arise.
 
 - [ ] 8. Frontend Knowledge Management Page
@@ -129,20 +129,20 @@ This plan implements hierarchically scoped knowledge entries for the SAMS AI Kno
     - Implement pagination controls
     - _Requirements: 6.3, 6.7, 5.4_
 
-  - [~] 8.2 Implement the Knowledge Form (create/edit) component
+  - [ ] 8.2 Implement the Knowledge Form (create/edit) component
     - Add modal/drawer form with title, content, and category fields
     - Implement client-side validation (title 1-200 chars, content required, category ≤50 chars)
     - Support both create and edit modes
     - Show only edit/delete actions for entries the user is authorized to modify
     - _Requirements: 6.4, 6.5, 7.1, 7.2, 7.3_
 
-  - [~] 8.3 Implement the delete confirmation dialog
+  - [ ] 8.3 Implement the delete confirmation dialog
     - Add confirmation modal before deletion
     - Show entry title in confirmation message
     - Call DELETE endpoint on confirmation
     - _Requirements: 6.6_
 
-  - [~] 8.4 Add API service functions for knowledge endpoints
+  - [ ] 8.4 Add API service functions for knowledge endpoints
     - Create API helper functions (or add to existing API service) for:
       - `getKnowledgeEntries(page, pageSize)` → GET /api/v1/knowledge
       - `createKnowledgeEntry(input)` → POST /api/v1/knowledge
@@ -157,13 +157,13 @@ This plan implements hierarchically scoped knowledge entries for the SAMS AI Kno
     - Import `KnowledgeManagementPage` component
     - _Requirements: 6.1, 6.2_
 
-  - [~] 9.2 Add navigation link to the Knowledge Management page
+  - [ ] 9.2 Add navigation link to the Knowledge Management page
     - Add "Knowledge Base" link in the admin/staff navigation sidebar or menu
     - Show link only for SCHOOL_ADMIN, HOD, and TEACHER roles
     - Use an appropriate icon (e.g., book/knowledge icon)
     - _Requirements: 6.1, 6.2_
 
-- [~] 10. Final checkpoint - Ensure all tests pass
+- [ ] 10. Final checkpoint - Ensure all tests pass
   - Ensure all tests pass, ask the user if questions arise.
 
 ## Notes

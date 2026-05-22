@@ -246,37 +246,9 @@ notificationsRouter.patch('/:id', async (req: Request, res: Response): Promise<v
 });
 
 /**
- * DELETE /api/v1/notifications/:id
- * Delete a single notification (for non-batched system notifications).
- * Users can only delete their own received notifications.
- */
-notificationsRouter.delete('/:id', async (req: Request, res: Response): Promise<void> => {
-  try {
-    const id = String(req.params.id);
-    const notification = await prisma.notification.findUnique({ where: { id } });
-
-    if (!notification) throw new AppError(404, 'NOT_FOUND', 'Notification not found');
-
-    // User can delete their own received notification, or sender/admin can delete
-    const isAdmin = req.user.role === 'SCHOOL_ADMIN' || req.user.role === 'HOD';
-    const isRecipient = notification.userId === req.user.sub;
-    const isSender = notification.senderId === req.user.sub;
-
-    if (!isAdmin && !isRecipient && !isSender) {
-      throw new AppError(403, 'FORBIDDEN', 'You cannot delete this notification');
-    }
-
-    await prisma.notification.delete({ where: { id } });
-    res.status(204).send();
-  } catch (err) {
-    if (err instanceof AppError) throw err;
-    throw new AppError(500, 'INTERNAL_ERROR', 'Failed to delete notification');
-  }
-});
-
-/**
  * DELETE /api/v1/notifications/batch/:batchId
  * Delete all notifications in a batch. Only the original sender or admin can do this.
+ * MUST be registered before DELETE /:id to avoid Express matching "batch" as an :id.
  */
 notificationsRouter.delete('/batch/:batchId', async (req: Request, res: Response): Promise<void> => {
   const batchId = String(req.params.batchId);
@@ -307,6 +279,34 @@ notificationsRouter.delete('/batch/:batchId', async (req: Request, res: Response
   } catch (err) {
     if (err instanceof AppError) throw err;
     throw new AppError(500, 'INTERNAL_ERROR', 'Failed to delete notification batch');
+  }
+});
+
+/**
+ * DELETE /api/v1/notifications/:id
+ * Delete a single notification (for non-batched system notifications).
+ * Users can only delete their own received notifications.
+ */
+notificationsRouter.delete('/:id', async (req: Request, res: Response): Promise<void> => {
+  try {
+    const id = String(req.params.id);
+    const notification = await prisma.notification.findUnique({ where: { id } });
+
+    if (!notification) throw new AppError(404, 'NOT_FOUND', 'Notification not found');
+
+    const isAdmin = req.user.role === 'SCHOOL_ADMIN' || req.user.role === 'HOD';
+    const isRecipient = notification.userId === req.user.sub;
+    const isSender = notification.senderId === req.user.sub;
+
+    if (!isAdmin && !isRecipient && !isSender) {
+      throw new AppError(403, 'FORBIDDEN', 'You cannot delete this notification');
+    }
+
+    await prisma.notification.delete({ where: { id } });
+    res.status(204).send();
+  } catch (err) {
+    if (err instanceof AppError) throw err;
+    throw new AppError(500, 'INTERNAL_ERROR', 'Failed to delete notification');
   }
 });
 

@@ -75,17 +75,20 @@ exports.notificationsRouter.get('/', async (req, res) => {
         const senders = senderIds.length > 0
             ? await index_1.prisma.user.findMany({
                 where: { id: { in: senderIds } },
-                select: { id: true, fullName: true },
+                select: { id: true, fullName: true, role: true },
             })
             : [];
-        const senderMap = new Map(senders.map((s) => [s.id, s.fullName]));
+        const senderMap = new Map(senders.map((s) => [s.id, { name: s.fullName, role: s.role }]));
         const enrichedNotifications = notifications.map((n) => {
             let senderName;
+            let senderRole = null;
             if (n.senderId === null) {
                 senderName = 'System';
             }
             else if (senderMap.has(n.senderId)) {
-                senderName = senderMap.get(n.senderId) || 'Unknown';
+                const sender = senderMap.get(n.senderId);
+                senderName = sender.name || 'Unknown';
+                senderRole = sender.role;
             }
             else {
                 senderName = 'Deleted User';
@@ -94,6 +97,7 @@ exports.notificationsRouter.get('/', async (req, res) => {
                 ...n,
                 senderId: n.senderId,
                 senderName,
+                senderRole,
                 batchId: n.batchId,
                 updatedAt: n.updatedAt,
             };
@@ -189,11 +193,12 @@ exports.notificationsRouter.patch('/:id', async (req, res) => {
                 select: { userId: true },
             });
             for (const n of affectedNotifications) {
+                // Fire and forget — don't block the response
                 notificationService_1.notificationService.sendInApp(n.userId, {
                     title: 'Notification Updated',
                     message,
                     type: 'NOTIFICATION_UPDATED',
-                });
+                }).catch(() => { });
             }
         }
         res.status(200).json(updated);

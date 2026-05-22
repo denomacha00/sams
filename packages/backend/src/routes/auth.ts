@@ -239,12 +239,12 @@ authRouter.post('/forgot-password', async (req: Request, res: Response): Promise
       );
     }
 
-    // Send reset link via SMS if available
+    // Send reset link via SMS if available (fire-and-forget — don't block response if AT is down)
     if (user.phone) {
-      await notificationService.sendSMS(
+      notificationService.sendSMS(
         user.phone,
         `SAMS Password Reset: Click this link to reset your password (expires in 1 hour): ${resetLink}`,
-      );
+      ).catch(() => {});
     }
 
     res.status(200).json({ message: 'If the account exists, a reset link has been sent.' });

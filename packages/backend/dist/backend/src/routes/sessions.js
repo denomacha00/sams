@@ -3,6 +3,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.sessionsRouter = void 0;
 const express_1 = require("express");
 const zod_1 = require("zod");
+const shared_1 = require("@sams/shared");
 const rbac_1 = require("../middleware/rbac");
 const sessionService_1 = require("../services/sessionService");
 const index_1 = require("../index");
@@ -44,9 +45,15 @@ exports.sessionsRouter.post('/', (0, rbac_1.requirePermission)('start:session'),
 /**
  * GET /api/v1/sessions
  * List sessions scoped to the school.
+ * Students cannot list sessions — they scan QR codes directly.
  */
 exports.sessionsRouter.get('/', async (req, res) => {
     try {
+        // Students cannot enumerate sessions
+        if (req.user.role === shared_1.UserRole.STUDENT) {
+            res.status(403).json({ error: 'Forbidden', code: 'FORBIDDEN' });
+            return;
+        }
         const where = { schoolId: req.schoolId };
         if (req.query.classId) {
             where.classId = req.query.classId;
@@ -92,9 +99,15 @@ exports.sessionsRouter.get('/:id', async (req, res) => {
 /**
  * GET /api/v1/sessions/:id/qr
  * Get the current active QR token for a session.
+ * Only teachers, HODs, and admins can retrieve QR tokens — not students.
  */
 exports.sessionsRouter.get('/:id/qr', async (req, res) => {
     try {
+        // Students cannot retrieve QR tokens directly
+        if (req.user.role === shared_1.UserRole.STUDENT) {
+            res.status(403).json({ error: 'Forbidden', code: 'FORBIDDEN' });
+            return;
+        }
         const qrToken = await sessionService_1.sessionService.getActiveQR(req.params.id);
         if (!qrToken) {
             throw new errors_1.AppError(404, 'QR_NOT_FOUND', 'No active QR code for this session');
