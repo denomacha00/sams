@@ -247,6 +247,22 @@ pm2 reload ecosystem.config.js --env production
 
 Sign in at `https://super.smart-managment.com` (panel sends school code `SUPERADMIN` automatically). Do not set `VITE_API_BASE_URL` to the API subdomain — use same-origin `/api` via nginx.
 
+### Production deploy (hands-off — Super Admin + app stay solid)
+
+`dist/` folders are **not in git**. Every deploy **must rebuild** the main app and Super Admin UI.
+
+**Automatic (recommended):** Push to `main` on GitHub. Actions runs tests, then SSH runs `scripts/deploy-production.sh` on the VPS (builds everything, verifies JS bundles exist, reloads PM2/nginx).
+
+**Manual from phone/SSH** (one command):
+
+```bash
+cd /var/www/sams && bash scripts/deploy-production.sh
+```
+
+**Manual from GitHub** (no PC): Repo → Actions → **CI/CD Deploy** → **Run workflow**.
+
+Never run only `git pull` on the server without a build — that is what causes blank app / blank Super Admin.
+
 ---
 
 ### Core Models

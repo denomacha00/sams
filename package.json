@@ -12,7 +12,8 @@
     "build": "turbo run build",
     "test": "turbo run test",
     "lint": "turbo run lint",
-    "dev": "turbo run dev"
+    "dev": "turbo run dev",
+    "deploy:production": "bash scripts/deploy-production.sh"
   },
   "devDependencies": {
     "turbo": "^2.3.3"

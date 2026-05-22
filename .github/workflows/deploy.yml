@@ -5,6 +5,8 @@ on:
     branches: [main]
   pull_request:
     branches: [main]
+  # Deploy from GitHub mobile/app when you are not at your PC
+  workflow_dispatch:
 
 env:
   NODE_VERSION: '20'
@@ -78,7 +80,9 @@ jobs:
     name: Deploy to VPS
     runs-on: ubuntu-latest
     needs: test
-    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    if: >
+      github.ref == 'refs/heads/main' &&
+      (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
 
     steps:
       - name: Deploy via SSH
@@ -89,14 +93,4 @@ jobs:
           key: ${{ secrets.VPS_SSH_KEY }}
           script: |
             cd /var/www/sams
-            git pull origin main
-            npm ci --production=false
-            npm run build -w @sams/shared
-            npm run build -w @sams/backend
-            npm run build -w @sams/frontend
-            npm run build -w @sams/super-admin
-            cd packages/backend && npx prisma generate && npx prisma migrate deploy
-            npm run create-super-admin || true
-            cd ../..
-            pm2 reload ecosystem.config.js --env production
-            sudo nginx -t && sudo systemctl reload nginx
+            bash scripts/deploy-production.sh
