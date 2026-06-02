@@ -706,6 +706,9 @@ const DashboardPage: React.FC = () => {
               <h1 className="text-lg font-bold text-white tracking-tight">SAMS</h1>
               <p className="text-xs text-gray-400 font-medium">Smart Attendance Management</p>
             </div>
+            <span className="hidden sm:inline-flex items-center rounded-full border border-emerald-300/40 bg-emerald-500/20 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide text-emerald-200">
+              UI Refresh Jun 2026
+            </span>
           </div>
 
           <div className="flex items-center gap-3">

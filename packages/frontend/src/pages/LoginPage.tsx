@@ -152,7 +152,10 @@ const LoginPage: React.FC = () => {
       </div>
 
       {/* Right panel — login form */}
-      <div className="flex-1 flex items-center justify-center bg-gradient-to-br from-[#1a2332] to-[#0f1923] px-6 py-12">
+      <div className="flex-1 flex items-center justify-center bg-gradient-to-br from-[#1a2332] to-[#0f1923] px-6 py-12 relative">
+        <div className="absolute top-4 right-4 z-10 rounded-full border border-emerald-300/40 bg-emerald-500/20 px-3 py-1 text-xs font-semibold text-emerald-200 shadow-lg shadow-emerald-500/20">
+          UI Refresh Jun 2026
+        </div>
         <div className="w-full max-w-md">
           {/* Mobile logo (shown on small screens) */}
           <div className="lg:hidden text-center mb-8">
