@@ -166,12 +166,12 @@ const FloatingAI: React.FC = () => {
           isOpen
             ? 'opacity-100 translate-y-0 pointer-events-auto'
             : 'opacity-0 translate-y-4 pointer-events-none'
-        } w-[calc(100vw-2rem)] sm:w-[400px] h-[520px] max-h-[70vh] flex flex-col rounded-2xl border border-white/10 backdrop-blur-xl bg-slate-900/95 shadow-2xl shadow-purple-500/10`}
+        } w-[calc(100vw-2rem)] sm:w-[400px] h-[520px] max-h-[70vh] flex flex-col rounded-2xl border border-slate-700 backdrop-blur-xl bg-slate-950/95 shadow-2xl shadow-black/30`}
       >
         {/* Header */}
-        <div className="flex items-center justify-between px-4 py-3 border-b border-white/10 bg-gradient-to-r from-purple-600/20 to-blue-600/20 rounded-t-2xl">
+        <div className="flex items-center justify-between px-4 py-3 border-b border-slate-700 bg-slate-900 rounded-t-2xl">
           <div className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-purple-500 to-blue-600 flex items-center justify-center shadow-lg shadow-purple-500/30">
+            <div className="w-8 h-8 rounded-lg bg-indigo-600 flex items-center justify-center">
               <AISparkleIcon className="w-4 h-4 text-white" />
             </div>
             <div>
@@ -198,15 +198,15 @@ const FloatingAI: React.FC = () => {
               className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
             >
               {msg.role === 'assistant' && (
-                <div className="w-6 h-6 rounded-full bg-gradient-to-br from-purple-500 to-blue-600 flex items-center justify-center mr-2 mt-1 flex-shrink-0">
+                <div className="w-6 h-6 rounded-full bg-indigo-600 flex items-center justify-center mr-2 mt-1 flex-shrink-0">
                   <AISparkleIcon className="w-3 h-3 text-white" />
                 </div>
               )}
               <div
                 className={`max-w-[80%] rounded-xl px-3 py-2 text-sm ${
                   msg.role === 'user'
-                    ? 'bg-gradient-to-r from-purple-600 to-blue-600 text-white shadow-md shadow-purple-500/20'
-                    : 'bg-white/5 border border-white/10 text-gray-200'
+                    ? 'bg-indigo-600 text-white'
+                    : 'bg-slate-900 border border-slate-700 text-slate-200'
                 }`}
               >
                 {/* User uploaded images */}
@@ -229,10 +229,10 @@ const FloatingAI: React.FC = () => {
           {/* Loading indicator */}
           {loading && (
             <div className="flex justify-start">
-              <div className="w-6 h-6 rounded-full bg-gradient-to-br from-purple-500 to-blue-600 flex items-center justify-center mr-2 mt-1 flex-shrink-0">
+              <div className="w-6 h-6 rounded-full bg-indigo-600 flex items-center justify-center mr-2 mt-1 flex-shrink-0">
                 <AISparkleIcon className="w-3 h-3 text-white" />
               </div>
-              <div className="bg-white/5 border border-white/10 rounded-xl px-3 py-2">
+              <div className="bg-slate-900 border border-slate-700 rounded-xl px-3 py-2">
                 <div className="flex space-x-1">
                   <div className="w-1.5 h-1.5 bg-purple-400 rounded-full animate-bounce" />
                   <div className="w-1.5 h-1.5 bg-purple-400 rounded-full animate-bounce" style={{ animationDelay: '0.1s' }} />
@@ -271,7 +271,7 @@ const FloatingAI: React.FC = () => {
 
             {/* Image upload button */}
             <button type="button" onClick={() => fileInputRef.current?.click()}
-              className="p-2 bg-white/5 text-gray-400 border border-white/10 rounded-lg hover:bg-white/10 hover:text-white transition-all"
+              className="p-2 bg-slate-900 text-slate-400 border border-slate-700 rounded-lg hover:bg-slate-800 hover:text-white transition-all"
               title="Upload images (max 4)" aria-label="Upload images">
               <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
                 <path strokeLinecap="round" strokeLinejoin="round" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
@@ -286,7 +286,7 @@ const FloatingAI: React.FC = () => {
               onChange={(e) => setInput(e.target.value)}
               placeholder={selectedImages.length > 0 ? 'Ask about these images...' : 'Ask SAMS AI...'}
               disabled={loading}
-              className="flex-1 bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm text-white placeholder-gray-500 focus:outline-none focus:ring-1 focus:ring-purple-500/50 disabled:opacity-50 transition-all"
+              className="flex-1 bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-indigo-500/40 disabled:opacity-50 transition-all"
             />
 
             {/* Voice button */}
@@ -296,7 +296,7 @@ const FloatingAI: React.FC = () => {
               className={`relative p-2 rounded-lg transition-all duration-200 ${
                 isListening
                   ? 'bg-red-500/20 text-red-300 border border-red-500/30'
-                  : 'bg-white/5 text-gray-400 border border-white/10 hover:bg-white/10 hover:text-white'
+                  : 'bg-slate-900 text-slate-400 border border-slate-700 hover:bg-slate-800 hover:text-white'
               }`}
               title={isListening ? 'Stop listening' : 'Voice input'}
               aria-label={isListening ? 'Stop listening' : 'Voice input'}
@@ -313,7 +313,7 @@ const FloatingAI: React.FC = () => {
             <button
               type="submit"
               disabled={loading || (!input.trim() && selectedImages.length === 0)}
-              className="p-2 bg-gradient-to-r from-purple-600 to-blue-600 text-white rounded-lg shadow-md shadow-purple-500/20 hover:scale-105 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200"
+              className="p-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-500 hover:scale-105 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200"
               aria-label="Send message"
             >
               <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
@@ -327,16 +327,16 @@ const FloatingAI: React.FC = () => {
       {/* Floating Button with pulse animation */}
       <button
         onClick={() => setIsOpen((prev) => !prev)}
-        className={`fixed bottom-6 right-6 z-[9999] w-14 h-14 rounded-full shadow-lg shadow-purple-500/40 flex items-center justify-center transition-all duration-300 hover:scale-110 active:scale-95 ${
+        className={`fixed bottom-6 right-6 z-[9999] w-14 h-14 rounded-full shadow-lg shadow-black/40 flex items-center justify-center transition-all duration-300 hover:scale-110 active:scale-95 ${
           isOpen
-            ? 'bg-slate-800 border border-white/20'
-            : 'bg-gradient-to-br from-purple-600 to-blue-600'
+            ? 'bg-slate-800 border border-slate-600'
+            : 'bg-indigo-600'
         }`}
         aria-label={isOpen ? 'Close SAMS AI Assistant' : 'Open SAMS AI Assistant'}
       >
         {/* Pulse ring animation when closed */}
         {!isOpen && (
-          <span className="absolute inset-0 rounded-full bg-gradient-to-br from-purple-600 to-blue-600 animate-ping opacity-20" />
+          <span className="absolute inset-0 rounded-full bg-indigo-600 animate-ping opacity-20" />
         )}
 
         {isOpen ? (

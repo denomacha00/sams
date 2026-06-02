@@ -113,53 +113,29 @@ const LoginPage: React.FC = () => {
   return (
     <div className="min-h-screen flex">
       {/* Left panel — branding */}
-      <div className="hidden lg:flex lg:w-1/2 relative overflow-hidden bg-gradient-to-br from-[#0f2027] via-[#203a43] to-[#2c5364] items-center justify-center">
-        {/* Decorative circles */}
-        <div className="absolute -top-20 -left-20 w-80 h-80 bg-teal-400/10 rounded-full blur-3xl" />
-        <div className="absolute -bottom-32 -right-32 w-96 h-96 bg-cyan-400/10 rounded-full blur-3xl" />
-        <div className="absolute top-1/3 right-10 w-40 h-40 bg-emerald-400/10 rounded-full blur-2xl" />
-
-        {/* 3D Logo */}
+      <div className="hidden lg:flex lg:w-1/2 relative overflow-hidden bg-slate-900 border-r border-slate-800 items-center justify-center">
         <div className="relative z-10 text-center px-12">
-          {/* 3D Shield Logo */}
-          <div className="relative inline-block mb-8">
-            {/* Shadow layer */}
-            <div className="absolute inset-0 translate-x-2 translate-y-2 rounded-3xl bg-black/30 blur-xl" />
-            {/* Back layer */}
-            <div className="absolute inset-0 translate-x-1 translate-y-1 rounded-3xl bg-gradient-to-br from-teal-700 to-cyan-900" />
-            {/* Main logo container */}
-            <div className="relative w-32 h-32 rounded-3xl bg-gradient-to-br from-teal-400 via-cyan-500 to-blue-600 flex items-center justify-center shadow-2xl shadow-teal-500/30 border border-white/20">
-              {/* Inner shield */}
-              <svg className="w-16 h-16 text-white drop-shadow-lg" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
-              </svg>
-              {/* Shine effect */}
-              <div className="absolute top-2 left-2 w-8 h-8 bg-white/30 rounded-full blur-md" />
-            </div>
+          <div className="inline-flex w-28 h-28 rounded-2xl bg-indigo-600 items-center justify-center border border-indigo-500/40 mb-8">
+            <svg className="w-14 h-14 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+            </svg>
           </div>
-
-          {/* 3D Text */}
-          <h1 className="text-6xl font-black text-white tracking-tight mb-3" style={{ textShadow: '0 4px 8px rgba(0,0,0,0.4), 0 2px 4px rgba(0,0,0,0.3)' }}>
-            SAMS
-          </h1>
-          <p className="text-lg text-teal-200/80 font-medium tracking-wide">
+          <h1 className="text-5xl font-bold text-slate-50 tracking-tight mb-3">SAMS</h1>
+          <p className="text-lg text-slate-300 font-medium tracking-wide">
             Smart Attendance Management System
           </p>
-          <p className="text-sm text-teal-300/50 mt-4 max-w-sm mx-auto leading-relaxed">
-            Multi-school enterprise platform with QR, GPS, and biometric attendance verification for Kenyan institutions.
+          <p className="text-sm text-slate-500 mt-4 max-w-sm mx-auto leading-relaxed">
+            Multi-school platform with QR, GPS, and biometric attendance for Kenyan institutions.
           </p>
         </div>
       </div>
 
       {/* Right panel — login form */}
-      <div className="flex-1 flex items-center justify-center bg-gradient-to-br from-[#1a2332] to-[#0f1923] px-6 py-12 relative">
-        <div className="absolute top-4 right-4 z-10 rounded-full border border-emerald-300/40 bg-emerald-500/20 px-3 py-1 text-xs font-semibold text-emerald-200 shadow-lg shadow-emerald-500/20">
-          UI Refresh Jun 2026
-        </div>
+      <div className="flex-1 flex items-center justify-center bg-slate-950 px-6 py-12 relative">
         <div className="w-full max-w-md">
           {/* Mobile logo (shown on small screens) */}
           <div className="lg:hidden text-center mb-8">
-            <div className="inline-flex items-center justify-center w-20 h-20 rounded-2xl bg-gradient-to-br from-teal-400 via-cyan-500 to-blue-600 shadow-xl shadow-teal-500/30 mb-4">
+            <div className="inline-flex items-center justify-center w-20 h-20 rounded-2xl bg-indigo-600 border border-indigo-500/40 mb-4">
               <svg className="w-10 h-10 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
               </svg>
@@ -169,7 +145,7 @@ const LoginPage: React.FC = () => {
           </div>
 
           {/* Form card */}
-          <div className="bg-white/5 backdrop-blur-xl rounded-2xl shadow-2xl shadow-black/20 p-8 border border-white/10">
+          <div className="surface-card p-8">
             <h2 className="text-2xl font-bold text-white mb-1">Welcome back</h2>
             <p className="text-gray-400 text-sm mb-8">Sign in to your school account</p>
 
@@ -218,7 +194,7 @@ const LoginPage: React.FC = () => {
                   value={identifier}
                   onChange={(e) => setIdentifier(e.target.value)}
                   required
-                  className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-teal-500/40 focus:border-teal-400 transition-all duration-200"
+                  className="input-field"
                   placeholder="Enter username, phone, email, or ADM number"
                 />
               </div>
@@ -234,7 +210,7 @@ const LoginPage: React.FC = () => {
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     required
-                    className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-teal-500/40 focus:border-teal-400 transition-all duration-200 pr-12"
+                    className="input-field pr-12"
                     placeholder="Enter password"
                   />
                   <button
@@ -254,7 +230,7 @@ const LoginPage: React.FC = () => {
               <button
                 type="submit"
                 disabled={loading}
-                className="w-full bg-gradient-to-r from-teal-500 to-cyan-600 text-white font-bold py-3.5 px-4 rounded-xl hover:from-teal-400 hover:to-cyan-500 focus:outline-none focus:ring-2 focus:ring-teal-500/50 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 shadow-lg shadow-teal-500/30 hover:shadow-teal-500/50 hover:scale-[1.01] active:scale-[0.99]"
+                className="w-full btn-primary py-3.5 px-4 font-bold"
               >
                 {loading ? (
                   <span className="flex items-center justify-center gap-2">
@@ -273,7 +249,7 @@ const LoginPage: React.FC = () => {
                     type="button"
                     onClick={handleWebAuthnLogin}
                     disabled={webauthnLoading}
-                    className="w-full flex items-center justify-center gap-2 bg-white/5 border border-white/20 text-white font-semibold py-3 px-4 rounded-xl hover:bg-white/10 focus:outline-none focus:ring-2 focus:ring-teal-500/40 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200"
+                    className="w-full flex items-center justify-center gap-2 btn-secondary py-3 px-4 disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     {webauthnLoading ? (
                       <svg className="animate-spin h-5 w-5 text-teal-400" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" /><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" /></svg>
@@ -291,10 +267,10 @@ const LoginPage: React.FC = () => {
                 </div>
               )}
 
-              <Link to="/forgot-password" className="block text-sm text-gray-400 hover:text-teal-300 font-medium transition-colors">
+              <Link to="/forgot-password" className="block text-sm text-slate-400 hover:text-indigo-300 font-medium transition-colors">
                 Forgot your password?
               </Link>
-              <Link to="/activate" className="block text-sm text-teal-400 hover:text-teal-300 font-semibold transition-colors">
+              <Link to="/activate" className="block text-sm text-indigo-400 hover:text-indigo-300 font-semibold transition-colors">
                 Activate a new school →
               </Link>
             </div>

@@ -128,18 +128,14 @@ const SkeletonCard: React.FC = () => (
 
 const AnimatedStatCard: React.FC<{ stat: StatCard; index: number }> = ({ stat, index }) => (
   <div
-    className="relative overflow-hidden rounded-2xl border border-white/10 bg-white/[0.03] backdrop-blur-md p-6 min-h-[140px] hover:bg-white/[0.08] hover:border-white/20 transition-all duration-500 hover:scale-[1.03] group cursor-default"
+    className="relative overflow-hidden rounded-2xl border border-slate-700/80 bg-slate-900/80 p-6 min-h-[140px] hover:bg-slate-800/80 hover:border-slate-600 transition-all duration-300 group cursor-default"
     style={{
       animationDelay: `${index * 100}ms`,
       animation: 'fadeInUp 0.5s ease-out forwards',
       opacity: 0,
     }}
   >
-    {/* Gradient glow on hover */}
-    <div className={`absolute -inset-1 bg-gradient-to-br ${stat.gradient} opacity-0 group-hover:opacity-15 blur-xl transition-opacity duration-500 rounded-2xl`} />
-    <div className={`absolute inset-0 bg-gradient-to-br ${stat.gradient} opacity-[0.03] group-hover:opacity-[0.08] transition-opacity duration-500`} />
-    {/* Glass border highlight */}
-    <div className="absolute inset-0 rounded-2xl border border-white/[0.05] group-hover:border-white/[0.15] transition-all duration-500" />
+    <div className={`absolute inset-0 bg-gradient-to-br ${stat.gradient} opacity-[0.04] group-hover:opacity-[0.07] transition-opacity duration-300 rounded-2xl`} />
     <div className="relative z-10">
       <div className={`w-12 h-12 rounded-xl bg-gradient-to-br ${stat.gradient} flex items-center justify-center shadow-lg ${stat.shadowColor} mb-4 group-hover:shadow-xl transition-shadow duration-500`}>
         <svg className="w-6 h-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -157,12 +153,10 @@ const AnimatedStatCard: React.FC<{ stat: StatCard; index: number }> = ({ stat, i
 const QuickActionButton: React.FC<{ action: QuickAction; index: number }> = ({ action, index }) => (
   <Link
     to={action.to}
-    className="group relative overflow-hidden rounded-2xl border border-white/10 bg-white/[0.03] backdrop-blur-md p-5 min-h-[120px] hover:bg-white/[0.08] hover:border-white/20 transition-all duration-500 hover:scale-[1.03] hover:shadow-2xl hover:shadow-black/30 flex flex-col justify-between"
+    className="group relative overflow-hidden rounded-2xl border border-slate-700/80 bg-slate-900/80 p-5 min-h-[120px] hover:bg-slate-800/80 hover:border-slate-600 transition-all duration-300 flex flex-col justify-between"
     style={{ animationDelay: `${(index + 4) * 80}ms`, animation: 'fadeInUp 0.5s ease-out forwards', opacity: 0 }}
   >
-    {/* Gradient glow on hover */}
-    <div className={`absolute -inset-1 bg-gradient-to-br ${action.gradient} opacity-0 group-hover:opacity-10 blur-xl transition-opacity duration-500 rounded-2xl`} />
-    <div className={`absolute top-0 left-0 right-0 h-[2px] bg-gradient-to-r ${action.gradient} opacity-0 group-hover:opacity-100 transition-opacity duration-300`} />
+    <div className={`absolute top-0 left-0 right-0 h-px bg-gradient-to-r ${action.gradient} opacity-40 group-hover:opacity-70 transition-opacity duration-300`} />
     <div>
       <div className={`w-10 h-10 rounded-lg bg-gradient-to-br ${action.gradient} flex items-center justify-center shadow-md mb-3 group-hover:shadow-lg transition-shadow duration-500`}>
         <svg className="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -656,7 +650,7 @@ const DashboardPage: React.FC = () => {
   const quickActions = getQuickActions(user?.role);
 
   return (
-    <div className="min-h-screen bg-slate-900 relative overflow-hidden">
+    <div className="page-shell relative overflow-hidden">
       {/* CSS Keyframes & Animations */}
       <style>{`
         @keyframes fadeInUp {
@@ -682,22 +676,11 @@ const DashboardPage: React.FC = () => {
         }
       `}</style>
 
-      {/* Ambient background effects */}
-      <div className="fixed inset-0 pointer-events-none overflow-hidden">
-        <div className="absolute -top-40 -right-40 w-80 h-80 bg-teal-500/[0.07] rounded-full blur-3xl" style={{ animation: 'pulse-glow 8s ease-in-out infinite' }} />
-        <div className="absolute top-1/3 -left-40 w-96 h-96 bg-blue-500/[0.05] rounded-full blur-3xl" style={{ animation: 'pulse-glow 10s ease-in-out infinite 2s' }} />
-        <div className="absolute -bottom-40 right-1/4 w-72 h-72 bg-purple-500/[0.05] rounded-full blur-3xl" style={{ animation: 'pulse-glow 12s ease-in-out infinite 4s' }} />
-      </div>
-
-      {/* Animated gradient border glow at top */}
-      <div className="absolute top-0 left-0 right-0 h-[2px] bg-gradient-to-r from-transparent via-teal-500/50 to-transparent" style={{ backgroundSize: '200% 100%', animation: 'gradientShift 4s ease infinite' }} />
-
       {/* Header */}
-      <header className="relative border-b border-white/[0.06] backdrop-blur-xl bg-slate-900/70 sticky top-0 z-50">
-        <div className="absolute inset-0 bg-gradient-to-r from-teal-500/[0.02] via-transparent to-blue-500/[0.02]" />
+      <header className="relative border-b border-slate-800 bg-slate-950/95 sticky top-0 z-50">
         <div className="relative max-w-7xl mx-auto px-6 lg:px-8 py-4 flex items-center justify-between">
           <div className="flex items-center gap-4">
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-teal-500 to-cyan-500 flex items-center justify-center shadow-lg shadow-teal-500/25 ring-1 ring-white/10">
+            <div className="w-10 h-10 rounded-xl bg-indigo-600 flex items-center justify-center ring-1 ring-indigo-500/30">
               <svg className="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
               </svg>
@@ -706,9 +689,6 @@ const DashboardPage: React.FC = () => {
               <h1 className="text-lg font-bold text-white tracking-tight">SAMS</h1>
               <p className="text-xs text-gray-400 font-medium">Smart Attendance Management</p>
             </div>
-            <span className="hidden sm:inline-flex items-center rounded-full border border-emerald-300/40 bg-emerald-500/20 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide text-emerald-200">
-              UI Refresh Jun 2026
-            </span>
           </div>
 
           <div className="flex items-center gap-3">
@@ -765,7 +745,7 @@ const DashboardPage: React.FC = () => {
 
             {/* User avatar & logout */}
             <div className="flex items-center gap-3 ml-1">
-              <div className="w-9 h-9 rounded-full bg-gradient-to-br from-teal-500 to-cyan-500 flex items-center justify-center text-white text-sm font-bold shadow-lg shadow-teal-500/25 ring-2 ring-white/10">
+              <div className="w-9 h-9 rounded-full bg-indigo-600 flex items-center justify-center text-white text-sm font-bold ring-2 ring-slate-700">
                 {user?.fullName?.charAt(0)?.toUpperCase() || 'U'}
               </div>
               <button
@@ -784,23 +764,31 @@ const DashboardPage: React.FC = () => {
       <main className="relative max-w-7xl mx-auto px-6 lg:px-8 py-10">
 
         {/* Welcome Banner */}
-        <div className="relative mb-10 rounded-2xl overflow-hidden border border-white/[0.08] bg-white/[0.02] backdrop-blur-md p-8 lg:p-10" style={{ animation: 'fadeInUp 0.5s ease-out forwards' }}>
-          {/* Banner gradient background */}
-          <div className="absolute inset-0 bg-gradient-to-br from-teal-500/[0.06] via-blue-500/[0.04] to-purple-500/[0.06]" />
-          <div className="absolute top-0 right-0 w-64 h-64 bg-gradient-to-bl from-teal-500/10 to-transparent rounded-full blur-2xl -translate-y-1/2 translate-x-1/4" />
+        <div className="relative mb-10 surface-card p-8 lg:p-10" style={{ animation: 'fadeInUp 0.5s ease-out forwards' }}>
           <div className="relative z-10 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
             <div>
               <div className="flex flex-col sm:flex-row sm:items-center gap-3 mb-2">
                 <h2 className="text-3xl lg:text-4xl font-bold text-white tracking-tight">
                   Welcome back, {user?.fullName?.split(' ')[0] || 'User'}
                 </h2>
-                <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold text-white bg-gradient-to-r from-teal-500 to-cyan-500 shadow-lg shadow-teal-500/20 w-fit ring-1 ring-white/20">
+                <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold text-indigo-100 bg-indigo-600/30 border border-indigo-500/40 w-fit">
                   {getRoleLabel(user?.role)}
                 </span>
               </div>
-              <p className="text-gray-400 text-base max-w-lg">
+              <p className="text-slate-400 text-base max-w-lg">
                 {getRoleGreeting(user?.role)}
               </p>
+              {user?.role === UserRole.STUDENT && (
+                <Link
+                  to="/sessions/scan"
+                  className="mt-4 inline-flex items-center justify-center gap-2 btn-primary py-3 px-6 text-sm w-full sm:w-auto"
+                >
+                  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={ICONS.qr} />
+                  </svg>
+                  Scan QR Now
+                </Link>
+              )}
             </div>
             <div className="hidden lg:flex flex-col items-end">
               <div className="text-2xl font-bold text-white/90 tracking-tight">{currentTime}</div>
