@@ -28,6 +28,7 @@ interface AuthState {
   login: (schoolCode: string, identifier: string, password: string) => Promise<void>;
   setAuth: (user: AuthUser, accessToken: string, refreshToken: string) => void;
   updateUser: (fields: Partial<AuthUser>) => void;
+  refreshProfile: () => Promise<void>;
   logout: () => Promise<void>;
   refreshAccessToken: () => Promise<void>;
   clearError: () => void;
@@ -58,6 +59,27 @@ export const useAuthStore = create<AuthState>()(
         const current = get().user;
         if (current) {
           set({ user: { ...current, ...fields } });
+        }
+      },
+
+      refreshProfile: async () => {
+        if (!get().isAuthenticated) return;
+        try {
+          const { data: me } = await apiClient.get('/users/me');
+          const current = get().user;
+          if (!current) return;
+          set({
+            user: {
+              ...current,
+              fullName: me.fullName ?? current.fullName,
+              username: me.username ?? current.username,
+              email: me.email ?? current.email,
+              phone: me.phone ?? current.phone,
+              avatarUrl: me.avatarUrl ?? undefined,
+            },
+          });
+        } catch {
+          // Non-fatal — profile refresh is best-effort.
         }
       },
 

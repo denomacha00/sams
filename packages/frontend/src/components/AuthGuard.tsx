@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { Navigate, Outlet, useLocation } from 'react-router-dom';
 import { useAuthStore } from '../store/authStore';
 import type { UserRole } from '@sams/shared';
@@ -15,7 +15,14 @@ interface AuthGuardProps {
 const AuthGuard: React.FC<AuthGuardProps> = ({ allowedRoles }) => {
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
   const user = useAuthStore((s) => s.user);
+  const refreshProfile = useAuthStore((s) => s.refreshProfile);
   const location = useLocation();
+
+  useEffect(() => {
+    if (isAuthenticated) {
+      void refreshProfile();
+    }
+  }, [isAuthenticated, refreshProfile]);
 
   if (!isAuthenticated) {
     return <Navigate to="/login" state={{ from: location }} replace />;

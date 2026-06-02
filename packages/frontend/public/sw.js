@@ -1,4 +1,4 @@
-const STATIC_CACHE = 'sams-static-v2';
+const STATIC_CACHE = 'sams-static-v3';
 const API_CACHE = 'sams-api-v2';
 const OFFLINE_QUEUE_STORE = 'offline-request-queue';
 
@@ -132,6 +132,12 @@ self.addEventListener('fetch', (event) => {
 
   // API requests: network-first with cache fallback
   if (url.pathname.startsWith('/api/')) {
+    event.respondWith(networkFirst(request));
+    return;
+  }
+
+  // Profile images: always network-first (avoid stale or cached 404s)
+  if (url.pathname.startsWith('/uploads/')) {
     event.respondWith(networkFirst(request));
     return;
   }

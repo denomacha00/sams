@@ -2,6 +2,7 @@ import { Router, type Request, type Response, type NextFunction } from 'express'
 import { z } from 'zod';
 import path from 'path';
 import fs from 'fs';
+import { AVATARS_DIR, avatarPublicUrl } from '../config/uploads';
 import multer from 'multer';
 import sharp from 'sharp';
 import { UserRole } from '@sams/shared';
@@ -13,7 +14,6 @@ import { AppError } from '../middleware/errors';
 
 // ─── Avatar Upload Config ─────────────────────────────────────────────────────
 
-const UPLOADS_DIR = path.resolve(process.env.UPLOADS_DIR || '/var/www/sams/uploads/avatars');
 const upload = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: 5 * 1024 * 1024 }, // 5MB max
@@ -217,13 +217,13 @@ usersRouter.post('/me/avatar', upload.single('avatar'), async (req: Request, res
     }
 
     // Ensure uploads directory exists
-    if (!fs.existsSync(UPLOADS_DIR)) {
-      fs.mkdirSync(UPLOADS_DIR, { recursive: true });
+    if (!fs.existsSync(AVATARS_DIR)) {
+      fs.mkdirSync(AVATARS_DIR, { recursive: true });
     }
 
     // Resize to 200x200 and convert to JPEG
     const filename = `${req.user.sub}.jpg`;
-    const filepath = path.join(UPLOADS_DIR, filename);
+    const filepath = path.join(AVATARS_DIR, filename);
 
     await sharp(req.file.buffer)
       .resize(200, 200, { fit: 'cover', position: 'center' })
@@ -231,7 +231,7 @@ usersRouter.post('/me/avatar', upload.single('avatar'), async (req: Request, res
       .toFile(filepath);
 
     // Save URL to database
-    const avatarUrl = `/uploads/avatars/${filename}`;
+    const avatarUrl = avatarPublicUrl(req.user.sub);
     await prisma.user.update({
       where: { id: req.user.sub },
       data: { avatarUrl },

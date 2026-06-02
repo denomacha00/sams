@@ -417,6 +417,18 @@ const KnowledgeManagementPage: React.FC = () => {
           </button>
         </div>
 
+        {/* Role scope guide */}
+        <div className="mb-6 p-4 rounded-xl bg-indigo-500/10 border border-indigo-500/20 text-sm text-indigo-100/90 space-y-2">
+          <p className="font-medium text-white">How knowledge reaches each role</p>
+          <ul className="list-disc list-inside text-indigo-100/80 space-y-1">
+            <li><strong>School Admin</strong> — school-wide entries; all staff and students see them via the AI assistant.</li>
+            <li><strong>HOD</strong> — department entries plus school-wide; teachers and students in that department receive them in AI chat.</li>
+            <li><strong>Teacher</strong> — class entries plus department and school-wide; only that class (and shared scopes) in AI chat.</li>
+            <li><strong>Student</strong> — cannot edit here; they receive school, department, and class entries automatically in the AI assistant.</li>
+          </ul>
+          <p className="text-xs text-indigo-200/70 pt-1">Scope for new entries: {scopeSubtitle}</p>
+        </div>
+
         {/* Error */}
         {error && (
           <div className="mb-6 p-4 rounded-xl bg-red-500/10 border border-red-500/20 text-red-300 text-sm">

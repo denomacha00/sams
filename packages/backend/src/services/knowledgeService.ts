@@ -360,7 +360,8 @@ export class KnowledgeService {
         ];
         break;
       case UserRole.TEACHER:
-        // School-wide + department + class entries
+      case UserRole.STUDENT:
+        // School-wide + department + class entries (students read via AI, not this list API)
         baseFilter.OR = [
           { departmentId: null, classId: null },
           { departmentId: user.departmentId, classId: null },
@@ -368,7 +369,6 @@ export class KnowledgeService {
         ];
         break;
       default:
-        // Fallback: only school-wide
         baseFilter.OR = [{ departmentId: null, classId: null }];
         break;
     }

@@ -23,15 +23,6 @@ interface QuickAction {
   gradient: string;
 }
 
-interface TimetableEntry {
-  id: string;
-  subject: string;
-  startTime: string;
-  endTime: string;
-  room?: string;
-  className?: string;
-}
-
 interface DashboardStats {
   stats: StatCard[];
   loading: boolean;
@@ -175,54 +166,209 @@ const QuickActionButton: React.FC<{ action: QuickAction; index: number }> = ({ a
 );
 
 
-// ─── Today's Schedule Component ──────────────────────────────────────────────
+// ─── Role-specific "At a glance" (replaces duplicate timetable on dashboard) ─
 
-const TodaySchedule: React.FC<{ entries: TimetableEntry[]; loading: boolean }> = ({ entries, loading }) => (
-  <div className="rounded-2xl border border-white/10 bg-white/[0.03] backdrop-blur-md p-6 min-h-[280px]" style={{ animation: 'fadeInUp 0.5s ease-out 0.6s forwards', opacity: 0 }}>
-    <div className="flex items-center gap-3 mb-5">
-      <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-indigo-600 to-slate-700 flex items-center justify-center shadow-lg shadow-indigo-500/20">
-        <svg className="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={ICONS.calendar} />
-        </svg>
-      </div>
-      <h3 className="text-lg font-semibold text-white">Today's Schedule</h3>
-    </div>
-    {loading ? (
-      <div className="space-y-3">
-        {[1, 2, 3].map((i) => (
-          <div key={i} className="animate-pulse flex items-center gap-4 p-3 rounded-xl bg-white/5">
-            <div className="w-16 h-8 bg-white/10 rounded" />
-            <div className="flex-1 h-4 bg-white/10 rounded" />
-          </div>
-        ))}
-      </div>
-    ) : entries.length === 0 ? (
-      <div className="flex flex-col items-center justify-center py-8">
-        <div className="w-12 h-12 rounded-full bg-white/5 flex items-center justify-center mb-3">
-          <svg className="w-6 h-6 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d={ICONS.calendar} />
+function getAtAGlanceTitle(role?: UserRole): string {
+  switch (role) {
+    case UserRole.STUDENT:
+      return 'Attendance Today';
+    case UserRole.TEACHER:
+      return 'Live Sessions';
+    case UserRole.HOD:
+      return 'Department Priorities';
+    case UserRole.SCHOOL_ADMIN:
+      return 'School Activity';
+    default:
+      return 'At a Glance';
+  }
+}
+
+const panelShellClass =
+  'rounded-2xl border border-white/10 bg-white/[0.03] backdrop-blur-md p-6 min-h-[280px]';
+const panelAnimStyle = { animation: 'fadeInUp 0.5s ease-out 0.6s forwards', opacity: 0 };
+
+const AtAGlancePanel: React.FC<{ role?: UserRole; userId?: string }> = ({ role, userId }) => {
+  const [loading, setLoading] = useState(true);
+  const [studentPresent, setStudentPresent] = useState(0);
+  const [activeSessions, setActiveSessions] = useState<Array<{ id: string; subject?: string; className?: string }>>([]);
+  const [unreadCount, setUnreadCount] = useState(0);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function load() {
+      setLoading(true);
+      try {
+        if (role === UserRole.STUDENT) {
+          const { data } = await apiClient.get('/attendance');
+          if (!cancelled) {
+            const today = new Date().toDateString();
+            const todayRecords = (Array.isArray(data) ? data : []).filter(
+              (r: { createdAt?: string; status?: string }) =>
+                r.createdAt &&
+                new Date(r.createdAt).toDateString() === today &&
+                (r.status === 'PRESENT' || r.status === 'LATE'),
+            );
+            setStudentPresent(todayRecords.length);
+          }
+        } else if (role === UserRole.TEACHER && userId) {
+          const { data } = await apiClient.get('/sessions', {
+            params: { teacherId: userId, isActive: true },
+          });
+          if (!cancelled) {
+            const list = (Array.isArray(data) ? data : []).slice(0, 4).map((s: Record<string, unknown>) => ({
+              id: s.id as string,
+              subject: (s.subject as string) ?? 'Session',
+              className: (s.className as string) ?? undefined,
+            }));
+            setActiveSessions(list);
+          }
+        } else if (role === UserRole.HOD || role === UserRole.SCHOOL_ADMIN) {
+          const { data } = await apiClient.get('/notifications/unread-count');
+          if (!cancelled) setUnreadCount(data.count ?? 0);
+        }
+      } catch {
+        // Non-critical dashboard widget
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    }
+
+    void load();
+    return () => {
+      cancelled = true;
+    };
+  }, [role, userId]);
+
+  const title = getAtAGlanceTitle(role);
+
+  return (
+    <div className={panelShellClass} style={panelAnimStyle}>
+      <div className="flex items-center gap-3 mb-5">
+        <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-indigo-600 to-slate-700 flex items-center justify-center shadow-lg shadow-indigo-500/20">
+          <svg className="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d={role === UserRole.STUDENT ? ICONS.qr : role === UserRole.TEACHER ? ICONS.session : ICONS.bell}
+            />
           </svg>
         </div>
-        <p className="text-gray-500 text-sm">No classes scheduled for today</p>
+        <h3 className="text-lg font-semibold text-white">{title}</h3>
       </div>
-    ) : (
-      <div className="space-y-2">
-        {entries.map((entry) => (
-          <div key={entry.id} className="flex items-center gap-4 p-3 rounded-xl bg-white/[0.03] hover:bg-white/[0.07] border border-white/5 hover:border-white/10 transition-all duration-300">
-            <div className="text-xs font-mono text-indigo-300 w-20 shrink-0">
-              {entry.startTime} - {entry.endTime}
-            </div>
-            <div className="flex-1 min-w-0">
-              <p className="text-sm text-white font-medium truncate">{entry.subject}</p>
-              {entry.room && <p className="text-xs text-gray-500">{entry.room}</p>}
-              {entry.className && <p className="text-xs text-gray-500">{entry.className}</p>}
-            </div>
+
+      {loading ? (
+        <div className="space-y-3">
+          {[1, 2, 3].map((i) => (
+            <div key={i} className="animate-pulse h-12 rounded-xl bg-white/5" />
+          ))}
+        </div>
+      ) : role === UserRole.STUDENT ? (
+        <div className="space-y-4">
+          <div className="text-center py-4">
+            <p className="text-4xl font-bold text-indigo-300">{studentPresent}</p>
+            <p className="text-sm text-gray-400 mt-1">classes marked present today</p>
           </div>
-        ))}
-      </div>
-    )}
-  </div>
-);
+          <Link to="/sessions/scan" className="btn-primary w-full py-3 text-sm flex items-center justify-center gap-2">
+            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={ICONS.qr} />
+            </svg>
+            Scan attendance QR
+          </Link>
+          <Link
+            to="/timetable"
+            className="block text-center text-sm text-indigo-300 hover:text-indigo-200 transition-colors"
+          >
+            Open full timetable →
+          </Link>
+        </div>
+      ) : role === UserRole.TEACHER ? (
+        <div className="space-y-3">
+          {activeSessions.length === 0 ? (
+            <div className="text-center py-6">
+              <p className="text-gray-500 text-sm mb-4">No active sessions right now</p>
+              <Link to="/sessions" className="btn-primary inline-flex py-2.5 px-5 text-sm">
+                Start a session
+              </Link>
+            </div>
+          ) : (
+            <>
+              {activeSessions.map((s) => (
+                <Link
+                  key={s.id}
+                  to="/sessions"
+                  className="flex items-center justify-between p-3 rounded-xl bg-white/[0.03] hover:bg-white/[0.07] border border-white/5 hover:border-indigo-500/30 transition-all"
+                >
+                  <div>
+                    <p className="text-sm text-white font-medium">{s.subject}</p>
+                    {s.className && <p className="text-xs text-gray-500">{s.className}</p>}
+                  </div>
+                  <span className="text-xs font-semibold text-emerald-400">Live</span>
+                </Link>
+              ))}
+              <Link to="/sessions" className="block text-center text-sm text-indigo-300 hover:text-indigo-200 pt-1">
+                Manage all sessions →
+              </Link>
+            </>
+          )}
+        </div>
+      ) : role === UserRole.HOD ? (
+        <div className="space-y-3">
+          <div className="flex items-center justify-between p-3 rounded-xl bg-white/[0.03] border border-white/5">
+            <span className="text-sm text-gray-300">Unread notifications</span>
+            <span className="text-sm font-semibold text-indigo-300">{unreadCount}</span>
+          </div>
+          <Link
+            to="/hod/department"
+            className="block p-3 rounded-xl bg-white/[0.03] hover:bg-white/[0.07] border border-white/5 text-sm text-gray-200"
+          >
+            Department management →
+          </Link>
+          <Link
+            to="/risk-scores"
+            className="block p-3 rounded-xl bg-white/[0.03] hover:bg-white/[0.07] border border-white/5 text-sm text-gray-200"
+          >
+            Review at-risk students →
+          </Link>
+          <Link
+            to="/notifications"
+            className="block text-center text-sm text-indigo-300 hover:text-indigo-200"
+          >
+            Open notifications →
+          </Link>
+        </div>
+      ) : role === UserRole.SCHOOL_ADMIN ? (
+        <div className="space-y-3">
+          <div className="flex items-center justify-between p-3 rounded-xl bg-white/[0.03] border border-white/5">
+            <span className="text-sm text-gray-300">Unread notifications</span>
+            <span className="text-sm font-semibold text-indigo-300">{unreadCount}</span>
+          </div>
+          <Link
+            to="/admin/users"
+            className="block p-3 rounded-xl bg-white/[0.03] hover:bg-white/[0.07] border border-white/5 text-sm text-gray-200"
+          >
+            Manage users →
+          </Link>
+          <Link
+            to="/reports"
+            className="block p-3 rounded-xl bg-white/[0.03] hover:bg-white/[0.07] border border-white/5 text-sm text-gray-200"
+          >
+            School attendance reports →
+          </Link>
+          <Link
+            to="/notifications"
+            className="block text-center text-sm text-indigo-300 hover:text-indigo-200"
+          >
+            Send or view notifications →
+          </Link>
+        </div>
+      ) : (
+        <p className="text-gray-500 text-sm text-center py-8">Welcome to SAMS</p>
+      )}
+    </div>
+  );
+};
 
 // ─── Activity Feed Component ─────────────────────────────────────────────────
 
@@ -570,42 +716,6 @@ function useDashboardStats(user?: { id: string; role?: UserRole; classId?: strin
   return { stats, loading };
 }
 
-function useTodaySchedule(): { entries: TimetableEntry[]; loading: boolean } {
-  const [entries, setEntries] = useState<TimetableEntry[]>([]);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    let cancelled = false;
-
-    async function fetchSchedule() {
-      try {
-        const { data } = await apiClient.get('/timetable', { params: { today: true } });
-        if (!cancelled) {
-          const mapped: TimetableEntry[] = (Array.isArray(data) ? data : data.entries ?? []).map((e: Record<string, unknown>, i: number) => ({
-            id: (e.id as string) ?? String(i),
-            subject: (e.subject as string) ?? (e.courseName as string) ?? 'Unknown',
-            startTime: (e.startTime as string) ?? '',
-            endTime: (e.endTime as string) ?? '',
-            room: (e.room as string) ?? (e.venue as string) ?? undefined,
-            className: (e.className as string) ?? undefined,
-          }));
-          setEntries(mapped);
-        }
-      } catch {
-        // No schedule available
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
-    }
-
-    fetchSchedule();
-    return () => { cancelled = true; };
-  }, []);
-
-  return { entries, loading };
-}
-
-
 // ─── Main Dashboard Component ────────────────────────────────────────────────
 
 const DashboardPage: React.FC = () => {
@@ -618,7 +728,7 @@ const DashboardPage: React.FC = () => {
   const [unreadCount, setUnreadCount] = useState(0);
 
   const { stats, loading: statsLoading } = useDashboardStats(user ?? undefined);
-  const { entries: schedule, loading: scheduleLoading } = useTodaySchedule();
+  const atAGlanceTitle = getAtAGlanceTitle(user?.role);
 
   // Update clock every minute
   useEffect(() => {
@@ -823,12 +933,11 @@ const DashboardPage: React.FC = () => {
           </div>
         </section>
 
-        {/* Bottom Grid: Schedule + Activity/Info */}
+        {/* Bottom Grid: role-specific insights (timetable lives on /timetable) */}
         <section>
-          <SectionHeader title="Today's Schedule" icon={ICONS.calendar} gradient="from-indigo-600 to-slate-700" />
+          <SectionHeader title={atAGlanceTitle} icon={ICONS.trending} gradient="from-indigo-600 to-slate-700" />
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            {/* Today's Schedule - shown for all roles */}
-            <TodaySchedule entries={schedule} loading={scheduleLoading} />
+            <AtAGlancePanel role={user?.role} userId={user?.id} />
 
             {/* Right panel varies by role */}
             {user?.role === UserRole.SCHOOL_ADMIN && <ActivityFeed />}

@@ -73,6 +73,12 @@ npx prisma migrate deploy
 npm run create-super-admin || true
 cd "$ROOT"
 
+echo "==> Uploads directories (avatars)"
+UPLOADS_ROOT="${UPLOADS_DIR:-/var/www/sams/uploads}"
+mkdir -p "$UPLOADS_ROOT/avatars"
+# Fix avatars saved to uploads root when UPLOADS_DIR was set without /avatars
+find "$UPLOADS_ROOT" -maxdepth 1 -type f -name '*.jpg' -exec mv -n -t "$UPLOADS_ROOT/avatars/" {} + 2>/dev/null || true
+
 echo "==> Restarting services"
 pm2 reload ecosystem.config.js --env production
 sudo nginx -t
