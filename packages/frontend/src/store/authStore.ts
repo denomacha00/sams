@@ -10,6 +10,8 @@ export interface AuthUser {
   email?: string;
   phone?: string;
   avatarUrl?: string;
+  /** Client-only timestamp to bust avatar image cache after re-upload. */
+  avatarVersion?: number;
   role: UserRole;
   schoolId: string;
   departmentId?: string;

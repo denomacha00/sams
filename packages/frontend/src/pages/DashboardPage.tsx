@@ -4,6 +4,7 @@ import { io as socketIo } from 'socket.io-client';
 import { useAuthStore } from '../store/authStore';
 import { UserRole } from '@sams/shared';
 import apiClient from '../services/apiClient';
+import { UserAvatar } from '../components/UserAvatar';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -745,9 +746,13 @@ const DashboardPage: React.FC = () => {
 
             {/* User avatar & logout */}
             <div className="flex items-center gap-3 ml-1">
-              <div className="w-9 h-9 rounded-full bg-indigo-600 flex items-center justify-center text-white text-sm font-bold ring-2 ring-slate-700">
-                {user?.fullName?.charAt(0)?.toUpperCase() || 'U'}
-              </div>
+              <Link to="/profile" title="Profile">
+                <UserAvatar
+                  avatarUrl={user?.avatarUrl}
+                  fullName={user?.fullName}
+                  cacheKey={user?.avatarVersion}
+                />
+              </Link>
               <button
                 onClick={handleLogout}
                 className="text-sm text-gray-400 hover:text-red-400 px-3 py-1.5 rounded-lg hover:bg-red-500/10 border border-transparent hover:border-red-500/20 transition-all duration-300"

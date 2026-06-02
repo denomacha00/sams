@@ -2,18 +2,7 @@ import React, { useState, useRef } from 'react';
 import { useAuthStore } from '../store/authStore';
 import apiClient from '../services/apiClient';
 import { UserRole } from '@sams/shared';
-
-function resolveAvatarUrl(url?: string | null): string | null {
-  if (!url) return null;
-  if (url.startsWith('http://') || url.startsWith('https://')) return url;
-  const base = import.meta.env.VITE_API_BASE_URL || '/api/v1';
-  const origin = window.location.origin;
-  if (base.startsWith('http://') || base.startsWith('https://')) {
-    const apiOrigin = new URL(base).origin;
-    return `${apiOrigin}${url}`;
-  }
-  return `${origin}${url}`;
-}
+import { UserAvatar } from '../components/UserAvatar';
 
 const ProfilePage: React.FC = () => {
   const user = useAuthStore((s) => s.user);
@@ -25,8 +14,6 @@ const ProfilePage: React.FC = () => {
   const [success, setSuccess] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  // Profile picture state
-  const [avatarUrl, setAvatarUrl] = useState<string | null>(resolveAvatarUrl(user?.avatarUrl));
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -164,9 +151,10 @@ const ProfilePage: React.FC = () => {
         headers: { 'Content-Type': 'multipart/form-data' },
       });
 
-      const resolved = resolveAvatarUrl(data.avatarUrl);
-      setAvatarUrl(resolved ? `${resolved}?t=${Date.now()}` : null);
-      useAuthStore.getState().updateUser({ avatarUrl: data.avatarUrl });
+      useAuthStore.getState().updateUser({
+        avatarUrl: data.avatarUrl,
+        avatarVersion: Date.now(),
+      });
       setCropImage(null);
       setSuccess('Profile picture updated!');
     } catch (err: any) {
@@ -271,12 +259,13 @@ const ProfilePage: React.FC = () => {
           <div className="flex items-center gap-5 mb-6 pb-6 border-b border-white/10">
             {/* Avatar */}
             <div className="relative group">
-              <div className="w-20 h-20 rounded-2xl bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-3xl font-bold text-white shadow-lg shadow-purple-500/20 overflow-hidden">
-                {avatarUrl ? (
-                  <img src={avatarUrl} alt="Profile" className="w-full h-full object-cover" />
-                ) : (
-                  user?.fullName?.charAt(0) || 'U'
-                )}
+              <div className="shadow-lg shadow-purple-500/20 overflow-hidden">
+                <UserAvatar
+                  avatarUrl={user?.avatarUrl}
+                  fullName={user?.fullName}
+                  cacheKey={user?.avatarVersion}
+                  className="w-20 h-20 rounded-2xl text-3xl"
+                />
               </div>
               <button
                 onClick={() => fileInputRef.current?.click()}
