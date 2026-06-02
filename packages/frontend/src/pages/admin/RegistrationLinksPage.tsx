@@ -422,7 +422,7 @@ const RegistrationLinksPage: React.FC = () => {
               )}
 
               {/* SCHOOL_ADMIN: Department (for HODs, Students and Teachers) */}
-              {!isHOD && (targetRole === 'HOD' || targetRole === 'STUDENT' || targetRole === 'TEACHER') && (
+              {!isHOD && !isTeacher && (targetRole === 'HOD' || targetRole === 'STUDENT' || targetRole === 'TEACHER') && (
                 <div>
                   <label className="block text-sm text-gray-300 mb-1">
                     Department *
@@ -456,7 +456,7 @@ const RegistrationLinksPage: React.FC = () => {
               )}
 
               {/* SCHOOL_ADMIN: Class (for Students and Teachers) */}
-              {!isHOD && (targetRole === 'STUDENT' || targetRole === 'TEACHER') && selectedDept && (
+              {!isHOD && !isTeacher && (targetRole === 'STUDENT' || targetRole === 'TEACHER') && selectedDept && (
                 <div>
                   <label className="block text-sm text-gray-300 mb-1">
                     Class {targetRole === 'STUDENT' ? '*' : '(optional — leave blank for any class)'}
