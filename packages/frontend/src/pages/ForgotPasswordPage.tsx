@@ -12,6 +12,7 @@ const ForgotPasswordPage: React.FC = () => {
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [otpSent, setOtpSent] = useState(false);
+  const [otpDeliveryHint, setOtpDeliveryHint] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
@@ -37,10 +38,14 @@ const ForgotPasswordPage: React.FC = () => {
     try {
       const { data } = await apiClient.post('/auth/forgot-password-otp', { schoolCode, identifier });
       setOtpSent(true);
-      if (data.hint) {
-        setError(null);
-        // Show hint as non-error info if partial success
-      }
+      const parts: string[] = [];
+      if (data.sentVia?.sms) parts.push('SMS');
+      if (data.sentVia?.email) parts.push('email');
+      setOtpDeliveryHint(
+        parts.length > 0
+          ? `Code sent via ${parts.join(' and ')}.${data.hint ? ` ${data.hint}` : ''}`
+          : data.hint ?? null,
+      );
     } catch (err: any) {
       const msg = err.response?.data?.error || 'Failed to send verification code.';
       const hint = err.response?.data?.sandbox
@@ -146,7 +151,9 @@ const ForgotPasswordPage: React.FC = () => {
                   <p className="text-sm text-red-300 text-center">{error}</p>
                 </div>
               )}
-              <p className="text-sm text-gray-400 mb-4 text-center">Enter the 6-digit code sent to your email or phone.</p>
+              <p className="text-sm text-gray-400 mb-4 text-center">
+                {otpDeliveryHint ?? 'Enter the 6-digit code sent to your email or phone.'}
+              </p>
               <form onSubmit={handleResetWithOtp} className="space-y-5">
                 <div>
                   <label htmlFor="otpCode" className="block text-sm font-semibold text-gray-300 mb-1.5">Verification code</label>

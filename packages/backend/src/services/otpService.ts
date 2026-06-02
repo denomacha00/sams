@@ -75,6 +75,10 @@ export async function deliverOtp(
   const name = user.fullName || 'there';
   const subject =
     context === 'login' ? 'Your SAMS login code' : 'Your SAMS password reset code';
+  const smsText =
+    context === 'login'
+      ? `SAMS login code: ${code}. Expires in ${Math.floor(OTP_TTL_SECONDS / 60)} min. Do not share.`
+      : `SAMS reset code: ${code}. Expires in ${Math.floor(OTP_TTL_SECONDS / 60)} min. Ignore if you did not request this.`;
   const text =
     context === 'login'
       ? `Hi ${name}, your SAMS login verification code is ${code}. It expires in ${Math.floor(OTP_TTL_SECONDS / 60)} minutes. Do not share this code.`
@@ -104,7 +108,7 @@ export async function deliverOtp(
   }
 
   if (user.phone && isSmsConfigured()) {
-    const result = await notificationService.sendSMSTest(user.phone, text);
+    const result = await notificationService.sendSMSTest(user.phone, smsText);
     smsSent = result.ok;
     if (!result.ok) {
       smsError = result.error;

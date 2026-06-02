@@ -52,7 +52,15 @@ set_env NODE_ENV production
 set_env APP_URL "https://app.smart-managment.com"
 set_env CORS_ORIGIN "https://app.smart-managment.com"
 set_env OTP_LOGIN_ENABLED false
-set_env OTP_PASSWORD_RESET_ENABLED false
+
+AT_KEY="$(read_env AT_API_KEY)"
+if [[ -n "$AT_KEY" && "$AT_KEY" != "your-africastalking-api-key" ]]; then
+  set_env OTP_PASSWORD_RESET_ENABLED true
+  echo "    SMS key found — OTP password reset enabled"
+else
+  set_env OTP_PASSWORD_RESET_ENABLED false
+  echo "    No AT_API_KEY — OTP password reset left disabled"
+fi
 set_env JWT_SECRET "$JWT_SECRET"
 set_env JWT_REFRESH_SECRET "$JWT_REFRESH_SECRET"
 set_env QR_SECRET "$QR_SECRET"
