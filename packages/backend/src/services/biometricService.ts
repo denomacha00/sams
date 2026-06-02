@@ -53,14 +53,14 @@ export class BiometricService {
     schoolId: string,
     descriptor: Float32Array,
   ): Promise<void> {
-    // Verify the student exists and belongs to this school
-    const student = await prisma.user.findFirst({
-      where: { id: studentId, schoolId, role: 'STUDENT' },
+    // Verify the user exists and belongs to this school
+    const user = await prisma.user.findFirst({
+      where: { id: studentId, schoolId },
       select: { id: true },
     });
 
-    if (!student) {
-      throw new AppError(404, 'STUDENT_NOT_FOUND', 'Student not found in this school');
+    if (!user) {
+      throw new AppError(404, 'USER_NOT_FOUND', 'User not found in this school');
     }
 
     // Derive the school-specific encryption key

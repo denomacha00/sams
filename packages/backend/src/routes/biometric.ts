@@ -1,5 +1,6 @@
 import { Router, type Request, type Response } from 'express';
 import { z } from 'zod';
+import { authenticate } from '../middleware/auth';
 import { requirePermission } from '../middleware/rbac';
 import { licenseService } from '../services/licenseService';
 import { biometricService } from '../services/biometricService';
@@ -8,7 +9,7 @@ import { AppError } from '../middleware/errors';
 // ─── Validation Schemas ───────────────────────────────────────────────────────
 
 const enrollSchema = z.object({
-  studentId: z.string().min(1),
+  studentId: z.string().min(1).optional(),
   descriptor: z.array(z.number()).min(1, 'Descriptor must not be empty'),
 });
 
@@ -48,7 +49,7 @@ biometricRouter.use(async (req: Request, res: Response, next) => {
  */
 biometricRouter.post(
   '/enroll',
-  requirePermission('mark:attendance'),
+  authenticate,
   async (req: Request, res: Response): Promise<void> => {
     const parsed = enrollSchema.safeParse(req.body);
     if (!parsed.success) {
@@ -61,18 +62,30 @@ biometricRouter.post(
     }
 
     try {
+      const requestedStudentId = parsed.data.studentId ?? req.user.sub;
+      const canManageOthers = ['SCHOOL_ADMIN', 'HOD', 'TEACHER'].includes(req.user.role);
+      const isSelfEnrollment = requestedStudentId === req.user.sub;
+
+      if (!isSelfEnrollment && !canManageOthers) {
+        throw new AppError(
+          403,
+          'FORBIDDEN',
+          'You can only enroll your own biometric profile',
+        );
+      }
+
       // Convert the number array to Float32Array
       const descriptor = new Float32Array(parsed.data.descriptor);
 
       await biometricService.enrollTemplate(
-        parsed.data.studentId,
+        requestedStudentId,
         req.schoolId,
         descriptor,
       );
 
       res.status(201).json({
         message: 'Biometric template enrolled successfully',
-        studentId: parsed.data.studentId,
+        studentId: requestedStudentId,
       });
     } catch (err) {
       if (err instanceof AppError) throw err;

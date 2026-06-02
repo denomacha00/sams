@@ -95,6 +95,7 @@ const NotificationsPage: React.FC = () => {
 
   const [departments, setDepartments] = useState<Department[]>([]);
   const [classes, setClasses] = useState<{ id: string; name: string }[]>([]);
+  const [selectedDepartmentId, setSelectedDepartmentId] = useState('');
 
   // Fetch notifications on mount
   useEffect(() => {
@@ -259,6 +260,15 @@ const NotificationsPage: React.FC = () => {
     return ['class'];
   };
 
+  const classOptionsForScope = (): { id: string; name: string }[] => {
+    if (user?.role === 'SCHOOL_ADMIN') {
+      if (!selectedDepartmentId) return [];
+      const selectedDept = departments.find((d) => d.id === selectedDepartmentId);
+      return selectedDept?.classes || [];
+    }
+    return classes;
+  };
+
   // What role filters are available for the current sender + scope
   const getTargetRoleOptions = (): { value: TargetRole; label: string }[] => {
     if (!user) return [];
@@ -339,7 +349,7 @@ const NotificationsPage: React.FC = () => {
   const unreadCount = notifications.filter((n) => !n.read).length;
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 p-6">
+    <div className="page-shell p-6">
       <div className="max-w-4xl mx-auto">
         {/* Header */}
         <div className="flex items-center justify-between mb-8">
@@ -347,7 +357,7 @@ const NotificationsPage: React.FC = () => {
             <h1 className="text-2xl font-bold text-white flex items-center gap-3">
               Notifications
               {unreadCount > 0 && (
-                <span className="inline-flex items-center justify-center px-2 py-0.5 rounded-full text-xs font-bold bg-teal-500 text-white min-w-[1.5rem]">
+                <span className="inline-flex items-center justify-center px-2 py-0.5 rounded-full text-xs font-bold bg-indigo-600 text-white min-w-[1.5rem]">
                   {unreadCount}
                 </span>
               )}
@@ -358,7 +368,7 @@ const NotificationsPage: React.FC = () => {
             {unreadCount > 0 && (
               <button
                 onClick={markAllAsRead}
-                className="px-3 py-2 text-sm text-gray-400 hover:text-white border border-white/10 rounded-xl hover:bg-white/5 transition-all"
+                className="px-3 py-2 text-sm text-gray-400 hover:text-white border border-slate-700 rounded-xl hover:bg-slate-800 transition-all"
               >
                 Mark all read
               </button>
@@ -366,7 +376,7 @@ const NotificationsPage: React.FC = () => {
             {canSend && (
               <button
                 onClick={() => setShowSendForm(!showSendForm)}
-                className="px-4 py-2 bg-gradient-to-r from-teal-500 to-cyan-600 text-white font-semibold rounded-xl hover:from-teal-400 hover:to-cyan-500 transition-all shadow-lg shadow-teal-500/20"
+                className="px-4 py-2 bg-indigo-600 text-white font-semibold rounded-xl hover:bg-indigo-500 transition-colors"
               >
                 {showSendForm ? 'Cancel' : 'Send Message'}
               </button>
@@ -376,7 +386,7 @@ const NotificationsPage: React.FC = () => {
 
         {/* Send Form */}
         {showSendForm && canSend && (
-          <div className="mb-8 bg-white/5 backdrop-blur-xl border border-white/10 rounded-2xl p-6">
+          <div className="mb-8 surface-card p-6">
             <h2 className="text-lg font-semibold text-white mb-4">Send Notification</h2>
             {sendSuccess && (
               <div className="mb-4 p-3 bg-emerald-500/20 border border-emerald-400/30 rounded-xl">
@@ -394,8 +404,8 @@ const NotificationsPage: React.FC = () => {
               {/* Scope */}
               <div>
                 <label className="block text-sm font-semibold text-gray-300 mb-1.5">Send to</label>
-                <select value={scope} onChange={(e) => { setScope(e.target.value as Scope); setTargetId(''); setTargetRole('ALL'); }}
-                  className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:ring-2 focus:ring-teal-500/40 transition-all">
+                <select value={scope} onChange={(e) => { setScope(e.target.value as Scope); setTargetId(''); setTargetRole('ALL'); setSelectedDepartmentId(''); }}
+                  className="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-3 text-white focus:outline-none focus:ring-2 focus:ring-indigo-500/40 transition-all">
                   {getScopeOptions().map((s) => (
                     <option key={s} value={s} className="bg-slate-800">
                       {s === 'school' ? 'Whole School' : s === 'department' ? 'Department' : 'Class'}
@@ -408,7 +418,7 @@ const NotificationsPage: React.FC = () => {
               <div>
                 <label className="block text-sm font-semibold text-gray-300 mb-1.5">Who receives it</label>
                 <select value={targetRole} onChange={(e) => setTargetRole(e.target.value as TargetRole)}
-                  className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:ring-2 focus:ring-teal-500/40 transition-all">
+                  className="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-3 text-white focus:outline-none focus:ring-2 focus:ring-indigo-500/40 transition-all">
                   {getTargetRoleOptions().map((o) => (
                     <option key={o.value} value={o.value} className="bg-slate-800">{o.label}</option>
                   ))}
@@ -423,22 +433,36 @@ const NotificationsPage: React.FC = () => {
                   </label>
                   {scope === 'department' && (
                     <select value={targetId} onChange={(e) => setTargetId(e.target.value)}
-                      className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:ring-2 focus:ring-teal-500/40 transition-all">
+                      className="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-3 text-white focus:outline-none focus:ring-2 focus:ring-indigo-500/40 transition-all">
                       <option value="" className="bg-slate-800">-- Select Department --</option>
                       {departments.map((d) => <option key={d.id} value={d.id} className="bg-slate-800">{d.name}</option>)}
                     </select>
                   )}
                   {scope === 'class' && (
-                    <select value={targetId} onChange={(e) => setTargetId(e.target.value)}
-                      className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:ring-2 focus:ring-teal-500/40 transition-all">
-                      <option value="" className="bg-slate-800">-- Select Class --</option>
-                      {user?.role === 'SCHOOL_ADMIN' && departments.flatMap((d) =>
-                        (d.classes || []).map((c) => <option key={c.id} value={c.id} className="bg-slate-800">{d.name} — {c.name}</option>)
+                    <div className="space-y-3">
+                      {user?.role === 'SCHOOL_ADMIN' && (
+                        <div>
+                          <label className="block text-sm font-semibold text-gray-300 mb-1.5">Department *</label>
+                          <select
+                            value={selectedDepartmentId}
+                            onChange={(e) => {
+                              setSelectedDepartmentId(e.target.value);
+                              setTargetId('');
+                            }}
+                            className="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-3 text-white focus:outline-none focus:ring-2 focus:ring-indigo-500/40 transition-all"
+                          >
+                            <option value="" className="bg-slate-800">-- Select Department --</option>
+                            {departments.map((d) => <option key={d.id} value={d.id} className="bg-slate-800">{d.name}</option>)}
+                          </select>
+                        </div>
                       )}
-                      {(user?.role === 'HOD' || user?.role === 'TEACHER') && classes.map((c) =>
-                        <option key={c.id} value={c.id} className="bg-slate-800">{c.name}</option>
-                      )}
-                    </select>
+                      <select value={targetId} onChange={(e) => setTargetId(e.target.value)}
+                        disabled={user?.role === 'SCHOOL_ADMIN' && !selectedDepartmentId}
+                        className="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-3 text-white focus:outline-none focus:ring-2 focus:ring-indigo-500/40 transition-all disabled:opacity-60 disabled:cursor-not-allowed">
+                        <option value="" className="bg-slate-800">-- Select Class --</option>
+                        {classOptionsForScope().map((c) => <option key={c.id} value={c.id} className="bg-slate-800">{c.name}</option>)}
+                      </select>
+                    </div>
                   )}
                 </div>
               )}
@@ -448,14 +472,14 @@ const NotificationsPage: React.FC = () => {
                 <label className="block text-sm font-semibold text-gray-300 mb-1.5">Title <span className="text-gray-500 font-normal">(optional)</span></label>
                 <input type="text" value={title} onChange={(e) => setTitle(e.target.value)} maxLength={200}
                   placeholder="e.g. Exam Reminder"
-                  className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-teal-500/40 transition-all" />
+                  className="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/40 transition-all" />
               </div>
 
               {/* Message */}
               <div>
                 <label className="block text-sm font-semibold text-gray-300 mb-1.5">Message *</label>
                 <textarea value={message} onChange={(e) => setMessage(e.target.value)} required rows={4}
-                  className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-teal-500/40 transition-all resize-none"
+                  className="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/40 transition-all resize-none"
                   placeholder="Type your message..." />
               </div>
 
@@ -466,7 +490,7 @@ const NotificationsPage: React.FC = () => {
                   {(['inapp', 'sms'] as Channel[]).map((ch) => (
                     <label key={ch} className="flex items-center gap-2 cursor-pointer">
                       <input type="checkbox" checked={channels.includes(ch)} onChange={() => toggleChannel(ch)}
-                        className="w-4 h-4 rounded border-white/20 bg-white/5 text-teal-500 focus:ring-teal-500/40" />
+                        className="w-4 h-4 rounded border-slate-600 bg-slate-900 text-indigo-500 focus:ring-indigo-500/40" />
                       <span className="text-sm text-gray-300">{ch === 'inapp' ? 'In-App' : 'SMS'}</span>
                     </label>
                   ))}
@@ -474,7 +498,7 @@ const NotificationsPage: React.FC = () => {
               </div>
 
               <button type="submit" disabled={sending || !message.trim() || channels.length === 0 || (scope !== 'school' && !targetId)}
-                className="w-full bg-gradient-to-r from-teal-500 to-cyan-600 text-white font-bold py-3 px-4 rounded-xl hover:from-teal-400 hover:to-cyan-500 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-lg shadow-teal-500/30">
+                className="w-full bg-indigo-600 text-white font-bold py-3 px-4 rounded-xl hover:bg-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors">
                 {sending ? 'Sending...' : 'Send Notification'}
               </button>
             </form>
@@ -484,7 +508,7 @@ const NotificationsPage: React.FC = () => {
         {/* Notifications List */}
         {loading ? (
           <div className="flex items-center justify-center py-12">
-            <svg className="animate-spin h-6 w-6 text-teal-400" viewBox="0 0 24 24">
+            <svg className="animate-spin h-6 w-6 text-indigo-400" viewBox="0 0 24 24">
               <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
               <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
             </svg>
@@ -508,12 +532,12 @@ const NotificationsPage: React.FC = () => {
               return (
                 <div key={notif.id} onClick={() => !notif.read && markAsRead(notif.id)}
                   className={`p-4 rounded-xl border transition-all cursor-pointer backdrop-blur-sm ${
-                    notif.read ? 'bg-white/[0.03] border-white/5' : 'bg-white/[0.06] border-teal-500/20 hover:border-teal-500/40'
+                    notif.read ? 'bg-slate-900/60 border-slate-700/60' : 'bg-slate-900 border-indigo-500/30 hover:border-indigo-500/50'
                   }`}>
                   <div className="flex items-start justify-between gap-3">
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 flex-wrap">
-                        {!notif.read && <div className="w-2 h-2 rounded-full bg-teal-400 flex-shrink-0" />}
+                        {!notif.read && <div className="w-2 h-2 rounded-full bg-indigo-400 flex-shrink-0" />}
                         <h3 className={`text-sm font-semibold ${notif.read ? 'text-gray-400' : 'text-white'}`}>{notif.title}</h3>
                         {notif.updatedAt && <span className="text-xs text-amber-400/70 italic">edited</span>}
                       </div>
@@ -522,7 +546,7 @@ const NotificationsPage: React.FC = () => {
                       {/* Sender info + time */}
                       <div className="flex items-center gap-2 mt-2 flex-wrap">
                         <div className="flex items-center gap-1.5">
-                          <div className="w-5 h-5 rounded-full bg-gradient-to-br from-teal-500 to-cyan-600 flex items-center justify-center text-[10px] font-bold text-white flex-shrink-0">
+                          <div className="w-5 h-5 rounded-full bg-indigo-600 flex items-center justify-center text-[10px] font-bold text-white flex-shrink-0">
                             {senderDisplay.charAt(0).toUpperCase()}
                           </div>
                           <span className="text-xs text-gray-400 font-medium">{senderDisplay}</span>

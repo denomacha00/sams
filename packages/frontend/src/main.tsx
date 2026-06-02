@@ -91,10 +91,14 @@ ReactDOM.createRoot(document.getElementById('root') as HTMLElement).render(
         <Route element={<AuthGuard allowedRoles={[UserRole.SCHOOL_ADMIN, UserRole.HOD, UserRole.TEACHER]} />}>
           <Route path="/sessions" element={<SessionPage />} />
           <Route path="/attendance" element={<ManualAttendancePage />} />
-          <Route path="/biometric/enroll" element={<BiometricEnrollPage />} />
           <Route path="/biometric/attendance" element={<BiometricAttendancePage />} />
           <Route path="/class/students" element={<ClassStudentsPage />} />
           <Route path="/admin/knowledge" element={<KnowledgeManagementPage />} />
+        </Route>
+
+        {/* Any authenticated role can enroll biometric for account login */}
+        <Route element={<AuthGuard />}>
+          <Route path="/biometric/enroll" element={<BiometricEnrollPage />} />
         </Route>
 
         {/* Student-only routes */}
