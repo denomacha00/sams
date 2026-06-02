@@ -208,7 +208,7 @@ const TodaySchedule: React.FC<{ entries: TimetableEntry[]; loading: boolean }> =
       <div className="space-y-2">
         {entries.map((entry) => (
           <div key={entry.id} className="flex items-center gap-4 p-3 rounded-xl bg-white/[0.03] hover:bg-white/[0.07] border border-white/5 hover:border-white/10 transition-all duration-300">
-            <div className="text-xs font-mono text-teal-400 w-20 shrink-0">
+            <div className="text-xs font-mono text-indigo-300 w-20 shrink-0">
               {entry.startTime} - {entry.endTime}
             </div>
             <div className="flex-1 min-w-0">
@@ -392,10 +392,10 @@ function getDefaultStats(role?: UserRole): StatCard[] {
       ];
     case UserRole.STUDENT:
       return [
-        { label: 'My Attendance %', value: '—', icon: ICONS.check, gradient: 'from-teal-500 to-cyan-500', shadowColor: 'shadow-teal-500/20' },
+        { label: 'My Attendance %', value: '—', icon: ICONS.check, gradient: 'from-indigo-500 to-violet-500', shadowColor: 'shadow-indigo-500/20' },
         { label: 'Classes Today', value: '—', icon: ICONS.calendar, gradient: 'from-blue-500 to-indigo-500', shadowColor: 'shadow-blue-500/20' },
         { label: 'Risk Score', value: '—', icon: ICONS.warning, gradient: 'from-purple-500 to-pink-500', shadowColor: 'shadow-purple-500/20' },
-        { label: 'Days Present', value: '—', icon: ICONS.fire, gradient: 'from-orange-500 to-amber-500', shadowColor: 'shadow-orange-500/20' },
+        { label: 'Days Present', value: '—', icon: ICONS.fire, gradient: 'from-slate-600 to-slate-700', shadowColor: 'shadow-slate-600/20' },
       ];
     case UserRole.HOD:
       return [
@@ -512,10 +512,10 @@ function useDashboardStats(user?: { id: string; role?: UserRole; classId?: strin
 
             if (!cancelled) {
               setStats([
-                { label: 'My Attendance %', value: attendancePct, icon: ICONS.check, gradient: 'from-teal-500 to-cyan-500', shadowColor: 'shadow-teal-500/20' },
+                { label: 'My Attendance %', value: attendancePct, icon: ICONS.check, gradient: 'from-indigo-500 to-violet-500', shadowColor: 'shadow-indigo-500/20' },
                 { label: 'Classes Today', value: classesToday, icon: ICONS.calendar, gradient: 'from-blue-500 to-indigo-500', shadowColor: 'shadow-blue-500/20' },
                 { label: 'Risk Score', value: riskScore, icon: ICONS.warning, gradient: 'from-purple-500 to-pink-500', shadowColor: 'shadow-purple-500/20' },
-                { label: 'Days Present', value: daysPresent, icon: ICONS.fire, gradient: 'from-orange-500 to-amber-500', shadowColor: 'shadow-orange-500/20' },
+                { label: 'Days Present', value: daysPresent, icon: ICONS.fire, gradient: 'from-slate-600 to-slate-700', shadowColor: 'shadow-slate-600/20' },
               ]);
             }
             break;
@@ -718,7 +718,7 @@ const DashboardPage: React.FC = () => {
               to="/profile"
               className={`relative w-9 h-9 rounded-lg border flex items-center justify-center hover:bg-white/[0.08] transition-all duration-300 ${
                 location.pathname === '/profile'
-                  ? 'bg-white/10 border-teal-500/50 text-teal-400'
+                  ? 'bg-white/10 border-indigo-500/50 text-indigo-300'
                   : 'bg-white/[0.04] border-white/10 text-gray-400'
               }`}
               title="Profile"
@@ -733,7 +733,7 @@ const DashboardPage: React.FC = () => {
               to="/settings"
               className={`relative w-9 h-9 rounded-lg border flex items-center justify-center hover:bg-white/[0.08] transition-all duration-300 ${
                 location.pathname === '/settings'
-                  ? 'bg-white/10 border-teal-500/50 text-teal-400'
+                  ? 'bg-white/10 border-indigo-500/50 text-indigo-300'
                   : 'bg-white/[0.04] border-white/10 text-gray-400'
               }`}
               title="Settings"
@@ -829,7 +829,7 @@ const DashboardPage: React.FC = () => {
             {user?.role === UserRole.SCHOOL_ADMIN && <ActivityFeed />}
 
             {user?.role === UserRole.TEACHER && (
-              <div className="rounded-2xl border border-white/10 bg-white/[0.03] backdrop-blur-md p-6 min-h-[280px]" style={{ animation: 'fadeInUp 0.5s ease-out 0.7s forwards', opacity: 0 }}>
+              <div className="rounded-2xl border border-slate-700 bg-slate-900/80 p-6 min-h-[280px]" style={{ animation: 'fadeInUp 0.5s ease-out 0.7s forwards', opacity: 0 }}>
                 <div className="flex items-center gap-3 mb-5">
                   <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-green-500 to-emerald-500 flex items-center justify-center shadow-lg shadow-green-500/20">
                     <svg className="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -862,7 +862,7 @@ const DashboardPage: React.FC = () => {
             {user?.role === UserRole.STUDENT && (
               <div className="rounded-2xl border border-white/10 bg-white/[0.03] backdrop-blur-md p-6 min-h-[280px]" style={{ animation: 'fadeInUp 0.5s ease-out 0.7s forwards', opacity: 0 }}>
                 <div className="flex items-center gap-3 mb-5">
-                  <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-orange-500 to-amber-500 flex items-center justify-center shadow-lg shadow-orange-500/20">
+                  <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-indigo-600 to-slate-700 flex items-center justify-center shadow-lg shadow-indigo-500/20">
                     <svg className="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={ICONS.fire} />
                     </svg>
@@ -870,7 +870,7 @@ const DashboardPage: React.FC = () => {
                   <h3 className="text-lg font-semibold text-white">Attendance Streak</h3>
                 </div>
                 <div className="text-center py-6">
-                  <div className="text-5xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-orange-400 to-amber-400 mb-2">
+                  <div className="text-5xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-indigo-300 to-slate-300 mb-2">
                     —
                   </div>
                   <p className="text-sm text-gray-400">consecutive days present</p>
@@ -879,7 +879,7 @@ const DashboardPage: React.FC = () => {
                   {Array.from({ length: 14 }).map((_, i) => (
                     <div
                       key={i}
-                      className={`w-full aspect-square rounded-md ${i < 10 ? 'bg-teal-500/40 border border-teal-500/20' : 'bg-white/[0.05] border border-white/5'}`}
+                      className={`w-full aspect-square rounded-md ${i < 10 ? 'bg-indigo-500/35 border border-indigo-500/25' : 'bg-slate-800 border border-slate-700'}`}
                       title={`Day ${i + 1}`}
                     />
                   ))}
