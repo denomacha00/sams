@@ -4,6 +4,7 @@ import { redis } from '../index';
 import { notificationService } from './notificationService';
 import { isEmailConfigured } from '../config/email';
 import { isSmsConfigured, getAfricasTalkingConfig } from '../config/africasTalking';
+import { preparePhoneForStorage } from './phoneOnboardingService';
 
 export type OtpPurpose = 'login' | 'password_reset';
 
@@ -108,7 +109,8 @@ export async function deliverOtp(
   }
 
   if (user.phone && isSmsConfigured()) {
-    const result = await notificationService.sendSMSTest(user.phone, smsText);
+    const smsTo = preparePhoneForStorage(user.phone);
+    const result = await notificationService.sendSMSTest(smsTo, smsText);
     smsSent = result.ok;
     if (!result.ok) {
       smsError = result.error;

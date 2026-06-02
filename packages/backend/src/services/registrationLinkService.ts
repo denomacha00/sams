@@ -4,6 +4,7 @@ import { UserRole } from '@sams/shared';
 import { prisma } from '../index';
 import { licenseService } from './licenseService';
 import { AppError } from '../middleware/errors';
+import { onboardPhoneForSms, optionalPhoneForStorage } from './phoneOnboardingService';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -223,6 +224,7 @@ export class RegistrationLinkService {
 
     // Hash the provided password
     const passwordHash = await bcrypt.hash(password, BCRYPT_ROUNDS);
+    const storedPhone = optionalPhoneForStorage(phone);
 
     // Create the user
     const user = await prisma.user.create({
@@ -231,7 +233,7 @@ export class RegistrationLinkService {
         role: link.targetRole,
         fullName,
         username: username.trim(),
-        phone: phone ?? null,
+        phone: storedPhone,
         email: email ?? null,
         admissionNumber: admissionNumber ?? null,
         passwordHash,
@@ -239,6 +241,10 @@ export class RegistrationLinkService {
         departmentId: (link as any).departmentId ?? null,
       },
     });
+
+    if (storedPhone) {
+      onboardPhoneForSms(storedPhone, fullName);
+    }
 
     // Increment useCount
     await prisma.registrationLink.update({
@@ -381,6 +387,7 @@ export class RegistrationLinkService {
 
     // Hash the password
     const passwordHash = await bcrypt.hash(data.password, BCRYPT_ROUNDS);
+    const storedPhone = optionalPhoneForStorage(data.phone);
 
     // Create the student
     const user = await prisma.user.create({
@@ -393,9 +400,13 @@ export class RegistrationLinkService {
         departmentId,
         classId,
         email: data.email ?? null,
-        phone: data.phone ?? null,
+        phone: storedPhone,
       },
     });
+
+    if (storedPhone) {
+      onboardPhoneForSms(storedPhone, data.fullName);
+    }
 
     // Return user without passwordHash
     // eslint-disable-next-line @typescript-eslint/no-unused-vars

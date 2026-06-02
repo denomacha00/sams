@@ -11,6 +11,7 @@ import { userService } from '../services/userService';
 import { registrationLinkService } from '../services/registrationLinkService';
 import { prisma } from '../index';
 import { AppError } from '../middleware/errors';
+import { onboardPhoneForSms, optionalPhoneForStorage } from '../services/phoneOnboardingService';
 
 // ─── Avatar Upload Config ─────────────────────────────────────────────────────
 
@@ -146,13 +147,19 @@ usersRouter.patch('/me', async (req: Request, res: Response, next: NextFunction)
     // Students cannot change their fullName (only admins/teachers can)
     const isStudent = req.user.role === 'STUDENT';
 
+    const current = await prisma.user.findUnique({
+      where: { id: req.user.sub },
+      select: { phone: true },
+    });
+    const phone = parsed.data.phone !== undefined ? optionalPhoneForStorage(parsed.data.phone) : undefined;
+
     const updated = await prisma.user.update({
       where: { id: req.user.sub },
       data: {
         ...(parsed.data.username && { username: parsed.data.username }),
         ...(!isStudent && parsed.data.fullName && { fullName: parsed.data.fullName }),
         ...(parsed.data.email && { email: parsed.data.email }),
-        ...(parsed.data.phone && { phone: parsed.data.phone }),
+        ...(phone !== undefined && { phone }),
       },
       select: {
         id: true,
@@ -164,6 +171,10 @@ usersRouter.patch('/me', async (req: Request, res: Response, next: NextFunction)
         avatarUrl: true,
       },
     });
+
+    if (phone && phone !== current?.phone) {
+      onboardPhoneForSms(phone, updated.fullName);
+    }
 
     res.status(200).json(updated);
   } catch (err) {

@@ -1,8 +1,9 @@
 import bcrypt from 'bcrypt';
 import { UserRole } from '@sams/shared';
-import { prisma } from '../index';
+import { prisma } from '../lib/prisma';
 import { licenseService } from './licenseService';
 import { AppError } from '../middleware/errors';
+import { onboardPhoneForSms, optionalPhoneForStorage } from './phoneOnboardingService';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -83,6 +84,7 @@ export class UserService {
 
     // Hash the password
     const passwordHash = await bcrypt.hash(data.password, BCRYPT_ROUNDS);
+    const phone = optionalPhoneForStorage(data.phone);
 
     const user = await prisma.user.create({
       data: {
@@ -91,13 +93,17 @@ export class UserService {
         fullName: data.fullName,
         username,
         email: data.email ?? null,
-        phone: data.phone ?? null,
+        phone,
         admissionNumber: data.admissionNumber ?? null,
         passwordHash,
         departmentId: data.departmentId || null,
         classId: data.classId || null,
       },
     });
+
+    if (phone) {
+      onboardPhoneForSms(phone, data.fullName);
+    }
 
     return excludePasswordHash(user);
   }
@@ -132,18 +138,24 @@ export class UserService {
       }
     }
 
+    const phone = data.phone !== undefined ? optionalPhoneForStorage(data.phone) : undefined;
+
     const updated = await prisma.user.update({
       where: { id: userId },
       data: {
         ...(data.fullName !== undefined && { fullName: data.fullName }),
         ...(data.username !== undefined && { username: data.username.trim() }),
         ...(data.email !== undefined && { email: data.email }),
-        ...(data.phone !== undefined && { phone: data.phone }),
+        ...(phone !== undefined && { phone }),
         ...(data.departmentId !== undefined && { departmentId: data.departmentId }),
         ...(data.classId !== undefined && { classId: data.classId }),
         ...(data.isLocked !== undefined && { isLocked: data.isLocked }),
       },
     });
+
+    if (phone && phone !== user.phone) {
+      onboardPhoneForSms(phone, updated.fullName);
+    }
 
     return excludePasswordHash(updated);
   }
