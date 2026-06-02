@@ -1,5 +1,5 @@
-const STATIC_CACHE = 'sams-static-v1';
-const API_CACHE = 'sams-api-v1';
+const STATIC_CACHE = 'sams-static-v2';
+const API_CACHE = 'sams-api-v2';
 const OFFLINE_QUEUE_STORE = 'offline-request-queue';
 
 const STATIC_ASSETS = [
@@ -136,6 +136,12 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
+  // HTML navigation: network-first so new deployments show immediately.
+  if (request.mode === 'navigate' || request.destination === 'document') {
+    event.respondWith(networkFirstPage(request));
+    return;
+  }
+
   // Static assets: cache-first
   event.respondWith(cacheFirst(request));
 });
@@ -173,6 +179,27 @@ async function cacheFirst(request) {
     }
     return response;
   } catch {
+    return new Response('Offline', { status: 503 });
+  }
+}
+
+// ─── Network-first strategy (HTML documents) ─────────────────────────────────
+
+async function networkFirstPage(request) {
+  try {
+    const response = await fetch(request);
+    if (response.ok) {
+      const cache = await caches.open(STATIC_CACHE);
+      cache.put(request, response.clone());
+    }
+    return response;
+  } catch {
+    const cached = await caches.match(request);
+    if (cached) return cached;
+
+    const fallback = await caches.match('/index.html');
+    if (fallback) return fallback;
+
     return new Response('Offline', { status: 503 });
   }
 }
