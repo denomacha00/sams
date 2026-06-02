@@ -3,6 +3,18 @@ import { useAuthStore } from '../store/authStore';
 import apiClient from '../services/apiClient';
 import { UserRole } from '@sams/shared';
 
+function resolveAvatarUrl(url?: string | null): string | null {
+  if (!url) return null;
+  if (url.startsWith('http://') || url.startsWith('https://')) return url;
+  const base = import.meta.env.VITE_API_BASE_URL || '/api/v1';
+  const origin = window.location.origin;
+  if (base.startsWith('http://') || base.startsWith('https://')) {
+    const apiOrigin = new URL(base).origin;
+    return `${apiOrigin}${url}`;
+  }
+  return `${origin}${url}`;
+}
+
 const ProfilePage: React.FC = () => {
   const user = useAuthStore((s) => s.user);
   const [username, setUsername] = useState(user?.username || '');
@@ -14,7 +26,7 @@ const ProfilePage: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
 
   // Profile picture state
-  const [avatarUrl, setAvatarUrl] = useState<string | null>(user?.avatarUrl || null);
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(resolveAvatarUrl(user?.avatarUrl));
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -152,7 +164,8 @@ const ProfilePage: React.FC = () => {
         headers: { 'Content-Type': 'multipart/form-data' },
       });
 
-      setAvatarUrl(data.avatarUrl + '?t=' + Date.now());
+      const resolved = resolveAvatarUrl(data.avatarUrl);
+      setAvatarUrl(resolved ? `${resolved}?t=${Date.now()}` : null);
       useAuthStore.getState().updateUser({ avatarUrl: data.avatarUrl });
       setCropImage(null);
       setSuccess('Profile picture updated!');

@@ -1,4 +1,5 @@
 import express, { type Request, type Response, type NextFunction } from 'express';
+import path from 'path';
 import { createServer } from 'http';
 import { Server as SocketIOServer } from 'socket.io';
 import Redis from 'ioredis';
@@ -34,6 +35,10 @@ const httpServer = createServer(app);
 // ─── Global Middleware ────────────────────────────────────────────────────────
 
 applyGlobalMiddleware(app);
+
+// Serve uploaded assets (avatars) from disk.
+const uploadsRoot = path.resolve(process.env.UPLOADS_DIR || '/var/www/sams/uploads');
+app.use('/uploads', express.static(uploadsRoot));
 
 // ─── Health Check ─────────────────────────────────────────────────────────────
 
