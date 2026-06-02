@@ -21,6 +21,11 @@ git reset --hard origin/main
 echo "==> Installing dependencies"
 npm ci
 
+echo "==> Generating Prisma client"
+cd "$ROOT/packages/backend"
+npx prisma generate
+cd "$ROOT"
+
 echo "==> Building packages"
 npm run build -w @sams/shared
 npm run build -w @sams/backend

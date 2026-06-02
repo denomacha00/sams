@@ -1,10 +1,16 @@
-import type { Prisma } from '@prisma/client';
 import { normalizeSmsPhone } from '../config/africasTalking';
 
+type UserIdentifierCondition = {
+  email?: { equals: string; mode: 'insensitive' };
+  username?: { equals: string; mode: 'insensitive' };
+  admissionNumber?: string;
+  phone?: string;
+};
+
 /** Build OR conditions to match username, email, admission no., or phone variants. */
-export function identifierMatchConditions(identifier: string): Prisma.UserWhereInput[] {
+export function identifierMatchConditions(identifier: string): UserIdentifierCondition[] {
   const trimmed = identifier.trim();
-  const conditions: Prisma.UserWhereInput[] = [
+  const conditions: UserIdentifierCondition[] = [
     { email: { equals: trimmed, mode: 'insensitive' } },
     { username: { equals: trimmed, mode: 'insensitive' } },
     { admissionNumber: trimmed },
