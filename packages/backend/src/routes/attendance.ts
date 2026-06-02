@@ -5,6 +5,7 @@ import { UserRole, AttendanceStatus } from '@sams/shared';
 import { requirePermission } from '../middleware/rbac';
 import { attendanceService } from '../services/attendanceService';
 import { prisma } from '../index';
+import { getQrSecret } from '../config/secrets';
 import { AppError } from '../middleware/errors';
 
 // ─── Validation Schemas ───────────────────────────────────────────────────────
@@ -225,7 +226,7 @@ attendanceRouter.get('/link/:token/info', async (req: Request, res: Response): P
 
   try {
     // Verify the token JWT, extract sessionId
-    const QR_SECRET = process.env.QR_SECRET ?? 'qr-secret-dev';
+    const QR_SECRET = getQrSecret();
 
     let payload: { sessionId: string; type?: string; exp?: number; requireGps?: boolean; gpsRadiusM?: number };
     try {

@@ -25,7 +25,7 @@ interface AuthState {
   isAuthenticated: boolean;
   error: string | null;
   loading: boolean;
-  login: (schoolCode: string, identifier: string, password: string) => Promise<void>;
+  login: (identifier: string, password: string) => Promise<void>;
   completeLoginFromTokens: (tokens: { accessToken: string; refreshToken: string }, identifier: string) => Promise<void>;
   verifyLoginOtp: (otpChallenge: string, code: string, identifier: string) => Promise<void>;
   setAuth: (user: AuthUser, accessToken: string, refreshToken: string) => void;
@@ -85,11 +85,10 @@ export const useAuthStore = create<AuthState>()(
         }
       },
 
-      login: async (schoolCode: string, identifier: string, password: string) => {
+      login: async (identifier: string, password: string) => {
         set({ loading: true, error: null });
         try {
           const { data } = await apiClient.post('/auth/login', {
-            schoolCode,
             identifier,
             password,
           });

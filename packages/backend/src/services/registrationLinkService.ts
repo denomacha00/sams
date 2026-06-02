@@ -188,8 +188,9 @@ export class RegistrationLinkService {
 
     // Check for duplicate username globally
     if (username) {
-      const existingUsername = await prisma.user.findUnique({
-        where: { username },
+      const normalized = username.trim();
+      const existingUsername = await prisma.user.findFirst({
+        where: { username: { equals: normalized, mode: 'insensitive' } },
       });
       if (existingUsername) {
         throw new AppError(409, 'DUPLICATE_USERNAME', 'A user with this username already exists');
@@ -229,7 +230,7 @@ export class RegistrationLinkService {
         schoolId: link.schoolId,
         role: link.targetRole,
         fullName,
-        username,
+        username: username.trim(),
         phone: phone ?? null,
         email: email ?? null,
         admissionNumber: admissionNumber ?? null,

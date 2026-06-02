@@ -3,8 +3,8 @@ module.exports = {
     {
       name: 'sams-api',
       script: './packages/backend/dist/index.js',
-      instances: 2,
-      exec_mode: 'cluster',
+      instances: 1,
+      exec_mode: 'fork',
       autorestart: true,
       watch: false,
       max_memory_restart: '512M',
@@ -20,6 +20,7 @@ module.exports = {
         NODE_ENV: 'staging',
         PORT: 3001,
       },
+      env_file: './packages/backend/.env',
       // Log configuration
       error_file: '/var/log/sams/sams-api-error.log',
       out_file: '/var/log/sams/sams-api-out.log',

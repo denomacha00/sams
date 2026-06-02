@@ -80,7 +80,14 @@ mkdir -p "$UPLOADS_ROOT/avatars"
 find "$UPLOADS_ROOT" -maxdepth 1 -type f -name '*.jpg' -exec mv -n -t "$UPLOADS_ROOT/avatars/" {} + 2>/dev/null || true
 
 echo "==> Restarting services"
-pm2 reload ecosystem.config.js --env production
+# delete + start applies ecosystem changes (instances, exec_mode); reload keeps old cluster layout
+pm2 delete sams-api 2>/dev/null || true
+set -a
+# shellcheck disable=SC1091
+source "$ROOT/packages/backend/.env"
+set +a
+pm2 start ecosystem.config.js --env production --update-env
+pm2 save
 sudo nginx -t
 sudo systemctl reload nginx
 

@@ -5,7 +5,7 @@ import apiClient from '../services/apiClient';
 type Mode = 'link' | 'otp';
 
 const ForgotPasswordPage: React.FC = () => {
-  const [mode, setMode] = useState<Mode>('otp');
+  const [mode, setMode] = useState<Mode>('link');
   const [schoolCode, setSchoolCode] = useState('');
   const [identifier, setIdentifier] = useState('');
   const [otpCode, setOtpCode] = useState('');

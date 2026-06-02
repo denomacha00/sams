@@ -1,5 +1,5 @@
-import React, { useState, useCallback } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import React, { useState, useCallback, useEffect } from 'react';
+import { useNavigate, Link, useSearchParams } from 'react-router-dom';
 import { useAuthStore } from '../store/authStore';
 import apiClient from '../services/apiClient';
 import { UserRole } from '@sams/shared';
@@ -10,12 +10,28 @@ const LoginPage: React.FC = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [webauthnLoading, setWebauthnLoading] = useState(false);
   const [webauthnError, setWebauthnError] = useState<string | null>(null);
-  const { login, verifyLoginOtp, loading, error, clearError } = useAuthStore();
+  const { login, verifyLoginOtp, loading, error, clearError, isAuthenticated } = useAuthStore();
+  const [searchParams] = useSearchParams();
+  const redirectTo = searchParams.get('redirect');
   const [otpStep, setOtpStep] = useState(false);
   const [otpChallenge, setOtpChallenge] = useState('');
   const [otpCode, setOtpCode] = useState('');
   const [otpDelivery, setOtpDelivery] = useState<{ email?: string | null; phone?: string | null } | null>(null);
   const navigate = useNavigate();
+
+  const getRoleRedirect = useCallback((role: UserRole): string => {
+    if (redirectTo && redirectTo.startsWith('/') && !redirectTo.startsWith('//')) {
+      return redirectTo;
+    }
+    return '/dashboard';
+  }, [redirectTo]);
+
+  useEffect(() => {
+    if (isAuthenticated) {
+      const user = useAuthStore.getState().user;
+      navigate(user ? getRoleRedirect(user.role) : '/dashboard', { replace: true });
+    }
+  }, [isAuthenticated, navigate, getRoleRedirect]);
 
   // Check if WebAuthn is available in this browser
   const webauthnAvailable = typeof window !== 'undefined' && !!window.PublicKeyCredential;
@@ -92,23 +108,13 @@ const LoginPage: React.FC = () => {
     } finally {
       setWebauthnLoading(false);
     }
-  }, [webauthnAvailable, navigate]);
-
-  const getRoleRedirect = (role: UserRole): string => {
-    switch (role) {
-      case UserRole.SCHOOL_ADMIN: return '/dashboard';
-      case UserRole.HOD: return '/dashboard';
-      case UserRole.TEACHER: return '/dashboard';
-      case UserRole.STUDENT: return '/dashboard';
-      default: return '/dashboard';
-    }
-  };
+  }, [webauthnAvailable, navigate, getRoleRedirect]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     clearError();
     try {
-      await login('', identifier, password);
+      await login(identifier, password);
       const user = useAuthStore.getState().user;
       if (user) navigate(getRoleRedirect(user.role), { replace: true });
     } catch (err: any) {

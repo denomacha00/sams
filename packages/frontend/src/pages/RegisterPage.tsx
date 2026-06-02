@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import apiClient from '../services/apiClient';
+import { FACE_API_MODELS_URI } from '../constants/faceApi';
 
 interface LinkMeta {
   schoolName: string;
@@ -92,11 +93,10 @@ const RegisterPage: React.FC = () => {
         setBioError('Face detection library not loaded. Please refresh.');
         return;
       }
-      const MODEL_URL = '/models';
       await Promise.all([
-        faceapi.nets.tinyFaceDetector.loadFromUri(MODEL_URL),
-        faceapi.nets.faceLandmark68Net.loadFromUri(MODEL_URL),
-        faceapi.nets.faceRecognitionNet.loadFromUri(MODEL_URL),
+        faceapi.nets.tinyFaceDetector.loadFromUri(FACE_API_MODELS_URI),
+        faceapi.nets.faceLandmark68Net.loadFromUri(FACE_API_MODELS_URI),
+        faceapi.nets.faceRecognitionNet.loadFromUri(FACE_API_MODELS_URI),
       ]);
       setBioModelsLoaded(true);
     } catch {

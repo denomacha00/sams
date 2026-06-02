@@ -7,6 +7,7 @@ import apiClient from '../../services/apiClient';
 interface User {
   id: string;
   fullName: string;
+  username?: string;
   email?: string;
   phone?: string;
   role: string;
@@ -27,6 +28,7 @@ interface Department {
 
 interface UserFormData {
   fullName: string;
+  username: string;
   email: string;
   phone: string;
   role: string;
@@ -38,6 +40,7 @@ interface UserFormData {
 
 const emptyForm: UserFormData = {
   fullName: '',
+  username: '',
   email: '',
   phone: '',
   role: 'STUDENT',
@@ -138,6 +141,7 @@ const UserManagementPage: React.FC = () => {
     const q = searchQuery.toLowerCase();
     return matchesTab && (
       u.fullName.toLowerCase().includes(q) ||
+      (u.username?.toLowerCase().includes(q)) ||
       (u.admissionNumber?.toLowerCase().includes(q)) ||
       (u.email?.toLowerCase().includes(q)) ||
       (u.phone?.includes(q))
@@ -156,6 +160,7 @@ const UserManagementPage: React.FC = () => {
     setEditingUser(user);
     setFormData({
       fullName: user.fullName,
+      username: user.username || '',
       email: user.email || '',
       phone: user.phone || '',
       role: user.role,
@@ -189,6 +194,7 @@ const UserManagementPage: React.FC = () => {
     try {
       const payload: any = {
         fullName: formData.fullName,
+        username: formData.username.trim(),
         email: formData.email || undefined,
         phone: formData.phone || undefined,
         role: formData.role,
@@ -298,6 +304,7 @@ const UserManagementPage: React.FC = () => {
               <thead>
                 <tr className="border-b border-white/10">
                   <th className="text-left px-6 py-4 text-sm font-semibold text-white">Name</th>
+                  <th className="text-left px-6 py-4 text-sm font-semibold text-white">Username</th>
                   <th className="text-left px-6 py-4 text-sm font-semibold text-white">Email</th>
                   <th className="text-left px-6 py-4 text-sm font-semibold text-white">Role</th>
                   <th className="text-left px-6 py-4 text-sm font-semibold text-white">Adm No.</th>
@@ -309,11 +316,11 @@ const UserManagementPage: React.FC = () => {
               <tbody>
                 {loading ? (
                   <tr>
-                    <td colSpan={7} className="px-6 py-12 text-center text-gray-400">Loading...</td>
+                    <td colSpan={8} className="px-6 py-12 text-center text-gray-400">Loading...</td>
                   </tr>
                 ) : filteredUsers.length === 0 ? (
                   <tr>
-                    <td colSpan={7} className="px-6 py-12 text-center text-gray-400">
+                    <td colSpan={8} className="px-6 py-12 text-center text-gray-400">
                       {searchQuery ? `No users found matching "${searchQuery}"` : 'No users found'}
                     </td>
                   </tr>
@@ -321,6 +328,7 @@ const UserManagementPage: React.FC = () => {
                   filteredUsers.map((u) => (
                     <tr key={u.id} className="border-b border-white/5 hover:bg-white/5 transition-colors">
                       <td className="px-6 py-4 text-sm text-white">{u.fullName}</td>
+                      <td className="px-6 py-4 text-sm text-cyan-300">{u.username || '—'}</td>
                       <td className="px-6 py-4 text-sm text-gray-400">{u.email || '—'}</td>
                       <td className="px-6 py-4">
                         <div className="flex items-center gap-1.5 flex-wrap">
@@ -410,6 +418,21 @@ const UserManagementPage: React.FC = () => {
                   className="w-full px-4 py-2.5 rounded-xl bg-white/5 border border-white/10 text-white placeholder-gray-500 focus:outline-none focus:border-cyan-500/50 transition-colors"
                   placeholder="John Doe"
                 />
+              </div>
+
+              <div>
+                <label className="block text-sm text-gray-300 mb-1">Username *</label>
+                <input
+                  type="text"
+                  required
+                  minLength={3}
+                  maxLength={50}
+                  value={formData.username}
+                  onChange={(e) => setFormData({ ...formData, username: e.target.value.replace(/\s/g, '') })}
+                  className="w-full px-4 py-2.5 rounded-xl bg-white/5 border border-white/10 text-white placeholder-gray-500 focus:outline-none focus:border-cyan-500/50 transition-colors"
+                  placeholder="e.g. hod_john"
+                />
+                <p className="text-xs text-gray-500 mt-1">Used to sign in — letters, numbers, dots, underscores, hyphens.</p>
               </div>
 
               <div className="grid grid-cols-2 gap-4">

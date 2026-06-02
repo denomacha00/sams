@@ -687,8 +687,10 @@ function useDashboardStats(user?: { id: string; role?: UserRole; classId?: strin
             const attendanceRate = reportsRes.status === 'fulfilled'
               ? `${Math.round(reportsRes.value.data.averageAttendancePercentage ?? 0)}%`
               : '—';
-            const atRisk = riskRes.status === 'fulfilled'
-              ? (Array.isArray(riskRes.value.data) ? riskRes.value.data.length : 0)
+            const atRisk = riskRes.status === 'fulfilled' && Array.isArray(riskRes.value.data)
+              ? riskRes.value.data.filter((s: { riskLevel?: string }) =>
+                  s.riskLevel === 'HIGH' || s.riskLevel === 'CRITICAL',
+                ).length
               : '—';
 
             if (!cancelled) {

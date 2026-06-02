@@ -31,6 +31,7 @@ const upload = multer({
 const createUserSchema = z.object({
   role: z.nativeEnum(UserRole),
   fullName: z.string().min(1).max(200),
+  username: z.string().min(3).max(50).regex(/^[a-zA-Z0-9._-]+$/, 'Username may only contain letters, numbers, dots, underscores, and hyphens'),
   email: z.string().email().optional(),
   phone: z.string().min(9).max(15).optional(),
   admissionNumber: z.string().optional(),
@@ -41,6 +42,7 @@ const createUserSchema = z.object({
 
 const updateUserSchema = z.object({
   fullName: z.string().min(1).max(200).optional(),
+  username: z.string().min(3).max(50).regex(/^[a-zA-Z0-9._-]+$/, 'Username may only contain letters, numbers, dots, underscores, and hyphens').optional(),
   email: z.string().email().optional(),
   phone: z.string().min(9).max(15).optional(),
   departmentId: z.string().optional(),
@@ -95,6 +97,8 @@ usersRouter.get('/me', async (req: Request, res: Response, next: NextFunction): 
         schoolId: true,
         departmentId: true,
         classId: true,
+        _count: { select: { webauthnCredentials: true } },
+        biometricTemplate: { select: { id: true } },
       },
     });
 
@@ -102,7 +106,12 @@ usersRouter.get('/me', async (req: Request, res: Response, next: NextFunction): 
       throw new AppError(404, 'USER_NOT_FOUND', 'User not found');
     }
 
-    res.status(200).json(user);
+    const { _count, biometricTemplate, ...profile } = user;
+    res.status(200).json({
+      ...profile,
+      fingerprintRegistered: _count.webauthnCredentials > 0,
+      bioEnrolled: !!biometricTemplate,
+    });
   } catch (err) {
     next(err instanceof AppError ? err : new AppError(500, 'INTERNAL_ERROR', 'Failed to get profile'));
   }

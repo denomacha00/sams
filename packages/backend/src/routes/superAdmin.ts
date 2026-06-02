@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { createHash } from 'crypto';
 import { PlanTier } from '@sams/shared';
 import { encodeLicenseKey } from '@sams/shared';
+import { getLicenseSecret } from '../config/secrets';
 import { prisma } from '../index';
 import { licenseService } from '../services/licenseService';
 import { auditService } from '../services/auditService';
@@ -84,7 +85,7 @@ superAdminRouter.post('/licenses', async (req: Request, res: Response): Promise<
   const { schoolName, planTier, expiresAt } = parsed.data;
   const expiryDate = new Date(expiresAt as string);
 
-  const secret = process.env.LICENSE_SECRET || process.env.JWT_SECRET || 'default-license-secret';
+  const secret = getLicenseSecret();
 
   // Generate the raw license key
   const rawKey = encodeLicenseKey(
@@ -630,7 +631,7 @@ superAdminRouter.post('/ai-action', async (req: Request, res: Response): Promise
           return;
         }
 
-        const secret = process.env.LICENSE_SECRET || process.env.JWT_SECRET || 'default-license-secret';
+        const secret = getLicenseSecret();
         const rawKey = encodeLicenseKey(
           { schoolName, planTier: planTier as any, expiresAt },
           secret,

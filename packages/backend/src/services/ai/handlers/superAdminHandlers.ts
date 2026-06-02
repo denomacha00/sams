@@ -1,4 +1,5 @@
 import type { ActionDefinition, ActionHandler } from '../roleActionRegistry';
+import { getLicenseSecret } from '../../../config/secrets';
 
 // ─── Helper Utilities (migrated from actionIntentDetector.ts) ─────────────────
 
@@ -104,7 +105,7 @@ const generateLicenseHandler: ActionHandler = async (params, scope) => {
   const expiresAt = new Date();
   expiresAt.setDate(expiresAt.getDate() + daysValid);
 
-  const secret = process.env.LICENSE_SECRET || process.env.JWT_SECRET || 'default-license-secret';
+  const secret = getLicenseSecret();
   const rawKey = encodeLicenseKey(
     { schoolName, planTier: planTier as any, expiresAt },
     secret,

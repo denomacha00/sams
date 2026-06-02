@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { useAuthStore } from '../store/authStore';
 import apiClient from '../services/apiClient';
 import { UserRole } from '@sams/shared';
+import { FACE_API_MODELS_URI } from '../constants/faceApi';
 
 interface SentNotification {
   id: string;
@@ -92,6 +93,16 @@ const SettingsPage: React.FC = () => {
         .catch(() => setEmailStatus({ configured: false }));
     }
   }, [isSchoolAdmin]);
+
+  useEffect(() => {
+    apiClient
+      .get('/users/me')
+      .then(({ data }) => {
+        if (data.fingerprintRegistered) setFingerprintRegistered(true);
+        if (data.bioEnrolled) setBioEnrolled(true);
+      })
+      .catch(() => {});
+  }, []);
 
   const handleTestEmail = async () => {
     setTestEmailLoading(true);
@@ -251,9 +262,9 @@ const SettingsPage: React.FC = () => {
       if (!faceapi) { setError('Face detection library not loaded. Refresh the page.'); setBioLoading(false); return; }
 
       await Promise.all([
-        faceapi.nets.tinyFaceDetector.loadFromUri('/models'),
-        faceapi.nets.faceLandmark68Net.loadFromUri('/models'),
-        faceapi.nets.faceRecognitionNet.loadFromUri('/models'),
+        faceapi.nets.tinyFaceDetector.loadFromUri(FACE_API_MODELS_URI),
+        faceapi.nets.faceLandmark68Net.loadFromUri(FACE_API_MODELS_URI),
+        faceapi.nets.faceRecognitionNet.loadFromUri(FACE_API_MODELS_URI),
       ]);
 
       const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user', width: 640, height: 480 } });

@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import apiClient from '../services/apiClient';
+import { FACE_API_MODELS_URI } from '../constants/faceApi';
 import { getTemplatesForClass } from '../services/offlineStore';
 import { saveAttendanceRecord } from '../services/offlineStore';
 import { useAuthStore } from '../store/authStore';
@@ -35,11 +36,10 @@ const BiometricAttendancePage: React.FC = () => {
           setError('Face detection library not loaded. Please refresh the page.');
           return;
         }
-        const MODEL_URL = '/models';
         await Promise.all([
-          faceapi.nets.tinyFaceDetector.loadFromUri(MODEL_URL),
-          faceapi.nets.faceLandmark68Net.loadFromUri(MODEL_URL),
-          faceapi.nets.faceRecognitionNet.loadFromUri(MODEL_URL),
+          faceapi.nets.tinyFaceDetector.loadFromUri(FACE_API_MODELS_URI),
+          faceapi.nets.faceLandmark68Net.loadFromUri(FACE_API_MODELS_URI),
+          faceapi.nets.faceRecognitionNet.loadFromUri(FACE_API_MODELS_URI),
         ]);
         setModelsLoaded(true);
       } catch {

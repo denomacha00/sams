@@ -2,11 +2,11 @@ import jwt from 'jsonwebtoken';
 import { createId } from '@paralleldrive/cuid2';
 import { prisma } from '../index';
 import { AppError } from '../middleware/errors';
+import { getQrSecret } from '../config/secrets';
 import { broadcastQRRefresh, broadcastSessionEnd } from '../sockets/attendanceSocket';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
-const QR_SECRET = process.env.QR_SECRET ?? 'qr-secret-dev';
 const QR_EXPIRY_SECONDS = 30;
 const DEFAULT_LATE_THRESHOLD_MIN = 15;
 
@@ -113,7 +113,7 @@ export class SessionService {
 
     const qrToken = jwt.sign(
       { sessionId, nonce, iat: nowUnix, exp: nowUnix + QR_EXPIRY_SECONDS },
-      QR_SECRET,
+      getQrSecret(),
     );
 
     // Create the attendance session
@@ -180,7 +180,7 @@ export class SessionService {
 
     const qrToken = jwt.sign(
       { sessionId, nonce, iat: now, exp: now + QR_EXPIRY_SECONDS },
-      QR_SECRET,
+      getQrSecret(),
     );
 
     return qrToken;

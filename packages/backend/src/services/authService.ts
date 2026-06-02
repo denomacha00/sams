@@ -2,7 +2,7 @@ import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
 import { createId } from '@paralleldrive/cuid2';
 import { UserRole } from '@sams/shared';
-import { prisma } from '../index';
+import { prisma } from '../lib/prisma';
 import { auditService } from './auditService';
 import { notificationService } from './notificationService';
 import { identifierMatchConditions } from '../utils/userIdentifier';
@@ -65,25 +65,45 @@ export class AuthService {
   }
 
   /**
-   * Validate school code + identifier + password without issuing tokens.
-   * Used for OTP login step 1.
+   * Validate identifier + password without issuing tokens.
+   * School code is optional — login works with username/email/phone/ADM alone.
    */
   async validateLoginCredentials(
     schoolCode: string,
     identifier: string,
     password: string,
   ) {
-    const user = await this.findUserForLogin(schoolCode, identifier);
+    const candidates = await this.findLoginCandidates(schoolCode, identifier);
 
-    if (!user) {
+    if (candidates.length === 0) {
       throw new Error('INVALID_CREDENTIALS');
+    }
+
+    let user: (typeof candidates)[number];
+    let passwordVerified = false;
+
+    if (candidates.length === 1) {
+      user = candidates[0];
+    } else {
+      // No school code and several matches — pick the one account whose password matches.
+      const matches: typeof candidates = [];
+      for (const candidate of candidates) {
+        if (candidate.isLocked) continue;
+        if (await bcrypt.compare(password, candidate.passwordHash)) {
+          matches.push(candidate);
+        }
+      }
+      if (matches.length !== 1) {
+        throw new Error('INVALID_CREDENTIALS');
+      }
+      user = matches[0];
+      passwordVerified = true;
     }
 
     if (user.isLocked) {
       throw new Error('ACCOUNT_LOCKED');
     }
 
-    // 4. Enforce 5-attempt / 15-min lockout window
     const now = new Date();
     const windowStart = user.failedLoginWindowStart;
     const withinWindow =
@@ -91,34 +111,42 @@ export class AuthService {
       now.getTime() - windowStart.getTime() < LOCKOUT_WINDOW_MS;
 
     if (withinWindow && user.failedLoginCount >= MAX_FAILED_ATTEMPTS) {
-      // Lock the account
       await this.lockAccount(user.id);
       throw new Error('ACCOUNT_LOCKED');
     }
 
-    // 5. Compare bcrypt password hash
-    const passwordMatch = await bcrypt.compare(password, user.passwordHash);
+    if (!passwordVerified) {
+      const passwordMatch = await bcrypt.compare(password, user.passwordHash);
 
-    if (!passwordMatch) {
-      // Increment failed login count
-      const newCount = withinWindow ? user.failedLoginCount + 1 : 1;
-      const newWindowStart = withinWindow ? windowStart! : now;
+      if (!passwordMatch) {
+        const newCount = withinWindow ? user.failedLoginCount + 1 : 1;
+        const newWindowStart = withinWindow ? windowStart! : now;
 
+        await prisma.user.update({
+          where: { id: user.id },
+          data: {
+            failedLoginCount: newCount,
+            failedLoginWindowStart: newWindowStart,
+          },
+        });
+
+        if (newCount >= MAX_FAILED_ATTEMPTS) {
+          await this.lockAccount(user.id);
+          throw new Error('ACCOUNT_LOCKED');
+        }
+
+        throw new Error('INVALID_CREDENTIALS');
+      }
+    }
+
+    if (user.failedLoginCount > 0 || user.failedLoginWindowStart) {
       await prisma.user.update({
         where: { id: user.id },
         data: {
-          failedLoginCount: newCount,
-          failedLoginWindowStart: newWindowStart,
+          failedLoginCount: 0,
+          failedLoginWindowStart: null,
         },
       });
-
-      // Lock account if threshold reached
-      if (newCount >= MAX_FAILED_ATTEMPTS) {
-        await this.lockAccount(user.id);
-        throw new Error('ACCOUNT_LOCKED');
-      }
-
-      throw new Error('INVALID_CREDENTIALS');
     }
 
     return user;
@@ -178,35 +206,23 @@ export class AuthService {
     return tokenPair;
   }
 
-  private async findUserForLogin(schoolCode: string, identifier: string) {
-    if (schoolCode === 'SUPERADMIN') {
-      return prisma.user.findFirst({
-        where: {
-          role: UserRole.SUPER_ADMIN,
-          OR: [
-            { email: identifier },
-            { username: identifier },
-            { phone: identifier },
-          ],
-        },
-      });
-    }
+  /** Find accounts matching identifier. School code is not used for login. */
+  private async findLoginCandidates(_schoolCode: string, identifier: string) {
+    const trimmed = identifier.trim();
 
-    if (schoolCode) {
-      const school = await prisma.school.findUnique({ where: { schoolCode } });
-      if (!school) return null;
-      return prisma.user.findFirst({
-        where: {
-          schoolId: school.id,
-          OR: identifierMatchConditions(identifier),
-        },
-      });
-    }
+    const byUsername = await prisma.user.findFirst({
+      where: { username: { equals: trimmed, mode: 'insensitive' } },
+    });
+    if (byUsername) return [byUsername];
 
-    return prisma.user.findFirst({
-      where: {
-        OR: identifierMatchConditions(identifier),
-      },
+    const byEmail = await prisma.user.findFirst({
+      where: { email: { equals: trimmed, mode: 'insensitive' } },
+    });
+    if (byEmail) return [byEmail];
+
+    return prisma.user.findMany({
+      where: { OR: identifierMatchConditions(trimmed) },
+      take: 20,
     });
   }
 

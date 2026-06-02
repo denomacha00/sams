@@ -13,6 +13,7 @@ const BCRYPT_ROUNDS = 12;
 export interface CreateUserData {
   role: UserRole;
   fullName: string;
+  username: string;
   email?: string;
   phone?: string;
   admissionNumber?: string;
@@ -23,6 +24,7 @@ export interface CreateUserData {
 
 export interface UpdateUserData {
   fullName?: string;
+  username?: string;
   email?: string;
   phone?: string;
   departmentId?: string;
@@ -71,6 +73,14 @@ export class UserService {
       throw new AppError(400, 'DEPARTMENT_REQUIRED', 'Teachers and HODs must be assigned to a department');
     }
 
+    const username = data.username.trim();
+    const existingUsername = await prisma.user.findFirst({
+      where: { username: { equals: username, mode: 'insensitive' } },
+    });
+    if (existingUsername) {
+      throw new AppError(409, 'DUPLICATE_USERNAME', 'A user with this username already exists');
+    }
+
     // Hash the password
     const passwordHash = await bcrypt.hash(data.password, BCRYPT_ROUNDS);
 
@@ -79,6 +89,7 @@ export class UserService {
         schoolId,
         role: data.role,
         fullName: data.fullName,
+        username,
         email: data.email ?? null,
         phone: data.phone ?? null,
         admissionNumber: data.admissionNumber ?? null,
@@ -108,10 +119,24 @@ export class UserService {
       throw new AppError(403, 'FORBIDDEN', 'Access to this resource is not allowed');
     }
 
+    if (data.username) {
+      const username = data.username.trim();
+      const taken = await prisma.user.findFirst({
+        where: {
+          username: { equals: username, mode: 'insensitive' },
+          NOT: { id: userId },
+        },
+      });
+      if (taken) {
+        throw new AppError(409, 'DUPLICATE_USERNAME', 'A user with this username already exists');
+      }
+    }
+
     const updated = await prisma.user.update({
       where: { id: userId },
       data: {
         ...(data.fullName !== undefined && { fullName: data.fullName }),
+        ...(data.username !== undefined && { username: data.username.trim() }),
         ...(data.email !== undefined && { email: data.email }),
         ...(data.phone !== undefined && { phone: data.phone }),
         ...(data.departmentId !== undefined && { departmentId: data.departmentId }),

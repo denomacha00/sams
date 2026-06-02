@@ -5,6 +5,7 @@ import { AppError } from '../middleware/errors';
 import { auditService } from './auditService';
 import { riskService } from './riskService';
 import { broadcastAttendanceNew, broadcastAttendanceUpdated } from '../sockets/attendanceSocket';
+import { getQrSecret } from '../config/secrets';
 import {
   haversineDistance,
   classifyAttendanceStatus,
@@ -16,7 +17,7 @@ import {
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
-const QR_SECRET = process.env.QR_SECRET ?? 'qr-secret-dev';
+
 const FRONTEND_URL = process.env.FRONTEND_URL ?? 'http://localhost:5173';
 const BIOMETRIC_CONFIDENCE_THRESHOLD = parseFloat(
   process.env.BIOMETRIC_CONFIDENCE_THRESHOLD ?? '0.6',
@@ -79,7 +80,7 @@ export class AttendanceService {
 
     const linkToken = jwt.sign(
       { sessionId, type: 'LINK', nonce, requireGps, gpsRadiusM, iat: now, exp },
-      QR_SECRET,
+      getQrSecret(),
     );
 
     // 3. Store token and expiry on the session record
@@ -118,7 +119,7 @@ export class AttendanceService {
     // 1. Verify JWT signature and expiry
     let payload: LinkTokenPayload;
     try {
-      payload = jwt.verify(linkToken, QR_SECRET) as LinkTokenPayload;
+      payload = jwt.verify(linkToken, getQrSecret()) as LinkTokenPayload;
     } catch {
       throw new AppError(400, 'LINK_EXPIRED', 'Attendance link is expired or invalid');
     }
@@ -218,7 +219,7 @@ export class AttendanceService {
     // 1. Verify QR JWT
     let payload: QRTokenPayload;
     try {
-      payload = jwt.verify(qrToken, QR_SECRET) as QRTokenPayload;
+      payload = jwt.verify(qrToken, getQrSecret()) as QRTokenPayload;
     } catch {
       throw new AppError(400, 'QR_EXPIRED', 'QR code is expired or invalid');
     }

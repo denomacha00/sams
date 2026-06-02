@@ -1,11 +1,13 @@
+import './config/loadEnv';
 import express, { type Request, type Response, type NextFunction } from 'express';
+import { validateProductionSecrets } from './config/secrets';
 import { UPLOADS_ROOT } from './config/uploads';
 import { getAfricasTalkingConfig, isSmsConfigured } from './config/africasTalking';
 import { getSmtpConfig, isEmailConfigured } from './config/email';
 import { createServer } from 'http';
 import { Server as SocketIOServer } from 'socket.io';
 import Redis from 'ioredis';
-import { PrismaClient } from '@prisma/client';
+import { prisma } from './lib/prisma';
 import { applyGlobalMiddleware } from './middleware/globalMiddleware';
 import { authenticate } from './middleware/auth';
 import { enforceSchoolScope } from './middleware/rbac';
@@ -41,27 +43,6 @@ applyGlobalMiddleware(app);
 // Serve uploaded assets (avatars) from disk.
 app.use('/uploads', express.static(UPLOADS_ROOT));
 
-// ─── Health Check ─────────────────────────────────────────────────────────────
-
-app.get('/health', (_req, res) => {
-  const atCfg = isSmsConfigured() ? getAfricasTalkingConfig() : null;
-  const smtpCfg = isEmailConfigured() ? getSmtpConfig() : null;
-  res.json({
-    status: 'ok',
-    timestamp: new Date().toISOString(),
-    sms: atCfg
-      ? { configured: true, sandbox: atCfg.sandbox, username: atCfg.username }
-      : { configured: false },
-    email: smtpCfg
-      ? { configured: true, host: smtpCfg.host, from: smtpCfg.fromEmail }
-      : { configured: false },
-    otp: {
-      loginEnabled: process.env.OTP_LOGIN_ENABLED === 'true',
-      passwordResetEnabled: process.env.OTP_PASSWORD_RESET_ENABLED !== 'false',
-    },
-  });
-});
-
 // ─── Public API routes (no auth required) ────────────────────────────────────
 // These are registered before the global auth guard so they remain accessible
 // without a Bearer token.
@@ -89,6 +70,8 @@ const PUBLIC_PATHS = [
   '/api/v1/auth/verify-otp',
   '/api/v1/auth/forgot-password-otp',
   '/api/v1/auth/reset-password-otp',
+  '/api/v1/auth/webauthn/authenticate/options',
+  '/api/v1/auth/webauthn/authenticate/verify',
   '/api/v1/activate',
   '/api/v1/payments/callback',
   '/api/v1/ai/query',
@@ -161,10 +144,43 @@ const redis = new Redis(process.env.REDIS_URL ?? 'redis://localhost:6379', {
 redis.on('connect', () => console.log('[Redis] Connected'));
 redis.on('error', (err) => console.error('[Redis] Error:', err));
 
-// ─── Prisma Client ────────────────────────────────────────────────────────────
+// ─── Health Check ─────────────────────────────────────────────────────────────
 
-const prisma = new PrismaClient({
-  log: process.env.NODE_ENV === 'development' ? ['warn', 'error'] : ['error'],
+app.get('/health', async (_req, res) => {
+  const atCfg = isSmsConfigured() ? getAfricasTalkingConfig() : null;
+  const smtpCfg = isEmailConfigured() ? getSmtpConfig() : null;
+
+  let dbOk = false;
+  let redisOk = false;
+  try {
+    await prisma.$queryRaw`SELECT 1`;
+    dbOk = true;
+  } catch {
+    dbOk = false;
+  }
+  try {
+    const pong = await redis.ping();
+    redisOk = pong === 'PONG';
+  } catch {
+    redisOk = false;
+  }
+
+  const ready = dbOk && redisOk;
+  res.status(ready ? 200 : 503).json({
+    status: ready ? 'ok' : 'degraded',
+    timestamp: new Date().toISOString(),
+    checks: { database: dbOk, redis: redisOk },
+    sms: atCfg
+      ? { configured: true, sandbox: atCfg.sandbox, username: atCfg.username }
+      : { configured: false },
+    email: smtpCfg
+      ? { configured: true, host: smtpCfg.host, from: smtpCfg.fromEmail }
+      : { configured: false },
+    otp: {
+      loginEnabled: process.env.OTP_LOGIN_ENABLED === 'true',
+      passwordResetEnabled: process.env.OTP_PASSWORD_RESET_ENABLED === 'true',
+    },
+  });
 });
 
 // ─── Start Server ─────────────────────────────────────────────────────────────
@@ -173,6 +189,7 @@ const PORT = process.env.PORT ?? 3001;
 
 async function start(): Promise<void> {
   try {
+    validateProductionSecrets();
     await redis.connect();
     await prisma.$connect();
 

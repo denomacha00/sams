@@ -89,8 +89,8 @@ export const authRouter = Router();
 
 /**
  * POST /api/v1/auth/login
- * Authenticate a user with schoolCode + identifier + password.
- * Requirements: 3.7, 3.8
+ * Authenticate with identifier (username, email, phone, or ADM) + password.
+ * School code is optional and not required for sign-in.
  */
 authRouter.post('/login', loginRateLimiter, async (req: Request, res: Response): Promise<void> => {
   const parsed = loginSchema.safeParse(req.body);
@@ -107,6 +107,15 @@ authRouter.post('/login', loginRateLimiter, async (req: Request, res: Response):
   const { schoolCode, identifier, password } = parsed.data;
 
   try {
+    if (process.env.LOGIN_DEBUG === 'true') {
+      console.log('[LOGIN_DEBUG]', {
+        identifier,
+        schoolCode: schoolCode || '(empty)',
+        otpLoginEnabled: isOtpLoginEnabled(),
+        requestId: req.id,
+      });
+    }
+
     if (isOtpLoginEnabled()) {
       const user = await authService.validateLoginCredentials(schoolCode, identifier, password);
 
@@ -159,6 +168,9 @@ authRouter.post('/login', loginRateLimiter, async (req: Request, res: Response):
     res.status(200).json(tokenPair);
   } catch (err) {
     const code = err instanceof Error ? err.message : 'INTERNAL_ERROR';
+    if (process.env.LOGIN_DEBUG === 'true') {
+      console.log('[LOGIN_DEBUG] failed', { identifier, code, requestId: req.id });
+    }
     const status = errorCodeToStatus(code);
     res.status(status).json({
       error: code === 'ACCOUNT_LOCKED' ? 'Account is locked' : 'Invalid credentials',
@@ -490,12 +502,7 @@ authRouter.post('/forgot-password', async (req: Request, res: Response): Promise
     const user = await prisma.user.findFirst({
       where: {
         schoolId: school.id,
-        OR: [
-          { email: identifier },
-          { admissionNumber: identifier },
-          { username: identifier },
-          { phone: identifier },
-        ],
+        OR: identifierMatchConditions(identifier),
       },
     });
 

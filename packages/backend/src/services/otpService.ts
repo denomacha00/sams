@@ -16,7 +16,7 @@ export function isOtpLoginEnabled(): boolean {
 }
 
 export function isOtpPasswordResetEnabled(): boolean {
-  return process.env.OTP_PASSWORD_RESET_ENABLED !== 'false';
+  return process.env.OTP_PASSWORD_RESET_ENABLED === 'true';
 }
 
 function otpKey(userId: string, purpose: OtpPurpose): string {

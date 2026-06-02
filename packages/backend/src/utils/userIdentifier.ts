@@ -1,12 +1,13 @@
+import type { Prisma } from '@prisma/client';
 import { normalizeSmsPhone } from '../config/africasTalking';
 
 /** Build OR conditions to match username, email, admission no., or phone variants. */
-export function identifierMatchConditions(identifier: string): Array<Record<string, string>> {
+export function identifierMatchConditions(identifier: string): Prisma.UserWhereInput[] {
   const trimmed = identifier.trim();
-  const conditions: Array<Record<string, string>> = [
-    { email: trimmed },
+  const conditions: Prisma.UserWhereInput[] = [
+    { email: { equals: trimmed, mode: 'insensitive' } },
+    { username: { equals: trimmed, mode: 'insensitive' } },
     { admissionNumber: trimmed },
-    { username: trimmed },
     { phone: trimmed },
   ];
 
@@ -23,12 +24,5 @@ export function identifierMatchConditions(identifier: string): Array<Record<stri
     }
   }
 
-  // Deduplicate identical phone values
-  const seen = new Set<string>();
-  return conditions.filter((c) => {
-    const val = Object.values(c)[0];
-    if (seen.has(val)) return false;
-    seen.add(val);
-    return true;
-  });
+  return conditions;
 }

@@ -1,0 +1,70 @@
+#!/usr/bin/env bash
+# Apply production-safe defaults to packages/backend/.env on the VPS.
+# Generates JWT/QR secrets automatically if not already set to real values.
+#
+# Usage: bash scripts/set-production-env.sh
+
+set -euo pipefail
+
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+ENV_FILE="${ROOT}/packages/backend/.env"
+
+if [[ ! -f "$ENV_FILE" ]]; then
+  echo "ERROR: $ENV_FILE not found" >&2
+  exit 1
+fi
+
+cp "$ENV_FILE" "${ENV_FILE}.bak.$(date +%Y%m%d%H%M%S)"
+
+set_env() {
+  local key="$1"
+  local val="$2"
+  if grep -q "^${key}=" "$ENV_FILE"; then
+    sed -i "s|^${key}=.*|${key}=\"${val}\"|" "$ENV_FILE"
+  else
+    echo "${key}=\"${val}\"" >> "$ENV_FILE"
+  fi
+}
+
+is_placeholder_secret() {
+  local val="$1"
+  [[ -z "$val" ]] && return 0
+  [[ ${#val} -lt 32 ]] && return 0
+  [[ "$val" == *change-me* ]] && return 0
+  return 1
+}
+
+read_env() {
+  grep "^${1}=" "$ENV_FILE" 2>/dev/null | head -1 | cut -d= -f2- | tr -d '"' || true
+}
+
+gen_secret() { openssl rand -hex 32; }
+
+JWT_SECRET="$(read_env JWT_SECRET)"
+JWT_REFRESH_SECRET="$(read_env JWT_REFRESH_SECRET)"
+QR_SECRET="$(read_env QR_SECRET)"
+
+if is_placeholder_secret "$JWT_SECRET"; then JWT_SECRET="$(gen_secret)"; fi
+if is_placeholder_secret "$JWT_REFRESH_SECRET"; then JWT_REFRESH_SECRET="$(gen_secret)"; fi
+if is_placeholder_secret "$QR_SECRET"; then QR_SECRET="$(gen_secret)"; fi
+
+set_env NODE_ENV production
+set_env APP_URL "https://app.smart-managment.com"
+set_env CORS_ORIGIN "https://app.smart-managment.com"
+set_env OTP_LOGIN_ENABLED false
+set_env OTP_PASSWORD_RESET_ENABLED false
+set_env JWT_SECRET "$JWT_SECRET"
+set_env JWT_REFRESH_SECRET "$JWT_REFRESH_SECRET"
+set_env QR_SECRET "$QR_SECRET"
+
+echo "==> Production env applied to $ENV_FILE"
+grep -E '^(NODE_ENV|APP_URL|CORS_ORIGIN|OTP_|JWT_|QR_SECRET)=' "$ENV_FILE"
+
+echo "==> Reload PM2"
+cd "$ROOT"
+pm2 reload ecosystem.config.js --env production
+
+echo "==> Health"
+sleep 2
+curl -s "http://127.0.0.1:${PORT:-3001}/health" || true
+echo ""
