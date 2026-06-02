@@ -1,6 +1,7 @@
 import express, { type Request, type Response, type NextFunction } from 'express';
 import { UPLOADS_ROOT } from './config/uploads';
 import { getAfricasTalkingConfig, isSmsConfigured } from './config/africasTalking';
+import { getSmtpConfig, isEmailConfigured } from './config/email';
 import { createServer } from 'http';
 import { Server as SocketIOServer } from 'socket.io';
 import Redis from 'ioredis';
@@ -44,12 +45,20 @@ app.use('/uploads', express.static(UPLOADS_ROOT));
 
 app.get('/health', (_req, res) => {
   const atCfg = isSmsConfigured() ? getAfricasTalkingConfig() : null;
+  const smtpCfg = isEmailConfigured() ? getSmtpConfig() : null;
   res.json({
     status: 'ok',
     timestamp: new Date().toISOString(),
     sms: atCfg
       ? { configured: true, sandbox: atCfg.sandbox, username: atCfg.username }
       : { configured: false },
+    email: smtpCfg
+      ? { configured: true, host: smtpCfg.host, from: smtpCfg.fromEmail }
+      : { configured: false },
+    otp: {
+      loginEnabled: process.env.OTP_LOGIN_ENABLED === 'true',
+      passwordResetEnabled: process.env.OTP_PASSWORD_RESET_ENABLED !== 'false',
+    },
   });
 });
 
@@ -77,6 +86,9 @@ const PUBLIC_PATHS = [
   '/api/v1/auth/refresh',
   '/api/v1/auth/forgot-password',
   '/api/v1/auth/reset-password',
+  '/api/v1/auth/verify-otp',
+  '/api/v1/auth/forgot-password-otp',
+  '/api/v1/auth/reset-password-otp',
   '/api/v1/activate',
   '/api/v1/payments/callback',
   '/api/v1/ai/query',
@@ -173,6 +185,9 @@ async function start(): Promise<void> {
       }
       if (!isSmsConfigured()) {
         console.warn('[STARTUP] SMS disabled — set AT_API_KEY and AT_USERNAME in .env to enable Africa\'s Talking.');
+      }
+      if (!isEmailConfigured()) {
+        console.warn('[STARTUP] Email disabled — set SMTP_USER and SMTP_PASS in .env to enable SMTP.');
       }
 
       startQRRefreshJob();

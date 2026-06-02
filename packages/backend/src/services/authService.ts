@@ -59,58 +59,25 @@ export class AuthService {
     identifier: string,
     password: string,
   ): Promise<TokenPair> {
-    let user: any = null;
+    const user = await this.validateLoginCredentials(schoolCode, identifier, password);
+    return this.finalizePasswordLogin(user);
+  }
 
-    if (schoolCode === 'SUPERADMIN') {
-      // Super Admin panel — only match users with SUPER_ADMIN role
-      user = await prisma.user.findFirst({
-        where: {
-          role: UserRole.SUPER_ADMIN,
-          OR: [
-            { email: identifier },
-            { username: identifier },
-            { phone: identifier },
-          ],
-        },
-      });
-    } else if (schoolCode) {
-      const school = await prisma.school.findUnique({
-        where: { schoolCode },
-      });
-
-      if (!school) {
-        throw new Error('INVALID_CREDENTIALS');
-      }
-
-      user = await prisma.user.findFirst({
-        where: {
-          schoolId: school.id,
-          OR: [
-            { email: identifier },
-            { admissionNumber: identifier },
-            { username: identifier },
-            { phone: identifier },
-          ],
-        },
-      });
-    } else {
-      user = await prisma.user.findFirst({
-        where: {
-          OR: [
-            { email: identifier },
-            { admissionNumber: identifier },
-            { username: identifier },
-            { phone: identifier },
-          ],
-        },
-      });
-    }
+  /**
+   * Validate school code + identifier + password without issuing tokens.
+   * Used for OTP login step 1.
+   */
+  async validateLoginCredentials(
+    schoolCode: string,
+    identifier: string,
+    password: string,
+  ) {
+    const user = await this.findUserForLogin(schoolCode, identifier);
 
     if (!user) {
       throw new Error('INVALID_CREDENTIALS');
     }
 
-    // 3. Check isLocked
     if (user.isLocked) {
       throw new Error('ACCOUNT_LOCKED');
     }
@@ -153,6 +120,20 @@ export class AuthService {
       throw new Error('INVALID_CREDENTIALS');
     }
 
+    return user;
+  }
+
+  /** Issue JWT tokens after password or OTP verification succeeded. */
+  async finalizePasswordLogin(user: {
+    id: string;
+    schoolId: string;
+    role: string;
+    departmentId: string | null;
+    classId: string | null;
+    email: string | null;
+    admissionNumber: string | null;
+  }): Promise<TokenPair> {
+    const now = new Date();
     // 6. Password correct — generate token pair
     const tokenPair = this._generateTokenPair(user);
 
@@ -194,6 +175,48 @@ export class AuthService {
     });
 
     return tokenPair;
+  }
+
+  private async findUserForLogin(schoolCode: string, identifier: string) {
+    if (schoolCode === 'SUPERADMIN') {
+      return prisma.user.findFirst({
+        where: {
+          role: UserRole.SUPER_ADMIN,
+          OR: [
+            { email: identifier },
+            { username: identifier },
+            { phone: identifier },
+          ],
+        },
+      });
+    }
+
+    if (schoolCode) {
+      const school = await prisma.school.findUnique({ where: { schoolCode } });
+      if (!school) return null;
+      return prisma.user.findFirst({
+        where: {
+          schoolId: school.id,
+          OR: [
+            { email: identifier },
+            { admissionNumber: identifier },
+            { username: identifier },
+            { phone: identifier },
+          ],
+        },
+      });
+    }
+
+    return prisma.user.findFirst({
+      where: {
+        OR: [
+          { email: identifier },
+          { admissionNumber: identifier },
+          { username: identifier },
+          { phone: identifier },
+        ],
+      },
+    });
   }
 
   /**

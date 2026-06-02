@@ -8,6 +8,11 @@ import {
   normalizeSmsPhone,
   type AfricasTalkingConfig,
 } from '../config/africasTalking';
+import {
+  getSmtpConfig,
+  isEmailConfigured,
+  type SmtpConfig,
+} from '../config/email';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -21,6 +26,11 @@ export interface SmsSendResult {
   ok: boolean;
   error?: string;
   recipients?: Array<{ number: string; status: string; statusCode?: number }>;
+}
+
+export interface EmailSendResult {
+  ok: boolean;
+  error?: string;
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -57,7 +67,8 @@ function parseAtSmsResponse(data: unknown): SmsSendResult {
 export class NotificationService {
   private atClient: ReturnType<typeof AfricasTalking> | null = null;
   private atConfig: AfricasTalkingConfig | null = null;
-  private transporter: nodemailer.Transporter;
+  private smtpConfig: SmtpConfig | null = null;
+  private transporter: nodemailer.Transporter | null = null;
 
   constructor() {
     this.atConfig = getAfricasTalkingConfig();
@@ -73,15 +84,36 @@ export class NotificationService {
       console.warn('[SMS] Africa\'s Talking not configured — set AT_API_KEY and AT_USERNAME in .env');
     }
 
-    this.transporter = nodemailer.createTransport({
-      host: process.env.SMTP_HOST ?? 'smtp.gmail.com',
-      port: Number(process.env.SMTP_PORT ?? 587),
-      secure: Number(process.env.SMTP_PORT ?? 587) === 465,
-      auth: {
-        user: process.env.SMTP_USER ?? '',
-        pass: process.env.SMTP_PASS ?? '',
-      },
-    });
+    this.smtpConfig = getSmtpConfig();
+    if (this.smtpConfig) {
+      this.transporter = nodemailer.createTransport({
+        host: this.smtpConfig.host,
+        port: this.smtpConfig.port,
+        secure: this.smtpConfig.secure,
+        auth: {
+          user: this.smtpConfig.user,
+          pass: this.smtpConfig.pass,
+        },
+      });
+      console.log(`[Email] SMTP ready (host=${this.smtpConfig.host}, from=${this.smtpConfig.fromEmail})`);
+    } else {
+      console.warn('[Email] SMTP not configured — set SMTP_USER and SMTP_PASS in .env');
+    }
+  }
+
+  getEmailStatus(): {
+    configured: boolean;
+    host: string | null;
+    fromEmail: string | null;
+  } {
+    if (!this.smtpConfig) {
+      return { configured: false, host: null, fromEmail: null };
+    }
+    return {
+      configured: true,
+      host: this.smtpConfig.host,
+      fromEmail: this.smtpConfig.fromEmail,
+    };
   }
 
   getSmsStatus(): {
@@ -171,22 +203,24 @@ export class NotificationService {
     }
   }
 
-  async sendEmail(to: string, subject: string, html: string): Promise<void> {
-    if (!process.env.SMTP_USER || !process.env.SMTP_PASS) {
+  async sendEmail(to: string, subject: string, html: string): Promise<EmailSendResult> {
+    if (!this.transporter || !this.smtpConfig) {
       console.warn(`[Email] SMTP not configured — skipping email to ${to} (subject: ${subject})`);
-      return;
+      return { ok: false, error: 'Email not configured' };
     }
 
     try {
-      const fromAddress = process.env.SMTP_USER ?? 'noreply@sams.ke';
       await this.transporter.sendMail({
-        from: `"SAMS" <${fromAddress}>`,
+        from: `"${this.smtpConfig.fromName}" <${this.smtpConfig.fromEmail}>`,
         to,
         subject,
         html,
       });
+      return { ok: true };
     } catch (err) {
-      console.error(`[Email] Failed to send email to ${to}:`, err instanceof Error ? err.message : err);
+      const errorMessage = err instanceof Error ? err.message : String(err);
+      console.error(`[Email] Failed to send email to ${to}:`, errorMessage);
+      return { ok: false, error: errorMessage };
     }
   }
 
@@ -223,4 +257,4 @@ export class NotificationService {
 }
 
 export const notificationService = new NotificationService();
-export { isSmsConfigured };
+export { isSmsConfigured, isEmailConfigured };

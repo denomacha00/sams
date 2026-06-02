@@ -10,7 +10,11 @@ const LoginPage: React.FC = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [webauthnLoading, setWebauthnLoading] = useState(false);
   const [webauthnError, setWebauthnError] = useState<string | null>(null);
-  const { login, loading, error, clearError } = useAuthStore();
+  const { login, verifyLoginOtp, loading, error, clearError } = useAuthStore();
+  const [otpStep, setOtpStep] = useState(false);
+  const [otpChallenge, setOtpChallenge] = useState('');
+  const [otpCode, setOtpCode] = useState('');
+  const [otpDelivery, setOtpDelivery] = useState<{ email?: string | null; phone?: string | null } | null>(null);
   const navigate = useNavigate();
 
   // Check if WebAuthn is available in this browser
@@ -107,6 +111,23 @@ const LoginPage: React.FC = () => {
       await login('', identifier, password);
       const user = useAuthStore.getState().user;
       if (user) navigate(getRoleRedirect(user.role), { replace: true });
+    } catch (err: any) {
+      if (err.message === 'OTP_REQUIRED') {
+        setOtpChallenge(err.otpChallenge);
+        setOtpDelivery(err.delivery ?? null);
+        setOtpStep(true);
+        clearError();
+      }
+    }
+  };
+
+  const handleVerifyOtp = async (e: React.FormEvent) => {
+    e.preventDefault();
+    clearError();
+    try {
+      await verifyLoginOtp(otpChallenge, otpCode, identifier);
+      const user = useAuthStore.getState().user;
+      if (user) navigate(getRoleRedirect(user.role), { replace: true });
     } catch { /* error in store */ }
   };
 
@@ -146,8 +167,14 @@ const LoginPage: React.FC = () => {
 
           {/* Form card */}
           <div className="surface-card p-8">
-            <h2 className="text-2xl font-bold text-white mb-1">Welcome back</h2>
-            <p className="text-gray-400 text-sm mb-8">Sign in to your school account</p>
+            <h2 className="text-2xl font-bold text-white mb-1">
+              {otpStep ? 'Enter verification code' : 'Welcome back'}
+            </h2>
+            <p className="text-gray-400 text-sm mb-8">
+              {otpStep
+                ? `Code sent${otpDelivery?.email ? ` to ${otpDelivery.email}` : ''}${otpDelivery?.phone ? ` to ${otpDelivery.phone}` : ''}`
+                : 'Sign in to your school account'}
+            </p>
 
             {error && (
               <div className={`mb-6 p-3 rounded-xl ${
@@ -183,6 +210,37 @@ const LoginPage: React.FC = () => {
               </div>
             )}
 
+            {otpStep ? (
+              <form onSubmit={handleVerifyOtp} className="space-y-5">
+                <div>
+                  <label htmlFor="otpCode" className="block text-sm font-semibold text-gray-300 mb-1.5">
+                    6-digit code
+                  </label>
+                  <input
+                    id="otpCode"
+                    type="text"
+                    inputMode="numeric"
+                    maxLength={6}
+                    value={otpCode}
+                    onChange={(e) => setOtpCode(e.target.value.replace(/\D/g, ''))}
+                    required
+                    className="input-field text-center text-2xl tracking-[0.4em] font-mono"
+                    placeholder="000000"
+                    autoFocus
+                  />
+                </div>
+                <button type="submit" disabled={loading || otpCode.length < 6} className="btn-primary w-full py-3.5">
+                  {loading ? 'Verifying...' : 'Verify & sign in'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => { setOtpStep(false); setOtpCode(''); clearError(); }}
+                  className="w-full text-sm text-slate-400 hover:text-indigo-300"
+                >
+                  ← Back to password login
+                </button>
+              </form>
+            ) : (
             <form onSubmit={handleSubmit} className="space-y-5">
               <div>
                 <label htmlFor="identifier" className="block text-sm font-semibold text-gray-300 mb-1.5">
@@ -240,7 +298,9 @@ const LoginPage: React.FC = () => {
                 ) : 'Sign In'}
               </button>
             </form>
+            )}
 
+            {!otpStep && (
             <div className="mt-6 pt-6 border-t border-white/10 text-center space-y-3">
               {/* WebAuthn Fingerprint Sign-In for Teachers */}
               {webauthnAvailable && (
@@ -274,6 +334,7 @@ const LoginPage: React.FC = () => {
                 Activate a new school →
               </Link>
             </div>
+            )}
           </div>
 
           {/* Footer */}

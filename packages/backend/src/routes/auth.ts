@@ -8,6 +8,17 @@ import { authService } from '../services/authService';
 import { webauthnService } from '../services/webauthnService';
 import { prisma } from '../index';
 import { notificationService } from '../services/notificationService';
+import {
+  createOtp,
+  createOtpChallenge,
+  deliverOtp,
+  isOtpLoginEnabled,
+  isOtpPasswordResetEnabled,
+  verifyOtp,
+  verifyOtpChallenge,
+} from '../services/otpService';
+import { isEmailConfigured } from '../config/email';
+import { isSmsConfigured } from '../config/africasTalking';
 
 // ─── Validation Schemas ───────────────────────────────────────────────────────
 
@@ -32,6 +43,23 @@ const forgotPasswordSchema = z.object({
 
 const resetPasswordSchema = z.object({
   token: z.string().min(1),
+  newPassword: z.string().min(8),
+});
+
+const verifyOtpSchema = z.object({
+  otpChallenge: z.string().min(1),
+  code: z.string().min(4).max(10),
+});
+
+const forgotPasswordOtpSchema = z.object({
+  schoolCode: z.string().min(3),
+  identifier: z.string().min(1),
+});
+
+const resetPasswordOtpSchema = z.object({
+  schoolCode: z.string().min(3),
+  identifier: z.string().min(1),
+  code: z.string().min(4).max(10),
   newPassword: z.string().min(8),
 });
 
@@ -78,6 +106,51 @@ authRouter.post('/login', loginRateLimiter, async (req: Request, res: Response):
   const { schoolCode, identifier, password } = parsed.data;
 
   try {
+    if (isOtpLoginEnabled()) {
+      const user = await authService.validateLoginCredentials(schoolCode, identifier, password);
+
+      if (!user.email && !user.phone) {
+        res.status(400).json({
+          error: 'No email or phone on file for OTP verification. Contact your school admin.',
+          code: 'OTP_CONTACT_MISSING',
+          requestId: req.id,
+        });
+        return;
+      }
+
+      if (!isEmailConfigured() && !isSmsConfigured()) {
+        res.status(503).json({
+          error: 'OTP login is enabled but email/SMS is not configured on the server.',
+          code: 'OTP_NOT_CONFIGURED',
+          requestId: req.id,
+        });
+        return;
+      }
+
+      const code = await createOtp(user.id, 'login');
+      const delivery = await deliverOtp(user, code, 'login');
+
+      if (!delivery.email && !delivery.sms) {
+        res.status(502).json({
+          error: 'Could not send verification code. Check SMTP/SMS configuration.',
+          code: 'OTP_DELIVERY_FAILED',
+          requestId: req.id,
+        });
+        return;
+      }
+
+      const otpChallenge = createOtpChallenge(user.id, 'login');
+      res.status(200).json({
+        requiresOtp: true,
+        otpChallenge,
+        delivery: {
+          email: delivery.email ? user.email : null,
+          phone: delivery.sms ? user.phone : null,
+        },
+      });
+      return;
+    }
+
     const tokenPair = await authService.login(schoolCode, identifier, password);
     res.status(200).json(tokenPair);
   } catch (err) {
@@ -86,6 +159,176 @@ authRouter.post('/login', loginRateLimiter, async (req: Request, res: Response):
     res.status(status).json({
       error: code === 'ACCOUNT_LOCKED' ? 'Account is locked' : 'Invalid credentials',
       code,
+      requestId: req.id,
+    });
+  }
+});
+
+/**
+ * POST /api/v1/auth/verify-otp
+ * Step 2 of OTP login — verify code and receive JWT tokens.
+ */
+authRouter.post('/verify-otp', loginRateLimiter, async (req: Request, res: Response): Promise<void> => {
+  const parsed = verifyOtpSchema.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({
+      error: 'Validation failed',
+      code: 'VALIDATION_ERROR',
+      details: parsed.error.flatten().fieldErrors,
+      requestId: req.id,
+    });
+    return;
+  }
+
+  try {
+    const userId = verifyOtpChallenge(parsed.data.otpChallenge, 'login');
+    const valid = await verifyOtp(userId, 'login', parsed.data.code);
+    if (!valid) {
+      res.status(401).json({
+        error: 'Invalid or expired verification code',
+        code: 'INVALID_OTP',
+        requestId: req.id,
+      });
+      return;
+    }
+
+    const tokenPair = await authService.generateTokensForUser(userId);
+    res.status(200).json(tokenPair);
+  } catch (err) {
+    const code = err instanceof Error ? err.message : 'INTERNAL_ERROR';
+    res.status(401).json({
+      error: 'Verification failed',
+      code: code === 'INVALID_OTP_CHALLENGE' ? 'INVALID_OTP_CHALLENGE' : code,
+      requestId: req.id,
+    });
+  }
+});
+
+/**
+ * POST /api/v1/auth/forgot-password-otp
+ * Send a 6-digit reset code via email and/or SMS.
+ */
+authRouter.post('/forgot-password-otp', async (req: Request, res: Response): Promise<void> => {
+  if (!isOtpPasswordResetEnabled()) {
+    res.status(404).json({ error: 'OTP password reset is disabled', code: 'NOT_ENABLED' });
+    return;
+  }
+
+  const parsed = forgotPasswordOtpSchema.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({
+      error: 'Validation failed',
+      code: 'VALIDATION_ERROR',
+      details: parsed.error.flatten().fieldErrors,
+      requestId: req.id,
+    });
+    return;
+  }
+
+  const { schoolCode, identifier } = parsed.data;
+
+  try {
+    const school = await prisma.school.findUnique({ where: { schoolCode } });
+    if (!school) {
+      res.status(200).json({ message: 'If the account exists, a verification code has been sent.' });
+      return;
+    }
+
+    const user = await prisma.user.findFirst({
+      where: {
+        schoolId: school.id,
+        OR: [
+          { email: identifier },
+          { admissionNumber: identifier },
+          { username: identifier },
+          { phone: identifier },
+        ],
+      },
+    });
+
+    if (!user) {
+      res.status(200).json({ message: 'If the account exists, a verification code has been sent.' });
+      return;
+    }
+
+    const code = await createOtp(user.id, 'password_reset');
+    await deliverOtp(user, code, 'password_reset');
+
+    res.status(200).json({ message: 'If the account exists, a verification code has been sent.' });
+  } catch (err) {
+    console.error('[Auth] Forgot password OTP error:', err);
+    res.status(500).json({
+      error: 'Failed to send verification code',
+      code: 'INTERNAL_ERROR',
+      requestId: req.id,
+    });
+  }
+});
+
+/**
+ * POST /api/v1/auth/reset-password-otp
+ * Reset password using OTP code instead of email link.
+ */
+authRouter.post('/reset-password-otp', async (req: Request, res: Response): Promise<void> => {
+  const parsed = resetPasswordOtpSchema.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({
+      error: 'Validation failed',
+      code: 'VALIDATION_ERROR',
+      details: parsed.error.flatten().fieldErrors,
+      requestId: req.id,
+    });
+    return;
+  }
+
+  const { schoolCode, identifier, code, newPassword } = parsed.data;
+
+  try {
+    const school = await prisma.school.findUnique({ where: { schoolCode } });
+    if (!school) {
+      res.status(400).json({ error: 'Invalid verification code', code: 'INVALID_OTP', requestId: req.id });
+      return;
+    }
+
+    const user = await prisma.user.findFirst({
+      where: {
+        schoolId: school.id,
+        OR: [
+          { email: identifier },
+          { admissionNumber: identifier },
+          { username: identifier },
+          { phone: identifier },
+        ],
+      },
+    });
+
+    if (!user) {
+      res.status(400).json({ error: 'Invalid verification code', code: 'INVALID_OTP', requestId: req.id });
+      return;
+    }
+
+    const valid = await verifyOtp(user.id, 'password_reset', code);
+    if (!valid) {
+      res.status(400).json({ error: 'Invalid or expired verification code', code: 'INVALID_OTP', requestId: req.id });
+      return;
+    }
+
+    const passwordHash = await bcrypt.hash(newPassword, 12);
+    await prisma.user.update({
+      where: { id: user.id },
+      data: {
+        passwordHash,
+        passwordResetToken: null,
+        passwordResetExpires: null,
+      },
+    });
+
+    res.status(200).json({ message: 'Password reset successfully. You can now log in.' });
+  } catch (err) {
+    console.error('[Auth] Reset password OTP error:', err);
+    res.status(500).json({
+      error: 'Failed to reset password',
+      code: 'INTERNAL_ERROR',
       requestId: req.id,
     });
   }

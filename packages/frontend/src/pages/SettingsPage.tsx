@@ -51,6 +51,10 @@ const SettingsPage: React.FC = () => {
   const [testPhone, setTestPhone] = useState('');
   const [testSmsLoading, setTestSmsLoading] = useState(false);
   const [smsTestMsg, setSmsTestMsg] = useState<string | null>(null);
+  const [emailStatus, setEmailStatus] = useState<{ configured: boolean; host?: string | null; fromEmail?: string | null } | null>(null);
+  const [testEmailTo, setTestEmailTo] = useState('');
+  const [testEmailLoading, setTestEmailLoading] = useState(false);
+  const [emailTestMsg, setEmailTestMsg] = useState<string | null>(null);
   const [sentNotifs, setSentNotifs] = useState<SentNotification[]>([]);
   const [sentLoading, setSentLoading] = useState(false);
   const [editingNotif, setEditingNotif] = useState<SentNotification | null>(null);
@@ -79,6 +83,30 @@ const SettingsPage: React.FC = () => {
         .catch(() => setSmsStatus({ configured: false }));
     }
   }, [isSchoolAdmin]);
+
+  useEffect(() => {
+    if (isSchoolAdmin) {
+      apiClient
+        .get('/notifications/email-status')
+        .then(({ data }) => setEmailStatus(data))
+        .catch(() => setEmailStatus({ configured: false }));
+    }
+  }, [isSchoolAdmin]);
+
+  const handleTestEmail = async () => {
+    setTestEmailLoading(true);
+    setEmailTestMsg(null);
+    setError(null);
+    try {
+      await apiClient.post('/notifications/test-email', { to: testEmailTo.trim() });
+      setEmailTestMsg('Test email sent — check your inbox (and spam folder).');
+      setSuccess('Test email sent.');
+    } catch (err: any) {
+      setError(err.response?.data?.error || 'Test email failed');
+    } finally {
+      setTestEmailLoading(false);
+    }
+  };
 
   const handleTestSms = async () => {
     setTestSmsLoading(true);
@@ -325,6 +353,48 @@ const SettingsPage: React.FC = () => {
                 {smsTestMsg && (
                   <p className="text-xs text-amber-200/90">{smsTestMsg}</p>
                 )}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Email / SMTP (School Admin) */}
+        {isSchoolAdmin && (
+          <div className="backdrop-blur-xl bg-white/5 border border-white/10 rounded-2xl p-6 mb-6">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-sky-500/20 to-indigo-500/20 border border-sky-500/30 flex items-center justify-center">
+                <svg className="w-5 h-5 text-sky-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                </svg>
+              </div>
+              <div>
+                <h3 className="text-lg font-semibold text-white">Email (SMTP)</h3>
+                <p className="text-xs text-gray-400">
+                  {emailStatus?.configured
+                    ? `Connected (${emailStatus.host} · from ${emailStatus.fromEmail})`
+                    : 'Not configured — add SMTP_USER and SMTP_PASS in backend .env'}
+                </p>
+              </div>
+            </div>
+            {emailStatus?.configured && (
+              <div className="space-y-3">
+                <p className="text-xs text-gray-500">Used for OTP codes, password reset, and admin alerts.</p>
+                <input
+                  type="email"
+                  value={testEmailTo}
+                  onChange={(e) => setTestEmailTo(e.target.value)}
+                  placeholder="your-email@example.com"
+                  className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-sky-500/50"
+                />
+                <button
+                  type="button"
+                  disabled={testEmailLoading || !testEmailTo.trim()}
+                  onClick={handleTestEmail}
+                  className="w-full bg-sky-600/80 hover:bg-sky-600 text-white font-semibold py-3 rounded-xl disabled:opacity-50 transition-all"
+                >
+                  {testEmailLoading ? 'Sending test...' : 'Send test email'}
+                </button>
+                {emailTestMsg && <p className="text-xs text-sky-200/90">{emailTestMsg}</p>}
               </div>
             )}
           </div>

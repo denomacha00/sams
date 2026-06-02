@@ -26,6 +26,8 @@ interface AuthState {
   error: string | null;
   loading: boolean;
   login: (schoolCode: string, identifier: string, password: string) => Promise<void>;
+  completeLoginFromTokens: (tokens: { accessToken: string; refreshToken: string }, identifier: string) => Promise<void>;
+  verifyLoginOtp: (otpChallenge: string, code: string, identifier: string) => Promise<void>;
   setAuth: (user: AuthUser, accessToken: string, refreshToken: string) => void;
   updateUser: (fields: Partial<AuthUser>) => void;
   refreshProfile: () => Promise<void>;
@@ -91,53 +93,81 @@ export const useAuthStore = create<AuthState>()(
             identifier,
             password,
           });
-          // Decode user info from JWT
-          const tokenPayload = JSON.parse(atob(data.accessToken.split('.')[1]));
 
-          // Build a partial user from the JWT first so the app is immediately usable
-          const partialUser = {
-            id: tokenPayload.sub,
-            fullName: identifier, // temporary — will be replaced by the profile fetch below
-            email: identifier.includes('@') ? identifier : undefined,
-            role: tokenPayload.role,
-            schoolId: tokenPayload.schoolId,
-            departmentId: tokenPayload.departmentId,
-            classId: tokenPayload.classId,
-          };
-
-          set({
-            user: partialUser,
-            accessToken: data.accessToken,
-            refreshToken: data.refreshToken,
-            isAuthenticated: true,
-            loading: false,
-            error: null,
-          });
-
-          // Fetch the real user profile to get the actual fullName, avatarUrl, etc.
-          // This runs after the state is set so the app can render immediately.
-          try {
-            const { data: me } = await apiClient.get('/users/me');
-            set((state) => ({
-              user: state.user
-                ? {
-                    ...state.user,
-                    fullName: me.fullName ?? state.user.fullName,
-                    username: me.username,
-                    email: me.email ?? state.user.email,
-                    phone: me.phone,
-                    avatarUrl: me.avatarUrl,
-                  }
-                : state.user,
-            }));
-          } catch {
-            // Profile fetch failure is non-fatal — user is still logged in
+          if (data.requiresOtp) {
+            set({ loading: false });
+            const err = new Error('OTP_REQUIRED') as Error & { otpChallenge: string; delivery: unknown };
+            err.otpChallenge = data.otpChallenge;
+            err.delivery = data.delivery;
+            throw err;
           }
+
+          await get().completeLoginFromTokens(data, identifier);
+          set({ loading: false, error: null });
         } catch (err: any) {
+          if (err.message === 'OTP_REQUIRED') throw err;
           const message =
             err.response?.data?.error ||
             err.response?.data?.message ||
             'Login failed. Please try again.';
+          set({ loading: false, error: message, isAuthenticated: false });
+          throw err;
+        }
+      },
+
+      completeLoginFromTokens: async (
+        data: { accessToken: string; refreshToken: string },
+        identifier: string,
+      ) => {
+        const tokenPayload = JSON.parse(atob(data.accessToken.split('.')[1]));
+        const partialUser = {
+          id: tokenPayload.sub,
+          fullName: identifier,
+          email: identifier.includes('@') ? identifier : undefined,
+          role: tokenPayload.role,
+          schoolId: tokenPayload.schoolId,
+          departmentId: tokenPayload.departmentId,
+          classId: tokenPayload.classId,
+        };
+
+        set({
+          user: partialUser,
+          accessToken: data.accessToken,
+          refreshToken: data.refreshToken,
+          isAuthenticated: true,
+          error: null,
+        });
+
+        try {
+          const { data: me } = await apiClient.get('/users/me');
+          set((state) => ({
+            user: state.user
+              ? {
+                  ...state.user,
+                  fullName: me.fullName ?? state.user.fullName,
+                  username: me.username,
+                  email: me.email ?? state.user.email,
+                  phone: me.phone,
+                  avatarUrl: me.avatarUrl,
+                }
+              : state.user,
+          }));
+        } catch {
+          // non-fatal
+        }
+      },
+
+      verifyLoginOtp: async (otpChallenge: string, code: string, identifier: string) => {
+        set({ loading: true, error: null });
+        try {
+          const { data } = await apiClient.post('/auth/verify-otp', { otpChallenge, code });
+          await get().completeLoginFromTokens(data, identifier);
+          set({ loading: false, error: null });
+        } catch (err: any) {
+          const message =
+            err.response?.data?.error ||
+            err.response?.data?.message ||
+            'Invalid verification code';
           set({ loading: false, error: message, isAuthenticated: false });
           throw err;
         }

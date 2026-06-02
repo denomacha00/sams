@@ -30,6 +30,11 @@ const testSmsSchema = z.object({
   message: z.string().min(1).max(160).optional(),
 });
 
+const testEmailSchema = z.object({
+  to: z.string().email(),
+  subject: z.string().min(1).max(200).optional(),
+});
+
 // ─── Router ───────────────────────────────────────────────────────────────────
 
 export const notificationsRouter = Router();
@@ -97,6 +102,60 @@ notificationsRouter.post('/test-sms', async (req: Request, res: Response): Promi
       : undefined,
     recipients: result.recipients,
   });
+});
+
+/**
+ * GET /api/v1/notifications/email-status
+ */
+notificationsRouter.get('/email-status', async (req: Request, res: Response): Promise<void> => {
+  if (req.user.role !== 'SCHOOL_ADMIN') {
+    throw new AppError(403, 'FORBIDDEN', 'Only school admins can view email status');
+  }
+  const { notificationService } = await import('../services/notificationService');
+  res.status(200).json(notificationService.getEmailStatus());
+});
+
+/**
+ * POST /api/v1/notifications/test-email
+ */
+notificationsRouter.post('/test-email', async (req: Request, res: Response): Promise<void> => {
+  if (req.user.role !== 'SCHOOL_ADMIN') {
+    throw new AppError(403, 'FORBIDDEN', 'Only school admins can send test email');
+  }
+
+  const parsed = testEmailSchema.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({
+      error: 'Validation failed',
+      code: 'VALIDATION_ERROR',
+      details: parsed.error.flatten().fieldErrors,
+    });
+    return;
+  }
+
+  const { notificationService } = await import('../services/notificationService');
+  const status = notificationService.getEmailStatus();
+  if (!status.configured) {
+    res.status(503).json({
+      error: 'Email not configured. Set SMTP_USER and SMTP_PASS on the server.',
+      code: 'EMAIL_NOT_CONFIGURED',
+    });
+    return;
+  }
+
+  const subject = parsed.data.subject?.trim() || 'SAMS test email';
+  const result = await notificationService.sendEmail(
+    parsed.data.to,
+    subject,
+    '<p>This is a test email from <strong>SAMS</strong>. SMTP is working correctly.</p>',
+  );
+
+  if (!result.ok) {
+    res.status(502).json({ error: result.error || 'Email send failed', code: 'EMAIL_SEND_FAILED' });
+    return;
+  }
+
+  res.status(200).json({ success: true });
 });
 
 /**
