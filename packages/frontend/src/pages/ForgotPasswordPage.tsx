@@ -35,10 +35,18 @@ const ForgotPasswordPage: React.FC = () => {
     setLoading(true);
     setError(null);
     try {
-      await apiClient.post('/auth/forgot-password-otp', { schoolCode, identifier });
+      const { data } = await apiClient.post('/auth/forgot-password-otp', { schoolCode, identifier });
       setOtpSent(true);
+      if (data.hint) {
+        setError(null);
+        // Show hint as non-error info if partial success
+      }
     } catch (err: any) {
-      setError(err.response?.data?.error || 'Failed to send verification code.');
+      const msg = err.response?.data?.error || 'Failed to send verification code.';
+      const hint = err.response?.data?.sandbox
+        ? ' Add your phone in the Africa\'s Talking sandbox dashboard (SMS → phone numbers).'
+        : '';
+      setError(msg + hint);
     } finally {
       setLoading(false);
     }

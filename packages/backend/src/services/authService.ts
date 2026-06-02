@@ -5,6 +5,7 @@ import { UserRole } from '@sams/shared';
 import { prisma } from '../index';
 import { auditService } from './auditService';
 import { notificationService } from './notificationService';
+import { identifierMatchConditions } from '../utils/userIdentifier';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -197,24 +198,14 @@ export class AuthService {
       return prisma.user.findFirst({
         where: {
           schoolId: school.id,
-          OR: [
-            { email: identifier },
-            { admissionNumber: identifier },
-            { username: identifier },
-            { phone: identifier },
-          ],
+          OR: identifierMatchConditions(identifier),
         },
       });
     }
 
     return prisma.user.findFirst({
       where: {
-        OR: [
-          { email: identifier },
-          { admissionNumber: identifier },
-          { username: identifier },
-          { phone: identifier },
-        ],
+        OR: identifierMatchConditions(identifier),
       },
     });
   }

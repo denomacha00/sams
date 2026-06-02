@@ -161,10 +161,13 @@ export class NotificationService {
     const senderId = this.atConfig.senderId;
 
     try {
+      // Sandbox: use Africa's Talking default short code. Production: use your approved sender ID.
+      const from = this.atConfig.sandbox ? (process.env.AT_SANDBOX_SENDER_ID?.trim() || 'AFRICASTKNG') : senderId;
+
       const data = await this.atClient.SMS.send({
         to: [to],
         message,
-        from: senderId,
+        from,
       });
       const result = parseAtSmsResponse(data);
       if (!result.ok) {

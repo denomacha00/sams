@@ -19,6 +19,7 @@ import {
 } from '../services/otpService';
 import { isEmailConfigured } from '../config/email';
 import { isSmsConfigured } from '../config/africasTalking';
+import { identifierMatchConditions } from '../utils/userIdentifier';
 
 // ─── Validation Schemas ───────────────────────────────────────────────────────
 
@@ -132,8 +133,11 @@ authRouter.post('/login', loginRateLimiter, async (req: Request, res: Response):
 
       if (!delivery.email && !delivery.sms) {
         res.status(502).json({
-          error: 'Could not send verification code. Check SMTP/SMS configuration.',
+          error: formatOtpDeliveryError(delivery),
           code: 'OTP_DELIVERY_FAILED',
+          smsError: delivery.smsError,
+          emailError: delivery.emailError,
+          sandbox: delivery.sandbox,
           requestId: req.id,
         });
         return;
@@ -163,6 +167,17 @@ authRouter.post('/login', loginRateLimiter, async (req: Request, res: Response):
     });
   }
 });
+
+function formatOtpDeliveryError(delivery: Awaited<ReturnType<typeof deliverOtp>>): string {
+  const parts: string[] = [];
+  if (delivery.smsError) parts.push(`SMS: ${delivery.smsError}`);
+  if (delivery.emailError) parts.push(`Email: ${delivery.emailError}`);
+  let msg = parts.length > 0 ? parts.join('. ') : 'Could not send verification code.';
+  if (delivery.sandbox) {
+    msg += ' Sandbox mode: add your phone number in the Africa\'s Talking dashboard under SMS → phone numbers.';
+  }
+  return msg;
+}
 
 /**
  * POST /api/v1/auth/verify-otp
@@ -230,31 +245,73 @@ authRouter.post('/forgot-password-otp', async (req: Request, res: Response): Pro
   try {
     const school = await prisma.school.findUnique({ where: { schoolCode } });
     if (!school) {
-      res.status(200).json({ message: 'If the account exists, a verification code has been sent.' });
+      res.status(404).json({
+        error: `No school found with code "${schoolCode}". Check the school code and try again.`,
+        code: 'SCHOOL_NOT_FOUND',
+        requestId: req.id,
+      });
       return;
     }
 
     const user = await prisma.user.findFirst({
       where: {
         schoolId: school.id,
-        OR: [
-          { email: identifier },
-          { admissionNumber: identifier },
-          { username: identifier },
-          { phone: identifier },
-        ],
+        OR: identifierMatchConditions(identifier),
       },
     });
 
     if (!user) {
-      res.status(200).json({ message: 'If the account exists, a verification code has been sent.' });
+      res.status(404).json({
+        error: 'No account found with that username, email, phone, or admission number in this school.',
+        code: 'USER_NOT_FOUND',
+        requestId: req.id,
+      });
+      return;
+    }
+
+    if (!user.phone && !user.email) {
+      res.status(400).json({
+        error: 'This account has no phone or email on file. Contact your school admin to add one.',
+        code: 'NO_CONTACT_ON_FILE',
+        requestId: req.id,
+      });
+      return;
+    }
+
+    if (!isEmailConfigured() && !isSmsConfigured()) {
+      res.status(503).json({
+        error: 'SMS and email are not configured on the server yet. Contact your school administrator.',
+        code: 'OTP_NOT_CONFIGURED',
+        requestId: req.id,
+      });
       return;
     }
 
     const code = await createOtp(user.id, 'password_reset');
-    await deliverOtp(user, code, 'password_reset');
+    const delivery = await deliverOtp(user, code, 'password_reset');
 
-    res.status(200).json({ message: 'If the account exists, a verification code has been sent.' });
+    if (!delivery.email && !delivery.sms) {
+      res.status(502).json({
+        error: formatOtpDeliveryError(delivery),
+        code: 'OTP_DELIVERY_FAILED',
+        smsError: delivery.smsError,
+        emailError: delivery.emailError,
+        sandbox: delivery.sandbox,
+        requestId: req.id,
+      });
+      return;
+    }
+
+    res.status(200).json({
+      message: 'Verification code sent.',
+      sentVia: {
+        sms: delivery.sms,
+        email: delivery.email,
+      },
+      hint: delivery.sandbox
+        ? 'Sandbox SMS only delivers to phone numbers registered in your Africa\'s Talking dashboard.'
+        : undefined,
+    });
   } catch (err) {
     console.error('[Auth] Forgot password OTP error:', err);
     res.status(500).json({
@@ -286,24 +343,27 @@ authRouter.post('/reset-password-otp', async (req: Request, res: Response): Prom
   try {
     const school = await prisma.school.findUnique({ where: { schoolCode } });
     if (!school) {
-      res.status(400).json({ error: 'Invalid verification code', code: 'INVALID_OTP', requestId: req.id });
+      res.status(404).json({
+        error: `No school found with code "${schoolCode}".`,
+        code: 'SCHOOL_NOT_FOUND',
+        requestId: req.id,
+      });
       return;
     }
 
     const user = await prisma.user.findFirst({
       where: {
         schoolId: school.id,
-        OR: [
-          { email: identifier },
-          { admissionNumber: identifier },
-          { username: identifier },
-          { phone: identifier },
-        ],
+        OR: identifierMatchConditions(identifier),
       },
     });
 
     if (!user) {
-      res.status(400).json({ error: 'Invalid verification code', code: 'INVALID_OTP', requestId: req.id });
+      res.status(404).json({
+        error: 'No account found with those details in this school.',
+        code: 'USER_NOT_FOUND',
+        requestId: req.id,
+      });
       return;
     }
 

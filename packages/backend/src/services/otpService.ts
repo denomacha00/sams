@@ -3,7 +3,7 @@ import jwt from 'jsonwebtoken';
 import { redis } from '../index';
 import { notificationService } from './notificationService';
 import { isEmailConfigured } from '../config/email';
-import { isSmsConfigured } from '../config/africasTalking';
+import { isSmsConfigured, getAfricasTalkingConfig } from '../config/africasTalking';
 
 export type OtpPurpose = 'login' | 'password_reset';
 
@@ -59,11 +59,19 @@ export function verifyOtpChallenge(token: string, expectedPurpose: OtpPurpose): 
   return payload.sub;
 }
 
+export interface OtpDeliveryResult {
+  email: boolean;
+  sms: boolean;
+  emailError?: string;
+  smsError?: string;
+  sandbox: boolean;
+}
+
 export async function deliverOtp(
   user: { id: string; email?: string | null; phone?: string | null; fullName?: string },
   code: string,
   context: 'login' | 'password_reset',
-): Promise<{ email: boolean; sms: boolean }> {
+): Promise<OtpDeliveryResult> {
   const name = user.fullName || 'there';
   const subject =
     context === 'login' ? 'Your SAMS login code' : 'Your SAMS password reset code';
@@ -82,16 +90,31 @@ export async function deliverOtp(
 
   let emailSent = false;
   let smsSent = false;
+  let emailError: string | undefined;
+  let smsError: string | undefined;
+  const atCfg = getAfricasTalkingConfig();
+  const sandbox = atCfg?.sandbox ?? false;
 
   if (user.email && isEmailConfigured()) {
     const result = await notificationService.sendEmail(user.email, subject, html);
     emailSent = result.ok;
+    if (!result.ok) emailError = result.error;
+  } else if (user.email && !isEmailConfigured()) {
+    emailError = 'Email not configured on server';
   }
 
   if (user.phone && isSmsConfigured()) {
     const result = await notificationService.sendSMSTest(user.phone, text);
     smsSent = result.ok;
+    if (!result.ok) {
+      smsError = result.error;
+      console.error(`[OTP] SMS failed for user ${user.id}:`, smsError);
+    }
+  } else if (user.phone && !isSmsConfigured()) {
+    smsError = 'SMS not configured on server';
+  } else if (!user.phone) {
+    smsError = 'No phone number on your account';
   }
 
-  return { email: emailSent, sms: smsSent };
+  return { email: emailSent, sms: smsSent, emailError, smsError, sandbox };
 }
