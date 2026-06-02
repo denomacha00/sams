@@ -110,7 +110,7 @@ const SectionHeader: React.FC<{ title: string; icon: string; gradient: string }>
       </div>
       <h3 className="text-lg font-semibold text-white tracking-tight">{title}</h3>
     </div>
-    <div className={`h-px bg-gradient-to-r ${gradient} opacity-30`} />
+    <div className="h-px bg-slate-700/70" />
   </div>
 );
 
@@ -179,7 +179,7 @@ const QuickActionButton: React.FC<{ action: QuickAction; index: number }> = ({ a
 const TodaySchedule: React.FC<{ entries: TimetableEntry[]; loading: boolean }> = ({ entries, loading }) => (
   <div className="rounded-2xl border border-white/10 bg-white/[0.03] backdrop-blur-md p-6 min-h-[280px]" style={{ animation: 'fadeInUp 0.5s ease-out 0.6s forwards', opacity: 0 }}>
     <div className="flex items-center gap-3 mb-5">
-      <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-blue-500 to-cyan-500 flex items-center justify-center shadow-lg shadow-blue-500/20">
+      <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-indigo-600 to-slate-700 flex items-center justify-center shadow-lg shadow-indigo-500/20">
         <svg className="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={ICONS.calendar} />
         </svg>
@@ -279,7 +279,7 @@ const ActivityFeed: React.FC = () => {
   return (
     <div className="rounded-2xl border border-white/10 bg-white/[0.03] backdrop-blur-md p-6 min-h-[280px]" style={{ animation: 'fadeInUp 0.5s ease-out 0.7s forwards', opacity: 0 }}>
       <div className="flex items-center gap-3 mb-5">
-        <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center shadow-lg shadow-purple-500/20">
+      <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-indigo-600 to-slate-700 flex items-center justify-center shadow-lg shadow-indigo-500/20">
           <svg className="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={ICONS.trending} />
           </svg>
@@ -327,9 +327,9 @@ function getQuickActions(role?: UserRole): QuickAction[] {
   switch (role) {
     case UserRole.SCHOOL_ADMIN:
       return [
-        { to: '/admin/users', label: 'Manage Users', icon: ICONS.users, gradient: 'from-teal-500 to-cyan-500' },
-        { to: '/admin/links', label: 'Generate Links', icon: ICONS.link, gradient: 'from-blue-500 to-indigo-500' },
-        { to: '/reports', label: 'View Reports', icon: ICONS.chart, gradient: 'from-purple-500 to-pink-500' },
+        { to: '/admin/users', label: 'Manage Users', icon: ICONS.users, gradient: 'from-indigo-600 to-slate-700' },
+        { to: '/admin/links', label: 'Generate Links', icon: ICONS.link, gradient: 'from-slate-600 to-indigo-600' },
+        { to: '/reports', label: 'View Reports', icon: ICONS.chart, gradient: 'from-indigo-600 to-slate-700' },
         { to: '/admin/timetable', label: 'Timetable', icon: ICONS.calendar, gradient: 'from-orange-500 to-amber-500' },
         { to: '/admin/departments', label: 'Departments', icon: ICONS.building, gradient: 'from-green-500 to-emerald-500' },
         { to: '/admin/knowledge', label: 'Knowledge Base', icon: ICONS.book, gradient: 'from-amber-500 to-yellow-500' },
@@ -338,15 +338,15 @@ function getQuickActions(role?: UserRole): QuickAction[] {
       ];
     case UserRole.TEACHER:
       return [
-        { to: '/sessions', label: 'Start Session', icon: ICONS.session, gradient: 'from-teal-500 to-cyan-500' },
-        { to: '/class/students', label: 'My Students', icon: ICONS.users, gradient: 'from-blue-500 to-indigo-500' },
-        { to: '/attendance', label: 'Mark Attendance', icon: ICONS.clipboard, gradient: 'from-purple-500 to-pink-500' },
+        { to: '/sessions', label: 'Start Session', icon: ICONS.session, gradient: 'from-indigo-600 to-slate-700' },
+        { to: '/class/students', label: 'My Students', icon: ICONS.users, gradient: 'from-slate-600 to-indigo-600' },
+        { to: '/attendance', label: 'Mark Attendance', icon: ICONS.clipboard, gradient: 'from-indigo-600 to-slate-700' },
         { to: '/admin/links', label: 'Registration Links', icon: ICONS.link, gradient: 'from-emerald-500 to-teal-500' },
-        { to: '/reports', label: 'View Reports', icon: ICONS.chart, gradient: 'from-purple-500 to-pink-500' },
+        { to: '/reports', label: 'View Reports', icon: ICONS.chart, gradient: 'from-indigo-600 to-slate-700' },
         { to: '/timetable', label: 'My Timetable', icon: ICONS.calendar, gradient: 'from-orange-500 to-amber-500' },
         { to: '/admin/knowledge', label: 'Knowledge Base', icon: ICONS.book, gradient: 'from-amber-500 to-yellow-500' },
         { to: '/ai', label: 'AI Assistant', icon: ICONS.ai, gradient: 'from-violet-500 to-purple-500' },
-        { to: '/notifications', label: 'Notifications', icon: ICONS.bell, gradient: 'from-rose-500 to-red-500' },
+        { to: '/notifications', label: 'Notifications', icon: ICONS.bell, gradient: 'from-slate-600 to-indigo-700' },
       ];
     case UserRole.STUDENT:
       return [
@@ -378,10 +378,10 @@ function getDefaultStats(role?: UserRole): StatCard[] {
   switch (role) {
     case UserRole.SCHOOL_ADMIN:
       return [
-        { label: 'Total Students', value: '—', icon: ICONS.users, gradient: 'from-teal-500 to-cyan-500', shadowColor: 'shadow-teal-500/20' },
-        { label: 'Total Teachers', value: '—', icon: ICONS.academic, gradient: 'from-blue-500 to-indigo-500', shadowColor: 'shadow-blue-500/20' },
-        { label: 'Active Sessions', value: '—', icon: ICONS.session, gradient: 'from-purple-500 to-pink-500', shadowColor: 'shadow-purple-500/20' },
-        { label: 'Attendance Rate', value: '—', icon: ICONS.chart, gradient: 'from-orange-500 to-amber-500', shadowColor: 'shadow-orange-500/20' },
+        { label: 'Total Students', value: '—', icon: ICONS.users, gradient: 'from-indigo-600 to-slate-700', shadowColor: 'shadow-indigo-500/20' },
+        { label: 'Total Teachers', value: '—', icon: ICONS.academic, gradient: 'from-slate-600 to-indigo-600', shadowColor: 'shadow-slate-600/20' },
+        { label: 'Active Sessions', value: '—', icon: ICONS.session, gradient: 'from-indigo-600 to-slate-700', shadowColor: 'shadow-indigo-500/20' },
+        { label: 'Attendance Rate', value: '—', icon: ICONS.chart, gradient: 'from-slate-600 to-slate-700', shadowColor: 'shadow-slate-600/20' },
       ];
     case UserRole.TEACHER:
       return [
@@ -446,10 +446,10 @@ function useDashboardStats(user?: { id: string; role?: UserRole; classId?: strin
 
             if (!cancelled) {
               setStats([
-                { label: 'Total Students', value: totalStudents, icon: ICONS.users, gradient: 'from-teal-500 to-cyan-500', shadowColor: 'shadow-teal-500/20' },
-                { label: 'Total Teachers', value: totalTeachers, icon: ICONS.academic, gradient: 'from-blue-500 to-indigo-500', shadowColor: 'shadow-blue-500/20' },
-                { label: 'Active Sessions', value: activeSessions, icon: ICONS.session, gradient: 'from-purple-500 to-pink-500', shadowColor: 'shadow-purple-500/20' },
-                { label: 'Attendance Rate', value: attendanceRate, icon: ICONS.chart, gradient: 'from-orange-500 to-amber-500', shadowColor: 'shadow-orange-500/20' },
+                { label: 'Total Students', value: totalStudents, icon: ICONS.users, gradient: 'from-indigo-600 to-slate-700', shadowColor: 'shadow-indigo-500/20' },
+                { label: 'Total Teachers', value: totalTeachers, icon: ICONS.academic, gradient: 'from-slate-600 to-indigo-600', shadowColor: 'shadow-slate-600/20' },
+                { label: 'Active Sessions', value: activeSessions, icon: ICONS.session, gradient: 'from-indigo-600 to-slate-700', shadowColor: 'shadow-indigo-500/20' },
+                { label: 'Attendance Rate', value: attendanceRate, icon: ICONS.chart, gradient: 'from-slate-600 to-slate-700', shadowColor: 'shadow-slate-600/20' },
               ]);
             }
             break;
@@ -799,7 +799,7 @@ const DashboardPage: React.FC = () => {
 
         {/* Stats Section */}
         <section className="mb-10">
-          <SectionHeader title="Overview" icon={ICONS.chart} gradient="from-teal-500 to-cyan-500" />
+          <SectionHeader title="Overview" icon={ICONS.chart} gradient="from-indigo-600 to-slate-700" />
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
             {statsLoading
               ? [1, 2, 3, 4].map((i) => <SkeletonCard key={i} />)
@@ -810,7 +810,7 @@ const DashboardPage: React.FC = () => {
 
         {/* Quick Actions Section */}
         <section className="mb-10">
-          <SectionHeader title="Quick Actions" icon={ICONS.trending} gradient="from-blue-500 to-indigo-500" />
+          <SectionHeader title="Quick Actions" icon={ICONS.trending} gradient="from-slate-600 to-indigo-600" />
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
             {quickActions.map((action, i) => (
               <QuickActionButton key={action.to} action={action} index={i} />
@@ -820,7 +820,7 @@ const DashboardPage: React.FC = () => {
 
         {/* Bottom Grid: Schedule + Activity/Info */}
         <section>
-          <SectionHeader title="Today's Schedule" icon={ICONS.calendar} gradient="from-purple-500 to-pink-500" />
+          <SectionHeader title="Today's Schedule" icon={ICONS.calendar} gradient="from-indigo-600 to-slate-700" />
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             {/* Today's Schedule - shown for all roles */}
             <TodaySchedule entries={schedule} loading={scheduleLoading} />
