@@ -4,16 +4,19 @@ import crypto from 'crypto';
 import bcrypt from 'bcrypt';
 import { authenticate } from '../middleware/auth';
 import { loginRateLimiter } from '../middleware/loginRateLimiter';
+import { otpResendRateLimiter } from '../middleware/otpResendRateLimiter';
 import { authService } from '../services/authService';
 import { webauthnService } from '../services/webauthnService';
 import { prisma } from '../index';
 import { notificationService } from '../services/notificationService';
 import {
+  assertOtpResendAllowed,
   createOtp,
   createOtpChallenge,
   deliverOtp,
   isOtpLoginEnabled,
   isOtpPasswordResetEnabled,
+  recordOtpResend,
   verifyOtp,
   verifyOtpChallenge,
 } from '../services/otpService';
@@ -50,6 +53,10 @@ const resetPasswordSchema = z.object({
 const verifyOtpSchema = z.object({
   otpChallenge: z.string().min(1),
   code: z.string().min(4).max(10),
+});
+
+const resendLoginOtpSchema = z.object({
+  otpChallenge: z.string().min(1),
 });
 
 const forgotPasswordOtpSchema = z.object({
@@ -137,6 +144,19 @@ authRouter.post('/login', loginRateLimiter, async (req: Request, res: Response):
         return;
       }
 
+      try {
+        await assertOtpResendAllowed(user.id, 'login');
+      } catch (cooldownErr) {
+        const retryAfter = (cooldownErr as Error & { retryAfterSeconds?: number }).retryAfterSeconds ?? 60;
+        res.status(429).json({
+          error: `Please wait ${retryAfter} seconds before requesting another code.`,
+          code: 'OTP_RESEND_COOLDOWN',
+          retryAfterSeconds: retryAfter,
+          requestId: req.id,
+        });
+        return;
+      }
+
       const code = await createOtp(user.id, 'login');
       const delivery = await deliverOtp(user, code, 'login');
 
@@ -152,6 +172,7 @@ authRouter.post('/login', loginRateLimiter, async (req: Request, res: Response):
         return;
       }
 
+      await recordOtpResend(user.id, 'login');
       const otpChallenge = createOtpChallenge(user.id, 'login');
       res.status(200).json({
         requiresOtp: true,
@@ -190,6 +211,99 @@ function formatOtpDeliveryError(delivery: Awaited<ReturnType<typeof deliverOtp>>
   }
   return msg;
 }
+
+/**
+ * POST /api/v1/auth/resend-login-otp
+ * Resend login OTP using an existing challenge (no password re-entry).
+ */
+authRouter.post('/resend-login-otp', otpResendRateLimiter, async (req: Request, res: Response): Promise<void> => {
+  if (!isOtpLoginEnabled()) {
+    res.status(404).json({ error: 'OTP login is disabled', code: 'NOT_ENABLED', requestId: req.id });
+    return;
+  }
+
+  const parsed = resendLoginOtpSchema.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({
+      error: 'Validation failed',
+      code: 'VALIDATION_ERROR',
+      details: parsed.error.flatten().fieldErrors,
+      requestId: req.id,
+    });
+    return;
+  }
+
+  try {
+    const userId = verifyOtpChallenge(parsed.data.otpChallenge, 'login');
+    const user = await prisma.user.findUnique({ where: { id: userId } });
+    if (!user) {
+      res.status(401).json({ error: 'Invalid verification session', code: 'INVALID_OTP_CHALLENGE', requestId: req.id });
+      return;
+    }
+
+    if (!user.email && !user.phone) {
+      res.status(400).json({
+        error: 'No email or phone on file for OTP verification.',
+        code: 'OTP_CONTACT_MISSING',
+        requestId: req.id,
+      });
+      return;
+    }
+
+    if (!isEmailConfigured() && !isSmsConfigured()) {
+      res.status(503).json({
+        error: 'OTP login is enabled but email/SMS is not configured on the server.',
+        code: 'OTP_NOT_CONFIGURED',
+        requestId: req.id,
+      });
+      return;
+    }
+
+    await assertOtpResendAllowed(user.id, 'login');
+
+    const code = await createOtp(user.id, 'login');
+    const delivery = await deliverOtp(user, code, 'login');
+
+    if (!delivery.email && !delivery.sms) {
+      res.status(502).json({
+        error: formatOtpDeliveryError(delivery),
+        code: 'OTP_DELIVERY_FAILED',
+        smsError: delivery.smsError,
+        emailError: delivery.emailError,
+        sandbox: delivery.sandbox,
+        requestId: req.id,
+      });
+      return;
+    }
+
+    await recordOtpResend(user.id, 'login');
+    const otpChallenge = createOtpChallenge(user.id, 'login');
+    res.status(200).json({
+      otpChallenge,
+      delivery: {
+        email: delivery.email ? user.email : null,
+        phone: delivery.sms ? user.phone : null,
+      },
+    });
+  } catch (err) {
+    if (err instanceof Error && err.message === 'OTP_RESEND_COOLDOWN') {
+      const retryAfter = (err as Error & { retryAfterSeconds?: number }).retryAfterSeconds ?? 60;
+      res.status(429).json({
+        error: `Please wait ${retryAfter} seconds before requesting another code.`,
+        code: 'OTP_RESEND_COOLDOWN',
+        retryAfterSeconds: retryAfter,
+        requestId: req.id,
+      });
+      return;
+    }
+    const code = err instanceof Error ? err.message : 'INTERNAL_ERROR';
+    res.status(401).json({
+      error: 'Could not resend verification code',
+      code: code === 'INVALID_OTP_CHALLENGE' ? 'INVALID_OTP_CHALLENGE' : code,
+      requestId: req.id,
+    });
+  }
+});
 
 /**
  * POST /api/v1/auth/verify-otp
@@ -235,7 +349,7 @@ authRouter.post('/verify-otp', loginRateLimiter, async (req: Request, res: Respo
  * POST /api/v1/auth/forgot-password-otp
  * Send a 6-digit reset code via email and/or SMS.
  */
-authRouter.post('/forgot-password-otp', async (req: Request, res: Response): Promise<void> => {
+authRouter.post('/forgot-password-otp', otpResendRateLimiter, async (req: Request, res: Response): Promise<void> => {
   if (!isOtpPasswordResetEnabled()) {
     res.status(404).json({ error: 'OTP password reset is disabled', code: 'NOT_ENABLED' });
     return;
@@ -299,6 +413,19 @@ authRouter.post('/forgot-password-otp', async (req: Request, res: Response): Pro
       return;
     }
 
+    try {
+      await assertOtpResendAllowed(user.id, 'password_reset');
+    } catch (cooldownErr) {
+      const retryAfter = (cooldownErr as Error & { retryAfterSeconds?: number }).retryAfterSeconds ?? 60;
+      res.status(429).json({
+        error: `Please wait ${retryAfter} seconds before requesting another code.`,
+        code: 'OTP_RESEND_COOLDOWN',
+        retryAfterSeconds: retryAfter,
+        requestId: req.id,
+      });
+      return;
+    }
+
     const code = await createOtp(user.id, 'password_reset');
     const delivery = await deliverOtp(user, code, 'password_reset');
 
@@ -313,6 +440,8 @@ authRouter.post('/forgot-password-otp', async (req: Request, res: Response): Pro
       });
       return;
     }
+
+    await recordOtpResend(user.id, 'password_reset');
 
     res.status(200).json({
       message: 'Verification code sent.',

@@ -17,7 +17,15 @@ const LoginPage: React.FC = () => {
   const [otpChallenge, setOtpChallenge] = useState('');
   const [otpCode, setOtpCode] = useState('');
   const [otpDelivery, setOtpDelivery] = useState<{ email?: string | null; phone?: string | null } | null>(null);
+  const [resendLoading, setResendLoading] = useState(false);
+  const [resendCooldown, setResendCooldown] = useState(0);
   const navigate = useNavigate();
+
+  useEffect(() => {
+    if (resendCooldown <= 0) return;
+    const t = setInterval(() => setResendCooldown((s) => Math.max(0, s - 1)), 1000);
+    return () => clearInterval(t);
+  }, [resendCooldown]);
 
   const getRoleRedirect = useCallback((role: UserRole): string => {
     if (redirectTo && redirectTo.startsWith('/') && !redirectTo.startsWith('//')) {
@@ -137,6 +145,26 @@ const LoginPage: React.FC = () => {
     } catch { /* error in store */ }
   };
 
+  const handleResendOtp = async () => {
+    if (resendCooldown > 0 || resendLoading) return;
+    clearError();
+    setResendLoading(true);
+    try {
+      const { data } = await apiClient.post('/auth/resend-login-otp', { otpChallenge });
+      setOtpChallenge(data.otpChallenge);
+      setOtpDelivery(data.delivery ?? null);
+      setOtpCode('');
+      setResendCooldown(60);
+    } catch (err: any) {
+      const retryAfter = err.response?.data?.retryAfterSeconds;
+      if (typeof retryAfter === 'number') setResendCooldown(retryAfter);
+      const msg = err.response?.data?.error || 'Could not resend code. Try again shortly.';
+      useAuthStore.setState({ error: msg });
+    } finally {
+      setResendLoading(false);
+    }
+  };
+
   return (
     <div className="min-h-screen flex">
       {/* Left panel — branding */}
@@ -237,6 +265,18 @@ const LoginPage: React.FC = () => {
                 </div>
                 <button type="submit" disabled={loading || otpCode.length < 6} className="btn-primary w-full py-3.5">
                   {loading ? 'Verifying...' : 'Verify & sign in'}
+                </button>
+                <button
+                  type="button"
+                  onClick={handleResendOtp}
+                  disabled={resendLoading || resendCooldown > 0}
+                  className="w-full text-sm text-indigo-400 hover:text-indigo-300 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {resendLoading
+                    ? 'Sending...'
+                    : resendCooldown > 0
+                      ? `Resend code (${resendCooldown}s)`
+                      : 'Resend code'}
                 </button>
                 <button
                   type="button"

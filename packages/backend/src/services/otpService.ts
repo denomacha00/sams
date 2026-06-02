@@ -9,8 +9,9 @@ import { preparePhoneForStorage } from './phoneOnboardingService';
 export type OtpPurpose = 'login' | 'password_reset';
 
 const OTP_LENGTH = Number(process.env.OTP_LENGTH ?? 6);
-const OTP_TTL_SECONDS = Number(process.env.OTP_TTL_SECONDS ?? 600);
-const OTP_CHALLENGE_EXPIRY = '10m';
+const OTP_TTL_SECONDS = Number(process.env.OTP_TTL_SECONDS ?? 900);
+const OTP_CHALLENGE_EXPIRY = '15m';
+const OTP_RESEND_COOLDOWN_SECONDS = Number(process.env.OTP_RESEND_COOLDOWN_SECONDS ?? 60);
 
 export function isOtpLoginEnabled(): boolean {
   return process.env.OTP_LOGIN_ENABLED === 'true';
@@ -24,16 +25,36 @@ function otpKey(userId: string, purpose: OtpPurpose): string {
   return `otp:${purpose}:${userId}`;
 }
 
+function otpResendKey(userId: string, purpose: OtpPurpose): string {
+  return `otp:resend:${purpose}:${userId}`;
+}
+
 function generateCode(): string {
   const max = 10 ** OTP_LENGTH;
   const min = 10 ** (OTP_LENGTH - 1);
   return crypto.randomInt(min, max).toString();
 }
 
+/** Issue a fresh code for this user + purpose; replaces any previous code for the same context. */
 export async function createOtp(userId: string, purpose: OtpPurpose): Promise<string> {
   const code = generateCode();
-  await redis.setex(otpKey(userId, purpose), OTP_TTL_SECONDS, code);
+  const key = otpKey(userId, purpose);
+  await redis.del(key);
+  await redis.setex(key, OTP_TTL_SECONDS, code);
   return code;
+}
+
+export async function assertOtpResendAllowed(userId: string, purpose: OtpPurpose): Promise<void> {
+  const remaining = await redis.ttl(otpResendKey(userId, purpose));
+  if (remaining > 0) {
+    const err = new Error('OTP_RESEND_COOLDOWN') as Error & { retryAfterSeconds: number };
+    err.retryAfterSeconds = remaining;
+    throw err;
+  }
+}
+
+export async function recordOtpResend(userId: string, purpose: OtpPurpose): Promise<void> {
+  await redis.setex(otpResendKey(userId, purpose), OTP_RESEND_COOLDOWN_SECONDS, '1');
 }
 
 export async function verifyOtp(userId: string, purpose: OtpPurpose, code: string): Promise<boolean> {

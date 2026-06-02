@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import apiClient from '../services/apiClient';
 
@@ -13,9 +13,16 @@ const ForgotPasswordPage: React.FC = () => {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [otpSent, setOtpSent] = useState(false);
   const [otpDeliveryHint, setOtpDeliveryHint] = useState<string | null>(null);
+  const [resendCooldown, setResendCooldown] = useState(0);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
+
+  useEffect(() => {
+    if (resendCooldown <= 0) return;
+    const t = setInterval(() => setResendCooldown((s) => Math.max(0, s - 1)), 1000);
+    return () => clearInterval(t);
+  }, [resendCooldown]);
 
   const handleSendLink = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -46,7 +53,10 @@ const ForgotPasswordPage: React.FC = () => {
           ? `Code sent via ${parts.join(' and ')}.${data.hint ? ` ${data.hint}` : ''}`
           : data.hint ?? null,
       );
+      setResendCooldown(60);
     } catch (err: any) {
+      const retryAfter = err.response?.data?.retryAfterSeconds;
+      if (typeof retryAfter === 'number') setResendCooldown(retryAfter);
       const msg = err.response?.data?.error || 'Failed to send verification code.';
       const hint = err.response?.data?.sandbox
         ? ' Add your phone in the Africa\'s Talking sandbox dashboard (SMS → phone numbers).'
@@ -55,6 +65,11 @@ const ForgotPasswordPage: React.FC = () => {
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleResendOtp = () => {
+    if (resendCooldown > 0 || loading) return;
+    void handleSendOtp({ preventDefault: () => {} } as React.FormEvent);
   };
 
   const handleResetWithOtp = async (e: React.FormEvent) => {
@@ -173,6 +188,18 @@ const ForgotPasswordPage: React.FC = () => {
                 <Field label="Confirm password" id="confirmPassword" value={confirmPassword} onChange={setConfirmPassword} placeholder="Repeat password" type="password" />
                 <SubmitButton loading={loading} label="Reset password" />
               </form>
+              <button
+                type="button"
+                onClick={handleResendOtp}
+                disabled={loading || resendCooldown > 0}
+                className="w-full mt-3 text-sm text-indigo-400 hover:text-indigo-300 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {loading
+                  ? 'Sending...'
+                  : resendCooldown > 0
+                    ? `Resend code (${resendCooldown}s)`
+                    : 'Resend code'}
+              </button>
             </>
           )}
 
