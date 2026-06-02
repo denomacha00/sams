@@ -1,5 +1,6 @@
 import express, { type Request, type Response, type NextFunction } from 'express';
 import { UPLOADS_ROOT } from './config/uploads';
+import { getAfricasTalkingConfig, isSmsConfigured } from './config/africasTalking';
 import { createServer } from 'http';
 import { Server as SocketIOServer } from 'socket.io';
 import Redis from 'ioredis';
@@ -42,7 +43,14 @@ app.use('/uploads', express.static(UPLOADS_ROOT));
 // ─── Health Check ─────────────────────────────────────────────────────────────
 
 app.get('/health', (_req, res) => {
-  res.json({ status: 'ok', timestamp: new Date().toISOString() });
+  const atCfg = isSmsConfigured() ? getAfricasTalkingConfig() : null;
+  res.json({
+    status: 'ok',
+    timestamp: new Date().toISOString(),
+    sms: atCfg
+      ? { configured: true, sandbox: atCfg.sandbox, username: atCfg.username }
+      : { configured: false },
+  });
 });
 
 // ─── Public API routes (no auth required) ────────────────────────────────────
@@ -162,6 +170,9 @@ async function start(): Promise<void> {
       // Conversation memory encryption check
       if (!process.env.CONVERSATION_MASTER_KEY || process.env.CONVERSATION_MASTER_KEY.length < 32) {
         console.warn('[STARTUP] CONVERSATION_MASTER_KEY not set or too short. Conversation memory will be disabled.');
+      }
+      if (!isSmsConfigured()) {
+        console.warn('[STARTUP] SMS disabled — set AT_API_KEY and AT_USERNAME in .env to enable Africa\'s Talking.');
       }
 
       startQRRefreshJob();

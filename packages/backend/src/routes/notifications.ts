@@ -25,9 +25,79 @@ const editNotificationSchema = z.object({
   message: z.string().min(1).max(1000),
 });
 
+const testSmsSchema = z.object({
+  phone: z.string().min(9).max(20),
+  message: z.string().min(1).max(160).optional(),
+});
+
 // ─── Router ───────────────────────────────────────────────────────────────────
 
 export const notificationsRouter = Router();
+
+/**
+ * GET /api/v1/notifications/sms-status
+ * Africa's Talking configuration status (no secrets).
+ */
+notificationsRouter.get('/sms-status', async (req: Request, res: Response): Promise<void> => {
+  if (req.user.role !== 'SCHOOL_ADMIN') {
+    throw new AppError(403, 'FORBIDDEN', 'Only school admins can view SMS status');
+  }
+  const { notificationService } = await import('../services/notificationService');
+  res.status(200).json(notificationService.getSmsStatus());
+});
+
+/**
+ * POST /api/v1/notifications/test-sms
+ * Send a test SMS (school admin). Sandbox only delivers to numbers added in AT dashboard.
+ */
+notificationsRouter.post('/test-sms', async (req: Request, res: Response): Promise<void> => {
+  if (req.user.role !== 'SCHOOL_ADMIN') {
+    throw new AppError(403, 'FORBIDDEN', 'Only school admins can send test SMS');
+  }
+
+  const parsed = testSmsSchema.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({
+      error: 'Validation failed',
+      code: 'VALIDATION_ERROR',
+      details: parsed.error.flatten().fieldErrors,
+    });
+    return;
+  }
+
+  const { notificationService } = await import('../services/notificationService');
+  const status = notificationService.getSmsStatus();
+  if (!status.configured) {
+    res.status(503).json({
+      error: 'SMS not configured. Set AT_API_KEY and AT_USERNAME on the server.',
+      code: 'SMS_NOT_CONFIGURED',
+    });
+    return;
+  }
+
+  const message =
+    parsed.data.message?.trim() ||
+    'SAMS test SMS — Africa\'s Talking is connected successfully.';
+
+  const result = await notificationService.sendSMSTest(parsed.data.phone, message);
+  if (!result.ok) {
+    res.status(502).json({
+      error: result.error || 'SMS send failed',
+      code: 'SMS_SEND_FAILED',
+      sandbox: status.sandbox,
+    });
+    return;
+  }
+
+  res.status(200).json({
+    success: true,
+    sandbox: status.sandbox,
+    hint: status.sandbox
+      ? 'Sandbox SMS only reaches phone numbers registered in your Africa\'s Talking sandbox.'
+      : undefined,
+    recipients: result.recipients,
+  });
+});
 
 /**
  * GET /api/v1/notifications/sent

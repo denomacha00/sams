@@ -40,6 +40,17 @@ const SettingsPage: React.FC = () => {
   // Sent notifications state
   const canSend = user && ['SCHOOL_ADMIN', 'HOD', 'TEACHER'].includes(user.role);
   const isAdmin = user && ['SCHOOL_ADMIN', 'HOD'].includes(user.role);
+  const isSchoolAdmin = user?.role === UserRole.SCHOOL_ADMIN;
+
+  const [smsStatus, setSmsStatus] = useState<{
+    configured: boolean;
+    sandbox?: boolean;
+    username?: string | null;
+    senderId?: string | null;
+  } | null>(null);
+  const [testPhone, setTestPhone] = useState('');
+  const [testSmsLoading, setTestSmsLoading] = useState(false);
+  const [smsTestMsg, setSmsTestMsg] = useState<string | null>(null);
   const [sentNotifs, setSentNotifs] = useState<SentNotification[]>([]);
   const [sentLoading, setSentLoading] = useState(false);
   const [editingNotif, setEditingNotif] = useState<SentNotification | null>(null);
@@ -59,6 +70,36 @@ const SettingsPage: React.FC = () => {
         .finally(() => setSentLoading(false));
     }
   }, [canSend]);
+
+  useEffect(() => {
+    if (isSchoolAdmin) {
+      apiClient
+        .get('/notifications/sms-status')
+        .then(({ data }) => setSmsStatus(data))
+        .catch(() => setSmsStatus({ configured: false }));
+    }
+  }, [isSchoolAdmin]);
+
+  const handleTestSms = async () => {
+    setTestSmsLoading(true);
+    setSmsTestMsg(null);
+    setError(null);
+    try {
+      const { data } = await apiClient.post('/notifications/test-sms', {
+        phone: testPhone.trim(),
+      });
+      setSmsTestMsg(
+        data.hint
+          ? `Test sent. ${data.hint}`
+          : 'Test SMS sent successfully.',
+      );
+      setSuccess('Test SMS request accepted by Africa\'s Talking.');
+    } catch (err: any) {
+      setError(err.response?.data?.error || 'Test SMS failed');
+    } finally {
+      setTestSmsLoading(false);
+    }
+  };
 
   const handleEditSave = async () => {
     if (!editingNotif) return;
@@ -238,6 +279,54 @@ const SettingsPage: React.FC = () => {
         {error && (
           <div className="mb-4 p-3 bg-red-500/20 border border-red-400/30 rounded-xl backdrop-blur-sm">
             <p className="text-sm text-red-200 text-center">{error}</p>
+          </div>
+        )}
+
+        {/* SMS (School Admin) */}
+        {isSchoolAdmin && (
+          <div className="backdrop-blur-xl bg-white/5 border border-white/10 rounded-2xl p-6 mb-6">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-amber-500/20 to-orange-500/20 border border-amber-500/30 flex items-center justify-center">
+                <svg className="w-5 h-5 text-amber-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" />
+                </svg>
+              </div>
+              <div>
+                <h3 className="text-lg font-semibold text-white">SMS (Africa&apos;s Talking)</h3>
+                <p className="text-xs text-gray-400">
+                  {smsStatus?.configured
+                    ? smsStatus.sandbox
+                      ? `Connected (sandbox · ${smsStatus.username})`
+                      : `Connected (production · ${smsStatus.username})`
+                    : 'Not configured on server — add AT_API_KEY in backend .env'}
+                </p>
+              </div>
+            </div>
+            {smsStatus?.configured && (
+              <div className="space-y-3">
+                <p className="text-xs text-gray-500">
+                  Sandbox only delivers to phone numbers you add in the Africa&apos;s Talking dashboard.
+                </p>
+                <input
+                  type="tel"
+                  value={testPhone}
+                  onChange={(e) => setTestPhone(e.target.value)}
+                  placeholder="e.g. 0712345678 or +254712345678"
+                  className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-amber-500/50"
+                />
+                <button
+                  type="button"
+                  disabled={testSmsLoading || !testPhone.trim()}
+                  onClick={handleTestSms}
+                  className="w-full bg-amber-600/80 hover:bg-amber-600 text-white font-semibold py-3 rounded-xl disabled:opacity-50 transition-all"
+                >
+                  {testSmsLoading ? 'Sending test...' : 'Send test SMS'}
+                </button>
+                {smsTestMsg && (
+                  <p className="text-xs text-amber-200/90">{smsTestMsg}</p>
+                )}
+              </div>
+            )}
           </div>
         )}
 
