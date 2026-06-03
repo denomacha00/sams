@@ -129,10 +129,11 @@ const viewTodayScheduleHandler: ActionHandler = async (_params, scope) => {
   };
 };
 
-const REMINDERS_EXPLANATION = `I can't set a phone-style alarm for a specific class time — **SAMS doesn't send timed personal reminders yet**.
+const REMINDERS_EXPLANATION = `I can't set a phone-style alarm for a specific class time — **SAMS doesn't send timed personal push/SMS reminders at arbitrary class times**.
 
 **What SAMS does offer:**
 • **In-app messages** — When your teacher, HOD, or school admin sends an announcement, it appears on your **Notifications** page (and live in the app when you're online).
+• **Morning class summary** — Each morning you'll get **Today's classes** in **Notifications** if your school enabled it (free in-app list of today's timetable slots).
 • **Class rep** — If you're a class rep, you can **reply** to messages from your teacher (not send new class-wide announcements yourself).
 
 **For a reminder at class time:**

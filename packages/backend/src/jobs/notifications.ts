@@ -192,6 +192,8 @@ export async function checkLicenseExpiry(): Promise<void> {
  */
 export async function runDailyNotificationChecks(): Promise<void> {
   console.log('[Notifications] Running daily notification checks...');
+  const { runStudentDailyScheduleReminders } = await import('./studentScheduleReminders');
+  await runStudentDailyScheduleReminders();
   await checkLowAttendance();
   await checkLicenseExpiry();
   console.log('[Notifications] Daily notification checks complete.');

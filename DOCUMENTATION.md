@@ -227,7 +227,8 @@ sams/
 - **Class rep replies:** students flagged as class rep may reply only to messages where `senderRole` is `TEACHER` (threaded reply API)
 - **HOD** cannot edit messages sent by school admin (must be sender)
 - SMS via Africa's Talking (server env — see [§12](#12-sms-otp--africas-talking)); Super Admin portal has **no** school-level AT settings
-- Daily cron: low attendance alerts, license expiry reminders
+- Daily cron: low attendance alerts, license expiry reminders, and optional **student morning schedule** in-app reminders (`STUDENT_DAILY_SCHEDULE_REMINDERS`, `APP_TIMEZONE`)
+- **Student daily schedule (zero-cost):** Each school day at 06:00 server cron, active students with a class and timetable slots **today** (per `APP_TIMEZONE`, default `Africa/Nairobi`) receive one in-app notification titled **Today's classes** listing time, subject, and teacher. No SMS or push. Disable with `STUDENT_DAILY_SCHEDULE_REMINDERS=false`.
 
 ### 5.8 Class Representative
 - Toggle per student: User Management (school admin) or **Class Roster** (`/class-roster`, teachers for their class, HODs for department classes)

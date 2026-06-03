@@ -4,11 +4,16 @@ import { actionIntentDetector } from '../actionIntentDetector';
 import { findAction, isActionPermitted } from '../roleActionRegistry';
 import { jsDateToSchemaDayOfWeek, schemaDayName } from '../../../lib/studentScheduleHelpers';
 
-vi.mock('../../../index', () => ({
+vi.mock('../../../lib/prisma', () => ({
   prisma: {
     timetableEntry: {
       findMany: vi.fn(),
     },
+  },
+}));
+
+vi.mock('../../../index', () => ({
+  prisma: {
     attendanceRecord: {
       findMany: vi.fn(),
     },
@@ -24,7 +29,7 @@ vi.mock('../../../lib/studentClassTeachers', () => ({
   formatStudentTeachersAnswer: vi.fn(),
 }));
 
-import { prisma } from '../../../index';
+import { prisma } from '../../../lib/prisma';
 
 const studentScope = {
   userId: 'student-1',
@@ -79,7 +84,8 @@ describe('student reminder actions', () => {
     expect(def).toBeDefined();
     const result = await def!.handler({}, studentScope);
 
-    expect(result.answer).toMatch(/doesn't send timed personal reminders/i);
+    expect(result.answer).toMatch(/doesn't send timed personal push\/SMS reminders/i);
+    expect(result.answer).toMatch(/Each morning you'll get \*\*Today's classes\*\*/i);
     expect(result.answer).toMatch(/Notifications/i);
     expect(result.answer).toMatch(/phone calendar/i);
     expect(result.answer).toMatch(schemaDayName(day));

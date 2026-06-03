@@ -1,3 +1,6 @@
+import { prisma } from './prisma';
+import { getAppTimezone, schemaDayOfWeekInTimezone } from './appTimezone';
+
 const DAY_NAMES = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
 
 /** SAMS schema: 0 = Monday … 6 = Sunday (see sessionService / TimetableEntry). */
@@ -23,24 +26,33 @@ export function formatTimetableSlotLines(entries: TimetableSlotRow[]): string {
     .join('\n');
 }
 
-export async function fetchTodayTimetableForClass(classId: string, date: Date = new Date()) {
-  const { prisma } = await import('../index');
-  const dayOfWeek = jsDateToSchemaDayOfWeek(date);
-
+export async function fetchTimetableSlotsForClassDay(classId: string, dayOfWeek: number) {
   const entries = await prisma.timetableEntry.findMany({
     where: { classId, dayOfWeek },
     orderBy: { startTime: 'asc' },
     include: { teacher: { select: { fullName: true } } },
   });
 
+  return entries.map((e) => ({
+    startTime: e.startTime,
+    endTime: e.endTime,
+    subject: e.subject,
+    teacherName: e.teacher.fullName,
+  }));
+}
+
+export async function fetchTodayTimetableForClass(
+  classId: string,
+  options?: { date?: Date; timeZone?: string },
+) {
+  const timeZone = options?.timeZone ?? getAppTimezone();
+  const date = options?.date ?? new Date();
+  const dayOfWeek = schemaDayOfWeekInTimezone(date, timeZone);
+  const entries = await fetchTimetableSlotsForClassDay(classId, dayOfWeek);
+
   return {
     dayOfWeek,
     dayName: schemaDayName(dayOfWeek),
-    entries: entries.map((e) => ({
-      startTime: e.startTime,
-      endTime: e.endTime,
-      subject: e.subject,
-      teacherName: e.teacher.fullName,
-    })),
+    entries,
   };
 }
