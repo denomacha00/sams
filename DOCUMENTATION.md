@@ -547,7 +547,9 @@ Ensure the same shell user that runs `pm2` uses nvm default 20 (`which node` sho
 | Script | Purpose |
 |--------|---------|
 | `scripts/deploy-production.sh` | Pull main, `npm ci`, build all packages, migrate, PM2 reload |
-| `scripts/post-deploy-verify.sh` | Dist artifacts, PM2, `/health`, `.env` presence |
+| `scripts/post-deploy-verify.sh` | Dist artifacts, PM2, `/health` (incl. AI/SMS block), optional AI/login smoke |
+| `scripts/smoke-production.sh` | Lightweight curl smoke on VPS |
+| `scripts/smoke-role-checks.md` | Curl examples + manual checks by role |
 | `scripts/upgrade-node20.sh` | Idempotent Node 20 via nvm when current version < 20 |
 | `scripts/set-production-env.sh` | JWT/QR secrets, `APP_URL`, `CORS`, OTP flags from AT key presence (does not touch `OPENAI_*`) |
 | `scripts/verify-secrets.sh` | Check merged provider env (AI, AT, SMTP, M-Pesa); masks values |
@@ -610,19 +612,80 @@ Put `OPENAI_*` and optional `OPENAI_FALLBACK_*` in `secrets/providers.env`. Veri
 - Builds all packages
 - Deploys via SSH to VPS
 
-### Production 100% checklist
+### Production go-live checklist
 
-Use this after deploy or any production change:
+Use this for first production launch or after any risky change (secrets, AT mode, Node upgrade).
 
-| Step | How to confirm |
-|------|----------------|
-| Deploy + verify passed | `bash scripts/deploy-production.sh` exits 0; `bash scripts/post-deploy-verify.sh` shows all critical checks passed |
-| Node 20+ | `node -v` → v20.x; verify script shows `OK Node` (not WARN) |
-| Production AT configured | `curl -s http://127.0.0.1:3001/health` → `"sms":{"configured":true,"sandbox":false}`; not sandbox username |
-| Test SMS | School admin → **Settings** → **SMS · Africa's Talking** → **Send test SMS** to a real number |
-| Login works | Sign in at https://app.smart-managment.com with a known account |
-| Class rep roster works | Class rep role can view assigned class roster / attendance as expected |
-| OTP login (optional) | Leave `OTP_LOGIN_ENABLED=false` until ready; then enable in `.env` and `pm2 reload` |
+#### 1. Deploy
+
+```bash
+cd /var/www/sams
+nvm use
+bash scripts/backup-secrets.sh
+git pull origin main
+bash scripts/deploy-production.sh
+bash scripts/post-deploy-verify.sh
+```
+
+Optional deeper smoke (AI uses provider quota):
+
+```bash
+VERIFY_AI_QUERY=1 bash scripts/post-deploy-verify.sh
+bash scripts/smoke-production.sh
+```
+
+#### 2. Secrets (never in git)
+
+| Action | Command |
+|--------|---------|
+| Backup before edits | `bash scripts/backup-secrets.sh` |
+| Verify merged keys | `bash scripts/verify-secrets.sh` |
+| AI only | `bash scripts/verify-secrets.sh --ai-only` |
+| Apply after `providers.env` change | `bash scripts/restart-api.sh` |
+
+First-time: copy `secrets/providers.env.example` → `secrets/providers.env`, `chmod 600`, paste keys, then verify.
+
+#### 3. Smoke tests
+
+| Check | How |
+|-------|-----|
+| Automated | `bash scripts/post-deploy-verify.sh` — all critical OK |
+| Health | `curl -s http://127.0.0.1:3001/health` — `status: ok`, `checks.database` + `checks.redis` true |
+| AI block | Same `/health` → `ai.configured: true`, no `modelMismatch` |
+| SMS / AT production | `"sms":{"configured":true,"sandbox":false}` |
+| Guest AI (optional) | `VERIFY_AI_QUERY=1 bash scripts/smoke-production.sh` |
+| Login (optional) | `VERIFY_LOGIN_IDENTIFIER` + `VERIFY_LOGIN_PASSWORD` in env, then smoke script |
+| By role (browser) | See `scripts/smoke-role-checks.md` |
+
+#### 4. Africa's Talking — production (not sandbox)
+
+```bash
+bash scripts/configure-production-at.sh   # interactive; writes to providers.env
+bash scripts/verify-secrets.sh
+bash scripts/restart-api.sh
+curl -s http://127.0.0.1:3001/health | grep -q '"sandbox":false' && echo "AT production OK"
+```
+
+Confirm with **SCHOOL_ADMIN** → Settings → **Send test SMS** to a real Kenyan number.
+
+#### 5. Rotate keys (incident or scheduled)
+
+1. `bash scripts/backup-secrets.sh`
+2. Generate new keys in provider consoles (Groq, AT, JWT, etc.)
+3. Update `secrets/providers.env` only (or `.env` for non-provider vars)
+4. `bash scripts/verify-secrets.sh` then `bash scripts/restart-api.sh`
+5. `bash scripts/post-deploy-verify.sh` and sign out/in all admin sessions (JWT rotation)
+
+#### 6. Sign-off
+
+| Step | Confirm |
+|------|---------|
+| Node 20+ | `node -v` → v20.x; verify shows `OK Node` |
+| Deploy + verify | Both scripts exit 0 |
+| AT production | Health `sandbox: false`; test SMS delivered |
+| Login | https://app.smart-managment.com with known admin |
+| Class rep | Roster + teacher-message reply per `smoke-role-checks.md` |
+| OTP (optional) | Keep `OTP_LOGIN_ENABLED=false` until ready; `pm2 reload` after enable |
 
 ---
 

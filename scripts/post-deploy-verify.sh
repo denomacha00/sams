@@ -69,7 +69,26 @@ if [[ -n "$HEALTH" ]]; then
     if(h.sms) console.log('       sms:', h.sms.configured ? (h.sms.sandbox?'sandbox':'production') : 'not configured');
     else console.log('       sms: unknown (stale backend — rm -rf packages/backend/dist && redeploy)');
     if(h.otp) console.log('       otp login:', h.otp.loginEnabled, '| reset:', h.otp.passwordResetEnabled);
+    if(h.ai) {
+      const ai=h.ai;
+      if(ai.configured) console.log('       ai: configured | model:', ai.model||'(unknown)');
+      else console.log('       ai: not configured (set OPENAI_* in secrets/providers.env)');
+      if(ai.fallbackKey) console.log('       ai: fallback key present');
+      if(ai.modelMismatch) console.log('       ai: MODEL MISMATCH — fix OPENAI_MODEL vs provider URL');
+    } else console.log('       ai: unknown (stale backend — redeploy)');
   " 2>/dev/null || true
+
+  # AI config sanity (non-fatal unless model mismatch)
+  AI_MISMATCH="$(echo "$HEALTH" | node -e "try{const h=JSON.parse(require('fs').readFileSync(0,'utf8'));process.exit(h.ai?.modelMismatch?1:0)}catch{process.exit(0)}" 2>/dev/null && echo 0 || echo 1)"
+  if [[ "${AI_MISMATCH:-0}" == "1" ]]; then
+    fail "AI model/provider mismatch — run: bash scripts/verify-secrets.sh --ai-only"
+  fi
+  AI_OK="$(echo "$HEALTH" | node -e "try{const h=JSON.parse(require('fs').readFileSync(0,'utf8'));process.stdout.write(h.ai?.configured?'1':'0')}catch{process.stdout.write('0')}" 2>/dev/null || echo 0)"
+  if [[ "${AI_OK:-0}" != "1" ]]; then
+    warn "AI not configured — chat will fail until OPENAI_* is set in secrets/providers.env"
+  else
+    pass "AI configured (see /health ai block)"
+  fi
 else
   fail "GET /health — no HTTP 200 on ${API} (connection refused or 503 starting/degraded)"
   health_curl_verbose "$API"
@@ -88,6 +107,22 @@ if [[ -n "${VERIFY_LOGIN_IDENTIFIER:-}" && -n "${VERIFY_LOGIN_PASSWORD:-}" ]]; t
   rm -f /tmp/sams-login.json
 else
   warn "Skipping login test — set VERIFY_LOGIN_IDENTIFIER and VERIFY_LOGIN_PASSWORD to enable"
+fi
+
+# Optional guest AI smoke (uses provider quota — set VERIFY_AI_QUERY=1 to enable)
+if [[ "${VERIFY_AI_QUERY:-}" == "1" ]]; then
+  AI_CODE="$(curl -sS -o /tmp/sams-ai-verify.json -w "%{http_code}" --max-time 45 \
+    -X POST "${API}/api/v1/ai/query" \
+    -H "Content-Type: application/json" \
+    -d '{"question":"Reply with exactly: ok"}' 2>/dev/null || echo "000")"
+  if [[ "$AI_CODE" == "200" ]] && grep -qE 'answer|response|content' /tmp/sams-ai-verify.json 2>/dev/null; then
+    pass "AI guest query smoke (HTTP 200)"
+  else
+    warn "AI guest query failed (HTTP ${AI_CODE}) — run: bash scripts/diagnose-ai.sh"
+  fi
+  rm -f /tmp/sams-ai-verify.json
+else
+  warn "Skipping AI query smoke — set VERIFY_AI_QUERY=1 to enable (uses API quota)"
 fi
 
 # Env file
