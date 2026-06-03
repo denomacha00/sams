@@ -1,4 +1,5 @@
 import OpenAI from 'openai';
+import { getOpenAIClient, resolveChatModel } from './aiProviderConfig';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -26,15 +27,6 @@ Rules:
 - If ambiguous between multiple actions, pick the highest confidence one
 - Never classify informational questions as actions`;
 
-// ─── LLM Client ───────────────────────────────────────────────────────────────
-
-function getClient(): OpenAI | null {
-  const apiKey = process.env.OPENAI_API_KEY;
-  if (!apiKey) return null;
-  const baseURL = process.env.OPENAI_BASE_URL || 'https://api.groq.com/openai/v1';
-  return new OpenAI({ apiKey, baseURL });
-}
-
 // ─── Classifier ───────────────────────────────────────────────────────────────
 
 /**
@@ -49,8 +41,12 @@ export async function classifyIntent(
   message: string,
   candidates: Array<{ action: string; description: string }>,
 ): Promise<ClassificationResult | null> {
-  const client = getClient();
-  if (!client) return null; // No API key — graceful degradation
+  let client: OpenAI;
+  try {
+    client = getOpenAIClient();
+  } catch {
+    return null; // No API key — graceful degradation
+  }
 
   if (candidates.length === 0) return null;
 
@@ -68,7 +64,7 @@ Classify this message.`;
 
     const response = await client.chat.completions.create(
       {
-        model: process.env.OPENAI_MODEL ?? 'llama3-70b-8192',
+        model: resolveChatModel(),
         messages: [
           { role: 'system', content: CLASSIFICATION_SYSTEM_PROMPT },
           { role: 'user', content: userPrompt },

@@ -11,6 +11,12 @@ import {
   type ActionScope,
 } from './ai/roleActionRegistry';
 import { auditService } from './auditService';
+import {
+  formatProviderError,
+  getMissingAIKeyMessage,
+  hasPrimaryAIKey,
+} from './ai/aiProviderConfig';
+import { isConversationMemoryEnabled } from './ai/roleActionsPrompt';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -57,6 +63,8 @@ export class AIService {
       pendingAction?: PendingAction;
     },
   ): Promise<AIServiceResponse> {
+    let threadId = await this.resolveThreadForUser(user, options?.threadId);
+
     // Step 1: Try local engine first — wrapped in try-catch so it never throws
     let localResult: AIQueryResult;
     try {
@@ -73,9 +81,8 @@ export class AIService {
 
     // If local engine resolved the query, persist to memory and return
     if (localResult.intent !== 'unknown') {
-      // Persist to memory for non-guest users (non-blocking)
       if (user.sub !== 'guest') {
-        const threadId = await this.safelyPersist(user, question, localResult.answer, options?.threadId);
+        threadId = await this.safelyPersist(user, question, localResult.answer, threadId);
         return {
           answer: localResult.answer,
           intent: localResult.intent,
@@ -97,7 +104,7 @@ export class AIService {
       // If user confirmed a pending action — execute it
       if (options?.confirmAction && options?.pendingAction) {
         const result = await this.executeAction(user, options.pendingAction);
-        const threadId = await this.safelyPersist(user, question, result.answer, options?.threadId);
+        threadId = await this.safelyPersist(user, question, result.answer, threadId);
         return { ...result, threadId };
       }
 
@@ -106,13 +113,16 @@ export class AIService {
       if (actionIntent.isAction) {
         // Defense in depth: verify action is permitted for this role
         if (!isActionPermitted(user.role, actionIntent.action!)) {
-          return this.buildDenialResponse(user.role, actionIntent.action!);
+          const denial = this.buildDenialResponse(user.role, actionIntent.action!);
+          threadId = await this.safelyPersist(user, question, denial.answer, threadId);
+          return { ...denial, threadId };
         }
 
         if (actionIntent.requiresConfirmation) {
-          // Return confirmation prompt with pendingAction
+          const confirmAnswer = `⚠️ **Confirm Action**: ${actionIntent.description}\n\nDo you want to proceed?`;
+          threadId = await this.safelyPersist(user, question, confirmAnswer, threadId);
           return {
-            answer: `⚠️ **Confirm Action**: ${actionIntent.description}\n\nDo you want to proceed?`,
+            answer: confirmAnswer,
             intent: 'action_confirmation',
             engine: 'openai',
             pendingAction: {
@@ -121,31 +131,25 @@ export class AIService {
               description: actionIntent.description!,
             },
             requiresConfirmation: true,
+            threadId,
           };
         }
 
-        // Non-destructive action — execute immediately
         const result = await this.executeAction(user, {
           action: actionIntent.action!,
           params: actionIntent.params!,
           description: actionIntent.description!,
         });
-        const threadId = await this.safelyPersist(user, question, result.answer, options?.threadId);
+        threadId = await this.safelyPersist(user, question, result.answer, threadId);
         return { ...result, threadId };
       }
     }
 
-    // Step 3: Resolve thread and retrieve conversation history (skip for guest users)
-    let threadId: string | undefined;
+    // Step 3: Load encrypted conversation history for LLM context
     let historyMessages: Array<{ role: 'user' | 'assistant'; content: string }> = [];
 
-    if (user.sub !== 'guest') {
+    if (user.sub !== 'guest' && threadId) {
       try {
-        threadId = await conversationMemoryService.resolveThread(
-          user.sub,
-          user.schoolId,
-          options?.threadId,
-        );
         const contextWindow = await conversationMemoryService.getContextWindow(
           user.sub,
           user.schoolId,
@@ -157,18 +161,14 @@ export class AIService {
         );
       } catch (err) {
         console.error('[AIService] Memory retrieval failed, proceeding without history:', err);
-        // Graceful degradation — continue without history
       }
     }
 
     // Local engine couldn't resolve — try OpenAI/Groq
-    const hasAPIKey = !!process.env.OPENAI_API_KEY;
-
-    if (!hasAPIKey) {
-      // No API key configured — return help text
+    if (!hasPrimaryAIKey()) {
       return {
-        answer: localResult.answer,
-        intent: 'unknown',
+        answer: getMissingAIKeyMessage(),
+        intent: 'ai_not_configured',
         engine: 'local',
         threadId,
       };
@@ -177,6 +177,15 @@ export class AIService {
     // Step 4: Call OpenAI/Groq with conversation history
     try {
       const openaiResult = await openaiQueryWithHistory(user, question, historyMessages);
+
+      if (openaiResult.intent === 'ai_error' || openaiResult.intent === 'ai_not_configured') {
+        return {
+          answer: openaiResult.answer,
+          intent: openaiResult.intent,
+          engine: 'openai',
+          threadId,
+        };
+      }
 
       // If OpenAI also couldn't resolve (feature gated or error), return scope message
       if (openaiResult.intent === 'feature_gated') {
@@ -202,11 +211,10 @@ export class AIService {
       };
     } catch (err) {
       console.error('[AIService] OpenAI fallback failed:', err);
-      // If OpenAI fails, return the local engine's help message
       return {
-        answer: localResult.answer,
-        intent: 'unknown',
-        engine: 'local',
+        answer: formatProviderError(err),
+        intent: 'ai_error',
+        engine: 'openai',
         threadId,
       };
     }
@@ -235,6 +243,19 @@ export class AIService {
 
   // ─── Private Helpers ──────────────────────────────────────────────────
 
+  private async resolveThreadForUser(
+    user: AccessTokenPayload,
+    threadId?: string,
+  ): Promise<string | undefined> {
+    if (user.sub === 'guest') return undefined;
+    try {
+      return await conversationMemoryService.resolveThread(user.sub, user.schoolId, threadId);
+    } catch (err) {
+      console.error('[AIService] Thread resolution failed:', err);
+      return threadId;
+    }
+  }
+
   /**
    * Safely persist a conversation record. Never throws — errors are logged.
    * Returns the resolved threadId (or the original if persistence fails).
@@ -257,7 +278,13 @@ export class AIService {
       );
       return resolvedThreadId;
     } catch (err) {
-      console.error('[AIService] Failed to persist conversation record:', err);
+      if (!isConversationMemoryEnabled()) {
+        console.error(
+          '[AIService] Conversation memory disabled — set CONVERSATION_MASTER_KEY (32+ chars) in .env',
+        );
+      } else {
+        console.error('[AIService] Failed to persist conversation record:', err);
+      }
       return threadId;
     }
   }

@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import apiClient from '../services/apiClient';
 import { useVoiceQuery } from '../hooks/useVoiceQuery';
+import { getAiErrorMessage, isAiUnavailableIntent } from '../lib/aiChat';
 
 interface PendingAction {
   action: string;
@@ -14,6 +15,7 @@ interface Message {
   content: string;
   timestamp: Date;
   pendingAction?: PendingAction;
+  isError?: boolean;
 }
 
 const SUGGESTED_QUESTIONS = [
@@ -29,6 +31,7 @@ const AIAssistantPage: React.FC = () => {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
+  const [threadId, setThreadId] = useState<string | null>(null);
   const pendingActionRef = useRef<PendingAction | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
@@ -76,10 +79,12 @@ const AIAssistantPage: React.FC = () => {
       const isConfirm = CONFIRM_RE.test(text.trim()) && pendingActionRef.current;
       const { data } = await apiClient.post('/ai/query', {
         question: text.trim(),
+        threadId,
         ...(isConfirm
           ? { confirmAction: true, pendingAction: pendingActionRef.current }
           : {}),
       });
+      if (data.threadId) setThreadId(data.threadId);
 
       if (data.requiresConfirmation && data.pendingAction) {
         pendingActionRef.current = data.pendingAction;
@@ -99,14 +104,16 @@ const AIAssistantPage: React.FC = () => {
         role: 'assistant',
         content: data.answer,
         timestamp: new Date(),
+        isError: isAiUnavailableIntent(data.intent),
       };
       setMessages((prev) => [...prev, assistantMessage]);
-    } catch (err: any) {
+    } catch (err: unknown) {
       const errorMessage: Message = {
         id: crypto.randomUUID(),
         role: 'assistant',
-        content: 'Sorry, I encountered an error. Please try again.',
+        content: getAiErrorMessage(err, 'Sorry, I encountered an error. Please try again.'),
         timestamp: new Date(),
+        isError: true,
       };
       setMessages((prev) => [...prev, errorMessage]);
     } finally {
@@ -182,7 +189,9 @@ const AIAssistantPage: React.FC = () => {
                 className={`max-w-[80%] rounded-2xl px-5 py-3.5 ${
                   msg.role === 'user'
                     ? 'bg-gradient-to-r from-purple-600 to-blue-600 text-white shadow-lg shadow-purple-500/20'
-                    : 'bg-white/10 border border-white/10 text-gray-200'
+                    : msg.isError
+                      ? 'bg-red-950/70 border border-red-500/50 text-red-100'
+                      : 'bg-white/10 border border-white/10 text-gray-200'
                 }`}
               >
                 <p className="whitespace-pre-wrap text-sm">{msg.content}</p>

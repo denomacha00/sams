@@ -13,7 +13,10 @@ interface ChatMessage {
   content: string;
   timestamp: Date;
   pendingAction?: PendingAction;
+  isError?: boolean;
 }
+
+const AI_UNAVAILABLE_INTENTS = new Set(['ai_error', 'ai_not_configured']);
 
 const CONFIRM_RE = /^(yes|y|confirm|proceed|ok|do it|go ahead)\.?$/i;
 
@@ -68,7 +71,7 @@ const SuperAdminAI: React.FC = () => {
     setImagePreviews((prev) => prev.filter((_, i) => i !== index));
   };
 
-  const appendAssistant = (content: string, pendingAction?: PendingAction) => {
+  const appendAssistant = (content: string, pendingAction?: PendingAction, isError?: boolean) => {
     if (pendingAction) {
       pendingActionRef.current = pendingAction;
     } else if (!content.includes('Confirm Action')) {
@@ -82,6 +85,7 @@ const SuperAdminAI: React.FC = () => {
         content,
         timestamp: new Date(),
         pendingAction,
+        isError,
       },
     ]);
   };
@@ -99,12 +103,12 @@ const SuperAdminAI: React.FC = () => {
     if (data.threadId) setThreadId(data.threadId);
 
     if (data.requiresConfirmation && data.pendingAction) {
-      appendAssistant(data.answer, data.pendingAction);
+      appendAssistant(data.answer, data.pendingAction, false);
       return;
     }
 
     pendingActionRef.current = null;
-    appendAssistant(data.answer);
+    appendAssistant(data.answer, undefined, AI_UNAVAILABLE_INTENTS.has(data.intent));
   };
 
   const handleConfirmAction = async (pending: PendingAction) => {
@@ -160,9 +164,12 @@ const SuperAdminAI: React.FC = () => {
 
       await runQuery(question);
     } catch (err: any) {
-      appendAssistant(
-        `Sorry, I encountered an error: ${err.response?.data?.error || err.message || 'Unknown error'}`,
-      );
+      const answer =
+        err.response?.data?.answer ||
+        err.response?.data?.error ||
+        err.message ||
+        'Unknown error';
+      appendAssistant(`Sorry, I encountered an error: ${answer}`, undefined, true);
     } finally {
       setLoading(false);
     }
@@ -245,7 +252,9 @@ const SuperAdminAI: React.FC = () => {
                   className={`max-w-[85%] rounded-lg px-3 py-2 text-sm whitespace-pre-wrap ${
                     msg.role === 'user'
                       ? 'bg-purple-600 text-white'
-                      : 'bg-gray-800 text-gray-200 border border-gray-700'
+                      : msg.isError
+                        ? 'bg-red-950 text-red-100 border border-red-600'
+                        : 'bg-gray-800 text-gray-200 border border-gray-700'
                   }`}
                 >
                   {msg.content}

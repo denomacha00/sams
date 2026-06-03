@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import apiClient from '../services/apiClient';
 import { useVoiceQuery } from '../hooks/useVoiceQuery';
+import { getAiErrorMessage, isAiUnavailableIntent } from '../lib/aiChat';
 
 interface PendingAction {
   action: string;
@@ -16,6 +17,7 @@ interface Message {
   userImages?: string[];
   timestamp: Date;
   pendingAction?: PendingAction;
+  isError?: boolean;
 }
 
 const CONFIRM_RE = /^(yes|y|confirm|proceed|ok|do it|go ahead)\.?$/i;
@@ -183,12 +185,19 @@ const FloatingAI: React.FC = () => {
 
       pendingActionRef.current = null;
       setMessages((prev) => [...prev, {
-        id: crypto.randomUUID(), role: 'assistant', content: data.answer, timestamp: new Date(),
+        id: crypto.randomUUID(),
+        role: 'assistant',
+        content: data.answer,
+        timestamp: new Date(),
+        isError: isAiUnavailableIntent(data.intent),
       }]);
-    } catch {
+    } catch (err) {
       setMessages((prev) => [...prev, {
-        id: crypto.randomUUID(), role: 'assistant',
-        content: "I'm having trouble connecting. Please try again.", timestamp: new Date(),
+        id: crypto.randomUUID(),
+        role: 'assistant',
+        content: getAiErrorMessage(err, "I'm having trouble connecting. Please try again."),
+        timestamp: new Date(),
+        isError: true,
       }]);
     } finally {
       setLoading(false);
@@ -262,7 +271,9 @@ const FloatingAI: React.FC = () => {
                 className={`max-w-[80%] rounded-xl px-3 py-2 text-sm ${
                   msg.role === 'user'
                     ? 'bg-indigo-600 text-white'
-                    : 'bg-slate-900 border border-slate-700 text-slate-200'
+                    : msg.isError
+                      ? 'bg-red-950/80 border border-red-600/60 text-red-100'
+                      : 'bg-slate-900 border border-slate-700 text-slate-200'
                 }`}
               >
                 {/* User uploaded images */}

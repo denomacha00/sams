@@ -25,6 +25,29 @@ async function connectDependencies(): Promise<void> {
   if (!process.env.CONVERSATION_MASTER_KEY || process.env.CONVERSATION_MASTER_KEY.length < 32) {
     console.warn('[STARTUP] CONVERSATION_MASTER_KEY not set or too short. Conversation memory will be disabled.');
   }
+
+  const {
+    DEPRECATED_MODEL_MIGRATIONS,
+    hasPrimaryAIKey,
+    resolveChatModel,
+  } = await import('./services/ai/aiProviderConfig');
+  const { isConversationMemoryEnabled } = await import('./services/ai/roleActionsPrompt');
+  if (!isConversationMemoryEnabled()) {
+    console.warn(
+      '[STARTUP] Encrypted conversation memory disabled — set CONVERSATION_MASTER_KEY (32+ chars).',
+    );
+  }
+
+  if (!hasPrimaryAIKey()) {
+    console.warn('[STARTUP] AI chat disabled — set OPENAI_API_KEY (see packages/backend/.env.example).');
+  } else {
+    const configuredModel = process.env.OPENAI_MODEL?.trim();
+    if (configuredModel && configuredModel in DEPRECATED_MODEL_MIGRATIONS) {
+      console.warn(
+        `[STARTUP] OPENAI_MODEL=${configuredModel} is decommissioned; runtime will use ${resolveChatModel()} instead.`,
+      );
+    }
+  }
   if (!isSmsConfigured()) {
     console.warn('[STARTUP] SMS disabled — set AT_API_KEY and AT_USERNAME in .env to enable Africa\'s Talking.');
   }

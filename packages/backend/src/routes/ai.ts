@@ -6,6 +6,12 @@ import { aiService } from '../services/aiService';
 import { openaiQuery } from '../services/ai/openaiEngine';
 import { conversationMemoryService } from '../services/conversationMemoryService';
 import { AppError } from '../middleware/errors';
+import {
+  formatProviderError,
+  getMissingAIKeyMessage,
+  getOpenAIClient,
+  hasPrimaryAIKey,
+} from '../services/ai/aiProviderConfig';
 
 // Multer config for multi-image uploads (max 4 images, 5MB each)
 const aiUpload = multer({
@@ -174,12 +180,11 @@ aiRouter.post('/query', async (req: Request, res: Response): Promise<void> => {
         const response: Record<string, unknown> = { ...result };
         res.status(200).json(response);
       } catch (aiErr) {
-        // AI service errors should never surface as 500 — return a graceful fallback
         console.error('[AI] Query error for authenticated user:', (aiErr as Error).message);
         res.status(200).json({
-          answer: 'I\'m having trouble connecting to the AI service right now. Please try again in a moment, or check that the AI API key is configured correctly.',
-          intent: 'fallback',
-          engine: 'local',
+          answer: formatProviderError(aiErr),
+          intent: 'ai_error',
+          engine: 'openai',
         });
       }
       return;
@@ -245,11 +250,11 @@ aiRouter.post('/query', async (req: Request, res: Response): Promise<void> => {
         const result = await openaiQuery(guestUserRestricted, question.trim());
         res.status(200).json(result);
       }
-    } catch {
+    } catch (guestErr) {
       res.status(200).json({
-        answer: 'I can answer general questions and questions about SAMS. For school-specific data, please log in first.',
-        intent: 'fallback',
-        engine: 'local',
+        answer: formatProviderError(guestErr),
+        intent: 'ai_error',
+        engine: 'openai',
       });
     }
   } catch (err) {
@@ -307,18 +312,11 @@ aiRouter.post('/query-with-image', aiUpload.array('images', 4), async (req: Requ
       image_url: { url: `data:${file.mimetype};base64,${file.buffer.toString('base64')}` },
     }));
 
-    // Call vision model
-    const OpenAI = (await import('openai')).default;
-    const apiKey = process.env.OPENAI_API_KEY;
-    if (!apiKey) {
-      throw new AppError(500, 'CONFIG_ERROR', 'AI API key not configured');
+    if (!hasPrimaryAIKey()) {
+      throw new AppError(503, 'CONFIG_ERROR', getMissingAIKeyMessage());
     }
 
-    const client = new OpenAI({
-      apiKey,
-      baseURL: process.env.OPENAI_BASE_URL || 'https://api.groq.com/openai/v1',
-      timeout: 60000, // 60 second timeout for vision
-    });
+    const client = getOpenAIClient({ timeoutMs: 60000 });
 
     const response = await client.chat.completions.create({
       model: process.env.VISION_MODEL || 'meta-llama/llama-4-scout-17b-16e-instruct',
@@ -342,12 +340,19 @@ aiRouter.post('/query-with-image', aiUpload.array('images', 4), async (req: Requ
       engine: 'openai',
     });
   } catch (err) {
-    if (err instanceof AppError) throw err;
+    if (err instanceof AppError) {
+      res.status(200).json({
+        answer: err.message,
+        intent: 'ai_not_configured',
+        engine: 'local',
+      });
+      return;
+    }
     console.error('[AI] Image query error:', (err as Error).message || err);
     res.status(200).json({
-      answer: 'I could not analyze the image. This may be due to the image being too large or the vision service being temporarily unavailable. Try a smaller image or try again later.',
+      answer: formatProviderError(err),
       intent: 'image_analysis_error',
-      engine: 'local',
+      engine: 'openai',
     });
   }
 });

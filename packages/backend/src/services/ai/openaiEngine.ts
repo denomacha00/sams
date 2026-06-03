@@ -1,6 +1,14 @@
 import OpenAI from 'openai';
 import { prisma } from '../../lib/prisma';
 import { type AccessTokenPayload, UserRole } from '@sams/shared';
+import {
+  formatProviderError,
+  getFallbackClient,
+  getOpenAIClient,
+  resolveChatModel,
+  resolveFallbackChatModel,
+} from './aiProviderConfig';
+import { buildRoleActionsPromptSection } from './roleActionsPrompt';
 import { getSystemDocumentationExcerpt } from './systemDocumentation';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -9,28 +17,6 @@ export interface OpenAIQueryResult {
   answer: string;
   intent: string;
   data?: unknown;
-}
-
-// ─── OpenAI Client ────────────────────────────────────────────────────────────
-
-/**
- * Multi-provider AI client with automatic fallback.
- * Priority: Primary (OPENAI_API_KEY) → Fallback (OPENAI_FALLBACK_KEY)
- */
-function getOpenAIClient(): OpenAI {
-  const apiKey = process.env.OPENAI_API_KEY;
-  if (!apiKey) {
-    throw new Error('OPENAI_API_KEY environment variable is not set');
-  }
-  const baseURL = process.env.OPENAI_BASE_URL || 'https://api.groq.com/openai/v1';
-  return new OpenAI({ apiKey, baseURL });
-}
-
-function getFallbackClient(): OpenAI | null {
-  const apiKey = process.env.OPENAI_FALLBACK_KEY;
-  if (!apiKey) return null;
-  const baseURL = process.env.OPENAI_FALLBACK_URL || 'https://openrouter.ai/api/v1';
-  return new OpenAI({ apiKey, baseURL });
 }
 
 // ─── System Prompt Builder ────────────────────────────────────────────────────
@@ -116,7 +102,6 @@ async function buildSystemPrompt(user: AccessTokenPayload): Promise<string> {
       }
     } else {
       // Guest/unauthenticated user — fetch only global super admin knowledge entries
-      const { prisma } = await import('../../index');
       const globalEntries = await prisma.aIKnowledge.findMany({
         where: { createdBy: { role: 'SUPER_ADMIN' } },
         select: { title: true, content: true },
@@ -148,7 +133,6 @@ async function buildSystemPrompt(user: AccessTokenPayload): Promise<string> {
   let systemDataSection = '';
   if (user.role === 'SUPER_ADMIN') {
     try {
-      const { prisma } = await import('../../index');
       const [schoolCount, userCount, studentCount, teacherCount, sessionCount] = await Promise.all([
         prisma.school.count(),
         prisma.user.count(),
@@ -161,6 +145,9 @@ async function buildSystemPrompt(user: AccessTokenPayload): Promise<string> {
       // If stats fetch fails, continue without them
     }
   }
+
+  const roleActionsSection =
+    user.sub !== 'guest' ? buildRoleActionsPromptSection(user.role) : '';
 
   return `You are SAMS AI — a smart, helpful assistant built into the Smart Attendance Management System (SAMS). You were developed by Denis Macharia.
 
@@ -195,7 +182,7 @@ CRITICAL — NEVER MAKE UP DATA:
 
 If the user asks for something above their permission level, politely tell them they don't have access and suggest who to contact.
 
-Be concise, friendly, and helpful. Address the user by their name. Answer in plain language.${knowledgeSection}${documentationSection}${systemDataSection}`;
+Be concise, friendly, and helpful. Address the user by their name. Answer in plain language.${roleActionsSection}${knowledgeSection}${documentationSection}${systemDataSection}`;
 }
 
 // ─── Function-Calling Tools ───────────────────────────────────────────────────
@@ -616,7 +603,7 @@ export async function openaiQuery(
   try {
     // Simple chat completion without function calling (works with Groq free tier)
     const response = await client.chat.completions.create({
-      model: process.env.OPENAI_MODEL ?? 'llama3-70b-8192',
+      model: resolveChatModel(),
       messages,
       temperature: 0.3,
       max_tokens: 1000,
@@ -636,7 +623,7 @@ export async function openaiQuery(
     if (fallback) {
       try {
         const fallbackResponse = await fallback.chat.completions.create({
-          model: process.env.OPENAI_FALLBACK_MODEL ?? 'meta-llama/llama-3.1-8b-instruct:free',
+          model: resolveFallbackChatModel(),
           messages,
           temperature: 0.3,
           max_tokens: 1000,
@@ -651,10 +638,9 @@ export async function openaiQuery(
       }
     }
 
-    // Both failed — return helpful fallback
     return {
-      answer: `I can help you with:\n• "What is SAMS?" — learn about the system\n• "How many students?" — get counts\n• "Show my timetable" — view schedule\n• "Generate timetable" — create timetables\n• "Who is absent today?" — check attendance\n• "Risk scores" — view at-risk students\n\nPlease try one of these, or rephrase your question.`,
-      intent: 'fallback',
+      answer: formatProviderError(err),
+      intent: 'ai_error',
     };
   }
 }
@@ -683,7 +669,7 @@ export async function openaiQueryWithHistory(
 
   try {
     const response = await client.chat.completions.create({
-      model: process.env.OPENAI_MODEL ?? 'llama3-70b-8192',
+      model: resolveChatModel(),
       messages,
       temperature: 0.3,
       max_tokens: 1000,
@@ -703,7 +689,7 @@ export async function openaiQueryWithHistory(
     if (fallback) {
       try {
         const fallbackResponse = await fallback.chat.completions.create({
-          model: process.env.OPENAI_FALLBACK_MODEL ?? 'meta-llama/llama-3.1-8b-instruct:free',
+          model: resolveFallbackChatModel(),
           messages,
           temperature: 0.3,
           max_tokens: 1000,
@@ -718,10 +704,9 @@ export async function openaiQueryWithHistory(
       }
     }
 
-    // Both failed — return helpful fallback
     return {
-      answer: `I can help you with:\n• "What is SAMS?" — learn about the system\n• "How many students?" — get counts\n• "Show my timetable" — view schedule\n• "Generate timetable" — create timetables\n• "Who is absent today?" — check attendance\n• "Risk scores" — view at-risk students\n\nPlease try one of these, or rephrase your question.`,
-      intent: 'fallback',
+      answer: formatProviderError(err),
+      intent: 'ai_error',
     };
   }
 }
