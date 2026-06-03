@@ -1,8 +1,12 @@
-import { describe, expect, it, vi, beforeEach } from 'vitest';
+import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest';
 import { UserRole } from '@sams/shared';
 import { actionIntentDetector } from '../actionIntentDetector';
 import { findAction, isActionPermitted } from '../roleActionRegistry';
-import { jsDateToSchemaDayOfWeek, schemaDayName } from '../../../lib/studentScheduleHelpers';
+import { schemaDayName } from '../../../lib/studentScheduleHelpers';
+import { schemaDayOfWeekInTimezone } from '../../../lib/appTimezone';
+
+const FIXED_NOW = new Date('2026-06-03T10:00:00Z');
+const APP_TZ = 'Africa/Nairobi';
 
 vi.mock('../../../lib/prisma', () => ({
   prisma: {
@@ -44,6 +48,12 @@ const studentScope = {
 describe('student reminder actions', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.useFakeTimers();
+    vi.setSystemTime(FIXED_NOW);
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
   });
 
   it('permits explain_reminders and view_today_schedule for STUDENT', () => {
@@ -72,7 +82,7 @@ describe('student reminder actions', () => {
   });
 
   it('explain_reminders handler is honest and mentions Notifications', async () => {
-    const day = jsDateToSchemaDayOfWeek(new Date('2026-06-03T10:00:00')); // Tuesday
+    const day = schemaDayOfWeekInTimezone(FIXED_NOW, APP_TZ);
     vi.mocked(prisma.timetableEntry.findMany).mockResolvedValue([
       {
         startTime: '08:00',
@@ -96,7 +106,7 @@ describe('student reminder actions', () => {
   });
 
   it('view_today_schedule lists only today slots', async () => {
-    const day = jsDateToSchemaDayOfWeek(new Date('2026-06-03T10:00:00'));
+    const day = schemaDayOfWeekInTimezone(FIXED_NOW, APP_TZ);
     vi.mocked(prisma.timetableEntry.findMany).mockResolvedValue([
       {
         startTime: '10:00',
