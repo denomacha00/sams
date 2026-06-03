@@ -1,7 +1,20 @@
 import { describe, expect, it, vi, beforeEach } from 'vitest';
 import { UserRole } from '@sams/shared';
 
-vi.mock('./conversationMemoryService', () => ({
+vi.mock('../../lib/prisma', () => ({
+  prisma: {
+    class: {
+      findMany: vi.fn().mockResolvedValue([
+        { id: 'c1', name: 'Form 1A' },
+        { id: 'c2', name: 'Form 1B' },
+      ]),
+      findFirst: vi.fn(),
+    },
+    department: { findMany: vi.fn().mockResolvedValue([]), findFirst: vi.fn() },
+  },
+}));
+
+vi.mock('../conversationMemoryService', () => ({
   conversationMemoryService: {
     resolveThread: vi.fn().mockResolvedValue('thread-1'),
     persistRecord: vi.fn().mockResolvedValue(undefined),
@@ -9,31 +22,31 @@ vi.mock('./conversationMemoryService', () => ({
   },
 }));
 
-vi.mock('./auditService', () => ({
+vi.mock('../auditService', () => ({
   auditService: { log: vi.fn().mockResolvedValue(undefined) },
 }));
 
-vi.mock('./ai/actionIntentDetector', () => ({
+vi.mock('./actionIntentDetector', () => ({
   actionIntentDetector: {
     detect: vi.fn(),
   },
 }));
 
-vi.mock('./ai/localEngine', () => ({
+vi.mock('./localEngine', () => ({
   localQuery: vi.fn().mockResolvedValue({ answer: 'unknown', intent: 'unknown' }),
 }));
 
-vi.mock('./ai/openaiEngine', () => ({
+vi.mock('./openaiEngine', () => ({
   openaiQueryWithHistory: vi.fn(),
 }));
 
-vi.mock('./ai/aiProviderConfig', () => ({
+vi.mock('./aiProviderConfig', () => ({
   hasPrimaryAIKey: vi.fn().mockReturnValue(false),
   getMissingAIKeyMessage: vi.fn().mockReturnValue('no key'),
   formatProviderError: vi.fn(),
 }));
 
-vi.mock('./ai/roleActionsPrompt', () => ({
+vi.mock('./roleActionsPrompt', () => ({
   isConversationMemoryEnabled: vi.fn().mockReturnValue(false),
 }));
 
@@ -43,14 +56,14 @@ const mockSendScoped = vi.fn().mockResolvedValue({
   batchId: 'batch-1',
 });
 
-vi.mock('./scopedNotificationSend', () => ({
+vi.mock('../scopedNotificationSend', () => ({
   assertAiNotificationChannels: vi.fn(),
   ScopedNotificationError: class ScopedNotificationError extends Error {},
   sendScopedNotification: (...args: unknown[]) => mockSendScoped(...args),
 }));
 
-import { actionIntentDetector } from './ai/actionIntentDetector';
-import { AIService } from './aiService';
+import { actionIntentDetector } from './actionIntentDetector';
+import { AIService } from '../aiService';
 
 describe('AIService multi-turn notification flow', () => {
   const service = new AIService();

@@ -87,4 +87,16 @@ describe('actionIntentDetector role scoping (regex path)', () => {
     );
     expect(result.action).toBe('send_school_notification');
   });
+
+  it('detects bare HOD post notification intent', async () => {
+    const result = await actionIntentDetector.detect('post a notification', UserRole.HOD);
+    expect(result.isAction).toBe(true);
+    expect(result.action).toBe('send_department_notification');
+  });
+
+  it('detects bare teacher notify class intent', async () => {
+    const result = await actionIntentDetector.detect('notify my class', UserRole.TEACHER);
+    expect(result.isAction).toBe(true);
+    expect(result.action).toBe('send_class_message');
+  });
 });
