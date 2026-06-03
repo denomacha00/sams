@@ -274,23 +274,15 @@ const getSystemStatsHandler: ActionHandler = async () => {
 
 export const superAdminActions: ActionDefinition[] = [
   {
-    action: 'suspend_school',
-    description: 'Suspend a school, blocking all users from logging in',
-    destructive: true,
-    patterns: [/suspend\s+(.+)/i, /block\s+(.+)/i, /disable\s+(.+)/i],
-    extractParams: (message: string, match: RegExpMatchArray | null) => {
-      const schoolName = match && match[1] ? extractSchoolName(match[1]) : '';
-      return { schoolName };
-    },
-    descriptionTemplate: (params) =>
-      `Suspend school "${params.schoolName}" — this will block all users from logging in.`,
-    handler: suspendSchoolHandler,
-  },
-  {
     action: 'unsuspend_school',
     description: 'Unsuspend a school, restoring user access',
     destructive: false,
-    patterns: [/unsuspend\s+(.+)/i, /unblock\s+(.+)/i, /reactivate\s+(.+)/i, /enable\s+(.+)/i],
+    patterns: [
+      /\bunsuspend\s+(.+)/i,
+      /\bunblock\s+(.+)/i,
+      /\breactivate\s+(.+)/i,
+      /\benabl(?:e|ing)\s+(.+)/i,
+    ],
     extractParams: (message: string, match: RegExpMatchArray | null) => {
       const schoolName = match && match[1] ? extractSchoolName(match[1]) : '';
       return { schoolName };
@@ -298,6 +290,19 @@ export const superAdminActions: ActionDefinition[] = [
     descriptionTemplate: (params) =>
       `Unsuspend school "${params.schoolName}" — users will be able to log in again.`,
     handler: unsuspendSchoolHandler,
+  },
+  {
+    action: 'suspend_school',
+    description: 'Suspend a school, blocking all users from logging in',
+    destructive: true,
+    patterns: [/\bsuspend\s+(.+)/i, /\bblock\s+(.+)/i, /\bdisable\s+(.+)/i],
+    extractParams: (message: string, match: RegExpMatchArray | null) => {
+      const schoolName = match && match[1] ? extractSchoolName(match[1]) : '';
+      return { schoolName };
+    },
+    descriptionTemplate: (params) =>
+      `Suspend school "${params.schoolName}" — this will block all users from logging in.`,
+    handler: suspendSchoolHandler,
   },
   {
     action: 'generate_license',

@@ -170,4 +170,42 @@ describe('actionIntentDetector role scoping (regex path)', () => {
     expect(result.action).toBe('list_my_hod');
     expect(result.action).not.toBe('list_my_teachers');
   });
+
+  it('detects unsuspend_school without matching suspend_school substring', async () => {
+    const cases = [
+      'unsuspend school Test Academy',
+      'unblock school Test Academy',
+      'reactivate school Test Academy',
+    ];
+    for (const message of cases) {
+      const result = await actionIntentDetector.detect(message, UserRole.SUPER_ADMIN);
+      expect(result.isAction).toBe(true);
+      expect(result.action).toBe('unsuspend_school');
+      expect(result.params?.schoolName).toBe('Test Academy');
+    }
+  });
+
+  it('detects suspend_school with word-boundary patterns only', async () => {
+    const suspend = await actionIntentDetector.detect('suspend school Test Academy', UserRole.SUPER_ADMIN);
+    expect(suspend.isAction).toBe(true);
+    expect(suspend.action).toBe('suspend_school');
+    expect(suspend.params?.schoolName).toBe('Test Academy');
+
+    const unsuspend = await actionIntentDetector.detect(
+      'unsuspend school Test Academy',
+      UserRole.SUPER_ADMIN,
+    );
+    expect(unsuspend.action).toBe('unsuspend_school');
+    expect(unsuspend.action).not.toBe('suspend_school');
+  });
+
+  it('detects get_school_info for super admin', async () => {
+    const result = await actionIntentDetector.detect(
+      'school info for Test Academy',
+      UserRole.SUPER_ADMIN,
+    );
+    expect(result.isAction).toBe(true);
+    expect(result.action).toBe('get_school_info');
+    expect(result.params?.schoolName).toBe('Test Academy');
+  });
 });
