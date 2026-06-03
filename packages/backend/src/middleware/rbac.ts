@@ -1,5 +1,6 @@
 import { type Request, type Response, type NextFunction } from 'express';
 import { UserRole } from '@sams/shared';
+import { prisma } from '../lib/prisma';
 import { AppError } from './errors';
 
 // ─── Augment Express Request ──────────────────────────────────────────────────
@@ -106,7 +107,11 @@ export function assertSchoolOwnership(
 //
 // Also handles classId in the body by checking the class belongs to the HOD's dept.
 
-export function requireHODScope(req: Request, res: Response, next: NextFunction): void {
+export async function requireHODScope(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
   const user = req.user;
 
   if (!user) {
@@ -119,21 +124,34 @@ export function requireHODScope(req: Request, res: Response, next: NextFunction)
     return;
   }
 
-  // HOD must have a departmentId in their JWT
   if (!user.departmentId) {
     res.status(403).json({ error: 'Forbidden', code: 'FORBIDDEN' });
     return;
   }
 
-  // Determine the target department from route params or request body
+  const body = req.body as Record<string, unknown> | undefined;
   const targetDepartmentId: string | undefined =
     (typeof req.params.departmentId === 'string' ? req.params.departmentId : undefined) ??
-    ((req.body as Record<string, unknown> | undefined)?.departmentId as string | undefined);
+    (typeof body?.departmentId === 'string' ? body.departmentId : undefined);
 
-  // If a departmentId target is present, enforce it matches the HOD's own department
   if (targetDepartmentId !== undefined && targetDepartmentId !== user.departmentId) {
     res.status(403).json({ error: 'Forbidden', code: 'FORBIDDEN' });
     return;
+  }
+
+  const classId =
+    (typeof req.params.classId === 'string' ? req.params.classId : undefined) ??
+    (typeof body?.classId === 'string' ? body.classId : undefined);
+
+  if (classId) {
+    const cls = await prisma.class.findUnique({
+      where: { id: classId },
+      select: { departmentId: true, schoolId: true },
+    });
+    if (!cls || cls.schoolId !== req.schoolId || cls.departmentId !== user.departmentId) {
+      res.status(403).json({ error: 'Forbidden', code: 'FORBIDDEN' });
+      return;
+    }
   }
 
   next();

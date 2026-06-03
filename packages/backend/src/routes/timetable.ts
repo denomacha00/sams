@@ -1,8 +1,23 @@
 import { Router, type Request, type Response } from 'express';
 import { z } from 'zod';
+import { UserRole } from '@sams/shared';
+import { prisma } from '../lib/prisma';
 import { requirePermission, requireHODScope } from '../middleware/rbac';
 import { timetableService } from '../services/timetableService';
 import { AppError } from '../middleware/errors';
+
+async function assertHODOwnsTimetableEntry(req: Request, entryId: string): Promise<void> {
+  if (req.user?.role !== UserRole.HOD || !req.user.departmentId) return;
+
+  const entry = await prisma.timetableEntry.findUnique({
+    where: { id: entryId },
+    select: { schoolId: true, class: { select: { departmentId: true } } },
+  });
+
+  if (!entry || entry.schoolId !== req.schoolId || entry.class.departmentId !== req.user.departmentId) {
+    throw new AppError(403, 'FORBIDDEN', 'HODs can only manage timetables for their own department');
+  }
+}
 
 // ─── Validation Schemas ───────────────────────────────────────────────────────
 
@@ -82,6 +97,8 @@ timetableRouter.post('/', requirePermission('manage:timetable'), requireHODScope
  * HOD scope guard ensures HODs can only update entries for their own department's classes.
  */
 timetableRouter.put('/:id', requirePermission('manage:timetable'), requireHODScope, async (req: Request, res: Response): Promise<void> => {
+  await assertHODOwnsTimetableEntry(req, req.params.id as string);
+
   const parsed = updateTimetableSchema.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({
@@ -108,6 +125,7 @@ timetableRouter.put('/:id', requirePermission('manage:timetable'), requireHODSco
  */
 timetableRouter.delete('/:id', requirePermission('manage:timetable'), requireHODScope, async (req: Request, res: Response): Promise<void> => {
   try {
+    await assertHODOwnsTimetableEntry(req, req.params.id as string);
     await timetableService.deleteEntry(req.schoolId, req.params.id as string);
     res.status(204).send();
   } catch (err) {

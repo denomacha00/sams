@@ -91,13 +91,6 @@ const createDepartmentHandler: ActionHandler = async (params, scope) => {
   };
 };
 
-const manageTimetableHandler: ActionHandler = async (_params, scope) => {
-  return {
-    answer: '✅ Timetable updated. Use "view timetable" to see the changes.',
-    data: { schoolId: scope.schoolId },
-  };
-};
-
 const getSchoolStatsHandler: ActionHandler = async (_params, scope) => {
   const { prisma } = await import('../../../index');
 
@@ -206,20 +199,6 @@ export const schoolAdminActions: ActionDefinition[] = [
     descriptionTemplate: (params) =>
       `Create department "${params.departmentName}".`,
     handler: createDepartmentHandler,
-  },
-  {
-    action: 'manage_timetable',
-    description: 'Generate or modify the school timetable',
-    destructive: false,
-    patterns: [
-      /(?:generate|create|remake)\s+(?:a\s+)?timetable/i,
-      /(?:update|modify|change)\s+(?:the\s+)?timetable/i,
-      /manage\s+timetable/i,
-    ],
-    extractParams: () => ({}),
-    descriptionTemplate: () =>
-      `Generate or update the school timetable.`,
-    handler: manageTimetableHandler,
   },
   {
     action: 'get_school_stats',

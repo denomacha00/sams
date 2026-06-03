@@ -112,6 +112,16 @@ const NotificationsPage: React.FC = () => {
 
   const canSend = user && ['SCHOOL_ADMIN', 'HOD', 'TEACHER'].includes(user.role);
   const isSchoolAdmin = user?.role === 'SCHOOL_ADMIN';
+  const isStudent = user?.role === 'STUDENT';
+  const isTeacher = user?.role === 'TEACHER';
+  const isHOD = user?.role === 'HOD';
+  const canUseSmsChannel = user?.role === 'SCHOOL_ADMIN' || user?.role === 'HOD';
+
+  useEffect(() => {
+    if (!canUseSmsChannel) {
+      setChannels((prev) => (prev.includes('sms') ? prev.filter((c) => c !== 'sms') : prev));
+    }
+  }, [canUseSmsChannel]);
 
   const [departments, setDepartments] = useState<Department[]>([]);
   const [classes, setClasses] = useState<{ id: string; name: string }[]>([]);
@@ -126,12 +136,14 @@ const NotificationsPage: React.FC = () => {
     }
   }, []);
 
-  // Teachers: pre-select their class so send is not submitted with an empty target
+  // Teachers / HOD (when assigned to a class): pre-select class for class-scoped sends
   useEffect(() => {
-    if (user?.role === 'TEACHER' && user.classId) {
-      setScope('class');
-      setTargetId(user.classId);
-      setTargetRole('STUDENT');
+    if ((user?.role === 'TEACHER' || user?.role === 'HOD') && user.classId) {
+      if (user.role === 'TEACHER') {
+        setScope('class');
+        setTargetId(user.classId);
+        setTargetRole('STUDENT');
+      }
     }
   }, [user?.role, user?.classId]);
 
@@ -423,7 +435,12 @@ const NotificationsPage: React.FC = () => {
     const senderDisplay = truncateName(notif.senderName || (notif.senderId === null ? 'System' : 'Deleted User'));
     const roleDisplay = formatRole(notif.senderRole);
     const isOwn = isOwnSentMessage(notif);
-    const canModify = isSentFolder && isOwn && (!!isSchoolAdmin || isWithin24Hours(notif.createdAt));
+    // Edit/delete only on Sent tab, only own messages; school admin bypasses 24h window
+    const canModify =
+      isSentFolder &&
+      isOwn &&
+      notif.senderId === user?.id &&
+      (!!isSchoolAdmin || isWithin24Hours(notif.createdAt));
     const windowExpired = isSentFolder && isOwn && !isSchoolAdmin && !isWithin24Hours(notif.createdAt);
     const canReply = !isSentFolder && isClassRep && notif.senderRole === 'TEACHER' && !!notif.senderId;
     const recipientCount = isSentFolder ? (notif as SentNotification).recipientCount : undefined;
@@ -439,9 +456,9 @@ const NotificationsPage: React.FC = () => {
               {!isSentFolder && !notif.read && <div className="w-2 h-2 rounded-full bg-indigo-400 flex-shrink-0" />}
               <h3 className={`text-sm font-semibold ${!isSentFolder && !notif.read ? 'text-white' : 'text-gray-400'}`}>{notif.title}</h3>
               {notif.updatedAt && <span className="text-xs text-amber-400/70 italic">edited</span>}
-              {notif.targetScopeLabel && (
+              {notif.targetScopeLabel && (isSentFolder || isTeacher || isHOD) && (
                 <span className="text-xs px-2 py-0.5 rounded-full bg-indigo-500/15 text-indigo-300 border border-indigo-500/20">
-                  {notif.targetScopeLabel}
+                  {isSentFolder ? `To: ${notif.targetScopeLabel}` : notif.targetScopeLabel}
                 </span>
               )}
               {recipientCount != null && (
@@ -533,7 +550,11 @@ const NotificationsPage: React.FC = () => {
               )}
             </h1>
             <p className="text-gray-400 text-sm mt-1">
-              {folder === 'inbox' ? 'Messages you received' : 'Messages you sent'}
+              {isStudent
+                ? 'Read-only — replies are only available to class representatives'
+                : folder === 'inbox'
+                  ? 'Messages you received'
+                  : 'Messages you sent'}
             </p>
           </div>
           <div className="flex items-center gap-3">
@@ -571,6 +592,12 @@ const NotificationsPage: React.FC = () => {
             )}
           </div>
         </div>
+
+        {isStudent && (
+          <div className="mb-6 p-4 rounded-xl bg-slate-900/80 border border-slate-700 text-sm text-gray-400">
+            You can read messages from your teachers, HOD, and school admin here. Only class representatives can reply to their teachers.
+          </div>
+        )}
 
         {/* Send Form */}
         {showSendForm && canSend && (

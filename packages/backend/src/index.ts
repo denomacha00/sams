@@ -75,6 +75,7 @@ const PUBLIC_PATHS = [
   '/api/v1/activate',
   '/api/v1/payments/callback',
   '/api/v1/ai/query',
+  '/api/v1/ai/voice',
 ];
 
 // Registration link public paths: only token resolution and self-registration

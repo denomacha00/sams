@@ -375,11 +375,11 @@ notificationsRouter.patch('/:id', async (req: Request, res: Response): Promise<v
     const { message } = parsed.data;
     const id = String(req.params.id);
 
-    const notification = await prisma.notification.findUnique({ where: { id } });
-    if (!notification) throw new AppError(404, 'NOT_FOUND', 'Notification not found');
-
-    // Only the original sender may edit their message (not HOD/admin on others' messages)
-    if (notification.senderId !== req.user.sub) {
+    // Must be the sender's outbound copy (prevents editing admin/HOD messages via inbox row ids)
+    const notification = await prisma.notification.findFirst({
+      where: { id, senderId: req.user.sub },
+    });
+    if (!notification) {
       throw new AppError(403, 'FORBIDDEN', 'You can only edit notifications you sent');
     }
 
@@ -438,10 +438,10 @@ notificationsRouter.delete('/batch/:batchId', async (req: Request, res: Response
   const batchId = String(req.params.batchId);
 
   try {
-    const batchNotification = await prisma.notification.findFirst({ where: { batchId } });
-    if (!batchNotification) throw new AppError(404, 'NOT_FOUND', 'Batch not found');
-
-    if (batchNotification.senderId !== req.user.sub) {
+    const batchNotification = await prisma.notification.findFirst({
+      where: { batchId, senderId: req.user.sub },
+    });
+    if (!batchNotification) {
       throw new AppError(403, 'FORBIDDEN', 'You can only delete notifications you sent');
     }
 
@@ -535,6 +535,14 @@ notificationsRouter.post('/reply', async (req: Request, res: Response): Promise<
     }
     if (!parent.senderId) {
       throw new AppError(400, 'VALIDATION_ERROR', 'Cannot reply to system messages');
+    }
+
+    const sender = await prisma.user.findUnique({
+      where: { id: parent.senderId },
+      select: { role: true },
+    });
+    if (!sender || sender.role !== 'TEACHER') {
+      throw new AppError(403, 'FORBIDDEN', 'You can only reply to teachers');
     }
 
     const allowedTeachers = await getTeachersForClass(student.classId);

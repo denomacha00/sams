@@ -40,10 +40,11 @@ describe('ROLE_PERMISSIONS', () => {
     expect(ROLE_PERMISSIONS[UserRole.SUPER_ADMIN]).toContain('view:reports');
   });
 
-  it('SCHOOL_ADMIN has manage:users, manage:timetable, view:reports, view:risk, manage:payments', () => {
+  it('SCHOOL_ADMIN has manage:users, view:timetable, view:reports, view:risk, manage:payments', () => {
     const perms = ROLE_PERMISSIONS[UserRole.SCHOOL_ADMIN];
     expect(perms).toContain('manage:users');
-    expect(perms).toContain('manage:timetable');
+    expect(perms).toContain('view:timetable');
+    expect(perms).not.toContain('manage:timetable');
     expect(perms).toContain('view:reports');
     expect(perms).toContain('view:risk');
     expect(perms).toContain('manage:payments');
@@ -275,76 +276,76 @@ describe('assertSchoolOwnership', () => {
 // ─── requireHODScope ─────────────────────────────────────────────────────────
 
 describe('requireHODScope', () => {
-  it('calls next() for non-HOD roles without checking department', () => {
+  it('calls next() for non-HOD roles without checking department', async () => {
     const req = makeReq({ user: { sub: 'u1', schoolId: 's1', role: UserRole.TEACHER, iat: 0, exp: 9999 }, params: { departmentId: 'dept-x' } } as any);
     const { res } = makeRes();
     const next = makeNext();
 
-    requireHODScope(req, res, next);
+    await requireHODScope(req, res, next);
 
     expect(next).toHaveBeenCalledOnce();
   });
 
-  it('calls next() for HOD when no departmentId target is present in params or body', () => {
+  it('calls next() for HOD when no departmentId target is present in params or body', async () => {
     const req = makeReq({ user: { sub: 'u1', schoolId: 's1', role: UserRole.HOD, departmentId: 'dept-1', iat: 0, exp: 9999 }, params: {}, body: {} } as any);
     const { res } = makeRes();
     const next = makeNext();
 
-    requireHODScope(req, res, next);
+    await requireHODScope(req, res, next);
 
     expect(next).toHaveBeenCalledOnce();
   });
 
-  it('calls next() for HOD when body.departmentId matches their own departmentId', () => {
+  it('calls next() for HOD when body.departmentId matches their own departmentId', async () => {
     const req = makeReq({ user: { sub: 'u1', schoolId: 's1', role: UserRole.HOD, departmentId: 'dept-1', iat: 0, exp: 9999 }, params: {}, body: { departmentId: 'dept-1' } } as any);
     const { res } = makeRes();
     const next = makeNext();
 
-    requireHODScope(req, res, next);
+    await requireHODScope(req, res, next);
 
     expect(next).toHaveBeenCalledOnce();
   });
 
-  it('returns 403 for HOD when body.departmentId differs from their departmentId', () => {
+  it('returns 403 for HOD when body.departmentId differs from their departmentId', async () => {
     const req = makeReq({ user: { sub: 'u1', schoolId: 's1', role: UserRole.HOD, departmentId: 'dept-1', iat: 0, exp: 9999 }, params: {}, body: { departmentId: 'dept-2' } } as any);
     const { res, status, json } = makeRes();
     const next = makeNext();
 
-    requireHODScope(req, res, next);
+    await requireHODScope(req, res, next);
 
     expect(next).not.toHaveBeenCalled();
     expect(status).toHaveBeenCalledWith(403);
     expect(json).toHaveBeenCalledWith({ error: 'Forbidden', code: 'FORBIDDEN' });
   });
 
-  it('returns 403 for HOD when params.departmentId differs from their departmentId', () => {
+  it('returns 403 for HOD when params.departmentId differs from their departmentId', async () => {
     const req = makeReq({ user: { sub: 'u1', schoolId: 's1', role: UserRole.HOD, departmentId: 'dept-1', iat: 0, exp: 9999 }, params: { departmentId: 'dept-99' }, body: {} } as any);
     const { res, status } = makeRes();
     const next = makeNext();
 
-    requireHODScope(req, res, next);
+    await requireHODScope(req, res, next);
 
     expect(next).not.toHaveBeenCalled();
     expect(status).toHaveBeenCalledWith(403);
   });
 
-  it('returns 403 for HOD with no departmentId in JWT', () => {
+  it('returns 403 for HOD with no departmentId in JWT', async () => {
     const req = makeReq({ user: { sub: 'u1', schoolId: 's1', role: UserRole.HOD, iat: 0, exp: 9999 }, params: {}, body: {} } as any);
     const { res, status } = makeRes();
     const next = makeNext();
 
-    requireHODScope(req, res, next);
+    await requireHODScope(req, res, next);
 
     expect(next).not.toHaveBeenCalled();
     expect(status).toHaveBeenCalledWith(403);
   });
 
-  it('returns 401 when req.user is missing', () => {
+  it('returns 401 when req.user is missing', async () => {
     const req = makeReq() as any;
     const { res, status, json } = makeRes();
     const next = makeNext();
 
-    requireHODScope(req, res, next);
+    await requireHODScope(req, res, next);
 
     expect(next).not.toHaveBeenCalled();
     expect(status).toHaveBeenCalledWith(401);

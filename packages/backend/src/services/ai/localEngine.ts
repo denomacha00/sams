@@ -307,6 +307,17 @@ function buildScope(user: AccessTokenPayload): QueryScope {
   return scope;
 }
 
+function canManageTimetable(user: AccessTokenPayload): boolean {
+  return user.role === UserRole.HOD || user.role === UserRole.SUPER_ADMIN;
+}
+
+function timetableManageDeniedMessage(role: UserRole): string {
+  if (role === UserRole.SCHOOL_ADMIN) {
+    return 'School admins can view timetables but only HODs can create or edit them. Try "show my timetable" to view the schedule, or ask your HOD to update it.';
+  }
+  return 'Only HODs can generate or modify timetables. Try "show my timetable" to view your schedule.';
+}
+
 
 // ─── School-Wide Timetable Generator ──────────────────────────────────────────
 
@@ -1559,8 +1570,20 @@ export async function localQuery(
       case 'class_comparison':
         return await handleClassComparison(scope);
       case 'generate_timetable':
+        if (!canManageTimetable(user)) {
+          return {
+            answer: timetableManageDeniedMessage(user.role as UserRole),
+            intent: 'generate_timetable',
+          };
+        }
         return await handleGenerateTimetable(scope, question, false);
       case 'remake_timetable':
+        if (!canManageTimetable(user)) {
+          return {
+            answer: timetableManageDeniedMessage(user.role as UserRole),
+            intent: 'remake_timetable',
+          };
+        }
         return await handleGenerateTimetable(scope, question, true);
       case 'view_timetable':
         return await handleViewTimetable(scope);

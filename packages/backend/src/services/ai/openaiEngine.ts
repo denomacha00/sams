@@ -1,7 +1,7 @@
 import OpenAI from 'openai';
 import { prisma } from '../../index';
 import { type AccessTokenPayload, UserRole } from '@sams/shared';
-import { licenseService } from '../licenseService';
+import { getSystemDocumentationExcerpt } from './systemDocumentation';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -93,7 +93,7 @@ async function buildSystemPrompt(user: AccessTokenPayload): Promise<string> {
         scopeDescription = `You are assisting a Head of Department (HOD) named ${userName || 'the HOD'}. They can see data for all classes and students within their department (departmentId: ${user.departmentId ?? 'none'}). Do not provide information about other departments.`;
         break;
       case UserRole.SCHOOL_ADMIN:
-        scopeDescription = `You are assisting a School Admin named ${userName || 'the admin'}. They can see all data within their school (schoolId: ${user.schoolId}).`;
+        scopeDescription = `You are assisting a School Admin named ${userName || 'the admin'}. They can see all data within their school (schoolId: ${user.schoolId}). They can view timetables but cannot create or edit them — only HODs manage timetables.`;
         break;
       default:
         scopeDescription = `You are assisting a user with role ${user.role}. Only provide data within their school scope.`;
@@ -132,6 +132,16 @@ async function buildSystemPrompt(user: AccessTokenPayload): Promise<string> {
   } catch (err) {
     // If knowledge fetch fails, continue without it (graceful degradation)
     console.error('[AI] Failed to fetch knowledge base:', err);
+  }
+
+  let documentationSection = '';
+  try {
+    const docExcerpt = getSystemDocumentationExcerpt(8000);
+    if (docExcerpt) {
+      documentationSection = `\n\nSAMS Platform Documentation (reference — use for how-to and feature questions):\n${docExcerpt}`;
+    }
+  } catch (err) {
+    console.error('[AI] Failed to load system documentation:', err);
   }
 
   // For SUPER_ADMIN, inject real-time system stats into the prompt
@@ -185,7 +195,7 @@ CRITICAL — NEVER MAKE UP DATA:
 
 If the user asks for something above their permission level, politely tell them they don't have access and suggest who to contact.
 
-Be concise, friendly, and helpful. Address the user by their name. Answer in plain language.${knowledgeSection}${systemDataSection}`;
+Be concise, friendly, and helpful. Address the user by their name. Answer in plain language.${knowledgeSection}${documentationSection}${systemDataSection}`;
 }
 
 // ─── Function-Calling Tools ───────────────────────────────────────────────────
