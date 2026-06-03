@@ -55,6 +55,9 @@ describe('roleActionRegistry permissions', () => {
         'view_today_schedule',
         'list_my_teachers',
         'list_my_hod',
+        'describe_my_class',
+        'describe_my_department',
+        'who_is_class_rep',
         'explain_reminders',
       ]),
     );

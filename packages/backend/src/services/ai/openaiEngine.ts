@@ -8,7 +8,8 @@ import {
   resolveChatModel,
   resolveFallbackChatModel,
 } from './aiProviderConfig';
-import { buildRoleActionsPromptSection } from './roleActionsPrompt';
+import { buildRoleActionsPromptSection, buildRoleCapabilityMatrix } from './roleActionsPrompt';
+import { isSamsDataQuery } from './dataQueryRouter';
 import { getSystemDocumentationExcerpt } from './systemDocumentation';
 import {
   formatStudentClassContextForPrompt,
@@ -155,6 +156,9 @@ Your knowledge is LIMITED to: (1) the SAMS Platform Documentation excerpt below,
   const roleActionsSection =
     user.sub !== 'guest' ? buildRoleActionsPromptSection(user.role) : '';
 
+  const roleCapabilityMatrix =
+    user.sub !== 'guest' ? buildRoleCapabilityMatrix(user.role) : '';
+
   let studentClassSection = '';
   if (user.role === UserRole.STUDENT && user.classId && user.sub !== 'guest') {
     try {
@@ -205,7 +209,7 @@ CRITICAL — NEVER MAKE UP DATA:
 - NEVER invent timetable entries, class schedules, subject lists, or teacher assignments. If you do not have query results in this conversation, tell the user you could not load their schedule and suggest they ask again with "show my timetable" — do NOT fabricate a sample week.
 - If you don't have the actual data from a database query, say honestly that nothing was found or ask them to rephrase — do NOT fill in placeholder Math/Science-style examples.
 - NEVER say things like "you have 150 students" unless you received that exact number from a database query result.
-- For SAMS data questions (timetable, attendance, teachers, HOD), the local action handlers query the real database before you respond. Do not override handler results with invented content.
+- For SAMS data questions (timetable, attendance, teachers, HOD, class, department, class rep), the local handlers query the real database before you respond. Bare phrases like "my hod" or "my teachers" are answered from the database — do not override with invented names or "not specified" messages.
 
 If the user asks for something above their permission level, politely tell them they don't have access and suggest who to contact.
 
@@ -213,7 +217,7 @@ ACT AS THE USER: When they ask you to notify a class, department, or school, che
 
 MULTI-TURN ACTIONS: If a role action needs more detail (class, department, message text, user name), the backend will ask exactly ONE clear question per turn. Do not list every field at once. Execute when you have enough; never invent data.
 
-Be concise, friendly, and helpful. Address the user by their name. Answer in plain language.${roleActionsSection}${studentClassSection}${knowledgeSection}${documentationSection}${systemDataSection}`;
+Be concise, friendly, and helpful. Address the user by their name. Answer in plain language.${roleCapabilityMatrix}${roleActionsSection}${studentClassSection}${knowledgeSection}${documentationSection}${systemDataSection}`;
 }
 
 // ─── Function-Calling Tools ───────────────────────────────────────────────────
@@ -623,6 +627,14 @@ export async function openaiQuery(
   user: AccessTokenPayload,
   question: string,
 ): Promise<OpenAIQueryResult> {
+  if (user.sub !== 'guest' && isSamsDataQuery(question)) {
+    return {
+      answer:
+        "I couldn't load that from SAMS here. Try \"show my timetable\", \"what is my attendance\", or \"who is absent today\" — or use your dashboard.",
+      intent: 'data_not_found',
+    };
+  }
+
   const client = getOpenAIClient();
   const systemPrompt = await buildSystemPrompt(user);
 
@@ -688,6 +700,14 @@ export async function openaiQueryWithHistory(
   question: string,
   history: Array<{ role: 'user' | 'assistant'; content: string }>,
 ): Promise<OpenAIQueryResult> {
+  if (user.sub !== 'guest' && isSamsDataQuery(question)) {
+    return {
+      answer:
+        "I couldn't load that from SAMS here. Try \"show my timetable\", \"what is my attendance\", or \"who is absent today\" — or use your dashboard.",
+      intent: 'data_not_found',
+    };
+  }
+
   const client = getOpenAIClient();
   const systemPrompt = await buildSystemPrompt(user);
 

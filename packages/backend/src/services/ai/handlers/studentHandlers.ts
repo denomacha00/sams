@@ -1,6 +1,13 @@
 import type { ActionDefinition, ActionHandler } from '../roleActionRegistry';
 import { TIMETABLE_VIEW_PATTERNS } from '../timetableQuery';
 import {
+  STUDENT_CLASS_QUERY_PATTERNS,
+  STUDENT_CLASS_REP_QUERY_PATTERNS,
+  STUDENT_DEPARTMENT_QUERY_PATTERNS,
+  STUDENT_HOD_QUERY_PATTERNS,
+  STUDENT_TEACHERS_QUERY_PATTERNS,
+} from '../studentContextQuery';
+import {
   formatStudentHodAnswer,
   formatStudentTeachersAnswer,
   getStudentClassContext,
@@ -64,6 +71,83 @@ const listMyHodHandler: ActionHandler = async (_params, scope) => {
       departmentName: ctx.departmentName,
       hod: ctx.hod,
     },
+  };
+};
+
+const describeMyClassHandler: ActionHandler = async (_params, scope) => {
+  if (!scope.classId) {
+    return {
+      answer:
+        'Your account is not linked to a class yet. Contact your school admin to assign you to a class.',
+    };
+  }
+
+  const ctx = await getStudentClassContext(scope.classId);
+  if (!ctx) {
+    return { answer: 'I could not find your class. Contact your school admin.' };
+  }
+
+  return {
+    answer: `📚 **Your class**\n\nYou are in **${ctx.className}** (${ctx.departmentName} department).`,
+    data: { classId: ctx.classId, className: ctx.className, departmentName: ctx.departmentName },
+  };
+};
+
+const describeMyDepartmentHandler: ActionHandler = async (_params, scope) => {
+  if (!scope.classId) {
+    return {
+      answer:
+        'Your account is not linked to a class yet, so I cannot determine your department. Contact your school admin.',
+    };
+  }
+
+  const ctx = await getStudentClassContext(scope.classId);
+  if (!ctx) {
+    return { answer: 'I could not find your class. Contact your school admin.' };
+  }
+
+  const hodLine = ctx.hod
+    ? ` Head of Department: **${ctx.hod.fullName}**.`
+    : ' No HOD is assigned in SAMS yet.';
+
+  return {
+    answer: `🏫 **Your department**\n\nYou are in **${ctx.departmentName}** (class **${ctx.className}**).${hodLine}`,
+    data: {
+      departmentId: ctx.departmentId,
+      departmentName: ctx.departmentName,
+      hod: ctx.hod,
+    },
+  };
+};
+
+const whoIsClassRepHandler: ActionHandler = async (_params, scope) => {
+  const { prisma } = await import('../../../index');
+
+  if (!scope.classId) {
+    return {
+      answer:
+        'Your account is not linked to a class yet, so I cannot look up your class representative.',
+    };
+  }
+
+  const ctx = await getStudentClassContext(scope.classId);
+  const classLabel = ctx?.className ?? 'your class';
+
+  const rep = await prisma.user.findFirst({
+    where: { classId: scope.classId, role: 'STUDENT', isClassRep: true },
+    select: { fullName: true },
+  });
+
+  if (!rep) {
+    return {
+      answer: `No class representative is assigned for **${classLabel}** yet. Your class teacher can assign one from the class roster.`,
+      data: { classId: scope.classId, hasClassRep: false },
+    };
+  }
+
+  return {
+    answer: `🎓 **Class representative** (${classLabel})\n\n**${rep.fullName}** is your class rep. Class reps can reply to teacher messages in **Notifications**.`,
+    data: { classId: scope.classId, classRepName: rep.fullName },
   };
 };
 
@@ -181,24 +265,6 @@ const explainRemindersHandler: ActionHandler = async (_params, scope) => {
   return { answer, data: { remindersSupported: false } };
 };
 
-const HOD_QUESTION_PATTERNS: RegExp[] = [
-  /(?:who|which)\s+(?:are\s+)?(?:is\s+)?(?:my|our)\s+hod\b/i,
-  /(?:who|which)\s+(?:are\s+)?(?:is\s+)?(?:my|our)\s+head\s+of\s+department/i,
-  /head\s+of\s+(?:my|our)\s+department/i,
-  /(?:my|our)\s+(?:department\s+)?hod\b/i,
-  /who\s+is\s+(?:the\s+)?hod\s+for\s+(?:my|our)\s+(?:class|department)/i,
-];
-
-const TEACHER_QUESTION_PATTERNS: RegExp[] = [
-  /(?:who|which)\s+(?:are\s+)?(?:my|our)\s+teachers?/i,
-  /(?:name|names)\s+of\s+(?:my|our)\s+teachers?/i,
-  /(?:my|our)\s+teachers?/i,
-  /who\s+teaches?\s+(?:me|us)/i,
-  /who\s+is\s+(?:my|our)\s+(?:class\s+)?teacher/i,
-  /teachers?\s+for\s+(?:my|our)\s+class/i,
-  /list\s+(?:my|our)\s+teachers?/i,
-];
-
 const REMINDER_REQUEST_PATTERNS: RegExp[] = [
   /remind\s+me/i,
   /will\s+you\s+remind/i,
@@ -248,7 +314,7 @@ export const studentActions: ActionDefinition[] = [
     action: 'list_my_hod',
     description: 'Name your Head of Department for your class department',
     destructive: false,
-    patterns: HOD_QUESTION_PATTERNS,
+    patterns: STUDENT_HOD_QUERY_PATTERNS,
     extractParams: () => ({}),
     descriptionTemplate: () =>
       'Tell the student who their Head of Department is for their class department.',
@@ -258,10 +324,37 @@ export const studentActions: ActionDefinition[] = [
     action: 'list_my_teachers',
     description: 'List your class teachers (class teacher + timetable teachers)',
     destructive: false,
-    patterns: TEACHER_QUESTION_PATTERNS,
+    patterns: STUDENT_TEACHERS_QUERY_PATTERNS,
     extractParams: () => ({}),
     descriptionTemplate: () => 'List the teachers for your class (from your timetable and class teacher).',
     handler: listMyTeachersHandler,
+  },
+  {
+    action: 'who_is_class_rep',
+    description: 'Name the class representative for your class',
+    destructive: false,
+    patterns: STUDENT_CLASS_REP_QUERY_PATTERNS,
+    extractParams: () => ({}),
+    descriptionTemplate: () => 'Tell the student who their class representative is.',
+    handler: whoIsClassRepHandler,
+  },
+  {
+    action: 'describe_my_class',
+    description: 'Name your assigned class',
+    destructive: false,
+    patterns: STUDENT_CLASS_QUERY_PATTERNS,
+    extractParams: () => ({}),
+    descriptionTemplate: () => 'Tell the student which class they belong to.',
+    handler: describeMyClassHandler,
+  },
+  {
+    action: 'describe_my_department',
+    description: 'Name your department (from your class)',
+    destructive: false,
+    patterns: STUDENT_DEPARTMENT_QUERY_PATTERNS,
+    extractParams: () => ({}),
+    descriptionTemplate: () => 'Tell the student which department their class belongs to.',
+    handler: describeMyDepartmentHandler,
   },
   {
     action: 'view_attendance',

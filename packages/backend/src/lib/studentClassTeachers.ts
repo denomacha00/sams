@@ -10,6 +10,8 @@ export interface StudentClassTeacherInfo {
 export interface StudentClassHodInfo {
   id: string;
   fullName: string;
+  email: string | null;
+  phone: string | null;
 }
 
 export interface StudentClassContext {
@@ -40,10 +42,15 @@ export async function getStudentClassContext(classId: string): Promise<StudentCl
 
   const hodUser = await prisma.user.findFirst({
     where: { departmentId: cls.departmentId, role: 'HOD' },
-    select: { id: true, fullName: true },
+    select: { id: true, fullName: true, email: true, phone: true },
   });
   const hod: StudentClassHodInfo | null = hodUser
-    ? { id: hodUser.id, fullName: hodUser.fullName }
+    ? {
+        id: hodUser.id,
+        fullName: hodUser.fullName,
+        email: hodUser.email,
+        phone: hodUser.phone,
+      }
     : null;
 
   const teacherIds = new Set<string>();
@@ -94,10 +101,17 @@ export async function getStudentClassContext(classId: string): Promise<StudentCl
   return { ...base, teachers };
 }
 
+function formatHodContact(hod: StudentClassHodInfo): string {
+  const parts: string[] = [];
+  if (hod.email) parts.push(`email: ${hod.email}`);
+  if (hod.phone) parts.push(`phone: ${hod.phone}`);
+  return parts.length > 0 ? `\n\nContact: ${parts.join(' · ')}` : '';
+}
+
 export function formatStudentHodAnswer(ctx: StudentClassContext): string {
   const dept = ctx.departmentName;
   if (ctx.hod) {
-    return `👤 **Your Head of Department** (${dept})\n\n**${ctx.hod.fullName}** is the HOD for your class department.\n\nYou may see messages from them on your **Notifications** page when they send department announcements.`;
+    return `👤 **Your Head of Department** (${dept})\n\n**${ctx.hod.fullName}** is the HOD for your class department.${formatHodContact(ctx.hod)}\n\nYou may see messages from them on your **Notifications** page when they send department announcements.`;
   }
   return `Your class **${ctx.className}** is in the **${dept}** department, but no Head of Department is assigned in SAMS yet. Ask your class teacher or school office.`;
 }

@@ -1,0 +1,151 @@
+import { describe, expect, it, vi, beforeEach } from 'vitest';
+import { UserRole } from '@sams/shared';
+
+vi.mock('../conversationMemoryService', () => ({
+  conversationMemoryService: {
+    resolveThread: vi.fn().mockResolvedValue(undefined),
+    getContextWindow: vi.fn().mockResolvedValue([]),
+    persistRecord: vi.fn().mockResolvedValue(undefined),
+  },
+}));
+
+vi.mock('./roleActionsPrompt', () => ({
+  isConversationMemoryEnabled: () => false,
+  buildRoleActionsPromptSection: () => '',
+  buildRoleCapabilityMatrix: () => '',
+}));
+
+vi.mock('./aiProviderConfig', () => ({
+  hasPrimaryAIKey: vi.fn().mockReturnValue(true),
+  getMissingAIKeyMessage: vi.fn(),
+  formatProviderError: vi.fn(),
+}));
+
+const localQuery = vi.fn();
+const queryTimetableView = vi.fn();
+const queryStudentContext = vi.fn();
+
+vi.mock('./localEngine', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('./localEngine')>();
+  return {
+    ...actual,
+    localQuery: (...args: unknown[]) => localQuery(...args),
+    queryTimetableView: (...args: unknown[]) => queryTimetableView(...args),
+  };
+});
+
+vi.mock('./studentContextQuery', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('./studentContextQuery')>();
+  return {
+    ...actual,
+    queryStudentContext: (...args: unknown[]) => queryStudentContext(...args),
+  };
+});
+
+vi.mock('./timetableQuery', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('./timetableQuery')>();
+  return {
+    ...actual,
+    isTimetableViewQuery: () => false,
+    isTimetableManageQuery: () => false,
+    queryTimetableView: (...args: unknown[]) => queryTimetableView(...args),
+  };
+});
+
+vi.mock('./openaiEngine', () => ({
+  openaiQuery: vi.fn(),
+  openaiQueryWithHistory: vi.fn(),
+}));
+
+vi.mock('./actionIntentDetector', () => ({
+  actionIntentDetector: { detect: vi.fn().mockResolvedValue({ isAction: false }) },
+}));
+
+vi.mock('./llmActionClassifier', () => ({
+  classifyIntent: vi.fn().mockResolvedValue(null),
+}));
+
+import { AIService } from '../aiService';
+import { openaiQueryWithHistory } from './openaiEngine';
+
+const studentUser = {
+  sub: 'stu-1',
+  schoolId: 'school-1',
+  role: UserRole.STUDENT,
+  classId: 'class-1',
+  iat: 0,
+  exp: 9999999999,
+};
+
+describe('AIService anti-hallucination routing', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    queryTimetableView.mockResolvedValue(null);
+    queryStudentContext.mockResolvedValue(null);
+    vi.mocked(openaiQueryWithHistory).mockResolvedValue({
+      answer: 'Photosynthesis converts light to chemical energy.',
+      intent: 'openai_response',
+    });
+  });
+
+  it('blocks LLM for data-like queries when local engine returns unknown', async () => {
+    localQuery.mockResolvedValue({
+      answer: 'help text',
+      intent: 'unknown',
+    });
+
+    const service = new AIService();
+    const r = await service.query(
+      studentUser as never,
+      'give me attendance breakdown by week',
+    );
+
+    expect(openaiQueryWithHistory).not.toHaveBeenCalled();
+    expect(r.engine).toBe('local');
+    expect(r.intent).toBe('data_not_found');
+    expect(r.answer).toMatch(/couldn't find/i);
+  });
+
+  it('uses local engine when intent resolves (no LLM)', async () => {
+    localQuery.mockResolvedValue({
+      answer: 'The attendance rate is 85.0%',
+      intent: 'attendance_percentage',
+      data: { percentage: 85 },
+    });
+
+    const service = new AIService();
+    const r = await service.query(studentUser as never, 'what is my attendance');
+
+    expect(openaiQueryWithHistory).not.toHaveBeenCalled();
+    expect(r.intent).toBe('attendance_percentage');
+    expect(r.engine).toBe('local');
+  });
+
+  it('uses student context handler for my hod without LLM', async () => {
+    localQuery.mockResolvedValue({ answer: 'help', intent: 'unknown' });
+    queryStudentContext.mockResolvedValue({
+      answer: '👤 **Your Head of Department** (Science)\n\n**Dr. Ada** is the HOD.',
+      intent: 'list_my_hod',
+      data: {},
+    });
+
+    const service = new AIService();
+    const r = await service.query(studentUser as never, 'my hod');
+
+    expect(openaiQueryWithHistory).not.toHaveBeenCalled();
+    expect(queryStudentContext).toHaveBeenCalled();
+    expect(r.engine).toBe('local');
+    expect(r.intent).toBe('list_my_hod');
+    expect(r.answer).toMatch(/Dr\. Ada/);
+  });
+
+  it('allows LLM for general knowledge', async () => {
+    localQuery.mockResolvedValue({ answer: 'help', intent: 'unknown' });
+
+    const service = new AIService();
+    const r = await service.query(studentUser as never, 'what is photosynthesis');
+
+    expect(openaiQueryWithHistory).toHaveBeenCalled();
+    expect(r.engine).toBe('openai');
+  });
+});

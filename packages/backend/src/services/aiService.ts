@@ -1,5 +1,11 @@
 import { type AccessTokenPayload, UserRole } from '@sams/shared';
 import { localQuery, type AIQueryResult, queryTimetableView } from './ai/localEngine';
+import { queryStudentContext } from './ai/studentContextQuery';
+import {
+  isSamsDataQuery,
+  querySamsDataFallback,
+  SAMS_DATA_NOT_FOUND_MESSAGE,
+} from './ai/dataQueryRouter';
 import { openaiQuery, openaiQueryWithHistory } from './ai/openaiEngine';
 import { conversationMemoryService } from './conversationMemoryService';
 import { tokenBudgetManager } from './ai/tokenBudgetManager';
@@ -174,6 +180,62 @@ export class AIService {
         engine: 'local',
         data: timetableResult.data,
       };
+    }
+
+    // Student HOD, teachers, class, department, class rep — DB-backed answers only.
+    const studentContextResult = await queryStudentContext(user, question);
+    if (studentContextResult) {
+      if (user.sub !== 'guest') {
+        threadId = await this.safelyPersist(user, question, studentContextResult.answer, threadId);
+        return {
+          answer: studentContextResult.answer,
+          intent: studentContextResult.intent,
+          engine: 'local',
+          data: studentContextResult.data,
+          threadId,
+        };
+      }
+      return {
+        answer: studentContextResult.answer,
+        intent: studentContextResult.intent,
+        engine: 'local',
+        data: studentContextResult.data,
+      };
+    }
+
+    // Attendance, absent lists, risk scores, etc. — never pass to pure LLM (avoids invented numbers).
+    const dataFallback = await querySamsDataFallback(user, question);
+    if (dataFallback) {
+      if (user.sub !== 'guest') {
+        threadId = await this.safelyPersist(user, question, dataFallback.answer, threadId);
+        return {
+          answer: dataFallback.answer,
+          intent: dataFallback.intent,
+          engine: 'local',
+          data: dataFallback.data,
+          threadId,
+        };
+      }
+      return {
+        answer: dataFallback.answer,
+        intent: dataFallback.intent,
+        engine: 'local',
+        data: dataFallback.data,
+      };
+    }
+
+    if (isSamsDataQuery(question)) {
+      const blocked: AIServiceResponse = {
+        answer: SAMS_DATA_NOT_FOUND_MESSAGE,
+        intent: 'data_not_found',
+        engine: 'local',
+        threadId,
+      };
+      if (user.sub !== 'guest') {
+        threadId = await this.safelyPersist(user, question, blocked.answer, threadId);
+        blocked.threadId = threadId;
+      }
+      return blocked;
     }
 
     // Step 3: Load encrypted conversation history for LLM context

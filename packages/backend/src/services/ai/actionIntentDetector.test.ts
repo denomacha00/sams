@@ -152,6 +152,8 @@ describe('actionIntentDetector role scoping (regex path)', () => {
 
   it('detects student list_my_hod for natural phrasing', async () => {
     const cases = [
+      'my hod',
+      'MY HOD',
       'who is my hod',
       'who are is my hod',
       'head of my department',

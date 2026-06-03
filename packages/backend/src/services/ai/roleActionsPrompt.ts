@@ -46,3 +46,28 @@ export function isConversationMemoryEnabled(): boolean {
   const key = process.env.CONVERSATION_MASTER_KEY;
   return Boolean(key && key.length >= 32);
 }
+
+/**
+ * Concise CAN / CANNOT block for LLM system prompts (role capability matrix).
+ */
+export function buildRoleCapabilityMatrix(role: string): string {
+  const scopeNote = getRoleScopeNote(role);
+  const forbidden = getForbiddenActionNames(role);
+  const actions = getActionsForRole(role);
+
+  const canList =
+    actions.length > 0
+      ? actions.slice(0, 12).map((a) => a.action).join(', ') +
+        (actions.length > 12 ? ', …' : '')
+      : 'read scoped SAMS data via chat (attendance, timetable, reports)';
+
+  let block = `\n\nROLE CAPABILITY MATRIX (${role}):\n• You CAN: ${canList}.`;
+  if (scopeNote) block += `\n• Scope: ${scopeNote}`;
+  if (forbidden.length > 0) {
+    block += `\n• You CANNOT: ${forbidden.slice(0, 10).join(', ')}${forbidden.length > 10 ? ', …' : ''}.`;
+  }
+  block +=
+    '\n• NEVER invent attendance %, student names, schedules, or counts — use database handlers or say data was not found.';
+
+  return block;
+}

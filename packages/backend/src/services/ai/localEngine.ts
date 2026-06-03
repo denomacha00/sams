@@ -163,6 +163,12 @@ const INTENT_PATTERNS: { intent: DetectedIntent; patterns: RegExp[] }[] = [
       /what\s*(is|are)\s*(the\s*)?(overall\s*)?attendance/i,
       /how\s*(is|are)\s*(the\s*)?attendance/i,
       /percentage\s*(of\s*)?(attendance|present)/i,
+      /my\s+attendance/i,
+      /(?:what|how)\s+(?:is|was)\s+my\s+attendance/i,
+      /attendance\s+(?:for\s+me|history|record)/i,
+      /how\s+(?:am|is)\s+i\s+doing\s+(?:with\s+)?attendance/i,
+      /have\s+i\s+been\s+present/i,
+      /show\s+(?:me\s+)?my\s+attendance/i,
     ],
   },
   {
@@ -173,6 +179,13 @@ const INTENT_PATTERNS: { intent: DetectedIntent; patterns: RegExp[] }[] = [
       /students?\s*(who\s*)?(are\s*)?absent/i,
       /missing\s*students/i,
       /not\s*(present|attending|here)/i,
+      /am\s+i\s+absent\s+today/i,
+      /was\s+i\s+absent\s+today/i,
+      /did\s+i\s+miss\s+(?:class|school)\s+today/i,
+      /am\s+i\s+marked\s+absent/i,
+      /who\s+missed\s+(?:class|school)\s+today/i,
+      /list\s+(?:of\s+)?absent/i,
+      /anyone\s+absent\s+today/i,
     ],
   },
   {
@@ -184,6 +197,9 @@ const INTENT_PATTERNS: { intent: DetectedIntent; patterns: RegExp[] }[] = [
       /high\s*risk/i,
       /critical\s*risk/i,
       /students?\s*(at\s*)?risk/i,
+      /my\s+risk\s+score/i,
+      /what\s+is\s+my\s+risk/i,
+      /am\s+i\s+at\s+risk/i,
     ],
   },
   {
@@ -213,7 +229,7 @@ const INTENT_PATTERNS: { intent: DetectedIntent; patterns: RegExp[] }[] = [
  * Detect the user's intent from a natural language question using regex patterns.
  */
 export function detectIntent(question: string): DetectedIntent {
-  const q = question.toLowerCase().trim();
+  const q = question.trim();
 
   for (const { intent, patterns } of INTENT_PATTERNS) {
     for (const pattern of patterns) {
@@ -1601,7 +1617,7 @@ export async function localQuery(
   user: AccessTokenPayload,
   question: string,
 ): Promise<AIQueryResult> {
-  const intent = detectIntent(question);
+  const intent = detectIntent(question); // includes extended data patterns
   const scope = buildScope(user);
 
   try {
