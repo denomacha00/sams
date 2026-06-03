@@ -574,6 +574,7 @@ Ensure the same shell user that runs `pm2` uses Node 20 (`which node` → `/usr/
 | `scripts/verify-ai-env.sh` | Deprecated alias → `verify-secrets.sh --ai-only` |
 | `scripts/backup-secrets.sh` | Backup all provider keys from merged env to `secrets/providers.env.backup.*` (chmod 600) |
 | `scripts/backup-production.sh` | Full VPS backup: secrets + PostgreSQL dump + optional uploads → `backups/production-*` |
+| `docs/SAMS-OPS-RUNBOOK.md` | Super Admin ops blueprint (symptom → fix → commands); auto-injected into Super Admin AI |
 | `scripts/backup-ai-secrets.sh` | Deprecated alias → `backup-secrets.sh` |
 | `scripts/configure-production-at.sh` | Interactive AT production setup (refuses sandbox when `NODE_ENV=production`) |
 | `scripts/production-readiness-check.sh` | Fails on sandbox SMS, weak JWT (under 64 chars), missing biometric key; checks biometric dist routes |
