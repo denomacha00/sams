@@ -5,7 +5,7 @@ import apiClient from '../services/apiClient';
 type Mode = 'link' | 'otp';
 
 const ForgotPasswordPage: React.FC = () => {
-  const [mode, setMode] = useState<Mode>('link');
+  const [mode, setMode] = useState<Mode>('otp');
   const [schoolCode, setSchoolCode] = useState('');
   const [identifier, setIdentifier] = useState('');
   const [otpCode, setOtpCode] = useState('');
@@ -50,7 +50,7 @@ const ForgotPasswordPage: React.FC = () => {
       if (data.sentVia?.email) parts.push('email');
       setOtpDeliveryHint(
         parts.length > 0
-          ? `Code sent via ${parts.join(' and ')}.${data.hint ? ` ${data.hint}` : ''}`
+          ? `Code sent via ${parts.join(' and ')}${data.maskedPhone ? ` (phone ending ${data.maskedPhone})` : ''}.${data.hint ? ` ${data.hint}` : ''}`
           : data.hint ?? null,
       );
       setResendCooldown(60);
@@ -58,10 +58,13 @@ const ForgotPasswordPage: React.FC = () => {
       const retryAfter = err.response?.data?.retryAfterSeconds;
       if (typeof retryAfter === 'number') setResendCooldown(retryAfter);
       const msg = err.response?.data?.error || 'Failed to send verification code.';
+      const smsErr = err.response?.data?.smsError;
       const hint = err.response?.data?.sandbox
-        ? ' Add your phone in the Africa\'s Talking sandbox dashboard (SMS → phone numbers).'
-        : '';
-      setError(msg + hint);
+        ? ' Add your phone at account.africastalking.com → SMS → phone numbers (sandbox mode).'
+        : err.response?.data?.code === 'NO_PHONE_ON_FILE'
+          ? ' Ask your school admin to add your phone number in User Management.'
+          : '';
+      setError([msg, smsErr, hint].filter(Boolean).join(' '));
     } finally {
       setLoading(false);
     }
@@ -154,6 +157,9 @@ const ForgotPasswordPage: React.FC = () => {
                 </div>
               )}
               <form onSubmit={handleSendOtp} className="space-y-5">
+                <p className="text-xs text-amber-200/90 bg-amber-500/10 border border-amber-500/20 rounded-lg px-3 py-2">
+                  SMS codes are sent to the phone number on your account. Use the same phone you registered with the school.
+                </p>
                 <Field label="School Code" id="schoolCode" value={schoolCode} onChange={setSchoolCode} placeholder="e.g. KHS2024" />
                 <Field label="Username, Phone, or Email" id="identifier" value={identifier} onChange={setIdentifier} placeholder="Your login identifier" />
                 <SubmitButton loading={loading} label="Send verification code" />

@@ -49,7 +49,6 @@ const updateUserSchema = z.object({
   departmentId: z.string().optional(),
   classId: z.string().optional(),
   isLocked: z.boolean().optional(),
-  isClassRep: z.boolean().optional(),
 });
 
 const generateLinkSchema = z.object({
@@ -336,7 +335,7 @@ usersRouter.get('/class-roster', async (req: Request, res: Response, next: NextF
 
 /**
  * PATCH /api/v1/users/:id/class-rep
- * Assign class representative (one per class). Teachers: own class only.
+ * Assign class representative (one per class). Class teachers only.
  */
 usersRouter.patch('/:id/class-rep', async (req: Request, res: Response, next: NextFunction): Promise<void> => {
   const parsed = classRepSchema.safeParse(req.body);
@@ -350,19 +349,21 @@ usersRouter.patch('/:id/class-rep', async (req: Request, res: Response, next: Ne
   }
 
   try {
-    const target = await userService.getUser(req.schoolId, req.params.id as string);
-    const role = req.user.role;
+    if (req.user.role !== UserRole.TEACHER) {
+      throw new AppError(
+        403,
+        'FORBIDDEN',
+        'Only the class teacher can assign or remove a class representative',
+      );
+    }
 
-    if (role === UserRole.TEACHER) {
-      if (!req.user.classId || (target as { classId?: string }).classId !== req.user.classId) {
-        throw new AppError(403, 'FORBIDDEN', 'Teachers can only assign class rep for students in their class');
-      }
-    } else if (role === UserRole.HOD) {
-      if (!req.user.departmentId || (target as { departmentId?: string }).departmentId !== req.user.departmentId) {
-        throw new AppError(403, 'FORBIDDEN', 'HODs can only assign class rep in their department');
-      }
-    } else if (role !== UserRole.SCHOOL_ADMIN) {
-      throw new AppError(403, 'FORBIDDEN', 'Not allowed to assign class representative');
+    const target = await userService.getUser(req.schoolId, req.params.id as string);
+
+    if (!req.user.classId) {
+      throw new AppError(403, 'FORBIDDEN', 'You must be assigned as class teacher for a class');
+    }
+    if ((target as { classId?: string }).classId !== req.user.classId) {
+      throw new AppError(403, 'FORBIDDEN', 'You can only assign class rep for students in your class');
     }
 
     const user = await userService.setClassRep(req.schoolId, req.params.id as string, parsed.data.isClassRep);

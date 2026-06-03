@@ -31,7 +31,6 @@ export interface UpdateUserData {
   departmentId?: string;
   classId?: string;
   isLocked?: boolean;
-  isClassRep?: boolean;
 }
 
 export interface ListUsersFilters {
@@ -141,10 +140,6 @@ export class UserService {
 
     const phone = data.phone !== undefined ? optionalPhoneForStorage(data.phone) : undefined;
 
-    if (data.isClassRep !== undefined && user.role !== UserRole.STUDENT) {
-      throw new AppError(400, 'VALIDATION_ERROR', 'Only students can be assigned as class representative');
-    }
-
     const updated = await prisma.user.update({
       where: { id: userId },
       data: {
@@ -155,7 +150,6 @@ export class UserService {
         ...(data.departmentId !== undefined && { departmentId: data.departmentId }),
         ...(data.classId !== undefined && { classId: data.classId }),
         ...(data.isLocked !== undefined && { isLocked: data.isLocked }),
-        ...(data.isClassRep !== undefined && { isClassRep: data.isClassRep }),
       },
     });
 

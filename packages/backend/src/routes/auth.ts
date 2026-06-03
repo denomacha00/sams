@@ -207,9 +207,18 @@ function formatOtpDeliveryError(delivery: Awaited<ReturnType<typeof deliverOtp>>
   if (delivery.emailError) parts.push(`Email: ${delivery.emailError}`);
   let msg = parts.length > 0 ? parts.join('. ') : 'Could not send verification code.';
   if (delivery.sandbox) {
-    msg += ' Sandbox mode: add your phone number in the Africa\'s Talking dashboard under SMS → phone numbers.';
+    msg +=
+      ' In sandbox mode, add your phone at account.africastalking.com → SMS → phone numbers, then try again.';
+  } else if (!isEmailConfigured()) {
+    msg += ' Ensure your account has a valid phone number and SMS balance is available.';
   }
   return msg;
+}
+
+function maskPhone(phone: string): string {
+  const digits = phone.replace(/\D/g, '');
+  if (digits.length < 4) return '****';
+  return `***${digits.slice(-4)}`;
 }
 
 /**
@@ -404,6 +413,16 @@ authRouter.post('/forgot-password-otp', otpResendRateLimiter, async (req: Reques
       return;
     }
 
+    if (!isEmailConfigured() && !user.phone) {
+      res.status(400).json({
+        error:
+          'This account has no phone number on file. SMS reset codes require a phone — ask your school admin to add your number to your profile.',
+        code: 'NO_PHONE_ON_FILE',
+        requestId: req.id,
+      });
+      return;
+    }
+
     if (!isEmailConfigured() && !isSmsConfigured()) {
       res.status(503).json({
         error: 'SMS and email are not configured on the server yet. Contact your school administrator.',
@@ -449,9 +468,12 @@ authRouter.post('/forgot-password-otp', otpResendRateLimiter, async (req: Reques
         sms: delivery.sms,
         email: delivery.email,
       },
+      maskedPhone: user.phone ? maskPhone(user.phone) : undefined,
       hint: delivery.sandbox
-        ? 'Sandbox SMS only delivers to phone numbers registered in your Africa\'s Talking dashboard.'
-        : undefined,
+        ? 'Sandbox SMS only delivers to numbers registered at account.africastalking.com → SMS → phone numbers.'
+        : !isEmailConfigured()
+          ? 'Code sent by SMS to the phone number on your account.'
+          : undefined,
     });
   } catch (err) {
     console.error('[Auth] Forgot password OTP error:', err);

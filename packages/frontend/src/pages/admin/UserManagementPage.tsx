@@ -37,7 +37,6 @@ interface UserFormData {
   password: string;
   departmentId: string;
   classId: string;
-  isClassRep: boolean;
 }
 
 const emptyForm: UserFormData = {
@@ -50,7 +49,6 @@ const emptyForm: UserFormData = {
   password: '',
   departmentId: '',
   classId: '',
-  isClassRep: false,
 };
 
 const UserManagementPage: React.FC = () => {
@@ -171,7 +169,6 @@ const UserManagementPage: React.FC = () => {
       password: '',
       departmentId: user.departmentId || '',
       classId: user.classId || '',
-      isClassRep: !!user.isClassRep,
     });
     setError('');
     setHodWarning(null);
@@ -206,10 +203,6 @@ const UserManagementPage: React.FC = () => {
         departmentId: formData.departmentId || undefined,
         classId: formData.classId || undefined,
       };
-
-      if (formData.role === 'STUDENT' && editingUser) {
-        payload.isClassRep = formData.isClassRep;
-      }
 
       if (editingUser) {
         if (formData.password) payload.password = formData.password;
@@ -556,20 +549,6 @@ const UserManagementPage: React.FC = () => {
                   )}
                 </div>
               </div>
-
-              {editingUser && formData.role === 'STUDENT' && (
-                <label className="flex items-start gap-3 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={formData.isClassRep}
-                    onChange={(e) => setFormData({ ...formData, isClassRep: e.target.checked })}
-                    className="mt-1 rounded border-white/20 bg-white/5 text-teal-500 focus:ring-teal-500/40"
-                  />
-                  <span className="text-sm text-gray-300">
-                    Class representative (can reply to teacher messages)
-                  </span>
-                </label>
-              )}
 
               <div>
                 <label className="block text-sm text-gray-300 mb-1">

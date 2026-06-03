@@ -20,7 +20,10 @@ const ClassRosterPage: React.FC = () => {
   const [updatingId, setUpdatingId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  const canAccess = user?.role === UserRole.TEACHER || user?.role === UserRole.HOD || user?.role === UserRole.SCHOOL_ADMIN;
+  const isTeacher = user?.role === UserRole.TEACHER;
+  const isViewer = user?.role === UserRole.HOD || user?.role === UserRole.SCHOOL_ADMIN;
+  const canAccess = isTeacher || isViewer;
+  const canAssign = isTeacher;
 
   const fetchRoster = async () => {
     setLoading(true);
@@ -41,6 +44,7 @@ const ClassRosterPage: React.FC = () => {
   }, [canAccess]);
 
   const toggleClassRep = async (student: Student) => {
+    if (!canAssign) return;
     setUpdatingId(student.id);
     try {
       await apiClient.patch(`/users/${student.id}/class-rep`, { isClassRep: !student.isClassRep });
@@ -66,18 +70,22 @@ const ClassRosterPage: React.FC = () => {
       <header className="border-b border-white/10 backdrop-blur-sm bg-white/5">
         <div className="max-w-3xl mx-auto px-6 py-4 flex items-center gap-3">
           <Link to="/dashboard" className="text-gray-400 hover:text-cyan-400 transition-colors">← Dashboard</Link>
-          <h1 className="text-lg font-bold text-white">Class Representatives</h1>
+          <h1 className="text-lg font-bold text-white">
+            {canAssign ? 'Class Representatives' : 'View Class Representatives'}
+          </h1>
         </div>
       </header>
 
       <main className="max-w-3xl mx-auto px-6 py-8">
         <p className="text-sm text-gray-400 mb-6">
-          Class representatives can reply to messages from their teachers in the Messages inbox. Only one rep per class.
+          {canAssign
+            ? 'As class teacher, assign one student as class rep. They can reply to your messages in the Messages inbox.'
+            : 'View-only list of class representatives. Only the class teacher can assign or remove a rep.'}
         </p>
 
-        {user?.role === UserRole.TEACHER && !user.classId && (
+        {isTeacher && !user?.classId && (
           <div className="mb-6 p-4 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-200 text-sm">
-            You are not assigned to a class yet. Ask your HOD or school admin to assign you to a class.
+            You are not assigned to a class yet. Ask your HOD or school admin to assign you as class teacher.
           </div>
         )}
 
@@ -105,18 +113,24 @@ const ClassRosterPage: React.FC = () => {
                       )}
                     </p>
                   </div>
-                  <button
-                    type="button"
-                    disabled={updatingId === s.id}
-                    onClick={() => toggleClassRep(s)}
-                    className={`px-4 py-2 rounded-xl text-sm font-semibold transition-all disabled:opacity-50 ${
-                      s.isClassRep
-                        ? 'bg-white/10 text-gray-300 hover:bg-white/15'
-                        : 'bg-indigo-600 text-white hover:bg-indigo-500'
-                    }`}
-                  >
-                    {updatingId === s.id ? 'Saving...' : s.isClassRep ? 'Remove rep' : 'Make class rep'}
-                  </button>
+                  {canAssign ? (
+                    <button
+                      type="button"
+                      disabled={updatingId === s.id || !user?.classId}
+                      onClick={() => toggleClassRep(s)}
+                      className={`px-4 py-2 rounded-xl text-sm font-semibold transition-all disabled:opacity-50 ${
+                        s.isClassRep
+                          ? 'bg-white/10 text-gray-300 hover:bg-white/15'
+                          : 'bg-indigo-600 text-white hover:bg-indigo-500'
+                      }`}
+                    >
+                      {updatingId === s.id ? 'Saving...' : s.isClassRep ? 'Remove rep' : 'Make class rep'}
+                    </button>
+                  ) : (
+                    <span className="text-xs text-gray-500">
+                      {s.isClassRep ? 'Class rep' : '—'}
+                    </span>
+                  )}
                 </li>
               ))}
             </ul>
