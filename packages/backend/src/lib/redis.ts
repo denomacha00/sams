@@ -1,7 +1,12 @@
 import Redis from 'ioredis';
 
+function resolveRedisUrl(): string {
+  const raw = process.env.REDIS_URL ?? 'redis://localhost:6379';
+  return raw.replace(/^["']+|["']+$/g, '').trim() || 'redis://localhost:6379';
+}
+
 /** Shared Redis client — import from here, not from index.ts (avoids circular deps). */
-export const redis = new Redis(process.env.REDIS_URL ?? 'redis://localhost:6379', {
+export const redis = new Redis(resolveRedisUrl(), {
   lazyConnect: true,
   maxRetriesPerRequest: 3,
 });

@@ -74,11 +74,11 @@ function applyEnvFile(envPath, opts = {}) {
     if (!key) continue;
 
     let value = trimmed.slice(eq + 1).trim();
-    if (
+    while (
       (value.startsWith('"') && value.endsWith('"')) ||
       (value.startsWith("'") && value.endsWith("'"))
     ) {
-      value = value.slice(1, -1);
+      value = value.slice(1, -1).trim();
     }
     if (value === '') continue;
 

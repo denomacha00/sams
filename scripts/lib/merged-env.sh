@@ -70,8 +70,12 @@ safe_source_env_file() {
       line="${line#"${line%%[![:space:]]*}"}"
     fi
     [[ "$line" =~ ^[A-Za-z_][A-Za-z0-9_]*= ]] || continue
-    # shellcheck disable=SC2163
-    export "$line"
+    local key="${line%%=*}"
+    local val="${line#*=}"
+    while [[ "$val" =~ ^[\"'].*[\"']$ ]]; do
+      val="${val:1:${#val}-2}"
+    done
+    export "${key}=${val}"
   done < "$f"
 }
 
