@@ -11,6 +11,7 @@ vi.mock('../lib/prisma', () => ({
     },
     class: {
       findUnique: vi.fn(),
+      findFirst: vi.fn(),
     },
   },
 }));
@@ -83,6 +84,8 @@ function createTestApp(user: { sub: string; schoolId: string; role: UserRole; de
 describe('Report Routes - Role-Based Scope Enforcement', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    (prisma.class.findFirst as ReturnType<typeof vi.fn>).mockResolvedValue(null);
+    (prisma.user.findUnique as ReturnType<typeof vi.fn>).mockResolvedValue({ classId: null });
   });
 
   describe('GET /reports/student/:id', () => {
@@ -146,12 +149,14 @@ describe('Report Routes - Role-Based Scope Enforcement', () => {
     });
 
     it('should allow a teacher to view their assigned class report', async () => {
+      (prisma.user.findUnique as ReturnType<typeof vi.fn>).mockResolvedValue({ classId: 'class-1' });
       const app = createTestApp({ sub: 'teacher-1', schoolId: 'school-1', role: UserRole.TEACHER, classId: 'class-1' });
       const res = await request(app).get('/reports/class/class-1');
       expect(res.status).toBe(200);
     });
 
     it('should deny a teacher from viewing a different class report', async () => {
+      (prisma.user.findUnique as ReturnType<typeof vi.fn>).mockResolvedValue({ classId: 'class-1' });
       const app = createTestApp({ sub: 'teacher-1', schoolId: 'school-1', role: UserRole.TEACHER, classId: 'class-1' });
       const res = await request(app).get('/reports/class/class-2');
       expect(res.status).toBe(403);
