@@ -72,7 +72,7 @@ export async function sendScopedNotification(
     schoolId: string;
     departmentId?: string;
     classId?: string;
-    role?: string;
+    role?: UserRole;
   } = { schoolId: sender.schoolId };
 
   if (scope === 'department') {
@@ -88,7 +88,7 @@ export async function sendScopedNotification(
   }
 
   if (targetRole) {
-    userFilter.role = targetRole;
+    userFilter.role = targetRole as UserRole;
   }
 
   if (sender.role === UserRole.HOD) {
@@ -133,7 +133,7 @@ export async function sendScopedNotification(
       throw new ScopedNotificationError(403, 'FORBIDDEN', 'Teachers can only send notifications to students');
     }
     if (!targetRole) {
-      userFilter.role = 'STUDENT';
+      userFilter.role = UserRole.STUDENT;
     }
     if (channels.includes('sms')) {
       throw new ScopedNotificationError(
