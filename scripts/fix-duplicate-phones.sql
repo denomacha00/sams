@@ -1,18 +1,23 @@
--- One phone per school (multiple NULL phones allowed in PostgreSQL).
--- Idempotent: normalize phones, dedupe duplicates, then create partial unique index.
+-- Manual cleanup: normalize User phones, dedupe per school, add partial unique index.
+-- Safe to re-run (idempotent). Run before migrate deploy if DB still has duplicate phones.
 --
--- VPS recovery after P3018 (migration failed before commit — index not created):
+-- Usage:
 --   cd /var/www/sams/packages/backend
---   git pull origin main
---   npx prisma migrate resolve --rolled-back 20250608000000_unique_phone_per_school
---   npx prisma migrate deploy
+--   set -a && source .env && set +a
+--   psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f ../../scripts/fix-duplicate-phones.sql
 --
--- If migration is incorrectly marked applied but index missing:
---   npx prisma migrate resolve --applied 20250608000000_unique_phone_per_school
---   psql "$DATABASE_URL" -f ../../scripts/fix-duplicate-phones.sql
--- Or run: bash ../../scripts/fix-duplicate-phones.sh
+-- Or: bash /var/www/sams/scripts/fix-duplicate-phones.sh
 
--- Matches normalizeSmsPhone() in packages/backend/src/config/africasTalking.ts
+\echo '==> Duplicate (schoolId, phone) groups BEFORE fix'
+SELECT "schoolId", phone, COUNT(*) AS cnt,
+       array_agg(id ORDER BY "createdAt" ASC) AS user_ids,
+       MIN("createdAt") AS oldest_created
+FROM "User"
+WHERE phone IS NOT NULL
+GROUP BY "schoolId", phone
+HAVING COUNT(*) > 1
+ORDER BY cnt DESC;
+
 CREATE OR REPLACE FUNCTION sams_normalize_kenya_phone(p text)
 RETURNS text
 LANGUAGE sql
@@ -35,13 +40,13 @@ AS $$
   END;
 $$;
 
--- Normalize stored phones so 0703… and +254703… compare equal
+\echo '==> Normalizing phones (Kenya E.164, same as normalizeSmsPhone)'
 UPDATE "User"
 SET phone = sams_normalize_kenya_phone(phone)
 WHERE phone IS NOT NULL
   AND phone IS DISTINCT FROM sams_normalize_kenya_phone(phone);
 
--- Deduplicate: keep oldest account per (schoolId, phone); clear phone on duplicates
+\echo '==> Clearing phone on duplicate accounts (keeps oldest per schoolId+phone)'
 WITH ranked AS (
   SELECT
     id,
@@ -67,6 +72,16 @@ WHERE u.id = d.id;
 
 DROP FUNCTION IF EXISTS sams_normalize_kenya_phone(text);
 
+\echo '==> Remaining duplicate groups (should be empty)'
+SELECT "schoolId", phone, COUNT(*) AS cnt
+FROM "User"
+WHERE phone IS NOT NULL
+GROUP BY "schoolId", phone
+HAVING COUNT(*) > 1;
+
+\echo '==> Creating partial unique index if missing'
 CREATE UNIQUE INDEX IF NOT EXISTS "User_schoolId_phone_key"
   ON "User"("schoolId", "phone")
   WHERE "phone" IS NOT NULL;
+
+\echo '==> Done'
