@@ -1,0 +1,37 @@
+#!/usr/bin/env bash
+# Keys backed up from merged env and checked by verify-secrets.sh (values never printed in full).
+
+provider_secret_keys() {
+  printf '%s\n' \
+    OPENAI_API_KEY \
+    OPENAI_BASE_URL \
+    OPENAI_MODEL \
+    OPENAI_FALLBACK_KEY \
+    OPENAI_FALLBACK_URL \
+    OPENAI_FALLBACK_MODEL \
+    VISION_MODEL \
+    AT_API_KEY \
+    AT_USERNAME \
+    AT_SENDER_ID \
+    AT_SANDBOX_SENDER_ID \
+    SMTP_HOST \
+    SMTP_PORT \
+    SMTP_USER \
+    SMTP_PASS \
+    SMTP_FROM_NAME \
+    SMTP_FROM_EMAIL \
+    MPESA_CONSUMER_KEY \
+    MPESA_CONSUMER_SECRET \
+    MPESA_SHORTCODE \
+    MPESA_PASSKEY \
+    MPESA_CALLBACK_URL \
+    JWT_SECRET \
+    JWT_REFRESH_SECRET \
+    QR_SECRET \
+    LICENSE_SECRET \
+    CONVERSATION_MASTER_KEY \
+    CONVERSATION_MASTER_KEY_PREVIOUS \
+    BIOMETRIC_MASTER_KEY \
+    BIOMETRIC_ENCRYPTION_KEY \
+    SUPER_ADMIN_PASSWORD
+}
