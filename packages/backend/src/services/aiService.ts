@@ -103,6 +103,11 @@ export class AIService {
     if (user.sub !== 'guest') {
       // If user confirmed a pending action — execute it
       if (options?.confirmAction && options?.pendingAction) {
+        if (!isActionPermitted(user.role, options.pendingAction.action)) {
+          const denial = this.buildDenialResponse(user.role, options.pendingAction.action);
+          threadId = await this.safelyPersist(user, question, denial.answer, threadId);
+          return { ...denial, threadId };
+        }
         const result = await this.executeAction(user, options.pendingAction);
         threadId = await this.safelyPersist(user, question, result.answer, threadId);
         return { ...result, threadId };

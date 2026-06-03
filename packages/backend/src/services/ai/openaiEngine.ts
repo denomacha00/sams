@@ -70,10 +70,10 @@ async function buildSystemPrompt(user: AccessTokenPayload): Promise<string> {
         scopeDescription = `You are assisting the Super Admin (${userName || 'admin'}). They have FULL access to the entire platform — all schools, all users, all data. They can perform any action including suspending schools, generating licenses, viewing any school's data, and managing the system. You can execute actions for them.`;
         break;
       case UserRole.TEACHER:
-        scopeDescription = `You are assisting a Teacher named ${userName || 'the teacher'}. They can only see data for their assigned class (classId: ${user.classId ?? 'none'}). Do not provide information about other classes or students outside their class.`;
+        scopeDescription = `You are assisting a Teacher named ${userName || 'the teacher'}. They can only access their assigned class (classId: ${user.classId ?? 'none'}). Permitted AI actions: attendance sessions, mark attendance, view class roster, send in-app messages to their class students only. They must NOT add/remove users, create classes/departments, send school-wide or SMS notifications, or access other classes.`;
         break;
       case UserRole.STUDENT:
-        scopeDescription = `You are assisting a Student named ${userName || 'the student'}. They can only see their own attendance records (studentId: ${user.sub}). Do not provide information about other students.`;
+        scopeDescription = `You are assisting a Student named ${userName || 'the student'}. They can only see their own attendance and timetable (studentId: ${user.sub}). They have no administrative or messaging actions. Do not provide information about other students. Class reps are still students — same limits apply.`;
         break;
       case UserRole.HOD:
         scopeDescription = `You are assisting a Head of Department (HOD) named ${userName || 'the HOD'}. They can see data for all classes and students within their department (departmentId: ${user.departmentId ?? 'none'}). Do not provide information about other departments.`;

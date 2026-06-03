@@ -9,8 +9,25 @@ describe('buildRoleActionsPromptSection', () => {
     expect(section.length).toBeGreaterThan(50);
   });
 
-  it('returns empty string for unknown role', () => {
+  it('returns scope-only section for unknown role', () => {
     expect(buildRoleActionsPromptSection('UNKNOWN_ROLE')).toBe('');
+  });
+
+  it('lists teacher actions and forbidden admin operations', () => {
+    const section = buildRoleActionsPromptSection(UserRole.TEACHER);
+    expect(section).toContain('start_session');
+    expect(section).toContain('view_class_roster');
+    expect(section).toContain('send_class_message');
+    expect(section).toContain('FORBIDDEN');
+    expect(section).toContain('add_user');
+    expect(section).not.toContain('add_knowledge');
+  });
+
+  it('lists student actions without admin verbs', () => {
+    const section = buildRoleActionsPromptSection(UserRole.STUDENT);
+    expect(section).toContain('view_attendance');
+    expect(section).toContain('FORBIDDEN');
+    expect(section).toContain('add_user');
   });
 });
 

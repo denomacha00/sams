@@ -1,4 +1,5 @@
 import { UserRole } from '@sams/shared';
+import { isActionForbiddenForRole } from './roleRestrictions';
 import { superAdminActions } from './handlers/superAdminHandlers';
 import { schoolAdminActions } from './handlers/schoolAdminHandlers';
 import { hodActions } from './handlers/hodHandlers';
@@ -59,6 +60,7 @@ export function findAction(role: string, actionName: string): ActionDefinition |
 }
 
 export function isActionPermitted(role: string, actionName: string): boolean {
+  if (isActionForbiddenForRole(role, actionName)) return false;
   return getActionsForRole(role).some((a) => a.action === actionName);
 }
 

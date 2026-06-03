@@ -90,24 +90,83 @@ const markAttendanceHandler: ActionHandler = async (params, scope) => {
   };
 };
 
-const addKnowledgeHandler: ActionHandler = async (params, scope) => {
+const viewClassRosterHandler: ActionHandler = async (_params, scope) => {
   const { prisma } = await import('../../../index');
+  const { resolveTeacherClassId } = await import('../../../lib/teacherScope');
 
-  const title = params.title as string;
-  const content = params.content as string;
-  const category = (params.category as string) || 'general';
-
-  if (!title || !content) {
-    return { answer: 'Please provide both a title and content for the knowledge entry.' };
+  const classId = await resolveTeacherClassId(scope.userId, scope.classId);
+  if (!classId) {
+    return { answer: 'Your account is not associated with a class.' };
   }
 
-  const entry = await prisma.aIKnowledge.create({
-    data: { title, content, category, schoolId: scope.schoolId, createdById: scope.userId },
+  const [classRecord, students] = await Promise.all([
+    prisma.class.findUnique({ where: { id: classId }, select: { name: true } }),
+    prisma.user.findMany({
+      where: { schoolId: scope.schoolId, classId, role: 'STUDENT' },
+      select: { fullName: true },
+      orderBy: { fullName: 'asc' },
+    }),
+  ]);
+
+  if (students.length === 0) {
+    return {
+      answer: `No students are enrolled in ${classRecord?.name ?? 'your class'} yet.`,
+      data: { classId, count: 0 },
+    };
+  }
+
+  const list = students.map((s, i) => `${i + 1}. ${s.fullName}`).join('\n');
+  return {
+    answer: `📋 **Class roster — ${classRecord?.name ?? 'Your class'}** (${students.length} students)\n\n${list}`,
+    data: { classId, count: students.length },
+  };
+};
+
+const sendClassMessageHandler: ActionHandler = async (params, scope) => {
+  const { prisma } = await import('../../../index');
+  const { resolveTeacherClassId } = await import('../../../lib/teacherScope');
+  const { createId } = await import('@paralleldrive/cuid2');
+
+  const message = (params.message as string)?.trim();
+  if (!message) {
+    return { answer: 'Please provide the message to send to your class (e.g. "message my class: Homework due Friday").' };
+  }
+
+  const classId = await resolveTeacherClassId(scope.userId, scope.classId);
+  if (!classId) {
+    return { answer: 'Your account is not associated with a class.' };
+  }
+
+  const students = await prisma.user.findMany({
+    where: { schoolId: scope.schoolId, classId, role: 'STUDENT' },
+    select: { id: true },
+  });
+
+  if (students.length === 0) {
+    return { answer: 'No students in your class to message.' };
+  }
+
+  const batchId = createId();
+  const title = (params.title as string)?.trim() || 'Class message';
+
+  await prisma.notification.createMany({
+    data: students.map((s) => ({
+      schoolId: scope.schoolId,
+      userId: s.id,
+      senderId: scope.userId,
+      batchId,
+      title,
+      message,
+      type: 'MESSAGE',
+      scope: 'class',
+      targetId: classId,
+      targetRole: 'STUDENT',
+    })),
   });
 
   return {
-    answer: `✅ Knowledge entry "${title}" added.`,
-    data: { entryId: entry.id },
+    answer: `✅ In-app message sent to ${students.length} student(s) in your class. (SMS is not available via AI — use the Notifications page if your school admin enables SMS.)`,
+    data: { batchId, recipientCount: students.length, classId },
   };
 };
 
@@ -168,25 +227,35 @@ export const teacherActions: ActionDefinition[] = [
     handler: markAttendanceHandler,
   },
   {
-    action: 'add_knowledge',
-    description: 'Add a knowledge base entry for the AI assistant',
+    action: 'view_class_roster',
+    description: 'List students in your assigned class',
     destructive: false,
     patterns: [
-      /add\s+(?:a\s+)?knowledge\s+(?:entry\s+)?(.+)/i,
-      /create\s+(?:a\s+)?knowledge\s+(?:entry\s+)?(.+)/i,
-      /new\s+knowledge\s+(.+)/i,
+      /(?:show|view|list|get)\s+(?:my\s+)?class\s+(?:roster|list|students?)/i,
+      /(?:who\s+are|list)\s+(?:the\s+)?students?\s+in\s+(?:my\s+)?class/i,
+      /class\s+roster/i,
+      /my\s+students?\s*$/i,
     ],
-    extractParams: (message: string, match: RegExpMatchArray | null) => {
-      const remainder = match && match[1] ? match[1].trim() : '';
-      // Try to split title and content by common separators
-      const colonSplit = remainder.split(':');
-      if (colonSplit.length >= 2) {
-        return { title: colonSplit[0].trim(), content: colonSplit.slice(1).join(':').trim() };
-      }
-      return { title: remainder, content: '' };
+    extractParams: () => ({}),
+    descriptionTemplate: () => 'List students in your assigned class.',
+    handler: viewClassRosterHandler,
+  },
+  {
+    action: 'send_class_message',
+    description: 'Send an in-app message to all students in your class (not SMS)',
+    destructive: true,
+    patterns: [
+      /(?:send|message)\s+(?:to\s+)?(?:my\s+)?class\s*[:,-]?\s*(.+)/i,
+      /notify\s+(?:my\s+)?class\s*[:,-]?\s*(.+)/i,
+      /tell\s+(?:my\s+)?class\s*[:,-]?\s*(.+)/i,
+      /message\s+(?:all\s+)?(?:my\s+)?students?\s*[:,-]?\s*(.+)/i,
+    ],
+    extractParams: (_message: string, match: RegExpMatchArray | null) => {
+      const message = match && match[1] ? match[1].trim() : '';
+      return { message };
     },
     descriptionTemplate: (params) =>
-      `Add knowledge entry "${params.title}".`,
-    handler: addKnowledgeHandler,
+      `Send in-app message to your class: "${String(params.message).slice(0, 80)}${String(params.message).length > 80 ? '…' : ''}"`,
+    handler: sendClassMessageHandler,
   },
 ];
