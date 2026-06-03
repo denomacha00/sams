@@ -35,9 +35,12 @@ describe('roleActionRegistry permissions', () => {
 
   it('STUDENT has read-only self actions only', () => {
     const names = getActionNames(UserRole.STUDENT);
-    expect(names).toEqual(expect.arrayContaining(['view_attendance', 'view_timetable']));
+    expect(names).toEqual(
+      expect.arrayContaining(['view_attendance', 'view_timetable', 'list_my_teachers']),
+    );
     expect(names).not.toContain('start_session');
     expect(isActionPermitted(UserRole.STUDENT, 'send_class_message')).toBe(false);
+    expect(isActionPermitted(UserRole.STUDENT, 'list_my_teachers')).toBe(true);
   });
 
   it('unknown role has no permitted actions', () => {

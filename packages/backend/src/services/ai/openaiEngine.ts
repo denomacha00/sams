@@ -10,6 +10,10 @@ import {
 } from './aiProviderConfig';
 import { buildRoleActionsPromptSection } from './roleActionsPrompt';
 import { getSystemDocumentationExcerpt } from './systemDocumentation';
+import {
+  formatStudentClassContextForPrompt,
+  getStudentClassContext,
+} from '../../lib/studentClassTeachers';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -73,7 +77,7 @@ async function buildSystemPrompt(user: AccessTokenPayload): Promise<string> {
         scopeDescription = `You ARE the logged-in Teacher (${userName || 'teacher'}). Act on their behalf — execute permitted actions yourself; never tell them to open another page for something you can do in chat. Class scope only (classId: ${user.classId ?? 'none'}): attendance sessions, mark attendance, class roster, in-app messages to their class students, and **student registration links** (create_registration_link — same as Dashboard → Registration Links). When they ask to add or register a student, generate a registration link; never claim you created a user account directly. Never add/remove users in the database, school/department notify, or SMS.`;
         break;
       case UserRole.STUDENT:
-        scopeDescription = `You are assisting a Student named ${userName || 'the student'}. They can only see their own attendance and timetable (studentId: ${user.sub}). They have no administrative or messaging actions. Do not provide information about other students. Class reps are still students — same limits apply.`;
+        scopeDescription = `You are assisting a Student named ${userName || 'the student'} (studentId: ${user.sub}, classId: ${user.classId ?? 'none'}). They MAY ask about their own attendance, class timetable, and teachers assigned to their class — answer using STUDENT CLASS CONTEXT below or role actions list_my_teachers / view_timetable. They must NOT see school-wide teacher directories, user management, license keys, or other students' data. Never refuse "who are my teachers" — list names from context. Class reps have the same limits.`;
         break;
       case UserRole.HOD:
         scopeDescription = `You ARE the logged-in Head of Department (${userName || 'HOD'}). Act on their behalf — run permitted actions in chat; do not redirect them to do it manually. Department scope only (departmentId: ${user.departmentId ?? 'none'}): department stats, assign existing teachers to the department, student registration links for classes, in-app department/class notifications. To onboard new students, use registration links — not direct user creation. No school-wide notify or school-wide user add/remove.`;
@@ -149,6 +153,18 @@ async function buildSystemPrompt(user: AccessTokenPayload): Promise<string> {
   const roleActionsSection =
     user.sub !== 'guest' ? buildRoleActionsPromptSection(user.role) : '';
 
+  let studentClassSection = '';
+  if (user.role === UserRole.STUDENT && user.classId && user.sub !== 'guest') {
+    try {
+      const ctx = await getStudentClassContext(user.classId);
+      if (ctx) {
+        studentClassSection = `\n\nSTUDENT CLASS CONTEXT (authoritative — use for teacher and schedule questions):\n${formatStudentClassContextForPrompt(ctx)}`;
+      }
+    } catch (err) {
+      console.error('[AI] Failed to load student class context:', err);
+    }
+  }
+
   return `You are SAMS AI — a smart, helpful assistant built into the Smart Attendance Management System (SAMS). You were developed by Denis Macharia.
 
 You can help with:
@@ -171,6 +187,7 @@ SENSITIVE DATA RULES — strictly enforce these:
 - License keys: ONLY SUPER_ADMIN and SCHOOL_ADMIN can see license information. If a STUDENT, TEACHER, or HOD asks about license keys, tell them to contact their school admin.
 - School suspension status: ONLY SUPER_ADMIN can suspend/unsuspend schools.
 - Other students' data: STUDENTS can only see their own data. Never reveal other students' attendance, grades, or personal info.
+- Student teachers: STUDENTS may ask who teaches them. Use STUDENT CLASS CONTEXT or list_my_teachers — never say they lack access to "the list of teachers". Do not invent teacher names.
 - System-wide stats (total schools, revenue): ONLY SUPER_ADMIN can see these.
 - School admin actions (manage users, classes, departments): ONLY SCHOOL_ADMIN and above.
 
@@ -186,7 +203,7 @@ ACT AS THE USER: When they ask you to notify a class, department, or school, che
 
 MULTI-TURN ACTIONS: If a role action needs more detail (class, department, message text, user name), the backend will ask exactly ONE clear question per turn. Do not list every field at once. Execute when you have enough; never invent data.
 
-Be concise, friendly, and helpful. Address the user by their name. Answer in plain language.${roleActionsSection}${knowledgeSection}${documentationSection}${systemDataSection}`;
+Be concise, friendly, and helpful. Address the user by their name. Answer in plain language.${roleActionsSection}${studentClassSection}${knowledgeSection}${documentationSection}${systemDataSection}`;
 }
 
 // ─── Function-Calling Tools ───────────────────────────────────────────────────

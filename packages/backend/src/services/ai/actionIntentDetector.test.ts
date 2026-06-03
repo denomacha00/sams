@@ -58,6 +58,28 @@ describe('actionIntentDetector role scoping (regex path)', () => {
     expect(teacher.isAction).toBe(false);
   });
 
+  it('detects student list_my_teachers for natural phrasing', async () => {
+    const cases = [
+      'name of our teachers',
+      'who are my teachers',
+      'who teaches me',
+    ];
+    for (const message of cases) {
+      const result = await actionIntentDetector.detect(message, UserRole.STUDENT);
+      expect(result.isAction).toBe(true);
+      expect(result.action).toBe('list_my_teachers');
+      expect(result.requiresConfirmation).toBe(false);
+    }
+  });
+
+  it('does not treat school admin teacher headcount as student list_my_teachers', async () => {
+    const result = await actionIntentDetector.detect(
+      'how many teachers in the school',
+      UserRole.STUDENT,
+    );
+    expect(result.action).not.toBe('list_my_teachers');
+  });
+
   it('detects HOD view_department_stats for natural headcount questions', async () => {
     const result = await actionIntentDetector.detect(
       'how many teachers and students in my dep',

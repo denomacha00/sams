@@ -70,7 +70,7 @@ const ROLE_SCOPE_NOTES: Partial<Record<UserRole, string>> = {
   [UserRole.TEACHER]:
     'Your assigned class only: attendance sessions, class roster, in-app class messages to students, and student registration links (invite via link — same as Registration Links page; never add users directly). No user management, no department/school notify, no SMS via AI.',
   [UserRole.STUDENT]:
-    'Your own attendance and timetable only. No administrative or messaging actions.',
+    'Your own attendance, class timetable, and teachers assigned to your class (same as the app). No school-wide user lists, admin stats, or messaging actions.',
 };
 
 export function getRoleScopeNote(role: string): string | undefined {
