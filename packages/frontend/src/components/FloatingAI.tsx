@@ -2,6 +2,12 @@ import React, { useState, useRef, useEffect, useCallback } from 'react';
 import apiClient from '../services/apiClient';
 import { useVoiceQuery } from '../hooks/useVoiceQuery';
 
+interface PendingAction {
+  action: string;
+  params: Record<string, unknown>;
+  description: string;
+}
+
 interface Message {
   id: string;
   role: 'user' | 'assistant';
@@ -9,7 +15,10 @@ interface Message {
   imageUrl?: string;
   userImages?: string[];
   timestamp: Date;
+  pendingAction?: PendingAction;
 }
+
+const CONFIRM_RE = /^(yes|y|confirm|proceed|ok|do it|go ahead)\.?$/i;
 
 const WELCOME_MESSAGE: Message = {
   id: 'welcome',
@@ -38,6 +47,7 @@ const FloatingAI: React.FC = () => {
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
   const [threadId, setThreadId] = useState<string | null>(null);
+  const pendingActionRef = useRef<PendingAction | null>(null);
   const [selectedImages, setSelectedImages] = useState<File[]>([]);
   const [imagePreviews, setImagePreviews] = useState<string[]>([]);
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -77,6 +87,35 @@ const FloatingAI: React.FC = () => {
   };
 
   const clearImages = () => { setSelectedImages([]); setImagePreviews([]); };
+
+  const confirmPendingAction = useCallback(async (pending: PendingAction) => {
+    setLoading(true);
+    try {
+      const { data } = await apiClient.post('/ai/query', {
+        question: 'yes',
+        threadId,
+        confirmAction: true,
+        pendingAction: pending,
+      });
+      if (data.threadId) setThreadId(data.threadId);
+      pendingActionRef.current = null;
+      setMessages((prev) => [...prev, {
+        id: crypto.randomUUID(),
+        role: 'assistant',
+        content: data.answer,
+        timestamp: new Date(),
+      }]);
+    } catch {
+      setMessages((prev) => [...prev, {
+        id: crypto.randomUUID(),
+        role: 'assistant',
+        content: "I couldn't complete that action. Please try again.",
+        timestamp: new Date(),
+      }]);
+    } finally {
+      setLoading(false);
+    }
+  }, [threadId]);
 
   const submitQuery = useCallback(async (text: string) => {
     if (!text.trim() && selectedImages.length === 0) return;
@@ -119,13 +158,30 @@ const FloatingAI: React.FC = () => {
         return;
       }
 
-      // Case 3: Normal text query
-      const history = [
-        ...messages.filter((m) => m.id !== 'welcome').map((m) => ({ role: m.role, content: m.content })),
-        { role: 'user' as const, content: text.trim() },
-      ];
-      const { data } = await apiClient.post('/ai/query', { question: text.trim(), threadId, history });
+      // Case 3: Normal text query (with action confirmation support)
+      const isConfirm = CONFIRM_RE.test(text.trim()) && pendingActionRef.current;
+      const { data } = await apiClient.post('/ai/query', {
+        question: text.trim(),
+        threadId,
+        ...(isConfirm
+          ? { confirmAction: true, pendingAction: pendingActionRef.current }
+          : {}),
+      });
       if (data.threadId) setThreadId(data.threadId);
+
+      if (data.requiresConfirmation && data.pendingAction) {
+        pendingActionRef.current = data.pendingAction;
+        setMessages((prev) => [...prev, {
+          id: crypto.randomUUID(),
+          role: 'assistant',
+          content: data.answer,
+          timestamp: new Date(),
+          pendingAction: data.pendingAction,
+        }]);
+        return;
+      }
+
+      pendingActionRef.current = null;
       setMessages((prev) => [...prev, {
         id: crypto.randomUUID(), role: 'assistant', content: data.answer, timestamp: new Date(),
       }]);
@@ -137,7 +193,7 @@ const FloatingAI: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  }, [selectedImages, imagePreviews]);
+  }, [selectedImages, imagePreviews, threadId, messages]);
 
   const { isListening, startListening, stopListening } = useVoiceQuery(submitQuery);
 
@@ -218,6 +274,16 @@ const FloatingAI: React.FC = () => {
                   </div>
                 )}
                 <p className="whitespace-pre-wrap leading-relaxed">{msg.content}</p>
+                {msg.pendingAction && (
+                  <button
+                    type="button"
+                    onClick={() => void confirmPendingAction(msg.pendingAction!)}
+                    disabled={loading}
+                    className="mt-2 w-full bg-amber-600 hover:bg-amber-500 disabled:opacity-50 text-white text-xs font-medium py-1.5 px-3 rounded-lg transition-colors"
+                  >
+                    Confirm: {msg.pendingAction.description}
+                  </button>
+                )}
                 {/* AI generated image */}
                 {msg.imageUrl && (
                   <img src={msg.imageUrl} alt="AI Generated" className="max-w-full rounded-lg mt-2 border border-white/10" loading="lazy" />

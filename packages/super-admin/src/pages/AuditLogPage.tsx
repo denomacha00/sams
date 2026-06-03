@@ -25,11 +25,16 @@ const EVENT_TYPES = [
   'ROLE_CHANGED',
   'CONFLICT_RESOLVED',
   'SMS_RETRY',
+  'AI_ACTION_EXECUTED',
+  'AI_ACTION_DENIED',
 ];
 
 const AuditLogPage: React.FC = () => {
   const [logs, setLogs] = useState<AuditLog[]>([]);
   const [loading, setLoading] = useState(true);
+  const [clearing, setClearing] = useState(false);
+  const [clearError, setClearError] = useState<string | null>(null);
+  const [showClearConfirm, setShowClearConfirm] = useState(false);
   const [filters, setFilters] = useState({
     schoolId: '',
     eventType: '',
@@ -37,14 +42,20 @@ const AuditLogPage: React.FC = () => {
     dateTo: '',
   });
 
+  const buildQueryParams = () => {
+    const params = new URLSearchParams();
+    if (filters.schoolId) params.set('schoolId', filters.schoolId);
+    if (filters.eventType) params.set('eventType', filters.eventType);
+    if (filters.dateFrom) params.set('dateFrom', new Date(filters.dateFrom).toISOString());
+    if (filters.dateTo) params.set('dateTo', new Date(filters.dateTo).toISOString());
+    return params;
+  };
+
   const fetchLogs = async () => {
     setLoading(true);
+    setClearError(null);
     try {
-      const params = new URLSearchParams();
-      if (filters.schoolId) params.set('schoolId', filters.schoolId);
-      if (filters.eventType) params.set('eventType', filters.eventType);
-      if (filters.dateFrom) params.set('dateFrom', new Date(filters.dateFrom).toISOString());
-      if (filters.dateTo) params.set('dateTo', new Date(filters.dateTo).toISOString());
+      const params = buildQueryParams();
       params.set('limit', '100');
 
       const { data } = await apiClient.get(`/super/audit-logs?${params.toString()}`);
@@ -69,9 +80,46 @@ const AuditLogPage: React.FC = () => {
     setFilters({ schoolId: '', eventType: '', dateFrom: '', dateTo: '' });
   };
 
+  const handleClearLogs = async () => {
+    setClearing(true);
+    setClearError(null);
+    try {
+      const params = buildQueryParams();
+      const qs = params.toString();
+      await apiClient.delete(`/super/audit-logs${qs ? `?${qs}` : ''}`);
+      setShowClearConfirm(false);
+      await fetchLogs();
+    } catch (err: any) {
+      setClearError(err.response?.data?.error || 'Failed to clear audit logs');
+    } finally {
+      setClearing(false);
+    }
+  };
+
+  const hasActiveFilters =
+    Boolean(filters.schoolId) ||
+    Boolean(filters.eventType) ||
+    Boolean(filters.dateFrom) ||
+    Boolean(filters.dateTo);
+
   return (
     <div className="space-y-6">
-      <h1 className="text-2xl font-bold text-white">Audit Logs</h1>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <h1 className="text-2xl font-bold text-white">Audit Logs</h1>
+        <button
+          type="button"
+          onClick={() => setShowClearConfirm(true)}
+          className="px-4 py-2 bg-red-600/90 hover:bg-red-600 text-white text-sm rounded transition-colors"
+        >
+          Clear audit logs{hasActiveFilters ? ' (filtered)' : ''}
+        </button>
+      </div>
+
+      {clearError && (
+        <div className="p-3 bg-red-500/20 border border-red-500/40 rounded text-red-200 text-sm">
+          {clearError}
+        </div>
+      )}
 
       {/* Filters */}
       <form onSubmit={handleFilter} className="bg-gray-800 rounded-lg p-4 border border-gray-700">
@@ -132,7 +180,7 @@ const AuditLogPage: React.FC = () => {
             onClick={handleClearFilters}
             className="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white text-sm rounded transition-colors"
           >
-            Clear
+            Clear filters
           </button>
         </div>
       </form>
@@ -191,6 +239,36 @@ const AuditLogPage: React.FC = () => {
 
       {!loading && logs.length === 0 && (
         <div className="text-center text-gray-400 py-12">No audit logs found.</div>
+      )}
+
+      {showClearConfirm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60">
+          <div className="bg-gray-800 border border-gray-700 rounded-lg p-6 max-w-md w-full">
+            <h2 className="text-lg font-semibold text-white mb-2">Clear audit logs?</h2>
+            <p className="text-sm text-gray-400 mb-6">
+              {hasActiveFilters
+                ? 'This permanently deletes audit records matching the current filters. One new entry will document the purge.'
+                : 'This permanently deletes all audit log records. One new entry will document the purge.'}
+            </p>
+            <div className="flex gap-3 justify-end">
+              <button
+                type="button"
+                onClick={() => setShowClearConfirm(false)}
+                className="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white text-sm rounded"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={() => void handleClearLogs()}
+                disabled={clearing}
+                className="px-4 py-2 bg-red-600 hover:bg-red-700 disabled:opacity-50 text-white text-sm rounded"
+              >
+                {clearing ? 'Clearing...' : 'Clear logs'}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

@@ -1406,6 +1406,7 @@ Here's what you can do as a Super Admin:
 • View platform-wide analytics
 • Check revenue by plan tier
 • View audit logs for all actions
+• Clear audit logs when needed ("clear audit logs")
 • Monitor active sessions across schools
 
 **Quick Commands (tell me):**
@@ -1413,6 +1414,7 @@ Here's what you can do as a Super Admin:
 • "suspend school X" — Suspend a school
 • "extend license for X" — Extend a license
 • "generate a license for Basic plan" — Generate a key
+• "clear audit logs" — Purge audit log records (confirm when prompted)
 • "system architecture" — View tech stack
 • "common problems" — Troubleshooting guide
 

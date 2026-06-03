@@ -80,6 +80,31 @@ export class AuditService {
 
     return results as unknown as AuditLogRecord[];
   }
+
+  /**
+   * Delete audit log records matching optional filters.
+   * Super-admin only — caller must log the purge separately if a trail is required.
+   */
+  async clear(filters: AuditFilters): Promise<number> {
+    const { schoolId, eventType, dateFrom, dateTo } = filters;
+
+    const result = await prisma.auditLog.deleteMany({
+      where: {
+        ...(schoolId !== undefined && { schoolId }),
+        ...(eventType !== undefined && { eventType: eventType as any }),
+        ...(dateFrom !== undefined || dateTo !== undefined
+          ? {
+              createdAt: {
+                ...(dateFrom !== undefined && { gte: dateFrom }),
+                ...(dateTo !== undefined && { lte: dateTo }),
+              },
+            }
+          : {}),
+      },
+    });
+
+    return result.count;
+  }
 }
 
 // ─── Singleton Export ─────────────────────────────────────────────────────────

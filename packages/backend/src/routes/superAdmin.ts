@@ -551,6 +551,33 @@ superAdminRouter.get('/audit-logs', async (req: Request, res: Response): Promise
   res.json({ logs: serializedLogs, count: serializedLogs.length });
 });
 
+// ─── DELETE /super/audit-logs — Clear audit logs (super admin only) ───────────
+
+superAdminRouter.delete('/audit-logs', async (req: Request, res: Response): Promise<void> => {
+  const { schoolId, eventType, dateFrom, dateTo } = req.query;
+
+  const filters: Parameters<typeof auditService.clear>[0] = {};
+  if (schoolId && typeof schoolId === 'string') filters.schoolId = schoolId;
+  if (eventType && typeof eventType === 'string') filters.eventType = eventType;
+  if (dateFrom && typeof dateFrom === 'string') filters.dateFrom = new Date(dateFrom);
+  if (dateTo && typeof dateTo === 'string') filters.dateTo = new Date(dateTo);
+
+  const deletedCount = await auditService.clear(filters);
+
+  await auditService.log({
+    eventType: 'AI_ACTION_EXECUTED',
+    actorRole: req.user?.role,
+    resourceSnapshot: {
+      action: 'AUDIT_LOGS_CLEARED',
+      deletedCount,
+      filters,
+      clearedAt: new Date().toISOString(),
+    },
+  });
+
+  res.json({ message: `Cleared ${deletedCount} audit log record(s).`, deletedCount });
+});
+
 // ─── AI Knowledge Base CRUD ────────────────────────────────────────────────────
 
 const aiKnowledgeSchema = z.object({
@@ -641,6 +668,7 @@ const aiActionSchema = z.object({
     'extend_license',
     'get_school_info',
     'get_system_stats',
+    'clear_audit_logs',
   ]),
   params: z.record(z.unknown()).default({}),
 });
@@ -890,6 +918,35 @@ superAdminRouter.post('/ai-action', async (req: Request, res: Response): Promise
             suspendedSchools,
             totalRevenue: revenue._sum.amount || 0,
           },
+        });
+        return;
+      }
+
+      case 'clear_audit_logs': {
+        const filters: Parameters<typeof auditService.clear>[0] = {};
+        if (params.schoolId && typeof params.schoolId === 'string') {
+          filters.schoolId = params.schoolId;
+        }
+        if (params.eventType && typeof params.eventType === 'string') {
+          filters.eventType = params.eventType;
+        }
+
+        const deletedCount = await auditService.clear(filters);
+
+        await auditService.log({
+          eventType: 'AI_ACTION_EXECUTED',
+          actorRole: req.user?.role,
+          resourceSnapshot: {
+            action: 'AUDIT_LOGS_CLEARED',
+            deletedCount,
+            filters,
+            clearedVia: 'SUPER_ADMIN_AI_ACTION',
+          },
+        });
+
+        res.json({
+          message: `✅ Cleared ${deletedCount} audit log record(s). A new audit entry documents this purge.`,
+          result: { deletedCount },
         });
         return;
       }

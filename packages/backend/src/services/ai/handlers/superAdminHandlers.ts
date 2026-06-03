@@ -171,6 +171,54 @@ const getSchoolInfoHandler: ActionHandler = async (params) => {
   };
 };
 
+const clearAuditLogsHandler: ActionHandler = async (params, scope) => {
+  const { auditService } = await import('../../auditService');
+
+  const filters: {
+    schoolId?: string;
+    eventType?: string;
+    dateFrom?: Date;
+    dateTo?: Date;
+  } = {};
+
+  if (params.schoolId && typeof params.schoolId === 'string') {
+    filters.schoolId = params.schoolId;
+  }
+  if (params.eventType && typeof params.eventType === 'string') {
+    filters.eventType = params.eventType;
+  }
+  if (params.dateFrom && typeof params.dateFrom === 'string') {
+    filters.dateFrom = new Date(params.dateFrom);
+  }
+  if (params.dateTo && typeof params.dateTo === 'string') {
+    filters.dateTo = new Date(params.dateTo);
+  }
+
+  const deletedCount = await auditService.clear(filters);
+
+  await auditService.log({
+    eventType: 'AI_ACTION_EXECUTED',
+    actorId: scope.userId,
+    actorRole: scope.role,
+    resourceSnapshot: {
+      action: 'AUDIT_LOGS_CLEARED',
+      deletedCount,
+      filters,
+      clearedVia: 'AI',
+    },
+  });
+
+  const filterNote =
+    Object.keys(filters).length > 0
+      ? ' (matching your filters)'
+      : ' (entire audit log table)';
+
+  return {
+    answer: `✅ Cleared **${deletedCount}** audit log record(s)${filterNote}.\n\nA new audit entry documents this purge.`,
+    data: { deletedCount, filters },
+  };
+};
+
 const getSystemStatsHandler: ActionHandler = async () => {
   const { prisma } = await import('../../../index');
 
@@ -321,5 +369,21 @@ export const superAdminActions: ActionDefinition[] = [
     descriptionTemplate: () =>
       `Retrieve system-wide statistics (schools, users, revenue, etc.).`,
     handler: getSystemStatsHandler,
+  },
+  {
+    action: 'clear_audit_logs',
+    description: 'Clear or delete audit log records (optionally filtered)',
+    destructive: true,
+    patterns: [
+      /clear\s+(?:all\s+)?audit\s+logs?/i,
+      /delete\s+(?:all\s+)?audit\s+logs?/i,
+      /purge\s+audit\s+logs?/i,
+      /remove\s+(?:all\s+)?audit\s+logs?/i,
+      /wipe\s+audit\s+logs?/i,
+    ],
+    extractParams: () => ({}),
+    descriptionTemplate: () =>
+      'Clear audit logs. This permanently deletes matching records and leaves one new entry documenting the purge.',
+    handler: clearAuditLogsHandler,
   },
 ];

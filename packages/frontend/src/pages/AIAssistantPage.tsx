@@ -2,11 +2,18 @@ import React, { useState, useRef, useEffect } from 'react';
 import apiClient from '../services/apiClient';
 import { useVoiceQuery } from '../hooks/useVoiceQuery';
 
+interface PendingAction {
+  action: string;
+  params: Record<string, unknown>;
+  description: string;
+}
+
 interface Message {
   id: string;
   role: 'user' | 'assistant';
   content: string;
   timestamp: Date;
+  pendingAction?: PendingAction;
 }
 
 const SUGGESTED_QUESTIONS = [
@@ -16,11 +23,41 @@ const SUGGESTED_QUESTIONS = [
   'How many sessions were held today?',
 ];
 
+const CONFIRM_RE = /^(yes|y|confirm|proceed|ok|do it|go ahead)\.?$/i;
+
 const AIAssistantPage: React.FC = () => {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
+  const pendingActionRef = useRef<PendingAction | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  const confirmPendingAction = async (pending: PendingAction) => {
+    setLoading(true);
+    try {
+      const { data } = await apiClient.post('/ai/query', {
+        question: 'yes',
+        confirmAction: true,
+        pendingAction: pending,
+      });
+      pendingActionRef.current = null;
+      setMessages((prev) => [...prev, {
+        id: crypto.randomUUID(),
+        role: 'assistant',
+        content: data.answer,
+        timestamp: new Date(),
+      }]);
+    } catch {
+      setMessages((prev) => [...prev, {
+        id: crypto.randomUUID(),
+        role: 'assistant',
+        content: 'Sorry, I could not complete that action.',
+        timestamp: new Date(),
+      }]);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const submitQuery = async (text: string) => {
     if (!text.trim()) return;
@@ -36,7 +73,27 @@ const AIAssistantPage: React.FC = () => {
     setLoading(true);
 
     try {
-      const { data } = await apiClient.post('/ai/query', { question: text.trim() });
+      const isConfirm = CONFIRM_RE.test(text.trim()) && pendingActionRef.current;
+      const { data } = await apiClient.post('/ai/query', {
+        question: text.trim(),
+        ...(isConfirm
+          ? { confirmAction: true, pendingAction: pendingActionRef.current }
+          : {}),
+      });
+
+      if (data.requiresConfirmation && data.pendingAction) {
+        pendingActionRef.current = data.pendingAction;
+        setMessages((prev) => [...prev, {
+          id: crypto.randomUUID(),
+          role: 'assistant',
+          content: data.answer,
+          timestamp: new Date(),
+          pendingAction: data.pendingAction,
+        }]);
+        return;
+      }
+
+      pendingActionRef.current = null;
       const assistantMessage: Message = {
         id: crypto.randomUUID(),
         role: 'assistant',
@@ -129,6 +186,16 @@ const AIAssistantPage: React.FC = () => {
                 }`}
               >
                 <p className="whitespace-pre-wrap text-sm">{msg.content}</p>
+                {msg.pendingAction && (
+                  <button
+                    type="button"
+                    onClick={() => void confirmPendingAction(msg.pendingAction!)}
+                    disabled={loading}
+                    className="mt-3 w-full px-3 py-2 text-xs font-semibold rounded-xl bg-amber-600/90 hover:bg-amber-500 text-white disabled:opacity-50"
+                  >
+                    Confirm: {msg.pendingAction.description}
+                  </button>
+                )}
                 <p
                   className={`text-xs mt-2 ${
                     msg.role === 'user' ? 'text-purple-200/70' : 'text-gray-500'
