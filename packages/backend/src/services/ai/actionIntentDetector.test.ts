@@ -140,4 +140,13 @@ describe('actionIntentDetector role scoping (regex path)', () => {
     expect(result.isAction).toBe(true);
     expect(result.action).toBe('send_class_message');
   });
+
+  it('detects student explain_reminders for remind-me phrasing', async () => {
+    const result = await actionIntentDetector.detect(
+      'will you remind me at that time please',
+      UserRole.STUDENT,
+    );
+    expect(result.isAction).toBe(true);
+    expect(result.action).toBe('explain_reminders');
+  });
 });

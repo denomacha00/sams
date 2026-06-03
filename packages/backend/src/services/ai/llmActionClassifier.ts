@@ -27,6 +27,7 @@ Rules:
 - If ambiguous between multiple actions, pick the highest confidence one
 - Questions asking "how many" teachers, students, or classes in the user's department are action requests (e.g. view_department_stats, get_school_stats), not generic informational chat — classify them when a matching stats action exists
 - "Send message to class", "notify students", "notify department", "notify school" are action requests when a matching send_* action exists for the role
+- "Remind me at class time", "set a reminder", or "will you remind me" for students map to explain_reminders (not a generic refusal)
 - Do not classify general knowledge or policy questions as actions`;
 
 // ─── Classifier ───────────────────────────────────────────────────────────────

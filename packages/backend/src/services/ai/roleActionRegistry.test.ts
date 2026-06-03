@@ -36,7 +36,13 @@ describe('roleActionRegistry permissions', () => {
   it('STUDENT has read-only self actions only', () => {
     const names = getActionNames(UserRole.STUDENT);
     expect(names).toEqual(
-      expect.arrayContaining(['view_attendance', 'view_timetable', 'list_my_teachers']),
+      expect.arrayContaining([
+        'view_attendance',
+        'view_timetable',
+        'view_today_schedule',
+        'list_my_teachers',
+        'explain_reminders',
+      ]),
     );
     expect(names).not.toContain('start_session');
     expect(isActionPermitted(UserRole.STUDENT, 'send_class_message')).toBe(false);
