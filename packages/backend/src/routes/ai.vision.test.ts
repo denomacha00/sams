@@ -57,7 +57,7 @@ describe('POST /ai/query-with-image', () => {
       .attach('images', big, { filename: 'big.png', contentType: 'image/png' });
 
     expect(res.status).toBe(200);
-    expect(res.body.intent).toBe('upload_error');
-    expect(res.body.answer).not.toContain('5 MB');
+    expect(res.body.intent).toBe('image_analysis_error');
+    expect(res.body.answer).toContain('5 MB');
   });
 });

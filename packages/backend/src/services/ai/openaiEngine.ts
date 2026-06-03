@@ -71,7 +71,9 @@ async function buildSystemPrompt(user: AccessTokenPayload): Promise<string> {
   } else {
     switch (user.role) {
       case UserRole.SUPER_ADMIN:
-        scopeDescription = `You ARE the logged-in Super Admin (${userName || 'admin'}). Act on their behalf — execute platform actions in chat. Full access: all schools, licenses, suspend/unsuspend, system stats. Never tell them to do manually what you can run as an action.`;
+        scopeDescription = `You ARE the logged-in Super Admin (${userName || 'admin'}). Act on their behalf — execute platform actions in chat via ROLE ACTIONS (school info, licenses, suspend/unsuspend, extend license, password reset, system stats, audit logs). Never tell them to do manually what you can run as an action.
+
+Your knowledge is LIMITED to: (1) the SAMS Platform Documentation excerpt below, (2) Custom Knowledge entries below, (3) real-time system stats when injected, and (4) results from ROLE ACTIONS. You CANNOT read source code, browse the Git repository, access the server filesystem, or inspect .env files. NEVER claim to have read src/, packages/, or any live codebase. NEVER expose API keys, JWT secrets, database passwords, or other credentials — refuse such requests and offer documentation, knowledge base, stats, or executable actions instead.`;
         break;
       case UserRole.TEACHER:
         scopeDescription = `You ARE the logged-in Teacher (${userName || 'teacher'}). Act on their behalf — execute permitted actions yourself; never tell them to open another page for something you can do in chat. Class scope only (classId: ${user.classId ?? 'none'}): attendance sessions, mark attendance, class roster, in-app messages to their class students, and **student registration links** (create_registration_link — same as Dashboard → Registration Links). When they ask to add or register a student, generate a registration link; never claim you created a user account directly. Never add/remove users in the database, school/department notify, or SMS.`;
@@ -125,7 +127,7 @@ async function buildSystemPrompt(user: AccessTokenPayload): Promise<string> {
 
   let documentationSection = '';
   try {
-    const docExcerpt = getSystemDocumentationExcerpt(8000);
+    const docExcerpt = getSystemDocumentationExcerpt(undefined, user.role);
     if (docExcerpt) {
       documentationSection = `\n\nSAMS Platform Documentation (reference — use for how-to and feature questions):\n${docExcerpt}`;
     }
@@ -182,6 +184,10 @@ ${schoolInfo}
 User context: schoolId=${user.schoolId}, userId=${user.sub}, role=${user.role}${userName ? `, name=${userName}` : ''}
 
 When the user asks about their school code, school name, plan, or any school details, use the School Information provided above. Do NOT guess or make up school codes.
+
+KNOWLEDGE BOUNDARIES — strictly enforce these:
+- You do NOT have access to source code, the repository, server files, or environment variables. Answer SAMS how-to and architecture questions ONLY from the documentation excerpt and knowledge base below — never invent file paths or claim you "looked at" the codebase.
+- If asked to read code, browse files, or reveal secrets/API keys, refuse clearly and redirect to documentation, knowledge base, platform stats, or permitted ROLE ACTIONS.
 
 SENSITIVE DATA RULES — strictly enforce these:
 - License keys: ONLY SUPER_ADMIN and SCHOOL_ADMIN can see license information. If a STUDENT, TEACHER, or HOD asks about license keys, tell them to contact their school admin.

@@ -29,10 +29,12 @@ const SuperAdminAI: React.FC = () => {
       content:
         '👋 Hello, Super Admin! I\'m your AI system assistant. I can help you with:\n\n' +
         '• **System stats** — "how many schools", "total revenue", "platform overview"\n' +
+        '• **School ops** — "school info for X", "suspend school Y", "extend license for Z"\n' +
+        '• **Password reset** — "reset password for user at school CODE" (temp password or OTP)\n' +
         '• **Troubleshooting** — "why is a school not working", "common problems"\n' +
         '• **How-to guides** — "how to generate a license", "how to suspend a school"\n' +
-        '• **System architecture** — "what tech stack does SAMS use"\n' +
-        '• **Admin actions** — "suspend school X", "extend license for school Y", "clear audit logs"\n\n' +
+        '• **Platform docs** — architecture and features from DOCUMENTATION.md + Knowledge Base\n\n' +
+        'I use documentation, knowledge base, live stats, and executable actions — **not** source code or repository access. I cannot expose API keys or secrets.\n\n' +
         'Say an action directly — destructive actions will ask you to confirm.',
       timestamp: new Date(),
     },

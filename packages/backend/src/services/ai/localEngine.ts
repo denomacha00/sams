@@ -1230,9 +1230,30 @@ Developed by Denis Macharia for Kenyan schools. Ask me anything specific!`;
 function handleSuperAdminHelp(question: string): AIQueryResult {
   const q = question.toLowerCase();
 
+  if (
+    /source\s*code|read\s*(the\s*)?(repo|repository|codebase|files)|browse\s*(the\s*)?(repo|repository|codebase|files)|packages\/|src\/|\.env|api\s*keys?|jwt\s*secret|database\s*password|show\s*me\s*the\s*code/i.test(
+      q,
+    )
+  ) {
+    return {
+      answer: `🔒 **Knowledge boundaries**
+
+I cannot read source code, browse the Git repository, access server files, or expose secrets (API keys, JWT secrets, database passwords, .env values).
+
+**What I can use instead:**
+• **DOCUMENTATION.md** excerpt — architecture, features, deployment, security (curated reference, not live file access)
+• **Knowledge Base** — policies and notes added by Super Admins
+• **ROLE ACTIONS** — school info, licenses, suspend/unsuspend, password reset, system stats
+• **Platform stats** — live counts from the database
+
+Ask a how-to question, request platform stats, or run an admin action directly.`,
+      intent: 'super_admin_help',
+    };
+  }
+
   if (/tech\s*stack|architecture|infrastructure|how\s*does\s*the\s*(backend|system)\s*work|what\s*tech/i.test(q)) {
     return {
-      answer: `🏗️ **SAMS System Architecture**
+      answer: `🏗️ **SAMS System Architecture** *(from DOCUMENTATION.md — not live codebase access)*
 
 **Frontend (Super Admin Panel):**
 • React 18 + TypeScript + Vite
@@ -1409,15 +1430,18 @@ Here's what you can do as a Super Admin:
 • Clear audit logs when needed ("clear audit logs")
 • Monitor active sessions across schools
 
+**Knowledge sources:** DOCUMENTATION.md excerpt, Knowledge Base entries, live database stats, and ROLE ACTIONS below — **not** source code or repository access.
+
 **Quick Commands (tell me):**
 • "how many schools" — Get platform stats
+• "school info for X" — School details
 • "suspend school X" — Suspend a school
 • "extend license for X" — Extend a license
 • "generate a license for Basic plan" — Generate a key
 • "clear audit logs" — Purge audit log records (confirm when prompted)
 • "reset password for jsmith at school ABC123" — Set temp password (confirm when prompted)
 • "send reset code for user@school.com at school ABC123" — OTP reset via SMS/email
-• "system architecture" — View tech stack
+• "system architecture" — View tech stack (from documentation)
 • "common problems" — Troubleshooting guide
 
 What would you like help with?`,
