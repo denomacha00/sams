@@ -47,12 +47,47 @@ export function getAiAuthHint(intent?: string): string | null {
 
 export function getAiErrorMessage(err: unknown, fallback: string): string {
   const axiosErr = err as {
-    response?: { data?: { answer?: string; error?: string; intent?: string } };
+    message?: string;
+    code?: string;
+    response?: {
+      status?: number;
+      data?: { answer?: string; error?: string; intent?: string; code?: string };
+    };
   };
+  const status = axiosErr.response?.status;
   const data = axiosErr.response?.data;
+
   if (data?.answer) return data.answer;
   if (data?.error) return data.error;
+
   const authHint = getAiAuthHint(data?.intent);
   if (authHint) return authHint;
+
+  if (data?.code === 'SESSION_EXPIRED' || status === 401) {
+    return getAiAuthHint('session_expired') ?? fallback;
+  }
+  if (status === 413) {
+    return 'The image upload is too large. Use images under 5 MB each (up to 4 images), then try again.';
+  }
+  if (status === 429 || data?.code === 'RATE_LIMITED') {
+    return 'Too many requests. Wait a moment and try again.';
+  }
+  if (status === 503) {
+    return 'The server is starting or temporarily unavailable. Try again in a moment.';
+  }
+  if (!axiosErr.response) {
+    if (axiosErr.code === 'ECONNABORTED' || axiosErr.message?.toLowerCase().includes('timeout')) {
+      return 'The request timed out. Check your connection and try again.';
+    }
+    if (axiosErr.message?.toLowerCase().includes('network')) {
+      return 'Network error — check your connection and try again.';
+    }
+  }
+
   return fallback;
+}
+
+/** True when a 200 vision/query response still indicates a provider or config failure. */
+export function isAiVisionFailureIntent(intent?: string): boolean {
+  return intent === 'image_analysis_error' || intent === 'ai_not_configured';
 }

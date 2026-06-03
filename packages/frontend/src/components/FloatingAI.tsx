@@ -6,6 +6,7 @@ import {
   getAiErrorMessage,
   isAiAuthIntent,
   isAiUnavailableIntent,
+  isAiVisionFailureIntent,
   loadAiThreadId,
   saveAiThreadId,
 } from '../lib/aiChat';
@@ -154,7 +155,11 @@ const FloatingAI: React.FC = () => {
 
         const { data } = await apiClient.post('/ai/query-with-image', formData);
         setMessages((prev) => [...prev, {
-          id: crypto.randomUUID(), role: 'assistant', content: data.answer, timestamp: new Date(),
+          id: crypto.randomUUID(),
+          role: 'assistant',
+          content: data.answer,
+          timestamp: new Date(),
+          isError: isAiVisionFailureIntent(data.intent) || isAiUnavailableIntent(data.intent),
         }]);
         return;
       }

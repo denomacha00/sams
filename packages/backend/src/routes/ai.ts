@@ -1,6 +1,6 @@
-import { Router, type Request, type Response, type NextFunction } from 'express';
+import { Router, type Request, type Response, type NextFunction, type RequestHandler } from 'express';
 import jwt from 'jsonwebtoken';
-import multer from 'multer';
+import multer, { type Multer } from 'multer';
 import { type AccessTokenPayload, UserRole } from '@sams/shared';
 import { aiService } from '../services/aiService';
 import { openaiQuery } from '../services/ai/openaiEngine';
@@ -9,7 +9,9 @@ import { AppError } from '../middleware/errors';
 import {
   formatProviderError,
   getMissingAIKeyMessage,
+  hasFallbackAIKey,
   hasPrimaryAIKey,
+  getVisionClientConfigs,
   runVisionChatCompletion,
 } from '../services/ai/aiProviderConfig';
 
@@ -24,6 +26,38 @@ const aiUpload = multer({
 });
 
 export const aiRouter = Router();
+
+/** Return multer failures as chat-shaped JSON (200) instead of a bare 500. */
+function aiUploadMiddleware(
+  upload: Multer,
+  field: string,
+  maxCount: number,
+): RequestHandler {
+  return (req, res, next) => {
+    upload.array(field, maxCount)(req, res, (err: unknown) => {
+      if (!err) {
+        next();
+        return;
+      }
+      const code = (err as { code?: string }).code;
+      let answer = 'Image upload failed. Please try again.';
+      if (code === 'LIMIT_FILE_SIZE') {
+        answer = 'Each image must be 5 MB or smaller.';
+      } else if (code === 'LIMIT_FILE_COUNT') {
+        answer = 'You can upload up to 4 images at once.';
+      } else if (code === 'LIMIT_UNEXPECTED_FILE') {
+        answer = 'Unexpected file field. Use the image upload button only.';
+      } else if (err instanceof Error && err.message.includes('Only image')) {
+        answer = 'Only image files are allowed (JPEG, PNG, WebP, etc.).';
+      }
+      res.status(200).json({
+        answer,
+        intent: 'image_analysis_error',
+        engine: 'local',
+      });
+    });
+  };
+}
 
 // ─── Optional Auth Middleware ─────────────────────────────────────────────────
 // Tries to parse the JWT token if present, but doesn't reject if missing.
@@ -319,7 +353,7 @@ aiRouter.post('/voice', async (req: Request, res: Response): Promise<void> => {
  * POST /api/v1/ai/query-with-image
  * Accepts up to 4 image uploads + question, sends to vision model for analysis.
  */
-aiRouter.post('/query-with-image', aiUpload.array('images', 4), async (req: Request, res: Response): Promise<void> => {
+aiRouter.post('/query-with-image', aiUploadMiddleware(aiUpload, 'images', 4), async (req: Request, res: Response): Promise<void> => {
   try {
     const files = (req as any).files as Express.Multer.File[];
     if (!files || files.length === 0) {
@@ -333,8 +367,17 @@ aiRouter.post('/query-with-image', aiUpload.array('images', 4), async (req: Requ
       image_url: { url: `data:${file.mimetype};base64,${file.buffer.toString('base64')}` },
     }));
 
-    if (!hasPrimaryAIKey()) {
+    if (!hasPrimaryAIKey() && !hasFallbackAIKey()) {
       throw new AppError(503, 'CONFIG_ERROR', getMissingAIKeyMessage());
+    }
+
+    const visionConfigs = getVisionClientConfigs({ timeoutMs: 60000 });
+    if (visionConfigs.length === 0) {
+      throw new AppError(
+        503,
+        'CONFIG_ERROR',
+        'Image analysis requires OPENAI_API_KEY or OPENAI_FALLBACK_KEY (OpenRouter) with VISION_MODEL set on the server.',
+      );
     }
 
     const answer = await runVisionChatCompletion(
@@ -349,9 +392,11 @@ aiRouter.post('/query-with-image', aiUpload.array('images', 4), async (req: Requ
     });
   } catch (err) {
     if (err instanceof AppError) {
+      const intent =
+        err.code === 'CONFIG_ERROR' ? 'ai_not_configured' : 'image_analysis_error';
       res.status(200).json({
         answer: err.message,
-        intent: 'ai_not_configured',
+        intent,
         engine: 'local',
       });
       return;

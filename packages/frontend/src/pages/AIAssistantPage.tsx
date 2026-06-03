@@ -6,6 +6,7 @@ import {
   getAiErrorMessage,
   isAiAuthIntent,
   isAiUnavailableIntent,
+  isAiVisionFailureIntent,
   loadAiThreadId,
   saveAiThreadId,
 } from '../lib/aiChat';
@@ -125,7 +126,7 @@ const AIAssistantPage: React.FC = () => {
           role: 'assistant',
           content: data.answer,
           timestamp: new Date(),
-          isError: isAiUnavailableIntent(data.intent),
+          isError: isAiVisionFailureIntent(data.intent) || isAiUnavailableIntent(data.intent),
         }]);
         return;
       }

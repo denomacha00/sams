@@ -43,6 +43,8 @@ const PUBLIC_PATHS = [
   '/api/v1/activate',
   '/api/v1/payments/callback',
   '/api/v1/ai/query',
+  '/api/v1/ai/query-with-image',
+  '/api/v1/ai/generate-image',
   '/api/v1/ai/voice',
 ];
 

@@ -242,7 +242,7 @@ export function getVisionClientConfigs(options?: { timeoutMs?: number }): Vision
   const fallbackUrl = process.env.OPENAI_FALLBACK_URL?.trim() || DEFAULT_OPENROUTER_BASE_URL;
   const fallbackKey = process.env.OPENAI_FALLBACK_KEY?.trim();
   const primaryIsGroq = isGroqBaseURL(primaryUrl);
-  const fallbackIsOpenRouter = Boolean(fallbackKey) && isOpenRouterBaseURL(fallbackUrl);
+  const fallbackIsOpenRouter = hasFallbackAIKey() && isOpenRouterBaseURL(fallbackUrl);
 
   const makeFallbackClient = (): OpenAI =>
     new OpenAI({

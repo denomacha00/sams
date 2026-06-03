@@ -65,6 +65,17 @@ describe('aiProviderConfig', () => {
     expect(resolveVisionModel()).toBe('custom/vision-model');
   });
 
+  it('does not use placeholder OpenRouter key for vision fallback', () => {
+    process.env.OPENAI_API_KEY = 'gsk_test';
+    process.env.OPENAI_BASE_URL = 'https://api.groq.com/openai/v1';
+    process.env.OPENAI_FALLBACK_KEY = 'sk-or-v1-your-openrouter-key';
+    process.env.OPENAI_FALLBACK_URL = 'https://openrouter.ai/api/v1';
+
+    const configs = getVisionClientConfigs();
+    expect(configs.every((c) => c.label === 'fallback')).toBe(false);
+    expect(configs[0]?.label).toBe('primary');
+  });
+
   it('uses OpenRouter fallback client for vision when primary is Groq', () => {
     process.env.OPENAI_API_KEY = 'gsk_test';
     process.env.OPENAI_BASE_URL = 'https://api.groq.com/openai/v1';

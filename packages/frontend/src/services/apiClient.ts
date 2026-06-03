@@ -9,7 +9,14 @@ const apiClient = axios.create({
 // Inject Authorization from Zustand (then localStorage); let axios set multipart boundaries for FormData
 apiClient.interceptors.request.use((config: InternalAxiosRequestConfig) => {
   if (config.data instanceof FormData && config.headers) {
-    delete config.headers['Content-Type'];
+    const headers = config.headers;
+    if (typeof headers.delete === 'function') {
+      headers.delete('Content-Type');
+      headers.delete('content-type');
+    } else {
+      delete (headers as Record<string, unknown>)['Content-Type'];
+      delete (headers as Record<string, unknown>)['content-type'];
+    }
   }
   const accessToken = readAccessToken();
   if (accessToken && config.headers) {
