@@ -1,6 +1,7 @@
 import type { ActionDefinition, ActionHandler } from '../roleActionRegistry';
 import { fetchDepartmentStats, formatDepartmentStatsAnswer } from '../departmentStatsQuery';
 import { extractMessageBody, parseNotificationTargetRole } from '../notificationActionParams';
+import { createRegistrationLinkActionDef } from './registrationLinkAction';
 
 // ─── Handlers ─────────────────────────────────────────────────────────────────
 
@@ -195,6 +196,7 @@ export const DEPARTMENT_STATS_PATTERNS: RegExp[] = [
 // ─── Action Definitions ───────────────────────────────────────────────────────
 
 export const hodActions: ActionDefinition[] = [
+  createRegistrationLinkActionDef,
   {
     action: 'add_teacher',
     description: 'Assign a teacher to your department',

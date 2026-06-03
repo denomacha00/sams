@@ -66,9 +66,9 @@ const ROLE_SCOPE_NOTES: Partial<Record<UserRole, string>> = {
   [UserRole.SCHOOL_ADMIN]:
     'School-wide user, class, and department management; in-app school/department notifications via chat. No platform license/suspend (Super Admin only). SMS via Notifications UI only.',
   [UserRole.HOD]:
-    'Department teachers, stats, and in-app department/class notifications. Cannot add/remove school users, school-wide notify, or manage licenses.',
+    'Department teachers, stats, student registration links for department classes, and in-app department/class notifications. Cannot add/remove school users directly, school-wide notify, or manage licenses.',
   [UserRole.TEACHER]:
-    'Your assigned class only: attendance sessions, class roster, in-app class messages to students. No user management, no department/school notify, no SMS via AI.',
+    'Your assigned class only: attendance sessions, class roster, in-app class messages to students, and student registration links (invite via link — same as Registration Links page; never add users directly). No user management, no department/school notify, no SMS via AI.',
   [UserRole.STUDENT]:
     'Your own attendance and timetable only. No administrative or messaging actions.',
 };

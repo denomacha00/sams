@@ -27,7 +27,26 @@ describe('actionIntentDetector role scoping (regex path)', () => {
     expect(admin.action).toBe('add_user');
 
     const teacher = await actionIntentDetector.detect('add student Jane Doe', UserRole.TEACHER);
-    expect(teacher.isAction).toBe(false);
+    expect(teacher.isAction).toBe(true);
+    expect(teacher.action).toBe('create_registration_link');
+    expect(teacher.params?.studentName).toBe('Jane Doe');
+    expect(teacher.requiresConfirmation).toBe(false);
+  });
+
+  it('detects teacher invite student phrasing', async () => {
+    const link = await actionIntentDetector.detect('generate enrollment link', UserRole.TEACHER);
+    expect(link.isAction).toBe(true);
+    expect(link.action).toBe('create_registration_link');
+
+    const named = await actionIntentDetector.detect('add student Ken Adim', UserRole.TEACHER);
+    expect(named.action).toBe('create_registration_link');
+    expect(named.params?.studentName).toBe('Ken Adim');
+  });
+
+  it('detects HOD student registration link intent', async () => {
+    const result = await actionIntentDetector.detect('register new student', UserRole.HOD);
+    expect(result.isAction).toBe(true);
+    expect(result.action).toBe('create_registration_link');
   });
 
   it('student view_attendance is student-only', async () => {

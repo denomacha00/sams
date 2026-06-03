@@ -1,4 +1,5 @@
 import type { ActionDefinition, ActionHandler } from '../roleActionRegistry';
+import { createRegistrationLinkActionDef } from './registrationLinkAction';
 
 // ─── Handlers ─────────────────────────────────────────────────────────────────
 
@@ -181,6 +182,7 @@ const sendClassMessageHandler: ActionHandler = async (params, scope) => {
 // ─── Action Definitions ───────────────────────────────────────────────────────
 
 export const teacherActions: ActionDefinition[] = [
+  createRegistrationLinkActionDef,
   {
     action: 'start_session',
     description: 'Start an attendance session for your class',

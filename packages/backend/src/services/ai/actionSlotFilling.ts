@@ -47,6 +47,7 @@ const ACTION_SLOT_ORDER: Record<string, SlotName[]> = {
   mark_attendance: ['studentName'],
   create_class: ['className'],
   create_department: ['departmentName'],
+  create_registration_link: ['classId'],
 };
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -137,6 +138,17 @@ export async function resolveActionParams(
 
   if (user.role === UserRole.TEACHER && action === 'send_class_message') {
     if (!resolved.classId) {
+      const classId = await resolveTeacherClassId(user.sub, user.classId);
+      if (classId) resolved.classId = classId;
+    }
+  }
+
+  if (
+    (user.role === UserRole.TEACHER || user.role === UserRole.HOD) &&
+    action === 'create_registration_link'
+  ) {
+    if (!resolved.targetRole) resolved.targetRole = 'STUDENT';
+    if (user.role === UserRole.TEACHER && !resolved.classId) {
       const classId = await resolveTeacherClassId(user.sub, user.classId);
       if (classId) resolved.classId = classId;
     }
@@ -307,11 +319,20 @@ export async function getNextMissingSlot(
     }
 
     if (slot === 'classId') {
-      if (resolved.notifyScope !== 'class' && action !== 'send_class_notification') continue;
+      if (
+        resolved.notifyScope !== 'class' &&
+        action !== 'send_class_notification' &&
+        action !== 'create_registration_link'
+      ) {
+        continue;
+      }
       if (isFilled(resolved.classId)) continue;
 
       const deptId =
         user.role === UserRole.HOD ? user.departmentId : undefined;
+      if (!deptId && user.role === UserRole.HOD && action === 'create_registration_link') {
+        return slot;
+      }
       if (!deptId && user.role === UserRole.HOD) return slot;
 
       const classes = deptId
@@ -392,9 +413,15 @@ export async function buildSlotQuestion(
             take: 30,
           });
       if (classes.length === 0) {
+        if (action === 'create_registration_link') {
+          return 'Which class is this registration link for? (No classes found in your department.)';
+        }
         return 'Which class should receive this? (No classes found in your scope.)';
       }
       const names = classes.map((c) => `**${c.name}**`).join(', ');
+      if (action === 'create_registration_link') {
+        return `Which class should the new student join? Reply with one of: ${names}`;
+      }
       return `Which class should receive this? Reply with one of: ${names}`;
     }
     case 'departmentName': {

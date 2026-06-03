@@ -22,6 +22,7 @@ describe('roleActionRegistry permissions', () => {
     expect(isActionPermitted(UserRole.TEACHER, 'mark_attendance')).toBe(true);
     expect(isActionPermitted(UserRole.TEACHER, 'view_class_roster')).toBe(true);
     expect(isActionPermitted(UserRole.TEACHER, 'send_class_message')).toBe(true);
+    expect(isActionPermitted(UserRole.TEACHER, 'create_registration_link')).toBe(true);
   });
 
   it('TEACHER cannot run school admin or platform actions', () => {

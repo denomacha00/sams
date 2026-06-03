@@ -18,6 +18,7 @@ describe('buildRoleActionsPromptSection', () => {
     expect(section).toContain('start_session');
     expect(section).toContain('view_class_roster');
     expect(section).toContain('send_class_message');
+    expect(section).toContain('create_registration_link');
     expect(section).toContain('FORBIDDEN');
     expect(section).toContain('add_user');
     expect(section).not.toContain('add_knowledge');
