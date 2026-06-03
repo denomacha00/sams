@@ -94,10 +94,17 @@ if [[ -n "$HEALTH" ]]; then
   fi
 
   SMS_SANDBOX="$(echo "$HEALTH" | node -e "try{const h=JSON.parse(require('fs').readFileSync(0,'utf8'));process.stdout.write(h.sms?.sandbox?'1':'0')}catch{process.stdout.write('0')}" 2>/dev/null || echo 0)"
+  SMS_MODE="$(echo "$HEALTH" | node -e "try{const h=JSON.parse(require('fs').readFileSync(0,'utf8'));const s=h.sms||{};process.stdout.write(s.mode||(s.sandbox?'sandbox':s.configured?'production':''))}catch{process.stdout.write('')}" 2>/dev/null || echo "")"
   NODE_ENV_VAL="$(grep -E '^NODE_ENV=' "$ROOT/packages/backend/.env" 2>/dev/null | head -1 | cut -d= -f2- | tr -d '\"' || true)"
   [[ -z "$NODE_ENV_VAL" && -f "$ROOT/secrets/providers.env" ]] && NODE_ENV_VAL="$(grep -E '^NODE_ENV=' "$ROOT/secrets/providers.env" 2>/dev/null | head -1 | cut -d= -f2- | tr -d '\"' || true)"
-  if [[ "${NODE_ENV_VAL:-}" == "production" && "${SMS_SANDBOX:-0}" == "1" ]]; then
-    warn "SMS sandbox mode while NODE_ENV=production — use bash scripts/configure-production-at.sh"
+  if [[ "${NODE_ENV_VAL:-}" == "production" ]]; then
+    if [[ "${SMS_SANDBOX:-0}" == "1" || "${SMS_MODE:-}" == "sandbox" ]]; then
+      fail "SMS sandbox while NODE_ENV=production — run: bash scripts/configure-production-at.sh (mode 2)"
+    elif [[ -n "${SMS_MODE:-}" && "${SMS_MODE:-}" != "production" ]]; then
+      fail "SMS mode=${SMS_MODE} — expected production (configure AT in secrets/providers.env)"
+    elif [[ "${SMS_MODE:-}" == "production" ]]; then
+      pass "SMS mode=production"
+    fi
   fi
 
   BIO_DIST="$ROOT/packages/backend/dist/routes/biometric.js"

@@ -498,7 +498,10 @@ Can execute via natural language:
 
 ### Deploy Commands
 
-**If `node -v` is v18 or lower:** run `bash scripts/upgrade-node20.sh` **before** `deploy-production.sh`. Deploying on Node 18 can leave PM2 showing `sams-api` online while `GET http://127.0.0.1:3001/health` returns connection refused (process exits before bind or native/runtime mismatch). After upgrading, run `npm ci` and a full deploy so binaries match Node 20.
+**If `node -v` is v18 or lower:** upgrade **before** deploy or go-live. Deploying on Node 18 can leave PM2 showing `sams-api` online while `GET http://127.0.0.1:3001/health` returns connection refused (process exits before bind or native/runtime mismatch). After upgrading, run `npm ci` and a full deploy so binaries match Node 20.
+
+- **Ubuntu VPS without nvm:** `bash scripts/install-node20-ubuntu.sh` (NodeSource apt)
+- **Per-user nvm:** `bash scripts/upgrade-node20.sh`
 
 ```bash
 cd /var/www/sams
@@ -536,7 +539,17 @@ npm ci
 bash scripts/deploy-production.sh
 ```
 
-Or run the idempotent helper (installs via nvm when Node < 20):
+**Option A — NodeSource (system Node, no nvm):**
+
+```bash
+cd /var/www/sams
+bash scripts/install-node20-ubuntu.sh   # sudo apt via deb.nodesource.com
+node -v   # v20.x.x; which node → /usr/bin/node
+npm ci
+bash scripts/go-live.sh
+```
+
+**Option B — nvm (per deploy user):**
 
 ```bash
 cd /var/www/sams
@@ -544,7 +557,7 @@ bash scripts/upgrade-node20.sh
 bash scripts/deploy-production.sh
 ```
 
-Ensure the same shell user that runs `pm2` uses nvm default 20 (`which node` should point under `~/.nvm/`). After upgrading, `bash scripts/post-deploy-verify.sh` should report `OK Node v20.x.x`.
+Ensure the same shell user that runs `pm2` uses Node 20 (`which node` → `/usr/bin/node` or `~/.nvm/`). After upgrading, `bash scripts/post-deploy-verify.sh` should report `OK Node v20.x.x`.
 
 ### VPS helper scripts
 | Script | Purpose |
@@ -553,6 +566,8 @@ Ensure the same shell user that runs `pm2` uses nvm default 20 (`which node` sho
 | `scripts/post-deploy-verify.sh` | Dist artifacts, PM2, `/health` (incl. AI/SMS block), optional AI/login smoke |
 | `scripts/smoke-production.sh` | Lightweight curl smoke on VPS |
 | `scripts/smoke-role-checks.md` | Curl examples + manual checks by role |
+| `scripts/go-live.sh` | Backup secrets, pull main, build, migrate, readiness gate, restart, verify |
+| `scripts/install-node20-ubuntu.sh` | Node 20 via NodeSource apt (no nvm) |
 | `scripts/upgrade-node20.sh` | Idempotent Node 20 via nvm when current version < 20 |
 | `scripts/set-production-env.sh` | JWT/QR secrets, `APP_URL`, `CORS`, OTP flags from AT key presence (does not touch `OPENAI_*`) |
 | `scripts/verify-secrets.sh` | Check merged provider env (AI, AT, SMTP, M-Pesa); masks values |
@@ -628,13 +643,19 @@ Use this when onboarding **licensed production schools** (not dev/sandbox). Emai
 | **Attendance flow** | Teacher starts an **active session** before `/biometric/attendance` face scan |
 | **Students** | Enroll face via registration, Settings, or `/biometric/enroll` (Pro+ gate) |
 
-**VPS steps (in order):**
+**One-shot deploy (after secrets are configured):**
 
 ```bash
 cd /var/www/sams
-bash scripts/backup-secrets.sh
+bash scripts/go-live.sh
+```
 
-# 1) Production AT (interactive; writes secrets/providers.env when present)
+**First-time secrets (before go-live):**
+
+```bash
+cd /var/www/sams
+
+# 1) Production AT (interactive; merges AT_* into secrets/providers.env)
 bash scripts/configure-production-at.sh   # choose mode 2 — production only
 
 # 2) Biometric master key (once per server; never commit)
@@ -644,9 +665,7 @@ chmod 600 secrets/providers.env
 # 3) Super Admin: set school plan to Professional or Enterprise
 
 bash scripts/verify-secrets.sh          # must not FAIL on sandbox AT or missing BIOMETRIC_MASTER_KEY
-bash scripts/production-readiness-check.sh
-bash scripts/restart-api.sh
-bash scripts/post-deploy-verify.sh
+bash scripts/go-live.sh                 # or: production-readiness-check + restart-api + post-deploy-verify
 curl -s http://127.0.0.1:3001/health | grep -E '"mode":"production"|"sandbox":false'
 ```
 
@@ -670,12 +689,10 @@ Use this for first production launch or after any risky change (secrets, AT mode
 
 ```bash
 cd /var/www/sams
-nvm use
-bash scripts/backup-secrets.sh
-git pull origin main
-bash scripts/deploy-production.sh
-bash scripts/post-deploy-verify.sh
-bash scripts/production-readiness-check.sh
+# Node 20+ required (install-node20-ubuntu.sh or upgrade-node20.sh)
+bash scripts/go-live.sh
+# Or CI-style reset deploy:
+# bash scripts/backup-secrets.sh && bash scripts/deploy-production.sh
 ```
 
 Optional deeper smoke (AI uses provider quota):

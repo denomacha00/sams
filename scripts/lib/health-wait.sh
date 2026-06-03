@@ -25,3 +25,28 @@ health_curl_verbose() {
   echo "--- curl -v ${api}/health (last attempt) ---"
   curl -v --max-time 10 "${api}/health" 2>&1 || true
 }
+
+# Print PM2 / Node hints when nothing is listening (curl 000 / connection refused).
+health_diagnose_connection_refused() {
+  local api="${1:?API base URL required}"
+  local code
+  code="$(curl -sS --max-time 3 -o /dev/null -w "%{http_code}" "${api}/health" 2>/dev/null || echo "000")"
+  if [[ "$code" != "000" ]]; then
+    return 0
+  fi
+  echo ""
+  echo "  Diagnose (connection refused — nothing listening on ${api}):"
+  echo "    PM2 may show online while the process exits before binding the port."
+  if command -v pm2 >/dev/null 2>&1; then
+    echo "    pm2 logs sams-api --err --lines 30"
+    echo "    pm2 logs sams-api --lines 30 --nostream"
+    echo "    pm2 describe sams-api"
+  fi
+  local node_major
+  node_major="$(node -p "process.versions.node.split('.')[0]" 2>/dev/null || echo 0)"
+  if [[ "$node_major" -lt 20 ]]; then
+    echo "    Node $(node -v) is below 20 — run: bash scripts/install-node20-ubuntu.sh or scripts/upgrade-node20.sh (DOCUMENTATION.md §9)"
+    echo "    Then: npm ci && bash scripts/deploy-production.sh"
+  fi
+  echo "    Common causes: missing/placeholder JWT_SECRET (64+ chars), Redis/Postgres down, stale dist"
+}

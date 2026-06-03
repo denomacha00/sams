@@ -36,5 +36,7 @@ fi
 
 echo "FAIL  /health did not return HTTP 200 on ${API}" >&2
 health_curl_verbose "$API"
-pm2 logs sams-api --lines 40 --nostream 2>/dev/null || true
+health_diagnose_connection_refused "$API"
+pm2 logs sams-api --err --lines 30 --nostream 2>/dev/null || true
+pm2 logs sams-api --lines 30 --nostream 2>/dev/null || true
 exit 1

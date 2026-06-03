@@ -16,7 +16,8 @@ cd "$ROOT"
 NODE_MAJOR="$(node -p "process.versions.node.split('.')[0]" 2>/dev/null || echo 0)"
 if [[ "$NODE_MAJOR" -lt 20 ]]; then
   echo "WARN: Node $(node -v) — SAMS requires Node 20+ (see .nvmrc)." >&2
-  echo "      Upgrade: cd /var/www/sams && bash scripts/upgrade-node20.sh" >&2
+  echo "      Upgrade (nvm):  bash scripts/upgrade-node20.sh" >&2
+  echo "      Upgrade (apt):  bash scripts/install-node20-ubuntu.sh" >&2
   echo "      Docs: DOCUMENTATION.md §9 — Upgrading Node.js to 20 on Ubuntu VPS" >&2
 fi
 

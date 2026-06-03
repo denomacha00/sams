@@ -25,12 +25,24 @@ if [[ -d /var/www/sams && -f /var/www/sams/secrets/providers.env ]]; then
   PROVIDERS_FILE="/var/www/sams/secrets/providers.env"
 fi
 
-# Prefer providers.env on VPS (overrides .env at runtime via pm2-start merge order).
-TARGET_FILE="$ENV_FILE"
-if [[ -f "$PROVIDERS_FILE" ]]; then
-  TARGET_FILE="$PROVIDERS_FILE"
-  echo "==> Writing AT_* to secrets overlay: $TARGET_FILE"
-elif [[ ! -f "$ENV_FILE" ]]; then
+# AT_* always go to providers.env (merged over .env at runtime). Create file if missing.
+mkdir -p "$(dirname "$PROVIDERS_FILE")"
+if [[ ! -f "$PROVIDERS_FILE" ]]; then
+  EXAMPLE="${ROOT}/secrets/providers.env.example"
+  if [[ -f "$EXAMPLE" ]]; then
+    cp "$EXAMPLE" "$PROVIDERS_FILE"
+    echo "==> Created $PROVIDERS_FILE from template (edit other keys as needed)"
+  else
+    touch "$PROVIDERS_FILE"
+    echo "# Africa's Talking (SMS) — $(date -Iseconds)" >>"$PROVIDERS_FILE"
+    echo "==> Created empty $PROVIDERS_FILE"
+  fi
+  chmod 600 "$PROVIDERS_FILE" 2>/dev/null || true
+fi
+TARGET_FILE="$PROVIDERS_FILE"
+echo "==> Merging AT_* into secrets overlay: $TARGET_FILE"
+
+if [[ ! -f "$ENV_FILE" ]]; then
   echo "ERROR: $ENV_FILE not found. Copy from packages/backend/.env.example first." >&2
   exit 1
 fi
