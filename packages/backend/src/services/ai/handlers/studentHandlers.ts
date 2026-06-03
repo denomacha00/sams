@@ -1,4 +1,5 @@
 import type { ActionDefinition, ActionHandler } from '../roleActionRegistry';
+import { TIMETABLE_VIEW_PATTERNS } from '../timetableQuery';
 import {
   formatStudentHodAnswer,
   formatStudentTeachersAnswer,
@@ -281,14 +282,7 @@ export const studentActions: ActionDefinition[] = [
     action: 'view_timetable',
     description: 'View your class timetable with subjects and teacher names',
     destructive: false,
-    patterns: [
-      /my\s+timetable/i,
-      /show\s+(?:my\s+)?(?:timetable|schedule)/i,
-      /view\s+(?:my\s+)?(?:timetable|schedule)/i,
-      /class\s+(?:timetable|schedule)/i,
-      /what(?:'s| is)\s+(?:my\s+)?(?:class\s+)?schedule/i,
-      /when\s+do\s+(?:i|we)\s+have\s+class/i,
-    ],
+    patterns: TIMETABLE_VIEW_PATTERNS,
     extractParams: () => ({}),
     descriptionTemplate: () =>
       `View your class timetable and schedule.`,

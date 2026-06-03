@@ -1,5 +1,6 @@
 import { prisma } from '../../lib/prisma';
 import { type AccessTokenPayload, UserRole } from '@sams/shared';
+import { isTimetableViewQuery, TIMETABLE_VIEW_PATTERNS } from './timetableQuery';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -131,16 +132,7 @@ const INTENT_PATTERNS: { intent: DetectedIntent; patterns: RegExp[] }[] = [
   },
   {
     intent: 'view_timetable',
-    patterns: [
-      /show\s*(me\s*)?(the\s*)?timetable/i,
-      /view\s*(the\s*)?timetable/i,
-      /my\s*timetable/i,
-      /what('s| is)\s*(the\s*)?(class\s*)?schedule/i,
-      /today('s)?\s*(schedule|timetable|classes)/i,
-      /what\s*(classes|lessons)\s*(do\s*(i|we)\s*have|are\s*there)/i,
-      /timetable\s*(for|of)/i,
-      /display\s*(the\s*)?timetable/i,
-    ],
+    patterns: TIMETABLE_VIEW_PATTERNS,
   },
   {
     intent: 'student_count',
@@ -278,22 +270,28 @@ interface QueryScope {
   classId?: string;
   studentId?: string;
   departmentId?: string;
+  teacherId?: string;
+  role: UserRole;
 }
 
 /**
  * Build a query scope based on the user's role.
  */
 function buildScope(user: AccessTokenPayload): QueryScope {
-  const scope: QueryScope = { schoolId: user.schoolId };
+  const scope: QueryScope = { schoolId: user.schoolId, role: user.role };
 
   switch (user.role) {
     case UserRole.TEACHER:
+      scope.teacherId = user.sub;
       if (user.classId) {
         scope.classId = user.classId;
       }
       break;
     case UserRole.STUDENT:
       scope.studentId = user.sub;
+      if (user.classId) {
+        scope.classId = user.classId;
+      }
       break;
     case UserRole.HOD:
       if (user.departmentId) {
@@ -1045,9 +1043,7 @@ async function handleViewTimetable(scope: QueryScope): Promise<AIQueryResult> {
 
   if (scope.classId) {
     filters.classId = scope.classId;
-  }
-
-  if (scope.studentId) {
+  } else if (scope.studentId) {
     const student = await prisma.user.findUnique({
       where: { id: scope.studentId },
       select: { classId: true },
@@ -1055,6 +1051,21 @@ async function handleViewTimetable(scope: QueryScope): Promise<AIQueryResult> {
     if (student?.classId) {
       filters.classId = student.classId;
     }
+  } else if (scope.teacherId) {
+    filters.teacherId = scope.teacherId;
+  } else if (scope.departmentId) {
+    const deptClasses = await prisma.class.findMany({
+      where: { schoolId, departmentId: scope.departmentId },
+      select: { id: true },
+    });
+    if (deptClasses.length === 0) {
+      return {
+        answer: 'No classes found in your department yet, so there is no department timetable to show.',
+        intent: 'view_timetable',
+        data: { entries: [] },
+      };
+    }
+    filters.classId = { in: deptClasses.map((c) => c.id) };
   }
 
   const entries = await prisma.timetableEntry.findMany({
@@ -1068,8 +1079,14 @@ async function handleViewTimetable(scope: QueryScope): Promise<AIQueryResult> {
   });
 
   if (entries.length === 0) {
+    const roleHint =
+      scope.role === UserRole.STUDENT
+        ? 'Your class has no timetable entries in SAMS yet. Ask your HOD or school office to publish one.'
+        : scope.role === UserRole.TEACHER
+          ? 'No teaching slots are assigned to you in SAMS yet. Ask your HOD to set up the timetable.'
+          : 'No timetable entries found for your scope. Ask your HOD to create or update the timetable.';
     return {
-      answer: 'No timetable entries found for your scope. Ask an admin to generate or create a timetable.',
+      answer: roleHint,
       intent: 'view_timetable',
       data: { entries: [] },
     };
@@ -1570,6 +1587,16 @@ async function handleCustomKnowledge(user: AccessTokenPayload): Promise<AIQueryR
  * Does not require any external AI provider.
  * NEVER throws — always returns a result.
  */
+/** Fetch real timetable data when the message is a view (not generate) request. */
+export async function queryTimetableView(
+  user: AccessTokenPayload,
+  question: string,
+): Promise<AIQueryResult | null> {
+  if (!isTimetableViewQuery(question)) return null;
+  const scope = buildScope(user);
+  return handleViewTimetable(scope);
+}
+
 export async function localQuery(
   user: AccessTokenPayload,
   question: string,

@@ -1,5 +1,5 @@
 import { type AccessTokenPayload, UserRole } from '@sams/shared';
-import { localQuery, type AIQueryResult } from './ai/localEngine';
+import { localQuery, type AIQueryResult, queryTimetableView } from './ai/localEngine';
 import { openaiQuery, openaiQueryWithHistory } from './ai/openaiEngine';
 import { conversationMemoryService } from './conversationMemoryService';
 import { tokenBudgetManager } from './ai/tokenBudgetManager';
@@ -152,6 +152,27 @@ export class AIService {
         intent: localResult.intent,
         engine: 'local',
         data: localResult.data,
+      };
+    }
+
+    // Timetable view queries must never fall through to the LLM (avoids hallucinated schedules).
+    const timetableResult = await queryTimetableView(user, question);
+    if (timetableResult) {
+      if (user.sub !== 'guest') {
+        threadId = await this.safelyPersist(user, question, timetableResult.answer, threadId);
+        return {
+          answer: timetableResult.answer,
+          intent: timetableResult.intent,
+          engine: 'local',
+          data: timetableResult.data,
+          threadId,
+        };
+      }
+      return {
+        answer: timetableResult.answer,
+        intent: timetableResult.intent,
+        engine: 'local',
+        data: timetableResult.data,
       };
     }
 
