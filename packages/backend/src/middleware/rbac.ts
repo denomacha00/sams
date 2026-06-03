@@ -1,6 +1,5 @@
 import { type Request, type Response, type NextFunction } from 'express';
 import { UserRole } from '@sams/shared';
-import { prisma } from '../lib/prisma';
 import { AppError } from './errors';
 
 // ─── Augment Express Request ──────────────────────────────────────────────────
@@ -144,6 +143,7 @@ export async function requireHODScope(
     (typeof body?.classId === 'string' ? body.classId : undefined);
 
   if (classId) {
+    const { prisma } = await import('../lib/prisma');
     const cls = await prisma.class.findUnique({
       where: { id: classId },
       select: { departmentId: true, schoolId: true },
