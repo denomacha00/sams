@@ -497,6 +497,9 @@ Can execute via natural language:
 | Health (on VPS) | `http://127.0.0.1:3001/health` |
 
 ### Deploy Commands
+
+**If `node -v` is v18 or lower:** run `bash scripts/upgrade-node20.sh` **before** `deploy-production.sh`. Deploying on Node 18 can leave PM2 showing `sams-api` online while `GET http://127.0.0.1:3001/health` returns connection refused (process exits before bind or native/runtime mismatch). After upgrading, run `npm ci` and a full deploy so binaries match Node 20.
+
 ```bash
 cd /var/www/sams
 nvm use   # Node 20 per .nvmrc
@@ -506,7 +509,7 @@ bash scripts/post-deploy-verify.sh   # smoke check (also at end of deploy)
 
 ### Upgrading Node.js to 20 on Ubuntu VPS
 
-SAMS requires **Node.js 20+** (see repo `.nvmrc`). If `node -v` shows v18 or lower, upgrade before the next deploy.
+SAMS requires **Node.js 20+** (see repo `.nvmrc`). If `node -v` shows v18 or lower, **upgrade before deploy** — do not run `deploy-production.sh` on Node 18. Post-deploy verify will warn and `/health` may refuse connections until Node 20 and a rebuild.
 
 **Install nvm (once per server user)** if `command -v nvm` fails:
 
@@ -556,7 +559,8 @@ Ensure the same shell user that runs `pm2` uses nvm default 20 (`which node` sho
 | `scripts/verify-ai-env.sh` | Deprecated alias → `verify-secrets.sh --ai-only` |
 | `scripts/backup-secrets.sh` | Backup all provider keys from merged env to `secrets/providers.env.backup.*` (chmod 600) |
 | `scripts/backup-ai-secrets.sh` | Deprecated alias → `backup-secrets.sh` |
-| `scripts/configure-production-at.sh` | Interactive AT sandbox vs production (no committed secrets) |
+| `scripts/configure-production-at.sh` | Interactive AT production setup (refuses sandbox when `NODE_ENV=production`) |
+| `scripts/production-readiness-check.sh` | Fails on sandbox SMS / missing biometric key; checks biometric dist routes |
 
 ### PM2 and environment
 - `packages/backend/bin/pm2-start.js` loads `packages/backend/.env`, then **overlays** gitignored provider secrets (see below).
@@ -612,6 +616,52 @@ Put `OPENAI_*` and optional `OPENAI_FALLBACK_*` in `secrets/providers.env`. Veri
 - Builds all packages
 - Deploys via SSH to VPS
 
+### Real school go-live (SMS + biometric)
+
+Use this when onboarding **licensed production schools** (not dev/sandbox). Email and M-Pesa can wait; SMS and biometric must work end-to-end.
+
+| Requirement | What to configure |
+|-------------|-------------------|
+| **SMS (Africa's Talking)** | Production API key + live `AT_USERNAME` (never `sandbox`) in `secrets/providers.env` |
+| **Biometric** | `BIOMETRIC_MASTER_KEY` (32+ chars, `openssl rand -base64 48`) in merged env |
+| **License** | School on **Professional** or **Enterprise** (Super Admin → school → plan tier) |
+| **Attendance flow** | Teacher starts an **active session** before `/biometric/attendance` face scan |
+| **Students** | Enroll face via registration, Settings, or `/biometric/enroll` (Pro+ gate) |
+
+**VPS steps (in order):**
+
+```bash
+cd /var/www/sams
+bash scripts/backup-secrets.sh
+
+# 1) Production AT (interactive; writes secrets/providers.env when present)
+bash scripts/configure-production-at.sh   # choose mode 2 — production only
+
+# 2) Biometric master key (once per server; never commit)
+# Add to secrets/providers.env: BIOMETRIC_MASTER_KEY="<openssl rand -base64 48>"
+chmod 600 secrets/providers.env
+
+# 3) Super Admin: set school plan to Professional or Enterprise
+
+bash scripts/verify-secrets.sh          # must not FAIL on sandbox AT or missing BIOMETRIC_MASTER_KEY
+bash scripts/production-readiness-check.sh
+bash scripts/restart-api.sh
+bash scripts/post-deploy-verify.sh
+curl -s http://127.0.0.1:3001/health | grep -E '"mode":"production"|"sandbox":false'
+```
+
+**Browser sign-off:**
+
+1. **SCHOOL_ADMIN** → Settings → **Send test SMS** to a real Kenyan number (not AT sandbox whitelist only).
+2. **Student** (Pro school) → enroll face (Settings or `/biometric/enroll`).
+3. **Teacher** → start attendance session → **Biometric attendance** → scan enrolled student → attendance recorded.
+
+**NGINX:** HTTPS on `app.*` and `api.*` unchanged; no sandbox-specific proxy rules. Ensure `CORS_ORIGIN` matches your app URL.
+
+**Do not:** commit `secrets/providers.env`, `.env` with real keys, or use `AT_USERNAME=sandbox` when `NODE_ENV=production`.
+
+---
+
 ### Production go-live checklist
 
 Use this for first production launch or after any risky change (secrets, AT mode, Node upgrade).
@@ -625,6 +675,7 @@ bash scripts/backup-secrets.sh
 git pull origin main
 bash scripts/deploy-production.sh
 bash scripts/post-deploy-verify.sh
+bash scripts/production-readiness-check.sh
 ```
 
 Optional deeper smoke (AI uses provider quota):
@@ -791,9 +842,17 @@ When `SMS_WELCOME_ON_REGISTER` is not `false`, adding or registering a phone sen
 
 `GET /health` returns:
 ```json
-"sms": { "configured": true, "sandbox": false, "username": "yourapp" },
+"sms": {
+  "configured": true,
+  "sandbox": false,
+  "mode": "production",
+  "username": "yourapp",
+  "senderId": "SAMS"
+},
 "otp": { "loginEnabled": false, "passwordResetEnabled": true }
 ```
+
+`mode` is `production`, `sandbox`, or `unconfigured`. For real schools, `/health` must show `"mode":"production"` and `"sandbox":false`. `bash scripts/verify-secrets.sh` **FAIL**s on sandbox AT when `NODE_ENV=production`.
 
 ### Common errors
 

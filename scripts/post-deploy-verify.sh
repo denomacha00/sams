@@ -66,7 +66,10 @@ if [[ -n "$HEALTH" ]]; then
     else console.log('       database: FAIL');
     if(redis===true) console.log('       redis: ok');
     else if(redis===false) console.log('       redis: FAIL');
-    if(h.sms) console.log('       sms:', h.sms.configured ? (h.sms.sandbox?'sandbox':'production') : 'not configured');
+    if(h.sms) {
+      const mode=h.sms.mode||(h.sms.sandbox?'sandbox':'production');
+      console.log('       sms:', h.sms.configured ? mode : 'not configured');
+    }
     else console.log('       sms: unknown (stale backend — rm -rf packages/backend/dist && redeploy)');
     if(h.otp) console.log('       otp login:', h.otp.loginEnabled, '| reset:', h.otp.passwordResetEnabled);
     if(h.ai) {
@@ -89,9 +92,28 @@ if [[ -n "$HEALTH" ]]; then
   else
     pass "AI configured (see /health ai block)"
   fi
+
+  SMS_SANDBOX="$(echo "$HEALTH" | node -e "try{const h=JSON.parse(require('fs').readFileSync(0,'utf8'));process.stdout.write(h.sms?.sandbox?'1':'0')}catch{process.stdout.write('0')}" 2>/dev/null || echo 0)"
+  NODE_ENV_VAL="$(grep -E '^NODE_ENV=' "$ROOT/packages/backend/.env" 2>/dev/null | head -1 | cut -d= -f2- | tr -d '\"' || true)"
+  [[ -z "$NODE_ENV_VAL" && -f "$ROOT/secrets/providers.env" ]] && NODE_ENV_VAL="$(grep -E '^NODE_ENV=' "$ROOT/secrets/providers.env" 2>/dev/null | head -1 | cut -d= -f2- | tr -d '\"' || true)"
+  if [[ "${NODE_ENV_VAL:-}" == "production" && "${SMS_SANDBOX:-0}" == "1" ]]; then
+    warn "SMS sandbox mode while NODE_ENV=production — use bash scripts/configure-production-at.sh"
+  fi
+
+  BIO_DIST="$ROOT/packages/backend/dist/routes/biometric.js"
+  if [[ -f "$BIO_DIST" ]]; then
+    if grep -q "'/match'" "$BIO_DIST" && grep -q "'/enroll'" "$BIO_DIST"; then
+      pass "Biometric routes in backend dist"
+    else
+      fail "Biometric routes missing from dist — rebuild backend"
+    fi
+  else
+    warn "Biometric dist smoke skipped — build backend first"
+  fi
 else
   fail "GET /health — no HTTP 200 on ${API} (connection refused or 503 starting/degraded)"
   health_curl_verbose "$API"
+  health_diagnose_connection_refused "$API"
 fi
 
 # Auth login (optional — set VERIFY_LOGIN_IDENTIFIER + VERIFY_LOGIN_PASSWORD in env)

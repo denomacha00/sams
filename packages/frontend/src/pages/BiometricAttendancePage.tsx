@@ -12,8 +12,6 @@ interface MatchResult {
   confidence: number;
 }
 
-const MATCH_THRESHOLD = 0.6; // Euclidean distance threshold
-
 const BiometricAttendancePage: React.FC = () => {
   const user = useAuthStore((s) => s.user);
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -27,6 +25,19 @@ const BiometricAttendancePage: React.FC = () => {
   const [modelsLoaded, setModelsLoaded] = useState(false);
   const [sessionId, setSessionId] = useState('');
   const [classId, setClassId] = useState<string | null>(null);
+  const [featureGated, setFeatureGated] = useState(false);
+
+  useEffect(() => {
+    const checkAccess = async () => {
+      try {
+        await apiClient.get('/biometric/templates/check-access');
+      } catch (err: unknown) {
+        const status = (err as { response?: { status?: number } })?.response?.status;
+        if (status === 403) setFeatureGated(true);
+      }
+    };
+    void checkAccess();
+  }, []);
 
   // Load face-api.js models
   useEffect(() => {
@@ -157,7 +168,7 @@ const BiometricAttendancePage: React.FC = () => {
         });
 
         const matched = data.matched === true || data.match === true;
-        if (matched && data.confidence >= MATCH_THRESHOLD) {
+        if (matched) {
           setMatchResult({
             studentId: data.studentId,
             studentName: data.studentName,
@@ -204,6 +215,20 @@ const BiometricAttendancePage: React.FC = () => {
   useEffect(() => {
     return () => stopCamera();
   }, []);
+
+  if (featureGated) {
+    return (
+      <div className="page-shell p-6">
+        <div className="max-w-lg mx-auto surface-card p-6 text-center">
+          <h1 className="text-xl font-bold text-white mb-2">Biometric attendance unavailable</h1>
+          <p className="text-gray-400 text-sm">
+            Biometric scanning requires a Professional or Enterprise plan. Upgrade the school license
+            in the Super Admin portal, then reload this page.
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="page-shell p-6">

@@ -152,18 +152,50 @@ AT_KEY="$(read_merged_env AT_API_KEY)"
 AT_USER="$(read_merged_env AT_USERNAME)"
 
 echo ""
+NODE_ENV="$(read_merged_env NODE_ENV)"
+NODE_ENV="${NODE_ENV:-development}"
+
 echo "--- SMS (Africa's Talking) ---"
 if is_real_at_key "$AT_KEY"; then
   echo "OK   AT_API_KEY is set"
   if [[ -n "$AT_USER" && "$AT_USER" != "sandbox" ]]; then
     echo "OK   AT_USERNAME=$AT_USER (production)"
   elif [[ "$AT_USER" == "sandbox" ]]; then
-    echo "INFO AT_USERNAME=sandbox — sandbox mode"
+    if [[ "$NODE_ENV" == "production" ]]; then
+      echo "FAIL AT_USERNAME=sandbox — real schools require production AT (run: bash scripts/configure-production-at.sh)"
+      ERR=1
+    else
+      echo "INFO AT_USERNAME=sandbox — sandbox mode (OK for dev only)"
+    fi
   else
-    echo "WARN AT_USERNAME unset — defaulting to sandbox"
+    if [[ "$NODE_ENV" == "production" ]]; then
+      echo "FAIL AT_USERNAME unset — defaults to sandbox; set live AT username in secrets/providers.env"
+      ERR=1
+    else
+      echo "WARN AT_USERNAME unset — defaulting to sandbox"
+    fi
   fi
 else
-  echo "WARN AT_API_KEY missing or placeholder — SMS/OTP disabled until set in secrets/providers.env"
+  if [[ "$NODE_ENV" == "production" ]]; then
+    echo "FAIL AT_API_KEY missing or placeholder — SMS required for production schools"
+    ERR=1
+  else
+    echo "WARN AT_API_KEY missing or placeholder — SMS/OTP disabled until set in secrets/providers.env"
+  fi
+fi
+
+BIO_KEY="$(read_merged_env BIOMETRIC_MASTER_KEY)"
+echo ""
+echo "--- Biometric (enroll + match) ---"
+if [[ -n "$BIO_KEY" && ${#BIO_KEY} -ge 32 && "$BIO_KEY" != *change-me* ]]; then
+  echo "OK   BIOMETRIC_MASTER_KEY is set (32+ chars)"
+else
+  if [[ "$NODE_ENV" == "production" ]]; then
+    echo "FAIL BIOMETRIC_MASTER_KEY missing or placeholder — required for licensed school biometric"
+    ERR=1
+  else
+    echo "WARN BIOMETRIC_MASTER_KEY missing — biometric encryption disabled"
+  fi
 fi
 
 # ─── SMTP (optional) ─────────────────────────────────────────────────────────

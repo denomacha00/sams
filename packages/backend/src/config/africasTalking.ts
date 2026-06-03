@@ -33,6 +33,14 @@ export function isSmsConfigured(): boolean {
   return getAfricasTalkingConfig() !== null;
 }
 
+/** Human-readable AT mode for health checks and admin UI (no secrets). */
+export function getAtSmsMode(
+  cfg: AfricasTalkingConfig | null,
+): 'unconfigured' | 'sandbox' | 'production' {
+  if (!cfg) return 'unconfigured';
+  return cfg.sandbox ? 'sandbox' : 'production';
+}
+
 /** E.164-style normalization for Kenya (+254). */
 export function normalizeSmsPhone(phone: string): string {
   const digits = phone.replace(/\D/g, '');

@@ -135,15 +135,24 @@ export class NotificationService {
   getSmsStatus(): {
     configured: boolean;
     sandbox: boolean;
+    mode: 'unconfigured' | 'sandbox' | 'production';
     username: string | null;
     senderId: string | null;
   } {
     if (!this.atConfig) {
-      return { configured: false, sandbox: false, username: null, senderId: null };
+      return {
+        configured: false,
+        sandbox: false,
+        mode: 'unconfigured',
+        username: null,
+        senderId: null,
+      };
     }
+    const mode = this.atConfig.sandbox ? 'sandbox' : 'production';
     return {
       configured: true,
       sandbox: this.atConfig.sandbox,
+      mode,
       username: this.atConfig.username,
       senderId: this.atConfig.senderId,
     };

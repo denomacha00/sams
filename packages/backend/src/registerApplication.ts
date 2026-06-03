@@ -2,7 +2,7 @@ import express, { type Request, type Response, type NextFunction } from 'express
 import type { Server as HttpServer } from 'http';
 import { Server as SocketIOServer } from 'socket.io';
 import { UPLOADS_ROOT } from './config/uploads';
-import { getAfricasTalkingConfig, isSmsConfigured } from './config/africasTalking';
+import { getAfricasTalkingConfig, getAtSmsMode, isSmsConfigured } from './config/africasTalking';
 import { getSmtpConfig, isEmailConfigured } from './config/email';
 import { prisma } from './lib/prisma';
 import { redis } from './lib/redis';
@@ -163,8 +163,14 @@ export function registerApplication(app: express.Express, httpServer: HttpServer
         ...(aiProbe ? { probe: aiProbe } : {}),
       },
       sms: atCfg
-        ? { configured: true, sandbox: atCfg.sandbox, username: atCfg.username }
-        : { configured: false },
+        ? {
+            configured: true,
+            sandbox: atCfg.sandbox,
+            mode: getAtSmsMode(atCfg),
+            username: atCfg.username,
+            senderId: atCfg.senderId,
+          }
+        : { configured: false, mode: 'unconfigured' as const },
       email: smtpCfg
         ? { configured: true, host: smtpCfg.host, from: smtpCfg.fromEmail }
         : { configured: false },

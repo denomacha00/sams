@@ -20,36 +20,63 @@ set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 ENV_FILE="${ROOT}/packages/backend/.env"
+PROVIDERS_FILE="${ROOT}/secrets/providers.env"
+if [[ -d /var/www/sams && -f /var/www/sams/secrets/providers.env ]]; then
+  PROVIDERS_FILE="/var/www/sams/secrets/providers.env"
+fi
 
-if [[ ! -f "$ENV_FILE" ]]; then
+# Prefer providers.env on VPS (overrides .env at runtime via pm2-start merge order).
+TARGET_FILE="$ENV_FILE"
+if [[ -f "$PROVIDERS_FILE" ]]; then
+  TARGET_FILE="$PROVIDERS_FILE"
+  echo "==> Writing AT_* to secrets overlay: $TARGET_FILE"
+elif [[ ! -f "$ENV_FILE" ]]; then
   echo "ERROR: $ENV_FILE not found. Copy from packages/backend/.env.example first." >&2
   exit 1
 fi
 
-cp "$ENV_FILE" "${ENV_FILE}.bak.$(date +%Y%m%d%H%M%S)"
+NODE_ENV="$(grep -E '^NODE_ENV=' "$ENV_FILE" 2>/dev/null | head -1 | cut -d= -f2- | tr -d '"' || true)"
+if [[ -f "$PROVIDERS_FILE" ]]; then
+  PE="$(grep -E '^NODE_ENV=' "$PROVIDERS_FILE" 2>/dev/null | head -1 | cut -d= -f2- | tr -d '"' || true)"
+  [[ -n "$PE" ]] && NODE_ENV="$PE"
+fi
+
+cp "$TARGET_FILE" "${TARGET_FILE}.bak.$(date +%Y%m%d%H%M%S)"
 
 set_env() {
   local key="$1"
   local val="$2"
-  if grep -q "^${key}=" "$ENV_FILE"; then
-    sed -i "s|^${key}=.*|${key}=\"${val}\"|" "$ENV_FILE"
+  if grep -q "^${key}=" "$TARGET_FILE"; then
+    sed -i "s|^${key}=.*|${key}=\"${val}\"|" "$TARGET_FILE"
   else
-    echo "${key}=\"${val}\"" >> "$ENV_FILE"
+    echo "${key}=\"${val}\"" >> "$TARGET_FILE"
   fi
 }
 
 read_env() {
-  grep "^${1}=" "$ENV_FILE" 2>/dev/null | head -1 | cut -d= -f2- | tr -d '"' || true
+  grep "^${1}=" "$TARGET_FILE" 2>/dev/null | head -1 | cut -d= -f2- | tr -d '"' || true
 }
 
 echo "==> SAMS — Africa's Talking configuration"
-echo "    Env file: $ENV_FILE"
+echo "    Target file: $TARGET_FILE"
+if [[ "$NODE_ENV" == "production" ]]; then
+  echo "    NODE_ENV=production — sandbox SMS is NOT acceptable for live schools."
+fi
 echo ""
 echo "Choose mode:"
-echo "  1) Sandbox (AT_USERNAME=sandbox, whitelist test numbers in AT dashboard)"
+echo "  1) Sandbox (dev only — AT_USERNAME=sandbox, whitelist numbers in AT dashboard)"
 echo "  2) Production (live username + production API key + approved sender ID)"
-read -r -p "Enter 1 or 2 [1]: " MODE
-MODE="${MODE:-1}"
+read -r -p "Enter 1 or 2 [2]: " MODE
+if [[ "$NODE_ENV" == "production" ]]; then
+  MODE="${MODE:-2}"
+else
+  MODE="${MODE:-1}"
+fi
+
+if [[ "$MODE" == "1" && "$NODE_ENV" == "production" ]]; then
+  echo "ERROR: Refusing sandbox AT while NODE_ENV=production. Choose mode 2 or change NODE_ENV." >&2
+  exit 1
+fi
 
 if [[ "$MODE" == "2" ]]; then
   echo ""
@@ -97,7 +124,11 @@ fi
 
 echo ""
 echo "==> Applied (secrets not shown):"
-grep -E '^(AT_USERNAME|AT_SENDER_ID|OTP_|SMS_WELCOME)=' "$ENV_FILE" | sed 's/AT_API_KEY=.*/AT_API_KEY="***"/'
+grep -E '^(AT_USERNAME|AT_SENDER_ID|OTP_|SMS_WELCOME)=' "$TARGET_FILE" | sed 's/AT_API_KEY=.*/AT_API_KEY="***"/'
+echo ""
+echo "==> Verify (must show production AT, not sandbox):"
+echo "    bash scripts/verify-secrets.sh"
+echo "    bash scripts/production-readiness-check.sh"
 echo ""
 echo "==> Reload PM2 and check health"
 cd "$ROOT"
