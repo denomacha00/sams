@@ -27,4 +27,12 @@ if (!entry) {
 }
 
 console.log('[SAMS] Starting API via pm2-start.js →', entry);
-require(entry);
+
+const mod = require(entry);
+const boot = typeof mod.boot === 'function' ? mod.boot : mod.default?.boot;
+if (typeof boot !== 'function') {
+  console.error('[SAMS] Backend entry does not export boot():', entry);
+  process.exit(1);
+}
+
+void boot();
