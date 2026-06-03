@@ -1,4 +1,4 @@
-import './loadEnv';
+import '../config/loadEnv';
 import { PrismaClient } from '@prisma/client';
 
 /** Shared Prisma client — import from here, not from index.ts (avoids circular deps). */
