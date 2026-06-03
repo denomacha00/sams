@@ -47,8 +47,16 @@ else
   warn "pm2 not in PATH — skipping process check"
 fi
 
-# Health API
-if HEALTH="$(curl -sf --max-time 10 "${API}/health" 2>/dev/null)"; then
+# Health API — retry while the process connects DB/Redis and binds the port
+HEALTH=""
+for attempt in 1 2 3 4 5 6 7 8 9 10; do
+  if HEALTH="$(curl -sf --max-time 5 "${API}/health" 2>/dev/null)"; then
+    break
+  fi
+  [[ "$attempt" -lt 10 ]] && sleep 2
+done
+
+if [[ -n "$HEALTH" ]]; then
   pass "GET /health"
   echo "$HEALTH" | node -e "
     const h=JSON.parse(require('fs').readFileSync(0,'utf8'));

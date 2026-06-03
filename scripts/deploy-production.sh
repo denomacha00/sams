@@ -115,6 +115,7 @@ echo "    App:         https://app.smart-managment.com"
 echo "    Super Admin: https://super.smart-managment.com"
 
 echo "==> Running post-deploy verification"
+sleep 3
 bash "$ROOT/scripts/post-deploy-verify.sh" || {
   echo "WARN: Post-deploy verification reported issues (see above)" >&2
   exit 1
