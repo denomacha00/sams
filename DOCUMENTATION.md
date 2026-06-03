@@ -458,8 +458,10 @@ Handles SAMS-specific queries via regex pattern matching:
 - Admin how-to guides
 
 ### Groq/OpenRouter Engine (For everything else)
-- Primary: Groq (llama3-70b-8192)
-- Fallback: OpenRouter (meta-llama/llama-3.1-8b-instruct:free)
+- Primary (Groq): `OPENAI_API_KEY`, `OPENAI_BASE_URL=https://api.groq.com/openai/v1`, `OPENAI_MODEL=llama-3.3-70b-versatile`
+- Fallback (OpenRouter, optional): `OPENAI_FALLBACK_KEY`, `OPENAI_FALLBACK_URL=https://openrouter.ai/api/v1`, `OPENAI_FALLBACK_MODEL=meta-llama/llama-3.1-8b-instruct:free`
+- Do not use decommissioned Groq IDs (`llama3-70b-8192`, etc.); runtime migrates some, but set the model explicitly on the VPS.
+- Verify on server without wiping keys: `bash scripts/verify-ai-env.sh`
 - Answers any general knowledge question
 - Handles misspellings and natural language
 - No plan tier restriction
@@ -546,7 +548,8 @@ Ensure the same shell user that runs `pm2` uses nvm default 20 (`which node` sho
 | `scripts/deploy-production.sh` | Pull main, `npm ci`, build all packages, migrate, PM2 reload |
 | `scripts/post-deploy-verify.sh` | Dist artifacts, PM2, `/health`, `.env` presence |
 | `scripts/upgrade-node20.sh` | Idempotent Node 20 via nvm when current version < 20 |
-| `scripts/set-production-env.sh` | JWT/QR secrets, `APP_URL`, `CORS`, OTP flags from AT key presence |
+| `scripts/set-production-env.sh` | JWT/QR secrets, `APP_URL`, `CORS`, OTP flags from AT key presence (does not touch `OPENAI_*`) |
+| `scripts/verify-ai-env.sh` | Check Groq/OpenRouter keys and model IDs; masks secrets; does not modify `.env` |
 | `scripts/configure-production-at.sh` | Interactive AT sandbox vs production (no committed secrets) |
 
 ### PM2 and environment

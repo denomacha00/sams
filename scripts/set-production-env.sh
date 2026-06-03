@@ -5,6 +5,9 @@
 # Africa's Talking (SMS): use scripts/configure-production-at.sh for guided AT setup.
 # Sandbox is detected when AT_USERNAME=sandbox (there is no separate AT_SANDBOX env var).
 #
+# AI (Groq + optional OpenRouter): this script does NOT read or overwrite OPENAI_* keys.
+# Verify without changing secrets: bash scripts/verify-ai-env.sh
+#
 # Usage: bash scripts/set-production-env.sh
 
 set -euo pipefail
