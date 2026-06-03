@@ -10,6 +10,7 @@ import {
   loadAiThreadId,
   saveAiThreadId,
 } from '../lib/aiChat';
+import { AiMessageContent } from '../lib/aiMessageContent';
 
 interface PendingAction {
   action: string;
@@ -305,7 +306,11 @@ const FloatingAI: React.FC = () => {
                     ))}
                   </div>
                 )}
-                <p className="whitespace-pre-wrap leading-relaxed">{msg.content}</p>
+                {msg.role === 'assistant' ? (
+                  <AiMessageContent content={msg.content} />
+                ) : (
+                  <p className="whitespace-pre-wrap leading-relaxed">{msg.content}</p>
+                )}
                 {msg.pendingAction && (
                   <button
                     type="button"

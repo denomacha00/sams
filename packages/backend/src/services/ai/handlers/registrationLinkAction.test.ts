@@ -65,9 +65,9 @@ describe('createRegistrationLinkHandler', () => {
       'school-1',
       'dept-1',
       'class-1',
-      { targetRole: 'STUDENT' },
+      { targetRole: 'STUDENT', maxUses: 50, expiryDays: 30 },
     );
-    expect(result.answer).toContain('https://school.example.com/register/tok-abc');
+    expect(result.answer).toContain('[Register Ken Adim](https://school.example.com/register/tok-abc)');
     expect(result.answer).toContain('Ken Adim');
     expect(result.answer).toContain('Registration Links');
     expect(result.answer).toContain('cannot add them directly');
@@ -98,7 +98,7 @@ describe('createRegistrationLinkHandler', () => {
       },
     );
 
-    expect(result.answer).toContain('https://app.smart-managment.com/register/prod-tok');
+    expect(result.answer).toContain('[Open registration page](https://app.smart-managment.com/register/prod-tok)');
     expect(result.data?.url).toBe('https://app.smart-managment.com/register/prod-tok');
   });
 });

@@ -45,6 +45,10 @@ function formatExpiry(date: Date): string {
   });
 }
 
+function formatShareableLink(url: string, label: string): string {
+  return `[${label}](${url})`;
+}
+
 function uiGuideForRole(role: UserRole): string {
   if (role === UserRole.TEACHER) {
     return (
@@ -88,13 +92,6 @@ export const createRegistrationLinkHandler: ActionHandler = async (
     }
   }
 
-  if (scope.role === UserRole.HOD && targetRole === 'STUDENT' && !classId) {
-    return {
-      answer:
-        'Which class should this student registration link be for? Reply with the class name (e.g. "Form 3A").',
-    };
-  }
-
   if (!scope.departmentId && scope.role === UserRole.HOD) {
     return {
       answer:
@@ -102,24 +99,38 @@ export const createRegistrationLinkHandler: ActionHandler = async (
     };
   }
 
+  const maxUses =
+    typeof params.maxUses === 'number' && params.maxUses > 0 ? params.maxUses : 50;
+  const expiryDays =
+    typeof params.expiryDays === 'number' && params.expiryDays > 0 ? params.expiryDays : 30;
+
   const link = await registrationLinkService.generateLink(
     scope.userId,
     scope.role,
     scope.schoolId,
     scope.departmentId,
     classId,
-    { targetRole },
+    { targetRole, maxUses, expiryDays },
   );
 
   const url = link.url;
+  const roleLabel =
+    targetRole === 'STUDENT' ? 'Student' : targetRole === 'TEACHER' ? 'Teacher' : 'HOD';
   const namePart = studentName ? ` (for **${studentName}**)` : '';
+  const linkLabel = studentName ? `Register ${studentName}` : 'Open registration page';
+  const shareLink = formatShareableLink(url, linkLabel);
+
+  const signupHint =
+    targetRole === 'STUDENT'
+      ? 'They complete signup with their name, username, and password — you cannot add them directly in chat.'
+      : 'Share the link so they can complete self-registration.';
 
   return {
     answer:
-      `✅ **Student registration link** created${namePart}.\n\n` +
-      `**Share this URL:** ${url}\n\n` +
+      `✅ **${roleLabel} registration link** created${namePart}.\n\n` +
+      `**Share this link:** ${shareLink}\n\n` +
       `Valid until **${formatExpiry(link.expiresAt)}** · up to **${link.maxUses}** registrations. ` +
-      `The student completes signup with their name, username, and password — you cannot add them directly as a teacher.` +
+      `${signupHint}` +
       uiGuideForRole(scope.role),
     data: {
       linkId: link.id,

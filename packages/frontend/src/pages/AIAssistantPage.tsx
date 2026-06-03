@@ -10,6 +10,7 @@ import {
   loadAiThreadId,
   saveAiThreadId,
 } from '../lib/aiChat';
+import { AiMessageContent } from '../lib/aiMessageContent';
 import { readAccessToken } from '../lib/authTokens';
 
 interface PendingAction {
@@ -268,7 +269,11 @@ const AIAssistantPage: React.FC = () => {
                       : 'bg-white/10 border border-white/10 text-gray-200'
                 }`}
               >
-                <p className="whitespace-pre-wrap text-sm">{msg.content}</p>
+                {msg.role === 'assistant' ? (
+                  <AiMessageContent content={msg.content} className="whitespace-pre-wrap text-sm" />
+                ) : (
+                  <p className="whitespace-pre-wrap text-sm">{msg.content}</p>
+                )}
                 {msg.userImages && msg.userImages.length > 0 && (
                   <div className="flex flex-wrap gap-2 mt-2">
                     {msg.userImages.map((src, i) => (

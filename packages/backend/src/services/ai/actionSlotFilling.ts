@@ -16,6 +16,7 @@ export type SlotName =
   | 'role'
   | 'email'
   | 'targetRole'
+  | 'maxUses'
   | 'teacherName'
   | 'studentName'
 
@@ -47,8 +48,10 @@ const ACTION_SLOT_ORDER: Record<string, SlotName[]> = {
   mark_attendance: ['studentName'],
   create_class: ['className'],
   create_department: ['departmentName'],
-  create_registration_link: ['classId'],
 };
+
+const DEFAULT_REGISTRATION_MAX_USES = 50;
+const DEFAULT_REGISTRATION_EXPIRY_DAYS = 30;
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -67,6 +70,24 @@ function normalizeRoleAnswer(text: string): string | undefined {
   const upper = text.trim().toUpperCase();
   if (['STUDENT', 'TEACHER', 'HOD', 'SCHOOL_ADMIN'].includes(upper)) return upper;
   return undefined;
+}
+
+function parseTargetRoleAnswer(text: string): 'STUDENT' | 'TEACHER' | 'HOD' | undefined {
+  const t = text.trim().toLowerCase();
+  if (/^(student|pupil)s?$/.test(t)) return 'STUDENT';
+  if (/^(teacher|staff)s?$/.test(t)) return 'TEACHER';
+  if (/^(hod|head)s?$/.test(t)) return 'HOD';
+  const upper = text.trim().toUpperCase();
+  if (upper === 'STUDENT' || upper === 'TEACHER' || upper === 'HOD') return upper;
+  return undefined;
+}
+
+function parseMaxUsesAnswer(text: string): number | undefined {
+  if (/^default$/i.test(text.trim())) return DEFAULT_REGISTRATION_MAX_USES;
+  const match = text.match(/\d+/);
+  if (!match) return undefined;
+  const n = parseInt(match[0], 10);
+  return n > 0 ? n : undefined;
 }
 
 function parseNotifyScopeAnswer(text: string): 'department' | 'school' | 'class' | undefined {
@@ -114,6 +135,31 @@ async function resolveClassByName(
   return cls;
 }
 
+function getRegistrationLinkSlotOrder(
+  user: AccessTokenPayload,
+  params: Record<string, unknown>,
+): SlotName[] {
+  if (user.role === UserRole.TEACHER) {
+    return ['classId', 'maxUses'];
+  }
+  if (user.role === UserRole.HOD) {
+    const order: SlotName[] = ['targetRole'];
+    const target = String(params.targetRole ?? '').toUpperCase();
+    if (target === 'STUDENT') order.push('classId');
+    order.push('maxUses');
+    return order;
+  }
+  if (user.role === UserRole.SCHOOL_ADMIN) {
+    const order: SlotName[] = ['targetRole'];
+    const target = String(params.targetRole ?? '').toUpperCase();
+    if (target === 'STUDENT' || target === 'TEACHER') order.push('departmentName');
+    if (target === 'STUDENT') order.push('classId');
+    order.push('maxUses');
+    return order;
+  }
+  return ['classId', 'maxUses'];
+}
+
 async function resolveDepartmentByName(
   schoolId: string,
   name: string,
@@ -143,14 +189,16 @@ export async function resolveActionParams(
     }
   }
 
-  if (
-    (user.role === UserRole.TEACHER || user.role === UserRole.HOD) &&
-    action === 'create_registration_link'
-  ) {
-    if (!resolved.targetRole) resolved.targetRole = 'STUDENT';
-    if (user.role === UserRole.TEACHER && !resolved.classId) {
-      const classId = await resolveTeacherClassId(user.sub, user.classId);
-      if (classId) resolved.classId = classId;
+  if (action === 'create_registration_link') {
+    if (user.role === UserRole.TEACHER) {
+      if (!resolved.targetRole) resolved.targetRole = 'STUDENT';
+      if (!resolved.classId) {
+        const classId = await resolveTeacherClassId(user.sub, user.classId);
+        if (classId) resolved.classId = classId;
+      }
+    }
+    if (user.role === UserRole.HOD && !resolved.departmentId && user.departmentId) {
+      resolved.departmentId = user.departmentId;
     }
   }
 
@@ -243,6 +291,17 @@ export function applySlotAnswer(
     case 'studentName':
       next.studentName = answer.trim();
       break;
+    case 'targetRole': {
+      const roleVal = parseTargetRoleAnswer(answer);
+      if (roleVal) next.targetRole = roleVal;
+      else next.targetRole = answer.trim().toUpperCase();
+      break;
+    }
+    case 'maxUses': {
+      const uses = parseMaxUsesAnswer(answer);
+      if (uses) next.maxUses = uses;
+      break;
+    }
     default:
       next[slot] = answer.trim();
   }
@@ -296,7 +355,10 @@ export async function getNextMissingSlot(
   params: Record<string, unknown>,
 ): Promise<SlotName | null> {
   const resolved = await resolveActionParams(user, action, params);
-  const order = ACTION_SLOT_ORDER[action] ?? [];
+  const order =
+    action === 'create_registration_link'
+      ? getRegistrationLinkSlotOrder(user, resolved)
+      : ACTION_SLOT_ORDER[action] ?? [];
 
   if (needsNotifyScopePrompt(user.role, action, resolved) && !isFilled(resolved.notifyScope)) {
     return 'notifyScope';
@@ -305,8 +367,28 @@ export async function getNextMissingSlot(
   for (const slot of order) {
     if (slot === 'notifyScope') continue;
 
+    if (slot === 'targetRole') {
+      if (!isFilled(resolved.targetRole)) return slot;
+      continue;
+    }
+
+    if (slot === 'maxUses') {
+      if (!isFilled(resolved.maxUses)) return slot;
+      continue;
+    }
+
     if (slot === 'departmentName') {
-      if (resolved.notifyScope !== 'department' && action !== 'create_department') continue;
+      if (
+        resolved.notifyScope !== 'department' &&
+        action !== 'create_department' &&
+        action !== 'create_registration_link'
+      ) {
+        continue;
+      }
+      if (action === 'create_registration_link') {
+        const target = String(resolved.targetRole ?? '').toUpperCase();
+        if (target !== 'STUDENT' && target !== 'TEACHER') continue;
+      }
       if (user.role === UserRole.HOD) continue;
       const depts = await listSchoolDepartments(user.schoolId);
       if (depts.length <= 1 && depts[0]) {
@@ -319,17 +401,23 @@ export async function getNextMissingSlot(
     }
 
     if (slot === 'classId') {
-      if (
+      if (action === 'create_registration_link') {
+        const target = String(resolved.targetRole ?? '').toUpperCase();
+        if (target !== 'STUDENT') continue;
+      } else if (
         resolved.notifyScope !== 'class' &&
-        action !== 'send_class_notification' &&
-        action !== 'create_registration_link'
+        action !== 'send_class_notification'
       ) {
         continue;
       }
       if (isFilled(resolved.classId)) continue;
 
       const deptId =
-        user.role === UserRole.HOD ? user.departmentId : undefined;
+        user.role === UserRole.HOD || user.role === UserRole.TEACHER
+          ? user.departmentId
+          : action === 'create_registration_link' && isFilled(resolved.departmentId)
+            ? String(resolved.departmentId)
+            : undefined;
       if (!deptId && user.role === UserRole.HOD && action === 'create_registration_link') {
         return slot;
       }
@@ -438,6 +526,19 @@ export async function buildSlotQuestion(
       return 'Which teacher should be assigned? (Full name)';
     case 'studentName':
       return 'Which student? (Full name)';
+    case 'targetRole':
+      if (user.role === UserRole.HOD) {
+        return (
+          'Who should this registration link be for?\n' +
+          '• Reply **student** for a class enrollment link\n' +
+          '• Reply **teacher** to invite a teacher to your department'
+        );
+      }
+      return 'What role is the link for? Reply **student**, **teacher**, or **HOD**.';
+    case 'maxUses':
+      return (
+        `How many people can use this link? (Default on the dashboard is **${DEFAULT_REGISTRATION_MAX_USES}** — reply with a number, e.g. "50".)`
+      );
     case 'className':
       return 'What should the new class be called?';
     default:

@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect, useCallback } from 'react';
 import apiClient from '../services/apiClient';
 import { useVoiceQuery } from '../hooks/useVoiceQuery';
 import { loadAiThreadId, saveAiThreadId } from '../lib/aiChat';
+import { AiMessageContent } from '../lib/aiMessageContent';
 
 interface PendingAction {
   action: string;
@@ -210,7 +211,11 @@ const AISAMSWidget: React.FC = () => {
                     : 'bg-slate-900 border border-slate-700 text-gray-200'
                 }`}
               >
-                <p className="whitespace-pre-wrap leading-relaxed">{msg.content}</p>
+                {msg.role === 'assistant' ? (
+                  <AiMessageContent content={msg.content} />
+                ) : (
+                  <p className="whitespace-pre-wrap leading-relaxed">{msg.content}</p>
+                )}
                 {msg.pendingAction && (
                   <button
                     type="button"

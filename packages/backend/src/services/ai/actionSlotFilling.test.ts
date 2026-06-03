@@ -76,6 +76,44 @@ describe('actionSlotFilling', () => {
     expect(slot).toBe('classId');
   });
 
+  it('HOD create_registration_link asks targetRole first', async () => {
+    const slot = await getNextMissingSlot(hodUser as any, 'create_registration_link', {});
+    expect(slot).toBe('targetRole');
+  });
+
+  it('HOD create_registration_link asks class after student role', async () => {
+    vi.mocked(prisma.class.findMany).mockResolvedValue([
+      { id: 'c1', name: 'Form 1A' },
+      { id: 'c2', name: 'Form 1B' },
+    ] as any);
+
+    const slot = await getNextMissingSlot(hodUser as any, 'create_registration_link', {
+      targetRole: 'STUDENT',
+    });
+    expect(slot).toBe('classId');
+  });
+
+  it('HOD create_registration_link skips class for teacher role', async () => {
+    const slot = await getNextMissingSlot(hodUser as any, 'create_registration_link', {
+      targetRole: 'TEACHER',
+    });
+    expect(slot).toBe('maxUses');
+  });
+
+  it('teacher create_registration_link asks maxUses when class is set', async () => {
+    const teacher = {
+      sub: 't1',
+      role: UserRole.TEACHER,
+      schoolId: 'school-1',
+      departmentId: 'dept-1',
+      classId: 'class-1',
+    };
+    const slot = await getNextMissingSlot(teacher as any, 'create_registration_link', {
+      classId: 'class-1',
+    });
+    expect(slot).toBe('maxUses');
+  });
+
   it('teacher send_class_message only needs message', async () => {
     const teacher = {
       sub: 't1',
