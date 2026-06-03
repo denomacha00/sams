@@ -46,6 +46,12 @@ packages/shared/src/**/*.d.ts.map
 .env
 .env.local
 .env.production
+packages/backend/.env.secrets
+secrets/providers.env
+secrets/ai.env
+secrets/providers.env.backup.*
+secrets/ai.env.backup.*
+secrets/*.backup.*
 
 # Logs
 *.log

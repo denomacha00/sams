@@ -6,6 +6,7 @@
 #   cd /var/www/sams && bash scripts/deploy-production.sh
 #
 # Safe to run after every `git pull` or let GitHub Actions run it for you.
+# Does NOT modify packages/backend/.env, .env.secrets, or secrets/providers.env (keys stay on disk).
 
 set -euo pipefail
 
@@ -99,12 +100,17 @@ find "$UPLOADS_ROOT" -maxdepth 1 -type f -name '*.jpg' -exec mv -n -t "$UPLOADS_
 
 echo "==> Restarting services"
 mkdir -p /var/log/sams
+# Provider secrets: secrets/providers.env or packages/backend/.env.secrets (gitignored).
+# Deploy never creates, copies, or overwrites those files — only pm2-start.js loads them after .env.
+mkdir -p "$ROOT/secrets"
+chmod 700 "$ROOT/secrets" 2>/dev/null || true
 # delete + start applies ecosystem changes (instances, exec_mode); reload keeps old cluster layout
 pm2 delete sams-api 2>/dev/null || true
-set -a
-# shellcheck disable=SC1091
-source "$ROOT/packages/backend/.env"
-set +a
+# shellcheck source=lib/merged-env.sh
+source "$ROOT/scripts/lib/merged-env.sh"
+MERGED_ENV_ROOT="$ROOT"
+MERGED_ENV_FILE="$ROOT/packages/backend/.env"
+source_merged_env
 pm2 start ecosystem.config.js --env production --update-env
 pm2 save
 sudo nginx -t

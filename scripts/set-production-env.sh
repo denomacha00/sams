@@ -5,8 +5,8 @@
 # Africa's Talking (SMS): use scripts/configure-production-at.sh for guided AT setup.
 # Sandbox is detected when AT_USERNAME=sandbox (there is no separate AT_SANDBOX env var).
 #
-# AI (Groq + optional OpenRouter): this script does NOT read or overwrite OPENAI_* keys.
-# Verify without changing secrets: bash scripts/verify-ai-env.sh
+# Provider secrets (AI, AT, SMTP, M-Pesa, etc.): this script does NOT overwrite keys in
+# secrets/providers.env or .env.secrets. Verify merged env: bash scripts/verify-secrets.sh
 #
 # Usage: bash scripts/set-production-env.sh
 
@@ -79,10 +79,11 @@ grep -E '^(NODE_ENV|APP_URL|CORS_ORIGIN|OTP_|JWT_|QR_SECRET)=' "$ENV_FILE"
 echo "==> Reload PM2"
 cd "$ROOT"
 mkdir -p /var/log/sams
-set -a
-# shellcheck disable=SC1091
-source "$ENV_FILE"
-set +a
+# shellcheck source=lib/merged-env.sh
+source "$ROOT/scripts/lib/merged-env.sh"
+MERGED_ENV_ROOT="$ROOT"
+MERGED_ENV_FILE="$ENV_FILE"
+source_merged_env
 pm2 delete sams-api 2>/dev/null || true
 pm2 start ecosystem.config.js --env production --update-env
 

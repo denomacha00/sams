@@ -4,12 +4,16 @@
  */
 const fs = require('fs');
 const path = require('path');
-const { loadEnvFromFile } = require('./load-env-from-file');
+const { loadEnvFromFile, resolveSecretsFilePaths } = require('./load-env-from-file');
 
 const backendRoot = path.join(__dirname, '..');
 const envPath = loadEnvFromFile();
 if (!envPath) {
   console.error('[SAMS] Missing packages/backend/.env (cwd:', process.cwd(), ')');
+}
+const secretsPaths = resolveSecretsFilePaths();
+if (secretsPaths.length) {
+  console.log('[SAMS] Provider secrets loaded from:', secretsPaths.join(', '));
 }
 
 const candidates = [

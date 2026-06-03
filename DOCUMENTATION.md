@@ -461,7 +461,7 @@ Handles SAMS-specific queries via regex pattern matching:
 - Primary (Groq): `OPENAI_API_KEY`, `OPENAI_BASE_URL=https://api.groq.com/openai/v1`, `OPENAI_MODEL=llama-3.3-70b-versatile`
 - Fallback (OpenRouter, optional): `OPENAI_FALLBACK_KEY`, `OPENAI_FALLBACK_URL=https://openrouter.ai/api/v1`, `OPENAI_FALLBACK_MODEL=meta-llama/llama-3.1-8b-instruct:free`
 - Do not use decommissioned Groq IDs (`llama3-70b-8192`, etc.); runtime migrates some, but set the model explicitly on the VPS.
-- Verify on server without wiping keys: `bash scripts/verify-ai-env.sh`
+- Verify on server without wiping keys: `bash scripts/verify-secrets.sh`
 - Answers any general knowledge question
 - Handles misspellings and natural language
 - No plan tier restriction
@@ -549,13 +549,57 @@ Ensure the same shell user that runs `pm2` uses nvm default 20 (`which node` sho
 | `scripts/post-deploy-verify.sh` | Dist artifacts, PM2, `/health`, `.env` presence |
 | `scripts/upgrade-node20.sh` | Idempotent Node 20 via nvm when current version < 20 |
 | `scripts/set-production-env.sh` | JWT/QR secrets, `APP_URL`, `CORS`, OTP flags from AT key presence (does not touch `OPENAI_*`) |
-| `scripts/verify-ai-env.sh` | Check Groq/OpenRouter keys and model IDs; masks secrets; does not modify `.env` |
+| `scripts/verify-secrets.sh` | Check merged provider env (AI, AT, SMTP, M-Pesa); masks values |
+| `scripts/verify-ai-env.sh` | Deprecated alias → `verify-secrets.sh --ai-only` |
+| `scripts/backup-secrets.sh` | Backup all provider keys from merged env to `secrets/providers.env.backup.*` (chmod 600) |
+| `scripts/backup-ai-secrets.sh` | Deprecated alias → `backup-secrets.sh` |
 | `scripts/configure-production-at.sh` | Interactive AT sandbox vs production (no committed secrets) |
 
 ### PM2 and environment
-- `ecosystem.config.js` sets `env_file: './packages/backend/.env'` so **all** backend variables (AT, SMTP, JWT, etc.) load from that file.
-- Use `pm2 reload ecosystem.config.js --env production` after `.env` changes.
+- `packages/backend/bin/pm2-start.js` loads `packages/backend/.env`, then **overlays** gitignored provider secrets (see below).
+- Use `bash scripts/restart-api.sh` or `pm2 reload ecosystem.config.js --env production` after env changes.
 - Do **not** commit `packages/backend/.env`; use `packages/backend/.env.example` as the template.
+
+### Secrets on VPS
+
+All third-party API keys and other sensitive credentials live **outside git** so `git pull` and `scripts/deploy-production.sh` never overwrite them. Deploy only resets tracked files (`git reset --hard origin/main`); `.env` and secrets paths stay on disk.
+
+| File | Purpose |
+|------|---------|
+| `packages/backend/.env` | Main VPS config (DB URL, JWT placeholders, feature flags, non-secret defaults) |
+| `/var/www/sams/secrets/providers.env` | **Recommended on VPS** — Groq, AT, SMTP, M-Pesa, optional JWT/crypto |
+| `packages/backend/.env.secrets` | Dev/local overlay (same merge rules as `providers.env`) |
+| `secrets/providers.env` | Same as VPS path when repo root is `/var/www/sams` |
+
+Template (committed, no real keys): **`secrets/providers.env.example`**.
+
+Load order (later wins for the same key): `.env` → `.env.secrets` → `secrets/providers.env` → `/var/www/sams/secrets/providers.env`. Legacy `secrets/ai.env` is still read if present (migrate to `providers.env`).
+
+**Before every deploy or risky `.env` edit:**
+
+```bash
+cd /var/www/sams
+bash scripts/backup-secrets.sh
+```
+
+**First-time VPS setup:**
+
+```bash
+cd /var/www/sams
+mkdir -p secrets
+cp secrets/providers.env.example secrets/providers.env
+chmod 600 secrets/providers.env
+nano secrets/providers.env   # paste real keys (Groq gsk_..., AT, SMTP, etc.)
+bash scripts/verify-secrets.sh
+bash scripts/backup-secrets.sh
+bash scripts/restart-api.sh
+```
+
+Keep placeholders in `.env` if you prefer; `providers.env` overrides them at runtime. Keys are **not** in git — recover from provider consoles or `secrets/providers.env.backup.*` after `backup-secrets.sh`.
+
+#### AI (Groq / OpenRouter)
+
+Put `OPENAI_*` and optional `OPENAI_FALLBACK_*` in `secrets/providers.env`. Verify AI only: `bash scripts/verify-secrets.sh --ai-only` (or deprecated `verify-ai-env.sh`). Do not use decommissioned Groq model IDs; see `.env.example`.
 
 > Use `pm2 reload` (not `pm2 restart`) for zero-downtime deploys. The backend signals PM2 with `process.send('ready')` after startup, and `wait_ready: true` in ecosystem.config.js ensures the old instance is only killed after the new one is healthy.
 
@@ -622,6 +666,8 @@ See [§12](#12-sms-otp--africas-talking) for setup steps. Key variables: `AT_API
 
 ### Email, AI, M-Pesa, Super Admin, Biometric
 See `.env.example` for `SMTP_*`, `OPENAI_*`, `MPESA_*`, `SUPER_ADMIN_*`, `BIOMETRIC_*`, `CONVERSATION_MASTER_KEY`, and notification job thresholds.
+
+For production provider keys, use **`secrets/providers.env`** (template: `secrets/providers.env.example`) instead of committing them into `.env`. See [Secrets on VPS](#secrets-on-vps).
 
 ---
 

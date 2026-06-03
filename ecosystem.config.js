@@ -25,7 +25,7 @@ module.exports = {
         NODE_ENV: 'staging',
         PORT: 3001,
       },
-      // .env loaded first by packages/backend/bin/pm2-start.js (then loadEnv.ts as backup)
+      // .env + gitignored secrets/providers.env loaded by packages/backend/bin/pm2-start.js
       error_file: '/var/log/sams/sams-api-error.log',
       out_file: '/var/log/sams/sams-api-out.log',
       log_date_format: 'YYYY-MM-DD HH:mm:ss Z',
