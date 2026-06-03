@@ -575,7 +575,7 @@ Ensure the same shell user that runs `pm2` uses Node 20 (`which node` → `/usr/
 | `scripts/backup-secrets.sh` | Backup all provider keys from merged env to `secrets/providers.env.backup.*` (chmod 600) |
 | `scripts/backup-ai-secrets.sh` | Deprecated alias → `backup-secrets.sh` |
 | `scripts/configure-production-at.sh` | Interactive AT production setup (refuses sandbox when `NODE_ENV=production`) |
-| `scripts/production-readiness-check.sh` | Fails on sandbox SMS / missing biometric key; checks biometric dist routes |
+| `scripts/production-readiness-check.sh` | Fails on sandbox SMS, weak JWT (under 64 chars), missing biometric key; checks biometric dist routes |
 
 ### PM2 and environment
 - `packages/backend/bin/pm2-start.js` loads `packages/backend/.env`, then **overlays** gitignored provider secrets (see below).
@@ -584,7 +584,7 @@ Ensure the same shell user that runs `pm2` uses Node 20 (`which node` → `/usr/
 
 ### Secrets on VPS
 
-All third-party API keys and other sensitive credentials live **outside git** so `git pull` and `scripts/deploy-production.sh` never overwrite them. Deploy only resets tracked files (`git reset --hard origin/main`); `.env` and secrets paths stay on disk.
+All third-party API keys and other sensitive credentials live **outside git** so `git pull` and `scripts/deploy-production.sh` never overwrite them. Deploy runs `git reset --hard origin/main` for tracked files only; **`packages/backend/.env` and `secrets/providers.env` are backed up and restored** around that reset so a mistakenly tracked `.env` cannot wipe your JWT. If the API crash-loops with `[STARTUP] JWT_SECRET must be … 64+ chars`, run `bash scripts/set-production-env.sh` then `bash scripts/restart-api.sh`.
 
 | File | Purpose |
 |------|---------|

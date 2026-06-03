@@ -108,7 +108,10 @@ if [[ "$MODE" == "2" ]]; then
   set_env AT_SENDER_ID "$AT_SENDER"
   set_env OTP_PASSWORD_RESET_ENABLED true
   echo ""
-  read -r -p "Enable OTP login (password + SMS/email code)? Usually keep false until tested [y/N]: " OTP_LOGIN
+  echo "    SMS OTP for Forgot Password only (recommended):"
+  echo "      OTP_PASSWORD_RESET_ENABLED=true  → /health otp.passwordResetEnabled"
+  echo "      OTP_LOGIN_ENABLED=false        → no 2-step sign-in OTP (keep false for schools)"
+  read -r -p "Enable OTP login (2-step sign-in after password)? Leave N for reset-only [y/N]: " OTP_LOGIN
   if [[ "${OTP_LOGIN,,}" == "y" ]]; then
     set_env OTP_LOGIN_ENABLED true
   else

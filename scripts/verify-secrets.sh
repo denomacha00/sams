@@ -184,6 +184,27 @@ else
   fi
 fi
 
+JWT_VAL="$(read_merged_env JWT_SECRET)"
+JWT_REFRESH="$(read_merged_env JWT_REFRESH_SECRET)"
+echo ""
+echo "--- JWT / QR (production startup) ---"
+if [[ "$NODE_ENV" == "production" ]]; then
+  if is_weak_production_secret "$JWT_VAL"; then
+    echo "FAIL JWT_SECRET missing or <64 chars — run: bash scripts/set-production-env.sh"
+    ERR=1
+  else
+    echo "OK   JWT_SECRET ok (64+ chars, merged env)"
+  fi
+  if is_weak_production_secret "$JWT_REFRESH"; then
+    echo "FAIL JWT_REFRESH_SECRET missing or <64 chars — run: bash scripts/set-production-env.sh"
+    ERR=1
+  else
+    echo "OK   JWT_REFRESH_SECRET ok (64+ chars)"
+  fi
+else
+  echo "INFO JWT length checks skipped (NODE_ENV=$NODE_ENV)"
+fi
+
 BIO_KEY="$(read_merged_env BIOMETRIC_MASTER_KEY)"
 echo ""
 echo "--- Biometric (enroll + match) ---"

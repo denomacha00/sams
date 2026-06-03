@@ -7,8 +7,22 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT"
 
-# shellcheck source=lib/health-wait.sh
-source "$ROOT/scripts/lib/health-wait.sh"
+HEALTH_WAIT_LIB="$ROOT/scripts/lib/health-wait.sh"
+if [[ ! -f "$HEALTH_WAIT_LIB" ]]; then
+  echo "ERROR: Missing $HEALTH_WAIT_LIB" >&2
+  exit 1
+fi
+# shellcheck source=scripts/lib/health-wait.sh
+source "$HEALTH_WAIT_LIB"
+if ! declare -F health_diagnose_connection_refused >/dev/null 2>&1; then
+  echo "ERROR: $HEALTH_WAIT_LIB did not define health_diagnose_connection_refused — pull latest main" >&2
+  exit 1
+fi
+
+# shellcheck source=lib/merged-env.sh
+source "$ROOT/scripts/lib/merged-env.sh"
+MERGED_ENV_ROOT="$ROOT"
+MERGED_ENV_FILE="$ROOT/packages/backend/.env"
 
 PORT="${PORT:-3001}"
 API="http://127.0.0.1:${PORT}"
@@ -154,11 +168,22 @@ else
   warn "Skipping AI query smoke — set VERIFY_AI_QUERY=1 to enable (uses API quota)"
 fi
 
-# Env file
+# Env file (merged: .env + secrets overlays)
 if [[ -f "$ROOT/packages/backend/.env" ]]; then
   pass "packages/backend/.env exists"
-  grep -q '^JWT_SECRET=' "$ROOT/packages/backend/.env" && pass "JWT_SECRET set" || warn "JWT_SECRET missing"
-  grep -q '^DATABASE_URL=' "$ROOT/packages/backend/.env" && pass "DATABASE_URL set" || fail "DATABASE_URL missing"
+  JWT_MERGED="$(read_merged_env JWT_SECRET)"
+  NODE_ENV_MERGED="$(read_merged_env NODE_ENV)"
+  NODE_ENV_MERGED="${NODE_ENV_MERGED:-production}"
+  if is_weak_production_secret "$JWT_MERGED"; then
+    if [[ "$NODE_ENV_MERGED" == "production" ]]; then
+      fail "JWT_SECRET weak (<64 chars) — API crash-loop risk; run: bash scripts/set-production-env.sh"
+    else
+      warn "JWT_SECRET weak (<64 chars) — run set-production-env before NODE_ENV=production"
+    fi
+  else
+    pass "JWT_SECRET ok (64+ chars, merged env)"
+  fi
+  [[ -n "$(read_merged_env DATABASE_URL)" ]] && pass "DATABASE_URL set" || fail "DATABASE_URL missing"
 else
   fail "packages/backend/.env missing"
 fi

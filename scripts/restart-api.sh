@@ -7,8 +7,17 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT"
 
-# shellcheck source=lib/health-wait.sh
-source "$ROOT/scripts/lib/health-wait.sh"
+HEALTH_WAIT_LIB="$ROOT/scripts/lib/health-wait.sh"
+[[ -f "$HEALTH_WAIT_LIB" ]] || { echo "ERROR: Missing $HEALTH_WAIT_LIB" >&2; exit 1; }
+# shellcheck source=scripts/lib/health-wait.sh
+source "$HEALTH_WAIT_LIB"
+declare -F health_diagnose_connection_refused >/dev/null 2>&1 \
+  || { echo "ERROR: health-wait.sh missing health_diagnose_connection_refused" >&2; exit 1; }
+
+# shellcheck source=lib/merged-env.sh
+source "$ROOT/scripts/lib/merged-env.sh"
+MERGED_ENV_ROOT="$ROOT"
+MERGED_ENV_FILE="$ROOT/packages/backend/.env"
 
 ENV_FILE="$ROOT/packages/backend/.env"
 PORT="${PORT:-3001}"
@@ -19,7 +28,14 @@ if [[ ! -f "$ENV_FILE" ]]; then
   exit 1
 fi
 
+if is_weak_production_secret "$(read_merged_env JWT_SECRET)"; then
+  echo "ERROR: JWT_SECRET missing or <64 chars — run: bash scripts/set-production-env.sh" >&2
+  exit 1
+fi
+
 mkdir -p /var/log/sams
+# shellcheck source=lib/merged-env.sh
+source_merged_env
 
 echo "==> Restarting sams-api (pm2-start.js loads .env)"
 pm2 delete sams-api 2>/dev/null || true

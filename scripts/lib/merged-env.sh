@@ -44,6 +44,18 @@ read_merged_env() {
   printf '%s' "$val"
 }
 
+# Matches packages/backend/src/config/secrets.ts (64+ chars in production).
+is_weak_production_secret() {
+  local val="$1"
+  local min="${2:-64}"
+  [[ -z "$val" ]] && return 0
+  [[ ${#val} -lt "$min" ]] && return 0
+  local lower="${val,,}"
+  [[ "$lower" == *change-me* ]] && return 0
+  [[ "$lower" == *qr-secret-dev* ]] && return 0
+  return 1
+}
+
 # Source .env then secrets for PM2 shell (same order as load-env-from-file.js).
 source_merged_env() {
   local f

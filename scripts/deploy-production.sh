@@ -23,9 +23,49 @@ fi
 
 echo "==> SAMS production deploy ($(date -Iseconds))"
 
-# Clean match to GitHub main (avoids dist merge conflicts)
+ENV_FILE="$ROOT/packages/backend/.env"
+ENV_DEPLOY_BACKUP=""
+PROTECT_ENV_FILES=(
+  "$ENV_FILE"
+  "$ROOT/secrets/providers.env"
+  "/var/www/sams/secrets/providers.env"
+  "$ROOT/packages/backend/.env.secrets"
+)
+
+backup_deploy_env_files() {
+  local f
+  for f in "${PROTECT_ENV_FILES[@]}"; do
+    [[ -f "$f" ]] || continue
+    if [[ -z "$ENV_DEPLOY_BACKUP" ]]; then
+      ENV_DEPLOY_BACKUP="$(mktemp -d)"
+    fi
+    cp "$f" "${ENV_DEPLOY_BACKUP}/$(basename "$f").$(echo "$f" | tr '/:' '__')"
+  done
+}
+
+restore_deploy_env_files() {
+  local f base saved
+  [[ -n "${ENV_DEPLOY_BACKUP:-}" && -d "$ENV_DEPLOY_BACKUP" ]] || return 0
+  for f in "${PROTECT_ENV_FILES[@]}"; do
+    [[ -f "$f" ]] || continue
+    base="$(basename "$f").$(echo "$f" | tr '/:' '__')"
+    saved="${ENV_DEPLOY_BACKUP}/${base}"
+    if [[ -f "$saved" ]]; then
+      cp "$saved" "$f"
+      echo "    Protected $f (restored after git reset)"
+    fi
+  done
+  rm -rf "$ENV_DEPLOY_BACKUP"
+  ENV_DEPLOY_BACKUP=""
+}
+
+backup_deploy_env_files
+
+# Clean match to GitHub main (avoids dist merge conflicts). Never rely on git for .env / secrets.
 git fetch origin main
 git reset --hard origin/main
+
+restore_deploy_env_files
 
 echo "==> Installing dependencies"
 npm ci
@@ -102,6 +142,18 @@ mkdir -p "$UPLOADS_ROOT/avatars"
 # Fix avatars saved to uploads root when UPLOADS_DIR was set without /avatars
 find "$UPLOADS_ROOT" -maxdepth 1 -type f -name '*.jpg' -exec mv -n -t "$UPLOADS_ROOT/avatars/" {} + 2>/dev/null || true
 
+# shellcheck source=lib/merged-env.sh
+source "$ROOT/scripts/lib/merged-env.sh"
+MERGED_ENV_ROOT="$ROOT"
+MERGED_ENV_FILE="$ENV_FILE"
+JWT_VAL="$(read_merged_env JWT_SECRET)"
+if is_weak_production_secret "$JWT_VAL"; then
+  echo "ERROR: JWT_SECRET missing or shorter than 64 chars — API will crash-loop in production." >&2
+  echo "       Run: bash scripts/set-production-env.sh" >&2
+  echo "       Then re-run: bash scripts/deploy-production.sh" >&2
+  exit 1
+fi
+
 echo "==> Restarting services"
 mkdir -p /var/log/sams
 # Provider secrets: secrets/providers.env or packages/backend/.env.secrets (gitignored).
@@ -110,10 +162,6 @@ mkdir -p "$ROOT/secrets"
 chmod 700 "$ROOT/secrets" 2>/dev/null || true
 # delete + start applies ecosystem changes (instances, exec_mode); reload keeps old cluster layout
 pm2 delete sams-api 2>/dev/null || true
-# shellcheck source=lib/merged-env.sh
-source "$ROOT/scripts/lib/merged-env.sh"
-MERGED_ENV_ROOT="$ROOT"
-MERGED_ENV_FILE="$ROOT/packages/backend/.env"
 source_merged_env
 pm2 start ecosystem.config.js --env production --update-env
 pm2 save
@@ -123,6 +171,8 @@ sudo systemctl reload nginx
 echo "==> Deploy finished successfully"
 echo "    App:         https://app.smart-managment.com"
 echo "    Super Admin: https://super.smart-managment.com"
+echo "    Env: packages/backend/.env was not overwritten by git (see restore_deploy_env_files above if shown)"
+echo "    After first deploy or weak JWT: bash scripts/set-production-env.sh"
 
 echo "==> Running post-deploy verification"
 sleep 3
