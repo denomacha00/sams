@@ -48,6 +48,13 @@ apiClient.interceptors.response.use(
   (response) => response,
   async (error: AxiosError) => {
     const originalRequest = error.config as InternalAxiosRequestConfig & { _retry?: boolean };
+    const responseCode = (error.response?.data as { code?: string } | undefined)?.code;
+
+    if (error.response?.status === 403 && responseCode === 'SCHOOL_SUSPENDED') {
+      localStorage.removeItem('auth-storage');
+      window.location.href = '/login';
+      return Promise.reject(error);
+    }
 
     if (error.response?.status === 401 && !originalRequest._retry) {
       if (isRefreshing) {

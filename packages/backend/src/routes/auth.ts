@@ -85,8 +85,26 @@ function errorCodeToStatus(code: string): number {
       return 401;
     case 'USER_NOT_FOUND':
       return 401;
+    case 'SCHOOL_SUSPENDED':
+      return 403;
     default:
       return 500;
+  }
+}
+
+function errorCodeToMessage(code: string): string {
+  switch (code) {
+    case 'ACCOUNT_LOCKED':
+      return 'Account is locked';
+    case 'SCHOOL_SUSPENDED':
+      return 'Your school account has been suspended. Please contact your administrator.';
+    case 'INVALID_REFRESH_TOKEN':
+    case 'REFRESH_TOKEN_EXPIRED':
+      return 'Invalid or expired refresh token';
+    case 'INVALID_CREDENTIALS':
+      return 'Invalid credentials';
+    default:
+      return 'Authentication failed';
   }
 }
 
@@ -194,7 +212,7 @@ authRouter.post('/login', loginRateLimiter, async (req: Request, res: Response):
     }
     const status = errorCodeToStatus(code);
     res.status(status).json({
-      error: code === 'ACCOUNT_LOCKED' ? 'Account is locked' : 'Invalid credentials',
+      error: errorCodeToMessage(code),
       code,
       requestId: req.id,
     });
@@ -346,8 +364,9 @@ authRouter.post('/verify-otp', loginRateLimiter, async (req: Request, res: Respo
     res.status(200).json(tokenPair);
   } catch (err) {
     const code = err instanceof Error ? err.message : 'INTERNAL_ERROR';
-    res.status(401).json({
-      error: 'Verification failed',
+    const status = errorCodeToStatus(code);
+    res.status(status).json({
+      error: errorCodeToMessage(code),
       code: code === 'INVALID_OTP_CHALLENGE' ? 'INVALID_OTP_CHALLENGE' : code,
       requestId: req.id,
     });
@@ -583,7 +602,7 @@ authRouter.post('/refresh', async (req: Request, res: Response): Promise<void> =
     const code = err instanceof Error ? err.message : 'INTERNAL_ERROR';
     const status = errorCodeToStatus(code);
     res.status(status).json({
-      error: 'Invalid or expired refresh token',
+      error: errorCodeToMessage(code),
       code,
       requestId: req.id,
     });
@@ -881,6 +900,11 @@ authRouter.post('/webauthn/authenticate/verify', async (req: Request, res: Respo
       res.status(err.statusCode).json({ error: err.message, code: err.code });
     } else if (err.message === 'ACCOUNT_LOCKED') {
       res.status(401).json({ error: 'Account is locked', code: 'ACCOUNT_LOCKED' });
+    } else if (err.message === 'SCHOOL_SUSPENDED') {
+      res.status(403).json({
+        error: 'Your school account has been suspended. Please contact your administrator.',
+        code: 'SCHOOL_SUSPENDED',
+      });
     } else {
       res.status(401).json({ error: 'Authentication failed', code: 'AUTH_FAILED' });
     }

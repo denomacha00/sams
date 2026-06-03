@@ -1,0 +1,107 @@
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+import bcrypt from 'bcrypt';
+import jwt from 'jsonwebtoken';
+import { authService } from './authService';
+import { prisma } from '../lib/prisma';
+
+vi.mock('../lib/prisma', () => ({
+  prisma: {
+    user: {
+      findFirst: vi.fn(),
+      findMany: vi.fn(),
+      findUnique: vi.fn(),
+      update: vi.fn(),
+    },
+    school: { findUnique: vi.fn() },
+    refreshToken: {
+      findMany: vi.fn(),
+      create: vi.fn(),
+      delete: vi.fn(),
+    },
+    $transaction: vi.fn((ops: unknown[]) => Promise.all(ops as Promise<unknown>[])),
+  },
+}));
+
+vi.mock('./auditService', () => ({
+  auditService: { log: vi.fn().mockResolvedValue(undefined) },
+}));
+
+vi.mock('./notificationService', () => ({
+  notificationService: {
+    sendInApp: vi.fn(),
+    sendEmail: vi.fn(),
+  },
+}));
+
+describe('authService school suspension', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('validateLoginCredentials throws SCHOOL_SUSPENDED when school is suspended', async () => {
+    const passwordHash = await bcrypt.hash('password123', 12);
+    vi.mocked(prisma.user.findFirst).mockResolvedValue({
+      id: 'user-1',
+      schoolId: 'school-1',
+      role: 'TEACHER',
+      isLocked: false,
+      failedLoginCount: 0,
+      failedLoginWindowStart: null,
+      passwordHash,
+      departmentId: null,
+      classId: null,
+    } as any);
+    vi.mocked(prisma.school.findUnique).mockResolvedValue({
+      isSuspended: true,
+      schoolCode: 'SCHOOL1',
+    } as any);
+
+    await expect(
+      authService.validateLoginCredentials('', 'teacher1', 'password123'),
+    ).rejects.toThrow('SCHOOL_SUSPENDED');
+  });
+
+  it('refresh throws SCHOOL_SUSPENDED when school is suspended', async () => {
+    process.env.JWT_REFRESH_SECRET = 'test-refresh-secret';
+    const refreshToken = jwt.sign({ sub: 'user-1', jti: 'jti-1' }, 'test-refresh-secret');
+
+    vi.mocked(prisma.refreshToken.findMany).mockResolvedValue([
+      {
+        id: 'rt-1',
+        tokenHash: await bcrypt.hash(refreshToken, 12),
+        expiresAt: new Date(Date.now() + 60_000),
+      },
+    ] as any);
+    vi.mocked(prisma.user.findUnique).mockResolvedValue({
+      id: 'user-1',
+      schoolId: 'school-1',
+      role: 'TEACHER',
+      isLocked: false,
+      departmentId: null,
+      classId: null,
+    } as any);
+    vi.mocked(prisma.school.findUnique).mockResolvedValue({
+      isSuspended: true,
+      schoolCode: 'SCHOOL1',
+    } as any);
+
+    await expect(authService.refresh(refreshToken)).rejects.toThrow('SCHOOL_SUSPENDED');
+  });
+
+  it('generateTokensForUser throws SCHOOL_SUSPENDED when school is suspended', async () => {
+    vi.mocked(prisma.user.findUnique).mockResolvedValue({
+      id: 'user-1',
+      schoolId: 'school-1',
+      role: 'TEACHER',
+      isLocked: false,
+      departmentId: null,
+      classId: null,
+    } as any);
+    vi.mocked(prisma.school.findUnique).mockResolvedValue({
+      isSuspended: true,
+      schoolCode: 'SCHOOL1',
+    } as any);
+
+    await expect(authService.generateTokensForUser('user-1')).rejects.toThrow('SCHOOL_SUSPENDED');
+  });
+});

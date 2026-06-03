@@ -17,6 +17,7 @@ const MAX_FAILED_ATTEMPTS = 5;
 const LOCKOUT_WINDOW_MS = 15 * 60 * 1000; // 15 minutes in ms
 
 const BCRYPT_ROUNDS = 12;
+const PLATFORM_SCHOOL_CODE = 'SAMS_PLATFORM';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -103,6 +104,8 @@ export class AuthService {
     if (user.isLocked) {
       throw new Error('ACCOUNT_LOCKED');
     }
+
+    await this.assertSchoolNotSuspended(user.schoolId);
 
     const now = new Date();
     const windowStart = user.failedLoginWindowStart;
@@ -283,6 +286,8 @@ export class AuthService {
       throw new Error('ACCOUNT_LOCKED');
     }
 
+    await this.assertSchoolNotSuspended(user.schoolId);
+
     // Generate new token pair
     const newTokenPair = this._generateTokenPair(user);
 
@@ -392,6 +397,8 @@ export class AuthService {
     if (!user) throw new Error('USER_NOT_FOUND');
     if (user.isLocked) throw new Error('ACCOUNT_LOCKED');
 
+    await this.assertSchoolNotSuspended(user.schoolId);
+
     const tokenPair = this._generateTokenPair(user);
 
     // Hash and store refresh token
@@ -424,6 +431,25 @@ export class AuthService {
     });
 
     return tokenPair;
+  }
+
+  private async assertSchoolNotSuspended(schoolId: string): Promise<void> {
+    const school = await prisma.school.findUnique({
+      where: { id: schoolId },
+      select: { isSuspended: true, schoolCode: true },
+    });
+
+    if (!school) {
+      throw new Error('USER_NOT_FOUND');
+    }
+
+    if (school.schoolCode === PLATFORM_SCHOOL_CODE) {
+      return;
+    }
+
+    if (school.isSuspended) {
+      throw new Error('SCHOOL_SUSPENDED');
+    }
   }
 
   /**

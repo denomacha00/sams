@@ -194,6 +194,11 @@ export class LicenseService {
       data: { isActive: false },
     });
 
+    // Invalidate all refresh tokens so suspended users cannot renew sessions
+    await prisma.refreshToken.deleteMany({
+      where: { user: { schoolId } },
+    });
+
     // Log to AuditService
     await auditService.log({
       eventType: 'SCHOOL_SUSPENDED',

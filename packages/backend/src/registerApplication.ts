@@ -9,6 +9,7 @@ import { redis } from './lib/redis';
 import { applyGlobalMiddleware } from './middleware/globalMiddleware';
 import { authenticate } from './middleware/auth';
 import { enforceSchoolScope } from './middleware/rbac';
+import { licenseGuard } from './middleware/licenseGuard';
 import { errorHandler } from './middleware/errors';
 import { authRouter } from './routes/auth';
 import { activationRouter } from './routes/activation';
@@ -81,7 +82,11 @@ export function registerApplication(app: express.Express, httpServer: HttpServer
       next();
       return;
     }
-    authenticate(req, res, () => enforceSchoolScope(req, res, next));
+    authenticate(req, res, () => {
+      enforceSchoolScope(req, res, () => {
+        void licenseGuard(req, res, next);
+      });
+    });
   });
 
   app.use('/api/v1/auth', authRouter);
