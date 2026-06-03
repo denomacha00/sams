@@ -10,11 +10,24 @@ describe('roleActionRegistry permissions', () => {
   it('SUPER_ADMIN has platform actions', () => {
     expect(isActionPermitted(UserRole.SUPER_ADMIN, 'suspend_school')).toBe(true);
     expect(isActionPermitted(UserRole.SUPER_ADMIN, 'get_system_stats')).toBe(true);
+    expect(isActionPermitted(UserRole.SUPER_ADMIN, 'reset_user_password')).toBe(true);
+    expect(findAction(UserRole.SUPER_ADMIN, 'reset_user_password')?.destructive).toBe(true);
   });
 
-  it('SCHOOL_ADMIN has school management but not platform suspend', () => {
+  it('SCHOOL_ADMIN has school management and password reset in own school', () => {
     expect(isActionPermitted(UserRole.SCHOOL_ADMIN, 'add_user')).toBe(true);
+    expect(isActionPermitted(UserRole.SCHOOL_ADMIN, 'reset_user_password')).toBe(true);
+    expect(findAction(UserRole.SCHOOL_ADMIN, 'reset_user_password')?.destructive).toBe(true);
     expect(isActionPermitted(UserRole.SCHOOL_ADMIN, 'suspend_school')).toBe(false);
+  });
+
+  it('TEACHER cannot reset passwords', () => {
+    expect(isActionPermitted(UserRole.TEACHER, 'reset_user_password')).toBe(false);
+  });
+
+  it('HOD and STUDENT cannot reset passwords', () => {
+    expect(isActionPermitted(UserRole.HOD, 'reset_user_password')).toBe(false);
+    expect(isActionPermitted(UserRole.STUDENT, 'reset_user_password')).toBe(false);
   });
 
   it('TEACHER can run class attendance actions', () => {

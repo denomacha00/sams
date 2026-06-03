@@ -6,6 +6,7 @@ describe('buildRoleActionsPromptSection', () => {
   it('includes super admin actions for SUPER_ADMIN role', () => {
     const section = buildRoleActionsPromptSection(UserRole.SUPER_ADMIN);
     expect(section).toContain('ROLE ACTIONS');
+    expect(section).toContain('reset_user_password');
     expect(section.length).toBeGreaterThan(50);
   });
 

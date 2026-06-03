@@ -669,6 +669,7 @@ const aiActionSchema = z.object({
     'get_school_info',
     'get_system_stats',
     'clear_audit_logs',
+    'reset_user_password',
   ]),
   params: z.record(z.unknown()).default({}),
 });
@@ -919,6 +920,40 @@ superAdminRouter.post('/ai-action', async (req: Request, res: Response): Promise
             totalRevenue: revenue._sum.amount || 0,
           },
         });
+        return;
+      }
+
+      case 'reset_user_password': {
+        const { resetUserPasswordBySuperAdmin } = await import('../services/passwordResetService');
+        const identifier = (params.identifier as string) || (params.username as string) || '';
+        const schoolCode = params.schoolCode as string | undefined;
+        const schoolId = params.schoolId as string | undefined;
+        const modeRaw = (params.mode as string) || 'temp_password';
+        const mode = modeRaw === 'trigger_reset' ? 'trigger_reset' : 'temp_password';
+
+        if (!identifier.trim()) {
+          res.status(400).json({ error: 'identifier is required', code: 'MISSING_PARAM' });
+          return;
+        }
+
+        const result = await resetUserPasswordBySuperAdmin({
+          identifier,
+          schoolCode,
+          schoolId,
+          mode,
+          actorRole: req.user?.role,
+        });
+
+        if (!result.ok) {
+          res.status(400).json({
+            error: result.answer,
+            code: 'RESET_FAILED',
+            result: result.data,
+          });
+          return;
+        }
+
+        res.json({ message: result.answer, result: result.data });
         return;
       }
 

@@ -264,6 +264,31 @@ const sendDepartmentNotificationHandler: ActionHandler = async (params, scope) =
   }
 };
 
+const resetUserPasswordHandler: ActionHandler = async (params, scope) => {
+  const { resetUserPasswordByAdmin } = await import('../../passwordResetService');
+
+  const identifier = (params.identifier as string) || (params.username as string) || '';
+  const modeRaw = (params.mode as string) || 'temp_password';
+  const mode = modeRaw === 'trigger_reset' ? 'trigger_reset' : 'temp_password';
+
+  if (!identifier.trim()) {
+    return {
+      answer:
+        'Who needs a password reset? Say: "reset password for [username or email]" — users must be in your school.',
+    };
+  }
+
+  const result = await resetUserPasswordByAdmin({
+    identifier,
+    mode,
+    actorId: scope.userId,
+    actorRole: scope.role,
+    actorScope: { kind: 'school', schoolId: scope.schoolId },
+  });
+
+  return { answer: result.answer, data: result.data };
+};
+
 const getSchoolStatsHandler: ActionHandler = async (_params, scope) => {
   const { prisma } = await import('../../../index');
 
@@ -393,6 +418,33 @@ export const schoolAdminActions: ActionDefinition[] = [
     descriptionTemplate: (params) =>
       `Get school statistics for ${params.entity || 'all'}.`,
     handler: getSchoolStatsHandler,
+  },
+  {
+    action: 'reset_user_password',
+    description:
+      'Reset a user password at your school (temporary password shown once, or send OTP reset). Cannot read existing passwords.',
+    destructive: true,
+    patterns: [
+      /reset\s+(?:user\s+)?password\s+(?:for\s+)?(.+)/i,
+      /password\s+reset\s+(?:for\s+)?(.+)/i,
+      /help\s+(?:user\s+)?(.+?)\s+(?:with\s+)?(?:login|password)/i,
+      /forgot\s+password\s+(?:for\s+)?(.+)/i,
+      /new\s+(?:temp(?:orary)?\s+)?password\s+(?:for\s+)?(.+)/i,
+    ],
+    extractParams: (message: string, match: RegExpMatchArray | null) => {
+      let identifier = match && match[1] ? match[1].trim() : '';
+      identifier = identifier.replace(/\s+(?:at|in)\s+school\s+\S+$/i, '').trim();
+      const mode = /send\s+(?:otp|code|reset\s+link)|trigger\s+reset/i.test(message)
+        ? 'trigger_reset'
+        : 'temp_password';
+      return { identifier, mode };
+    },
+    descriptionTemplate: (params) => {
+      const who = params.identifier || 'user';
+      const mode = params.mode === 'trigger_reset' ? 'send reset code to' : 'set temporary password for';
+      return `${mode} "${who}" at your school. Existing passwords cannot be read.`;
+    },
+    handler: resetUserPasswordHandler,
   },
   {
     action: 'send_school_notification',

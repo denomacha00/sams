@@ -219,6 +219,35 @@ const clearAuditLogsHandler: ActionHandler = async (params, scope) => {
   };
 };
 
+const resetUserPasswordHandler: ActionHandler = async (params, scope) => {
+  const identifier = (params.identifier as string) || (params.username as string) || '';
+  const schoolCode = params.schoolCode as string | undefined;
+  const schoolId = params.schoolId as string | undefined;
+  const modeRaw = (params.mode as string) || 'temp_password';
+  const mode = modeRaw === 'trigger_reset' ? 'trigger_reset' : 'temp_password';
+
+  if (!identifier.trim()) {
+    return {
+      answer:
+        'Who needs a password reset? Say: "reset password for [username] at school [code]" or provide identifier + schoolCode/schoolId.',
+    };
+  }
+
+  const { resetUserPasswordByAdmin } = await import('../../passwordResetService');
+
+  const result = await resetUserPasswordByAdmin({
+    identifier,
+    schoolCode,
+    schoolId,
+    mode,
+    actorId: scope.userId,
+    actorRole: scope.role,
+    actorScope: { kind: 'platform' },
+  });
+
+  return { answer: result.answer, data: result.data };
+};
+
 const getSystemStatsHandler: ActionHandler = async () => {
   const { prisma } = await import('../../../index');
 
@@ -369,6 +398,50 @@ export const superAdminActions: ActionDefinition[] = [
     descriptionTemplate: () =>
       `Retrieve system-wide statistics (schools, users, revenue, etc.).`,
     handler: getSystemStatsHandler,
+  },
+  {
+    action: 'reset_user_password',
+    description:
+      'Reset a user password (temporary password shown once, or send OTP reset). Cannot read existing passwords.',
+    destructive: true,
+    patterns: [
+      /reset\s+(?:user\s+)?password\s+(?:for\s+)?(.+)/i,
+      /password\s+reset\s+(?:for\s+)?(.+)/i,
+      /help\s+(?:user\s+)?(.+?)\s+(?:with\s+)?(?:login|password)/i,
+      /forgot\s+password\s+(?:for\s+)?(.+)/i,
+      /new\s+(?:temp(?:orary)?\s+)?password\s+(?:for\s+)?(.+)/i,
+    ],
+    extractParams: (message: string, match: RegExpMatchArray | null) => {
+      const remainder = match && match[1] ? match[1].trim() : '';
+      let schoolCode: string | undefined;
+      let schoolId: string | undefined;
+      let identifier = remainder;
+
+      const atSchool = remainder.match(/^(.+?)\s+(?:at|in)\s+school\s+(\S+)/i);
+      if (atSchool) {
+        identifier = atSchool[1]!.trim();
+        schoolCode = atSchool[2]!.trim();
+      } else {
+        const codeMatch = remainder.match(/^(.+?)\s+(\b[A-Z0-9]{4,12}\b)\s*$/i);
+        if (codeMatch && codeMatch[2]!.length <= 12) {
+          identifier = codeMatch[1]!.trim();
+          schoolCode = codeMatch[2]!.trim();
+        }
+      }
+
+      const mode = /send\s+(?:otp|code|reset\s+link)|trigger\s+reset/i.test(message)
+        ? 'trigger_reset'
+        : 'temp_password';
+
+      return { identifier, schoolCode, schoolId, mode };
+    },
+    descriptionTemplate: (params) => {
+      const who = params.identifier || 'user';
+      const school = params.schoolCode ? ` at school ${params.schoolCode}` : '';
+      const mode = params.mode === 'trigger_reset' ? 'send reset code to' : 'set temporary password for';
+      return `${mode} "${who}"${school}. Existing passwords cannot be read.`;
+    },
+    handler: resetUserPasswordHandler,
   },
   {
     action: 'clear_audit_logs',

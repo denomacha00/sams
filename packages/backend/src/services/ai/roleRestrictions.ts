@@ -17,6 +17,7 @@ const FORBIDDEN_ACTION_NAMES: Partial<Record<UserRole, string[]>> = {
     'get_school_info',
     'get_system_stats',
     'clear_audit_logs',
+    'reset_user_password',
     'add_teacher',
     'view_department_stats',
   ],
@@ -37,6 +38,7 @@ const FORBIDDEN_ACTION_NAMES: Partial<Record<UserRole, string[]>> = {
     'generate_license',
     'get_system_stats',
     'clear_audit_logs',
+    'reset_user_password',
   ],
   [UserRole.HOD]: [
     'suspend_school',
@@ -45,6 +47,7 @@ const FORBIDDEN_ACTION_NAMES: Partial<Record<UserRole, string[]>> = {
     'extend_license',
     'get_system_stats',
     'clear_audit_logs',
+    'reset_user_password',
     'add_user',
     'remove_user',
     'create_department',
@@ -62,9 +65,9 @@ const FORBIDDEN_ACTION_NAMES: Partial<Record<UserRole, string[]>> = {
 
 const ROLE_SCOPE_NOTES: Partial<Record<UserRole, string>> = {
   [UserRole.SUPER_ADMIN]:
-    'Full platform access. Can manage schools, licenses, and system-wide audit logs.',
+    'Full platform access. Can manage schools, licenses, system-wide audit logs, and reset user passwords (temporary password shown once — never read or list passwords).',
   [UserRole.SCHOOL_ADMIN]:
-    'School-wide user, class, and department management; in-app school/department notifications via chat. No platform license/suspend (Super Admin only). SMS via Notifications UI only.',
+    'School-wide user, class, and department management; reset passwords for users at your school (temp password once — never read passwords; not other school admins). In-app school/department notifications via chat. No platform license/suspend (Super Admin only). SMS via Notifications UI only.',
   [UserRole.HOD]:
     'Department teachers, stats, student registration links for department classes, and in-app department/class notifications. Cannot add/remove school users directly, school-wide notify, or manage licenses.',
   [UserRole.TEACHER]:

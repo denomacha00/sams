@@ -1415,6 +1415,8 @@ Here's what you can do as a Super Admin:
 • "extend license for X" — Extend a license
 • "generate a license for Basic plan" — Generate a key
 • "clear audit logs" — Purge audit log records (confirm when prompted)
+• "reset password for jsmith at school ABC123" — Set temp password (confirm when prompted)
+• "send reset code for user@school.com at school ABC123" — OTP reset via SMS/email
 • "system architecture" — View tech stack
 • "common problems" — Troubleshooting guide
 

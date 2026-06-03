@@ -79,5 +79,25 @@ describe('AI role capabilities matrix', () => {
       expect(r.action).not.toBe('send_school_notification');
       expect(r.isAction).toBe(false);
     });
+
+    it('detects super admin password reset', async () => {
+      const r = await actionIntentDetector.detect(
+        'reset password for jsmith at school ABC123',
+        UserRole.SUPER_ADMIN,
+      );
+      expect(r.action).toBe('reset_user_password');
+      expect(r.requiresConfirmation).toBe(true);
+      expect(r.params).toMatchObject({ identifier: 'jsmith', schoolCode: 'ABC123' });
+    });
+
+    it('detects school admin password reset without school code', async () => {
+      const r = await actionIntentDetector.detect(
+        'reset password for john',
+        UserRole.SCHOOL_ADMIN,
+      );
+      expect(r.action).toBe('reset_user_password');
+      expect(r.requiresConfirmation).toBe(true);
+      expect(r.params).toMatchObject({ identifier: 'john', mode: 'temp_password' });
+    });
   });
 });
