@@ -5,7 +5,7 @@
   "main": "dist/index.js",
   "scripts": {
     "dev": "tsx watch src/index.ts",
-    "build": "prisma generate && tsc --project tsconfig.json && node -e \"require('fs').accessSync('dist/index.js')\"",
+    "build": "prisma generate && npx tsc --project tsconfig.json && node -e \"require('fs').accessSync('dist/index.js')\"",
     "start": "node dist/index.js",
     "test": "vitest run",
     "test:watch": "vitest",

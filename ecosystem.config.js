@@ -2,7 +2,7 @@ module.exports = {
   apps: [
     {
       name: 'sams-api',
-      script: './packages/backend/dist/index.js',
+      script: './packages/backend/bin/pm2-start.js',
       instances: 1,
       exec_mode: 'fork',
       autorestart: true,
