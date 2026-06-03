@@ -35,6 +35,8 @@ cd "$ROOT"
 
 echo "==> Building packages"
 npm run build -w @sams/shared
+# Remove stale compiled output (git reset can restore old dist/index.js with outdated /health)
+rm -rf "$ROOT/packages/backend/dist"
 npm run build -w @sams/backend
 npm run build -w @sams/frontend
 npm run build -w @sams/super-admin
@@ -57,20 +59,24 @@ verify_spa_dist() {
 
 verify_backend_dist() {
   local dir="$ROOT/packages/backend/dist"
+  local entry=""
   if [[ -f "$dir/index.js" ]]; then
-    echo "    OK Backend ($dir/index.js)"
-    return 0
+    entry="$dir/index.js"
+  elif [[ -f "$dir/backend/src/index.js" ]]; then
+    entry="$dir/backend/src/index.js"
+    echo "    WARN: Legacy backend layout ($entry) — PM2 expects packages/backend/dist/index.js" >&2
+    echo "    Run: rm -rf packages/backend/dist && npm run build -w @sams/backend" >&2
+  else
+    echo "ERROR: Backend build failed — no dist/index.js under $dir" >&2
+    find "$dir" -name 'index.js' 2>/dev/null | head -5 >&2 || true
+    exit 1
   fi
-  # Legacy layout from older tsconfig (nested dist/backend/src)
-  local legacy="$dir/backend/src/index.js"
-  if [[ -f "$legacy" ]]; then
-    echo "    OK Backend ($legacy)"
-    echo "    NOTE: Updating PM2 to use legacy entry path"
-    return 0
+  if ! grep -q 'passwordResetEnabled' "$entry" 2>/dev/null; then
+    echo "ERROR: Backend $entry looks stale (missing expanded /health handler)." >&2
+    echo "       Fix: rm -rf packages/backend/dist && npm run build -w @sams/backend" >&2
+    exit 1
   fi
-  echo "ERROR: Backend build failed — no dist/index.js under $dir" >&2
-  find "$dir" -name 'index.js' 2>/dev/null | head -5 >&2 || true
-  exit 1
+  echo "    OK Backend ($entry)"
 }
 
 echo "==> Verifying build output"

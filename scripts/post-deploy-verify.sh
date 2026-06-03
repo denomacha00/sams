@@ -59,6 +59,7 @@ if HEALTH="$(curl -sf --max-time 10 "${API}/health" 2>/dev/null)"; then
     if(redis===true) console.log('       redis: ok');
     else if(redis===false) console.log('       redis: FAIL');
     if(h.sms) console.log('       sms:', h.sms.configured ? (h.sms.sandbox?'sandbox':'production') : 'not configured');
+    else console.log('       sms: unknown (stale backend — rm -rf packages/backend/dist && redeploy)');
     if(h.otp) console.log('       otp login:', h.otp.loginEnabled, '| reset:', h.otp.passwordResetEnabled);
   " 2>/dev/null || true
 else
