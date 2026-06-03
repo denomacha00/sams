@@ -2,6 +2,9 @@
 # Apply production-safe defaults to packages/backend/.env on the VPS.
 # Generates JWT/QR secrets automatically if not already set to real values.
 #
+# Africa's Talking (SMS): use scripts/configure-production-at.sh for guided AT setup.
+# Sandbox is detected when AT_USERNAME=sandbox (there is no separate AT_SANDBOX env var).
+#
 # Usage: bash scripts/set-production-env.sh
 
 set -euo pipefail

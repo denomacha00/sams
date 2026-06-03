@@ -4,7 +4,9 @@
 **Version:** 1.0.0  
 **Developer:** Denis Macharia  
 **Contact:** +254 703 285 246 | denis@smart-managment.com  
-**Live URL:** https://smart-managment.com  
+**Main app:** https://app.smart-managment.com  
+**Super Admin:** https://super.smart-managment.com  
+**Marketing site:** https://smart-managment.com  
 **Repository:** https://github.com/denomacha00/sams  
 **Server:** 185.143.228.182  
 
@@ -23,6 +25,7 @@
 9. [Deployment](#9-deployment)
 10. [Security](#10-security)
 11. [Configuration](#11-configuration)
+12. [SMS, OTP & Africa's Talking](#12-sms-otp--africas-talking)
 
 ---
 
@@ -51,8 +54,9 @@ SAMS is a multi-school enterprise platform designed for Kenyan educational insti
 ```
 ┌─────────────────────────────────────────────────────────┐
 │                    NGINX (Reverse Proxy)                  │
-│  app.sams.ke → Frontend | api.sams.ke → Backend          │
-│  super.sams.ke → Super Admin Panel                       │
+│  app.smart-managment.com → Frontend (React SPA)          │
+│  API: same-origin /api → Backend (port 3001)           │
+│  super.smart-managment.com → Super Admin Panel           │
 └─────────────────────┬───────────────────────────────────┘
                       │
 ┌─────────────────────┴───────────────────────────────────┐
@@ -121,10 +125,11 @@ sams/
 - Sends notifications to entire school
 
 ### HOD (Head of Department)
-- Manages their department
+- Manages their department timetable (create/edit entries; school admin can view only)
 - Views department reports and risk scores
 - Generates registration links for teachers
-- Sends notifications to department
+- Sends notifications to department or classes within it
+- Can assign class rep on Class Roster for department classes
 
 ### TEACHER
 - Starts attendance sessions
@@ -138,7 +143,13 @@ sams/
 - Scans QR codes for attendance
 - Views own attendance records and reports
 - Views timetable
-- Receives notifications
+- Receives notifications (inbox; read-only unless also class rep)
+
+### CLASS_REP (flag on a student, not a separate role)
+- A student with `isClassRep: true` for their class (at most one per class)
+- Can **reply** to messages from their class teacher in Notifications (inbox)
+- Cannot send school-wide or department broadcasts; cannot edit others' messages
+- Assigned by **School Admin** (User Management) or **Teacher/HOD** (Class Roster page)
 
 ---
 
@@ -204,14 +215,26 @@ sams/
 - Invoice generation
 - Audit logging
 
-### 5.7 Notifications
-- In-app notifications (real-time via Socket.io)
-- SMS via Africa's Talking
-- Email via Nodemailer
-- Scope-based sending: school, department, class
+### 5.7 Notifications & Messaging
+- **Inbox / Sent** folders on the Notifications page
+- In-app delivery (real-time via Socket.io) and optional **SMS** channel (School Admin and HOD only)
+- Email via Nodemailer (password reset, OTP, optional copies)
+- **Send scope:** school, department, or class (role-dependent)
+  - **School Admin:** entire school, any department/class, optional role filter
+  - **HOD:** own department and classes within it
+  - **Teacher:** own class(es)
+- **Edit/delete:** only the **original sender** can edit or delete their outbound copy (prevents editing admin/HOD messages via inbox row IDs). Non–school-admins have a **24-hour** edit window; school admins are not limited by that window.
+- **Class rep replies:** students flagged as class rep may reply only to messages where `senderRole` is `TEACHER` (threaded reply API)
+- **HOD** cannot edit messages sent by school admin (must be sender)
+- SMS via Africa's Talking (server env — see [§12](#12-sms-otp--africas-talking)); Super Admin portal has **no** school-level AT settings
 - Daily cron: low attendance alerts, license expiry reminders
 
-### 5.8 Reports
+### 5.8 Class Representative
+- Toggle per student: User Management (school admin) or **Class Roster** (`/class-roster`, teachers for their class, HODs for department classes)
+- API: `PATCH /api/v1/users/:id/class-rep` with `{ isClassRep: true|false }`
+- Enabling a new rep clears the previous rep in the same class
+
+### 5.9 Reports
 - Student, Class, Department, School level reports
 - Attendance percentage calculation
 - PDF export (pdfkit)
@@ -219,16 +242,34 @@ sams/
 - CSV export
 - Role-based access control on all reports
 
-### 5.9 Password Reset Flow
-- User visits `/forgot-password` and enters school code + identifier (username/email/phone/ADM)
-- Backend generates a secure 32-byte random token (1 hour expiry)
-- Reset link sent via email (`/reset-password?token=...`) and SMS
-- User clicks link → lands on `/reset-password` page
-- Enters and confirms new password (min 8 chars)
-- Token validated server-side, password updated, token cleared
-- User auto-redirected to login after 3 seconds
+### 5.10 Authentication Flows
 
-### 5.10 Super Admin Panel
+**Standard login**
+- Identifier: username, email, phone, or ADM number + password
+- Optional school code (not required for sign-in)
+- JWT access (15 min) + refresh (30 days)
+
+**OTP login** (optional, `OTP_LOGIN_ENABLED=true`)
+- After valid password, server sends 6-digit code via SMS and/or email
+- User completes login on `/login` with `POST /api/v1/auth/verify-otp`
+- Keep disabled in production until SMS and SMTP are verified
+
+**Password reset — link mode**
+- `/forgot-password` → school code + identifier
+- Secure token (1 hour) emailed/SMS'd; user opens `/reset-password?token=...`
+
+**Password reset — OTP mode** (default when `OTP_PASSWORD_RESET_ENABLED=true`)
+- Forgot Password → **OTP code** tab
+- `POST /api/v1/auth/forgot-password-otp` then `POST /api/v1/auth/reset-password-otp` with code + new password
+- Requires email and/or phone on the user record; sandbox SMS only reaches AT-whitelisted numbers
+
+**Registration links**
+- Admins generate time-limited links; recipients self-register at `/register/:token`
+
+**Biometric**
+- Face enrollment and session attendance (plan-gated); descriptors encrypted per school
+
+### 5.11 Super Admin Panel
 - Accessible at `super.smart-managment.com`
 - Separate React SPA (`packages/super-admin`)
 - Host-restricted: only accessible via `super.smart-managment.com` (configurable via `SUPER_ADMIN_HOST`)
@@ -263,7 +304,15 @@ cd /var/www/sams && bash scripts/deploy-production.sh
 
 Never run only `git pull` on the server without a build — that is what causes blank app / blank Super Admin.
 
+### 5.12 School Admin Settings
+- Route: `/settings` (school admin only)
+- **SMS · Africa's Talking:** read-only status from server (`GET /api/v1/notifications/sms-status`), sandbox vs production indicator, **Send test SMS**
+- **Email (SMTP):** status + test email (credentials live in server `.env`, not per-school DB)
+- AT credentials are **platform-level** on the VPS (`packages/backend/.env`), not configured in Super Admin
+
 ---
+
+## 6. Database Schema
 
 ### Core Models
 - **School** — Multi-tenant root entity
@@ -295,11 +344,22 @@ Never run only `git pull` on the server without a build — that is what causes 
 ## 7. API Endpoints
 
 ### Authentication
-- `POST /api/v1/auth/login` — Login (username/phone/email/ADM + password)
+- `POST /api/v1/auth/login` — Login; may return `requiresOtp` when OTP login enabled
+- `POST /api/v1/auth/verify-otp` — Complete login with OTP challenge + code
+- `POST /api/v1/auth/resend-login-otp` — Resend login OTP (cooldown applies)
 - `POST /api/v1/auth/refresh` — Refresh token pair
 - `POST /api/v1/auth/logout` — Invalidate refresh token
-- `POST /api/v1/auth/forgot-password` — Send password reset link via email/SMS
-- `POST /api/v1/auth/reset-password` — Validate reset token and set new password
+- `POST /api/v1/auth/forgot-password` — Password reset link via email/SMS
+- `POST /api/v1/auth/reset-password` — Set password from reset token
+- `POST /api/v1/auth/forgot-password-otp` — Send 6-digit reset code
+- `POST /api/v1/auth/reset-password-otp` — Reset password with OTP code
+
+### Health
+- `GET /health` — DB/Redis status, `sms` (configured/sandbox/username), `email`, `otp` flags (no secrets)
+
+### Notifications (SMS admin)
+- `GET /api/v1/notifications/sms-status` — School admin: AT config status
+- `POST /api/v1/notifications/test-sms` — School admin: send test SMS
 
 ### School Activation
 - `POST /api/v1/activate` — Activate school with license key
@@ -307,6 +367,7 @@ Never run only `git pull` on the server without a build — that is what causes 
 ### Users
 - `GET/POST /api/v1/users` — List/create users
 - `GET/PUT/DELETE /api/v1/users/:id` — CRUD single user
+- `PATCH /api/v1/users/:id/class-rep` — Assign/remove class representative (student)
 
 ### Registration Links
 - `POST /api/v1/registration-links` — Generate link
@@ -377,6 +438,11 @@ Never run only `git pull` on the server without a build — that is what causes 
 
 ## 8. AI Assistant
 
+### Documentation context injection
+- At runtime the backend loads **`DOCUMENTATION.md`** from the repo root (truncated excerpt, ~8–10k chars) and injects it into the OpenAI/Groq system prompt for how-to and feature questions (`systemDocumentation.ts`).
+- Keep this file accurate after feature changes; `post-deploy-verify.sh` warns if it is missing on the VPS.
+- Super Admin can also maintain an **AI knowledge base** via the super-admin API for extra school-neutral facts.
+
 ### Local Engine (No API needed)
 Handles SAMS-specific queries via regex pattern matching:
 - About SAMS, features, developer info
@@ -418,13 +484,35 @@ Can execute via natural language:
 - PM2 process manager
 - NGINX reverse proxy with SSL
 
+### Production URLs
+
+| Surface | URL |
+|---------|-----|
+| Main app | https://app.smart-managment.com |
+| Super Admin | https://super.smart-managment.com |
+| API (browser) | Same-origin `https://app.smart-managment.com/api/...` via nginx |
+| Health (on VPS) | `http://127.0.0.1:3001/health` |
+
 ### Deploy Commands
 ```bash
 cd /var/www/sams
 nvm use   # Node 20 per .nvmrc
 bash scripts/deploy-production.sh
-bash scripts/post-deploy-verify.sh   # optional smoke check (also runs at end of deploy)
+bash scripts/post-deploy-verify.sh   # smoke check (also at end of deploy)
 ```
+
+### VPS helper scripts
+| Script | Purpose |
+|--------|---------|
+| `scripts/deploy-production.sh` | Pull main, `npm ci`, build all packages, migrate, PM2 reload |
+| `scripts/post-deploy-verify.sh` | Dist artifacts, PM2, `/health`, `.env` presence |
+| `scripts/set-production-env.sh` | JWT/QR secrets, `APP_URL`, `CORS`, OTP flags from AT key presence |
+| `scripts/configure-production-at.sh` | Interactive AT sandbox vs production (no committed secrets) |
+
+### PM2 and environment
+- `ecosystem.config.js` sets `env_file: './packages/backend/.env'` so **all** backend variables (AT, SMTP, JWT, etc.) load from that file.
+- Use `pm2 reload ecosystem.config.js --env production` after `.env` changes.
+- Do **not** commit `packages/backend/.env`; use `packages/backend/.env.example` as the template.
 
 > Use `pm2 reload` (not `pm2 restart`) for zero-downtime deploys. The backend signals PM2 with `process.send('ready')` after startup, and `wait_ready: true` in ecosystem.config.js ensures the old instance is only killed after the new one is healthy.
 
@@ -456,50 +544,99 @@ bash scripts/post-deploy-verify.sh   # optional smoke check (also runs at end of
 
 ## 11. Configuration
 
-### Environment Variables (.env)
+Full annotated template: **`packages/backend/.env.example`**. Copy to `packages/backend/.env` on the VPS and never commit real secrets.
+
+### Core
+| Variable | Description |
+|----------|-------------|
+| `DATABASE_URL` | PostgreSQL connection string |
+| `REDIS_URL` | Redis for OTP codes, rate limits, sessions |
+| `JWT_SECRET` / `JWT_REFRESH_SECRET` | 64+ char random strings (required in production) |
+| `QR_SECRET` | QR session JWT signing |
+| `LICENSE_SECRET` | License key HMAC |
+| `NODE_ENV` | `production` on VPS |
+| `PORT` | Default `3001` |
+| `APP_URL` | `https://app.smart-managment.com` (reset links, emails) |
+| `CORS_ORIGIN` | Exact frontend origin in production |
+| `UPLOADS_DIR` | e.g. `/var/www/sams/uploads` |
+
+### Africa's Talking & OTP
+See [§12](#12-sms-otp--africas-talking) for setup steps. Key variables: `AT_API_KEY`, `AT_USERNAME`, `AT_SENDER_ID`, `AT_SANDBOX_SENDER_ID`, `SMS_WELCOME_ON_REGISTER`, `OTP_LOGIN_ENABLED`, `OTP_PASSWORD_RESET_ENABLED`, `OTP_TTL_SECONDS`, `OTP_LENGTH`, `OTP_RESEND_COOLDOWN_SECONDS`.
+
+### Email, AI, M-Pesa, Super Admin, Biometric
+See `.env.example` for `SMTP_*`, `OPENAI_*`, `MPESA_*`, `SUPER_ADMIN_*`, `BIOMETRIC_*`, `CONVERSATION_MASTER_KEY`, and notification job thresholds.
+
+---
+
+## 12. SMS, OTP & Africa's Talking
+
+SAMS uses [Africa's Talking](https://africastalking.com) for SMS: OTP codes, password reset texts, notification broadcasts, welcome SMS on phone registration, and cron alerts.
+
+### Sandbox vs production
+
+| | Sandbox | Production |
+|---|---------|------------|
+| `AT_USERNAME` | `sandbox` | Your **live** app username from AT dashboard |
+| `AT_API_KEY` | Sandbox key (often `atsk_...`) | Production API key |
+| Delivery | **Only** numbers whitelisted in AT dashboard → SMS → phone numbers | Any valid Kenyan number (balance permitting) |
+| Sender | `AT_SANDBOX_SENDER_ID` or default `AFRICASTKNG` | Approved `AT_SENDER_ID` (e.g. `SAMS`) |
+| Detection | `username === 'sandbox'` → `sandbox: true` in health/API | `sandbox: false` |
+
+There is **no** `AT_SANDBOX=true` environment variable; sandbox mode is inferred from `AT_USERNAME=sandbox`.
+
+### OTP: login vs password reset
+
+| Feature | Env flag | Default | Notes |
+|---------|----------|---------|-------|
+| Password reset OTP | `OTP_PASSWORD_RESET_ENABLED` | `true` when AT configured | Forgot Password → OTP tab |
+| Login OTP (2-step) | `OTP_LOGIN_ENABLED` | `false` | Password first, then SMS/email code |
+| Code TTL | `OTP_TTL_SECONDS` | `900` (15 min) | Stored in Redis |
+| Resend cooldown | `OTP_RESEND_COOLDOWN_SECONDS` | `60` | Per user/purpose |
+
+`scripts/set-production-env.sh` sets `OTP_PASSWORD_RESET_ENABLED=true` only when a real `AT_API_KEY` is present.
+
+### VPS setup (production AT)
+
+1. Create production app and API key at https://account.africastalking.com  
+2. Request **sender ID** approval for `AT_SENDER_ID` (e.g. `SAMS`).  
+3. On the server:
+   ```bash
+   cd /var/www/sams
+   bash scripts/configure-production-at.sh   # guided; does not store secrets in git
+   # or edit packages/backend/.env manually
+   pm2 reload ecosystem.config.js --env production
+   curl -s http://127.0.0.1:3001/health
+   ```
+4. Sign in as **school admin** → **Settings** → **SMS · Africa's Talking** → **Send test SMS** to a real number.  
+5. When stable, keep `OTP_LOGIN_ENABLED=false` until you intentionally enable 2-step login.
+
+### School admin Settings UI
+
+- Shows configured / sandbox / production badge, username, sender ID (no API key).  
+- Test SMS uses `POST /api/v1/notifications/test-sms` (school admin only).  
+- Super Admin portal does **not** configure AT; all schools share the same server credentials.
+
+### Welcome SMS
+
+When `SMS_WELCOME_ON_REGISTER` is not `false`, adding or registering a phone sends a short confirmation SMS (`phoneOnboardingService`) so users know the number works before OTP.
+
+### Health endpoint
+
+`GET /health` returns:
+```json
+"sms": { "configured": true, "sandbox": false, "username": "yourapp" },
+"otp": { "loginEnabled": false, "passwordResetEnabled": true }
 ```
-DATABASE_URL=postgresql://user:pass@localhost:5432/sams_db
-REDIS_URL=redis://localhost:6379
-JWT_SECRET=<64+ char secret>
-JWT_REFRESH_SECRET=<64+ char secret>
-QR_SECRET=<secret for QR JWT signing>
-LICENSE_SECRET=<HMAC secret for license keys>
-OPENAI_API_KEY=<Groq/OpenRouter API key>
-OPENAI_BASE_URL=https://openrouter.ai/api/v1
-OPENAI_MODEL=meta-llama/llama-3.1-8b-instruct
-VISION_MODEL=meta-llama/llama-4-scout-17b-16e-instruct
-OPENAI_FALLBACK_KEY=<Groq API key>
-OPENAI_FALLBACK_URL=https://api.groq.com/openai/v1
-OPENAI_FALLBACK_MODEL=llama-3.3-70b-versatile
-BIOMETRIC_MASTER_KEY=<master key for biometric encryption>
-BIOMETRIC_ENCRYPTION_KEY=<32-byte hex AES-256 key>
-BIOMETRIC_CONFIDENCE_THRESHOLD=0.6
-MPESA_CONSUMER_KEY=<Daraja consumer key>
-MPESA_CONSUMER_SECRET=<Daraja consumer secret>
-MPESA_SHORTCODE=<business shortcode>
-MPESA_PASSKEY=<Daraja passkey>
-MPESA_CALLBACK_URL=https://api.smart-managment.com/api/v1/payments/callback
-MPESA_ALLOWED_IPS=<comma-separated Safaricom IPs>
-MPESA_BASE_URL=https://sandbox.safaricom.co.ke
-AT_API_KEY=<Africa's Talking API key>
-AT_USERNAME=<Africa's Talking username>
-AT_SENDER_ID=SAMS
-SMTP_HOST=smtp.gmail.com
-SMTP_PORT=587
-SMTP_USER=<gmail address>
-SMTP_PASS=<gmail app password>
-APP_URL=https://app.smart-managment.com
-SUPER_ADMIN_HOST=super.smart-managment.com
-SUPER_ADMIN_HOST_CHECK=enabled
-SUPER_ADMIN_EMAIL=admin@smart-managment.com
-SUPER_ADMIN_PASSWORD=<strong-password>
-SUPER_ADMIN_USERNAME=superadmin
-CONVERSATION_MASTER_KEY=<32+ char key for encrypting AI conversation history>
-ATTENDANCE_THRESHOLD_PERCENT=75
-LICENSE_EXPIRY_WARNING_DAYS=7
-NODE_ENV=production
-PORT=3001
-```
+
+### Common errors
+
+| Code | Meaning |
+|------|---------|
+| `SMS_NOT_CONFIGURED` | Missing `AT_API_KEY` / placeholder key |
+| `OTP_NOT_CONFIGURED` | OTP enabled but neither SMS nor SMTP configured |
+| `OTP_CONTACT_MISSING` | User has no email or phone |
+| `OTP_DELIVERY_FAILED` | AT/SMTP rejected send (check sandbox whitelist) |
+| `OTP_RESEND_COOLDOWN` | Wait before resending |
 
 ---
 
