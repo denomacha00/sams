@@ -432,7 +432,7 @@ cd /var/www/sams && git pull origin main
 
 ## 18. Load this runbook into Super Admin AI
 
-**Option A — Automatic (after deploy):** This file is injected into Super Admin AI context from `docs/SAMS-OPS-RUNBOOK.md`.
+**Option A — Automatic (after deploy):** This file and `docs/SAMS-DEVELOPER-OPS-BOOK-DENIS.md` are injected into Super Admin AI context (ops runbook first, then developer book, then platform docs).
 
 **Option B — Knowledge Base (editable in UI):**
 
@@ -442,6 +442,8 @@ cd /var/www/sams && git pull origin main
 4. Paste sections you use most (keep under ~8000 chars per entry if splitting)
 
 **Option C — PDF for your desk:** See `docs/README-RUNBOOK-PDF.md`
+
+**Deep reference (architecture & failure modes):** See `docs/SAMS-DEVELOPER-OPS-BOOK-DENIS.md` and `docs/README-DEVELOPER-OPS-BOOK-PDF.md` — also auto-injected into Super Admin AI after deploy.
 
 ---
 

@@ -3,6 +3,7 @@ import { join } from 'path';
 
 let cachedFullDoc: string | null = null;
 let cachedOpsRunbook: string | null = null;
+let cachedDeveloperBook: string | null = null;
 
 const CANDIDATE_PATHS = [
   () => join(process.cwd(), 'DOCUMENTATION.md'),
@@ -16,9 +17,19 @@ const RUNBOOK_PATHS = [
   () => join(__dirname, '..', '..', '..', '..', '..', 'docs/SAMS-OPS-RUNBOOK.md'),
 ];
 
+const DEVELOPER_BOOK_PATHS = [
+  () => join(process.cwd(), 'docs/SAMS-DEVELOPER-OPS-BOOK-DENIS.md'),
+  () => join(process.cwd(), '..', '..', 'docs/SAMS-DEVELOPER-OPS-BOOK-DENIS.md'),
+  () =>
+    join(__dirname, '..', '..', '..', '..', '..', 'docs/SAMS-DEVELOPER-OPS-BOOK-DENIS.md'),
+];
+
 const DEFAULT_MAX_CHARS = 8_000;
 const SUPER_ADMIN_MAX_CHARS = 12_000;
-const SUPER_ADMIN_RUNBOOK_MAX_CHARS = 14_000;
+const SUPER_ADMIN_RUNBOOK_MAX_CHARS = 12_000;
+const SUPER_ADMIN_DEVBOOK_MAX_CHARS = 28_000;
+const SUPER_ADMIN_PLATFORM_DOC_MAX_CHARS = 8_000;
+const SUPER_ADMIN_TOTAL_MAX_CHARS = 48_000;
 
 function loadFullDocumentation(): string {
   if (cachedFullDoc !== null) return cachedFullDoc;
@@ -56,54 +67,102 @@ function loadOpsRunbook(): string {
   return '';
 }
 
+function loadDeveloperBook(): string {
+  if (cachedDeveloperBook !== null) return cachedDeveloperBook;
+
+  for (const resolve of DEVELOPER_BOOK_PATHS) {
+    const path = resolve();
+    if (!existsSync(path)) continue;
+    try {
+      cachedDeveloperBook = readFileSync(path, 'utf8');
+      return cachedDeveloperBook;
+    } catch {
+      continue;
+    }
+  }
+
+  cachedDeveloperBook = '';
+  return '';
+}
+
+function truncateExcerpt(raw: string, limit: number, label: string): string {
+  if (!raw) return '';
+  return raw.length <= limit
+    ? raw
+    : `${raw.slice(0, limit)}\n\n[${label} truncated for context length.]`;
+}
+
 /**
  * Ops runbook excerpt for Super Admin AI troubleshooting context.
  */
 export function getOpsRunbookExcerpt(maxChars?: number): string {
   const limit = maxChars ?? SUPER_ADMIN_RUNBOOK_MAX_CHARS;
-  const raw = loadOpsRunbook();
-  if (!raw) return '';
+  return truncateExcerpt(loadOpsRunbook(), limit, 'Ops runbook');
+}
 
-  return raw.length <= limit
-    ? raw
-    : `${raw.slice(0, limit)}\n\n[Ops runbook truncated for context length.]`;
+/**
+ * Developer & operations book excerpt for Super Admin AI (deep troubleshooting).
+ */
+export function getDeveloperBookExcerpt(maxChars?: number): string {
+  const limit = maxChars ?? SUPER_ADMIN_DEVBOOK_MAX_CHARS;
+  return truncateExcerpt(loadDeveloperBook(), limit, 'Developer ops book');
+}
+
+/**
+ * Build Super Admin context: runbook + developer book + platform docs (ops-first).
+ */
+function buildSuperAdminDocumentationExcerpt(): string {
+  const parts: string[] = [];
+
+  const runbook = getOpsRunbookExcerpt();
+  if (runbook) {
+    parts.push(`# Operations Runbook (troubleshooting — check first)\n\n${runbook}`);
+  }
+
+  const devBook = getDeveloperBookExcerpt();
+  if (devBook) {
+    parts.push(`# Developer & Operations Book (deep reference)\n\n${devBook}`);
+  }
+
+  const platformDoc = loadFullDocumentation();
+  if (platformDoc) {
+    parts.push(
+      `# Platform Documentation (features)\n\n${truncateExcerpt(
+        platformDoc,
+        SUPER_ADMIN_PLATFORM_DOC_MAX_CHARS,
+        'Platform documentation',
+      )}`,
+    );
+  }
+
+  return parts.join('\n\n---\n\n');
 }
 
 /**
  * Load a truncated excerpt of DOCUMENTATION.md for AI context injection.
- * Super Admin also receives the ops runbook when available.
+ * Super Admin also receives the ops runbook and developer book when available.
  */
 export function getSystemDocumentationExcerpt(
   maxChars?: number,
   role?: string,
 ): string {
-  const limit =
-    maxChars ??
-    (role === 'SUPER_ADMIN' && loadOpsRunbook()
-      ? 20_000
-      : role === 'SUPER_ADMIN'
-        ? SUPER_ADMIN_MAX_CHARS
-        : DEFAULT_MAX_CHARS);
-  let raw = loadFullDocumentation();
-
   if (role === 'SUPER_ADMIN') {
-    const runbook = getOpsRunbookExcerpt();
-    if (runbook) {
-      raw = raw
-        ? `${raw}\n\n---\n\n# Operations Runbook (troubleshooting)\n\n${runbook}`
-        : runbook;
-    }
+    const raw = buildSuperAdminDocumentationExcerpt();
+    const limit = maxChars ?? SUPER_ADMIN_TOTAL_MAX_CHARS;
+    if (!raw) return '';
+    return truncateExcerpt(raw, limit, 'Super Admin documentation bundle');
   }
 
+  const limit = maxChars ?? DEFAULT_MAX_CHARS;
+  const raw = loadFullDocumentation();
   if (!raw) return '';
 
-  return raw.length <= limit
-    ? raw
-    : `${raw.slice(0, limit)}\n\n[Documentation truncated for context length.]`;
+  return truncateExcerpt(raw, limit, 'Documentation');
 }
 
 /** Reset cache (for tests). */
 export function clearSystemDocumentationCache(): void {
   cachedFullDoc = null;
   cachedOpsRunbook = null;
+  cachedDeveloperBook = null;
 }
