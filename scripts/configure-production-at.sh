@@ -79,6 +79,7 @@ echo "Choose mode:"
 echo "  1) Sandbox (dev only — AT_USERNAME=sandbox, whitelist numbers in AT dashboard)"
 echo "  2) Production (live username + production API key + approved sender ID)"
 read -r -p "Enter 1 or 2 [2]: " MODE
+MODE="$(echo "${MODE:-}" | tr -d ' \r\n\t')"
 if [[ "$NODE_ENV" == "production" ]]; then
   MODE="${MODE:-2}"
 else
@@ -90,8 +91,9 @@ if [[ "$MODE" == "1" && "$NODE_ENV" == "production" ]]; then
   exit 1
 fi
 
-if [[ "$MODE" == "2" ]]; then
+if [[ "$MODE" == "2" || "$MODE" == "production" || "$MODE" == "Production" ]]; then
   echo ""
+  echo "==> Production mode selected"
   echo "Production checklist:"
   echo "  - Create/get production API key in AT dashboard (not the sandbox atsk_ key)"
   echo "  - Set AT_USERNAME to your live application username (NOT the word 'sandbox')"
@@ -119,6 +121,7 @@ if [[ "$MODE" == "2" ]]; then
   fi
 else
   echo ""
+  echo "==> Sandbox mode selected"
   echo "Sandbox: SMS only delivers to numbers you add at:"
   echo "  account.africastalking.com → SMS → phone numbers"
   echo ""
