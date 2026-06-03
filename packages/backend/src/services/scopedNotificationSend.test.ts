@@ -58,6 +58,13 @@ describe('scopedNotificationSend RBAC', () => {
     );
     expect(result.success).toBe(true);
     expect(result.recipientCount).toBe(1);
+    expect(prismaMock.notification.createMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.arrayContaining([
+          expect.objectContaining({ senderId: 't1', userId: 'u1' }),
+        ]),
+      }),
+    );
   });
 
   it('denies TEACHER school scope', async () => {

@@ -5,6 +5,9 @@ vi.mock('./prisma', () => ({
     class: {
       findFirst: vi.fn(),
     },
+    user: {
+      findUnique: vi.fn(),
+    },
   },
 }));
 
@@ -16,23 +19,30 @@ describe('resolveTeacherClassId', () => {
     vi.clearAllMocks();
   });
 
-  it('returns token classId when present', async () => {
-    const id = await resolveTeacherClassId('teacher-1', 'class-a');
-    expect(id).toBe('class-a');
-    expect(prisma.class.findFirst).not.toHaveBeenCalled();
+  it('prefers classTeacherId over stale JWT hint', async () => {
+    (prisma.class.findFirst as ReturnType<typeof vi.fn>).mockResolvedValue({ id: 'class-live' });
+    const id = await resolveTeacherClassId('teacher-1', 'class-stale-jwt');
+    expect(id).toBe('class-live');
+    expect(prisma.user.findUnique).not.toHaveBeenCalled();
   });
 
-  it('falls back to class where user is class teacher', async () => {
-    (prisma.class.findFirst as ReturnType<typeof vi.fn>).mockResolvedValue({ id: 'class-b' });
-    const id = await resolveTeacherClassId('teacher-1', null);
-    expect(id).toBe('class-b');
-    expect(prisma.class.findFirst).toHaveBeenCalledWith(
-      expect.objectContaining({ where: { classTeacherId: 'teacher-1' } }),
-    );
+  it('uses DB user.classId when not class teacher on record', async () => {
+    (prisma.class.findFirst as ReturnType<typeof vi.fn>).mockResolvedValue(null);
+    (prisma.user.findUnique as ReturnType<typeof vi.fn>).mockResolvedValue({ classId: 'class-db' });
+    const id = await resolveTeacherClassId('teacher-1', 'class-stale-jwt');
+    expect(id).toBe('class-db');
+  });
+
+  it('falls back to JWT hint when DB has no class', async () => {
+    (prisma.class.findFirst as ReturnType<typeof vi.fn>).mockResolvedValue(null);
+    (prisma.user.findUnique as ReturnType<typeof vi.fn>).mockResolvedValue({ classId: null });
+    const id = await resolveTeacherClassId('teacher-1', 'class-hint');
+    expect(id).toBe('class-hint');
   });
 
   it('returns null when no assignment', async () => {
     (prisma.class.findFirst as ReturnType<typeof vi.fn>).mockResolvedValue(null);
+    (prisma.user.findUnique as ReturnType<typeof vi.fn>).mockResolvedValue({ classId: null });
     const id = await resolveTeacherClassId('teacher-1', undefined);
     expect(id).toBeNull();
   });

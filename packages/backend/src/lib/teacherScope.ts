@@ -1,19 +1,25 @@
 import { prisma } from './prisma';
 
 /**
- * Effective class for a teacher: explicit user.classId, or the class they are assigned as class teacher.
+ * Effective class for a teacher. Prefers live DB assignment over JWT hints (token classId can be stale).
+ * Order: Class.classTeacherId → User.classId in DB → optional hint (e.g. JWT).
  */
 export async function resolveTeacherClassId(
   userId: string,
-  classIdFromToken?: string | null,
+  classIdHint?: string | null,
 ): Promise<string | null> {
-  if (classIdFromToken) return classIdFromToken;
-
-  const taught = await prisma.class.findFirst({
+  const asClassTeacher = await prisma.class.findFirst({
     where: { classTeacherId: userId },
     select: { id: true },
     orderBy: { name: 'asc' },
   });
+  if (asClassTeacher) return asClassTeacher.id;
 
-  return taught?.id ?? null;
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { classId: true },
+  });
+  if (user?.classId) return user.classId;
+
+  return classIdHint ?? null;
 }

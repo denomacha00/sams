@@ -62,6 +62,10 @@ vi.mock('../scopedNotificationSend', () => ({
   sendScopedNotification: (...args: unknown[]) => mockSendScoped(...args),
 }));
 
+vi.mock('../../lib/teacherScope', () => ({
+  resolveTeacherClassId: vi.fn().mockResolvedValue('class-1'),
+}));
+
 import { actionIntentDetector } from './actionIntentDetector';
 import { AIService } from '../aiService';
 
@@ -132,5 +136,33 @@ describe('AIService multi-turn notification flow', () => {
     expect(r.intent).toBe('action_executed');
     expect(mockSendScoped).toHaveBeenCalled();
     expect(r.answer).toMatch(/sent to/i);
+  });
+
+  it('teacher send_class_message: yes without confirmAction still executes', async () => {
+    vi.mocked(actionIntentDetector.detect).mockResolvedValue({ isAction: false });
+    const teacherUser = {
+      sub: 'teacher-1',
+      role: UserRole.TEACHER,
+      schoolId: 'school-1',
+      classId: 'class-stale',
+    } as const;
+
+    const r = await service.query(teacherUser as any, 'yes', {
+      pendingAction: {
+        action: 'send_class_message',
+        params: { message: 'Homework due Friday' },
+        description: 'Send in-app message to your class',
+      },
+    });
+
+    expect(r.intent).toBe('action_executed');
+    expect(mockSendScoped).toHaveBeenCalledWith(
+      expect.objectContaining({ sub: 'teacher-1', role: UserRole.TEACHER }),
+      expect.objectContaining({
+        scope: 'class',
+        message: 'Homework due Friday',
+        channels: ['inapp'],
+      }),
+    );
   });
 });

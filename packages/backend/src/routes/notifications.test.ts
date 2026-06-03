@@ -127,6 +127,53 @@ describe('POST /notifications/send — teacher scope', () => {
     expect(res.body.error).toMatch(/own class/i);
   });
 
+  it('GET /sent returns batches grouped by senderId', async () => {
+    const request = (await import('supertest')).default;
+    const app = createTestApp({
+      sub: 'teacher-1',
+      schoolId: 'school-1',
+      role: UserRole.TEACHER,
+      classId: 'class-1',
+    });
+
+    const now = new Date();
+    (prisma.notification.findMany as ReturnType<typeof vi.fn>).mockResolvedValue([
+      {
+        id: 'n1',
+        senderId: 'teacher-1',
+        batchId: 'batch-a',
+        title: 'Class message',
+        message: 'Hello',
+        createdAt: now,
+        scope: 'class',
+        targetId: 'class-1',
+        targetRole: 'STUDENT',
+      },
+      {
+        id: 'n2',
+        senderId: 'teacher-1',
+        batchId: 'batch-a',
+        title: 'Class message',
+        message: 'Hello',
+        createdAt: now,
+        scope: 'class',
+        targetId: 'class-1',
+        targetRole: 'STUDENT',
+      },
+    ]);
+    (prisma.notification.count as ReturnType<typeof vi.fn>).mockResolvedValue(2);
+    (prisma.class.findFirst as ReturnType<typeof vi.fn>).mockResolvedValue({ name: 'Form 1A' });
+
+    const res = await request(app).get('/notifications/sent');
+
+    expect(res.status).toBe(200);
+    expect(res.body).toHaveLength(1);
+    expect(res.body[0].recipientCount).toBe(2);
+    expect(prisma.notification.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { senderId: 'teacher-1' } }),
+    );
+  });
+
   it('defaults targetId from resolved teacher class when omitted', async () => {
     const request = (await import('supertest')).default;
     const app = createTestApp({

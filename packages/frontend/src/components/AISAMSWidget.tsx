@@ -1,12 +1,21 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import apiClient from '../services/apiClient';
 import { useVoiceQuery } from '../hooks/useVoiceQuery';
+import { loadAiThreadId, saveAiThreadId } from '../lib/aiChat';
+
+interface PendingAction {
+  action: string;
+  params: Record<string, unknown>;
+  description: string;
+  awaitingSlot?: string;
+}
 
 interface Message {
   id: string;
   role: 'user' | 'assistant';
   content: string;
   timestamp: Date;
+  pendingAction?: PendingAction;
 }
 
 const WELCOME_MESSAGE: Message = {
@@ -24,13 +33,49 @@ const QUICK_QUESTIONS = [
   'How many students?',
 ];
 
+const CONFIRM_RE = /^(yes|y|confirm|proceed|ok|do it|go ahead)\.?$/i;
+
 const AISAMSWidget: React.FC = () => {
   const [isOpen, setIsOpen] = useState(false);
   const [messages, setMessages] = useState<Message[]>([WELCOME_MESSAGE]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
+  const [threadId, setThreadId] = useState<string | null>(() => loadAiThreadId());
+  const pendingActionRef = useRef<PendingAction | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+
+  const confirmPendingAction = useCallback(async (pending: PendingAction) => {
+    setLoading(true);
+    try {
+      const { data } = await apiClient.post('/ai/query', {
+        question: 'yes',
+        threadId,
+        confirmAction: true,
+        pendingAction: pending,
+      });
+      if (data.threadId) {
+        setThreadId(data.threadId);
+        saveAiThreadId(data.threadId);
+      }
+      pendingActionRef.current = null;
+      setMessages((prev) => [...prev, {
+        id: crypto.randomUUID(),
+        role: 'assistant',
+        content: data.answer,
+        timestamp: new Date(),
+      }]);
+    } catch {
+      setMessages((prev) => [...prev, {
+        id: crypto.randomUUID(),
+        role: 'assistant',
+        content: "I couldn't complete that action. Please try again.",
+        timestamp: new Date(),
+      }]);
+    } finally {
+      setLoading(false);
+    }
+  }, [threadId]);
 
   const submitQuery = useCallback(async (text: string) => {
     if (!text.trim()) return;
@@ -46,7 +91,35 @@ const AISAMSWidget: React.FC = () => {
     setLoading(true);
 
     try {
-      const { data } = await apiClient.post('/ai/query', { question: text.trim() });
+      const isConfirm = CONFIRM_RE.test(text.trim()) && pendingActionRef.current;
+      const pending = pendingActionRef.current;
+      const { data } = await apiClient.post('/ai/query', {
+        question: text.trim(),
+        threadId,
+        ...(isConfirm && pending
+          ? { confirmAction: true, pendingAction: pending }
+          : pending
+            ? { pendingAction: pending }
+            : {}),
+      });
+      if (data.threadId) {
+        setThreadId(data.threadId);
+        saveAiThreadId(data.threadId);
+      }
+
+      if (data.pendingAction) {
+        pendingActionRef.current = data.pendingAction;
+        setMessages((prev) => [...prev, {
+          id: crypto.randomUUID(),
+          role: 'assistant',
+          content: data.answer,
+          timestamp: new Date(),
+          pendingAction: data.pendingAction,
+        }]);
+        return;
+      }
+
+      pendingActionRef.current = null;
       const assistantMessage: Message = {
         id: crypto.randomUUID(),
         role: 'assistant',
@@ -65,7 +138,7 @@ const AISAMSWidget: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [threadId]);
 
   const { isListening, startListening, stopListening } = useVoiceQuery(submitQuery);
 
@@ -138,6 +211,16 @@ const AISAMSWidget: React.FC = () => {
                 }`}
               >
                 <p className="whitespace-pre-wrap leading-relaxed">{msg.content}</p>
+                {msg.pendingAction && (
+                  <button
+                    type="button"
+                    onClick={() => void confirmPendingAction(msg.pendingAction!)}
+                    disabled={loading}
+                    className="mt-2 w-full bg-amber-600 hover:bg-amber-500 disabled:opacity-50 text-white text-xs font-medium py-1.5 px-3 rounded-lg transition-colors"
+                  >
+                    Confirm: {msg.pendingAction.description}
+                  </button>
+                )}
               </div>
             </div>
           ))}
