@@ -5,7 +5,7 @@ import { extractMessageBody, parseNotificationTargetRole } from '../notification
 // ─── Handlers ─────────────────────────────────────────────────────────────────
 
 const addTeacherHandler: ActionHandler = async (params, scope) => {
-  const { prisma } = await import('../../../index');
+  const { prisma } = await import('../../../lib/prisma');
 
   const teacherName = params.teacherName as string;
   if (!teacherName) return { answer: 'Please provide the teacher name.' };
@@ -36,7 +36,7 @@ const addTeacherHandler: ActionHandler = async (params, scope) => {
 };
 
 const sendClassNotificationHandler: ActionHandler = async (params, scope) => {
-  const { prisma } = await import('../../../index');
+  const { prisma } = await import('../../../lib/prisma');
   const {
     assertAiNotificationChannels,
     ScopedNotificationError,

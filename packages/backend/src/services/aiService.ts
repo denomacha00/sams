@@ -30,6 +30,8 @@ import type { PendingAction } from './ai/aiTypes';
 
 export type { PendingAction };
 
+const CONFIRM_ANSWER_RE = /^(yes|y|confirm|proceed|ok|do it|go ahead)\.?$/i;
+
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 export interface AIServiceResponse {
@@ -87,7 +89,17 @@ export class AIService {
       }
 
       if (options?.pendingAction && !options?.confirmAction) {
-        const continued = await this.continueSlotFilling(user, question, options.pendingAction);
+        const pending = options.pendingAction;
+        if (
+          !pending.awaitingSlot &&
+          CONFIRM_ANSWER_RE.test(question.trim()) &&
+          isActionPermitted(user.role, pending.action)
+        ) {
+          const result = await this.executeAction(user, pending);
+          threadId = await this.safelyPersist(user, question, result.answer, threadId);
+          return { ...result, threadId };
+        }
+        const continued = await this.continueSlotFilling(user, question, pending);
         threadId = await this.safelyPersist(user, question, continued.answer, threadId);
         return { ...continued, threadId };
       }
@@ -420,8 +432,16 @@ export class AIService {
         data: result.data,
       };
     } catch (err) {
-      console.error('[AIService] Action execution failed:', err);
-      // Safe error response — no internal details exposed
+      const errMsg = err instanceof Error ? err.message : String(err);
+      const errStack = err instanceof Error ? err.stack : undefined;
+      console.error('[AIService] action_executed failed', {
+        action,
+        role: user.role,
+        userId: user.sub,
+        schoolId: user.schoolId,
+        message: errMsg,
+        stack: errStack,
+      });
       return {
         answer: 'The action could not be completed. Please try again or contact support.',
         intent: 'action_error',

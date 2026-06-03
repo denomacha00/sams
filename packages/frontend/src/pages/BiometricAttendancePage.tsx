@@ -25,6 +25,8 @@ const BiometricAttendancePage: React.FC = () => {
   const [submitted, setSubmitted] = useState(false);
   const [templates, setTemplates] = useState<any[]>([]);
   const [modelsLoaded, setModelsLoaded] = useState(false);
+  const [sessionId, setSessionId] = useState('');
+  const [classId, setClassId] = useState<string | null>(null);
 
   // Load face-api.js models
   useEffect(() => {
@@ -49,26 +51,47 @@ const BiometricAttendancePage: React.FC = () => {
     loadModels();
   }, []);
 
+  // Active session + class scope (teacher classId may live on Class.classTeacherId)
+  useEffect(() => {
+    const loadScope = async () => {
+      try {
+        const { data: sessions } = await apiClient.get('/sessions', {
+          params: { isActive: true, teacherId: user?.id },
+        });
+        const active = Array.isArray(sessions)
+          ? sessions.filter((s: { isActive?: boolean }) => s.isActive !== false)
+          : [];
+        if (active.length > 0) {
+          setSessionId(active[0].id);
+          if (active[0].classId) setClassId(active[0].classId);
+        }
+      } catch {
+        // ignore
+      }
+    };
+    void loadScope();
+  }, [user?.id]);
+
   // Load cached templates from IndexedDB
   useEffect(() => {
     const loadTemplates = async () => {
-      if (user?.classId) {
-        const cached = await getTemplatesForClass(user.classId);
-        setTemplates(cached);
+      const effectiveClassId = classId ?? user?.classId;
+      if (!effectiveClassId) return;
 
-        // If no cached templates, fetch from server
-        if (cached.length === 0) {
-          try {
-            const { data } = await apiClient.get(`/biometric/templates/${user.classId}`);
-            setTemplates(data);
-          } catch {
-            // ignore - will work without cached templates
-          }
+      const cached = await getTemplatesForClass(effectiveClassId);
+      setTemplates(cached);
+
+      if (cached.length === 0) {
+        try {
+          const { data } = await apiClient.get(`/biometric/templates/${effectiveClassId}`);
+          setTemplates(data);
+        } catch {
+          // ignore - server match still works online
         }
       }
     };
-    loadTemplates();
-  }, [user?.classId]);
+    void loadTemplates();
+  }, [classId, user?.classId]);
 
   const startCamera = async () => {
     setError(null);
@@ -121,13 +144,20 @@ const BiometricAttendancePage: React.FC = () => {
       const descriptor = Array.from(detection.descriptor as Float32Array);
 
       if (navigator.onLine) {
-        // Send to server for matching
-        const { data } = await apiClient.post('/attendance/biometric', {
+        if (!sessionId) {
+          setError('No active attendance session. Start a session first.');
+          setLoading(false);
+          return;
+        }
+
+        const { data } = await apiClient.post('/biometric/match', {
           descriptor,
-          classId: user?.classId,
+          classId: classId ?? user?.classId ?? undefined,
+          sessionId,
         });
 
-        if (data.match && data.confidence >= MATCH_THRESHOLD) {
+        const matched = data.matched === true || data.match === true;
+        if (matched && data.confidence >= MATCH_THRESHOLD) {
           setMatchResult({
             studentId: data.studentId,
             studentName: data.studentName,
@@ -161,7 +191,11 @@ const BiometricAttendancePage: React.FC = () => {
         stopCamera();
       }
     } catch (err: any) {
-      setError(err.response?.data?.error || 'Biometric verification failed.');
+      const apiMsg =
+        err.response?.data?.message ||
+        err.response?.data?.error ||
+        err.response?.data?.code;
+      setError(apiMsg || 'Biometric verification failed.');
     } finally {
       setLoading(false);
     }
@@ -199,6 +233,12 @@ const BiometricAttendancePage: React.FC = () => {
             </div>
           )}
 
+          {modelsLoaded && !sessionId && !submitted && (
+            <p className="text-amber-200/90 text-sm text-center mb-4">
+              Start an attendance session before using face scan.
+            </p>
+          )}
+
           {modelsLoaded && !cameraActive && !submitted && (
             <div className="text-center py-8">
               <div className="inline-flex items-center justify-center w-20 h-20 rounded-2xl bg-slate-900 border border-slate-700 mb-4">
@@ -212,7 +252,8 @@ const BiometricAttendancePage: React.FC = () => {
               </p>
               <button
                 onClick={startCamera}
-                className="btn-primary py-3 px-8 hover:scale-[1.02] active:scale-[0.98] transition-all duration-200"
+                disabled={!sessionId}
+                className="btn-primary py-3 px-8 hover:scale-[1.02] active:scale-[0.98] transition-all duration-200 disabled:opacity-50"
               >
                 Start Camera
               </button>
