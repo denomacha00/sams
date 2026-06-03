@@ -247,7 +247,7 @@ export class AIService {
     user: AccessTokenPayload,
     threadId?: string,
   ): Promise<string | undefined> {
-    if (user.sub === 'guest') return undefined;
+    if (user.sub === 'guest' || !isConversationMemoryEnabled()) return undefined;
     try {
       return await conversationMemoryService.resolveThread(user.sub, user.schoolId, threadId);
     } catch (err) {
@@ -266,6 +266,9 @@ export class AIService {
     response: string,
     threadId?: string,
   ): Promise<string | undefined> {
+    if (user.sub === 'guest' || !isConversationMemoryEnabled()) {
+      return threadId;
+    }
     try {
       const resolvedThreadId =
         threadId || (await conversationMemoryService.resolveThread(user.sub, user.schoolId));

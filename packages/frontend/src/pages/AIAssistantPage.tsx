@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import apiClient from '../services/apiClient';
 import { useVoiceQuery } from '../hooks/useVoiceQuery';
-import { getAiErrorMessage, isAiUnavailableIntent } from '../lib/aiChat';
+import { getAiErrorMessage, isAiUnavailableIntent, loadAiThreadId, saveAiThreadId } from '../lib/aiChat';
 
 interface PendingAction {
   action: string;
@@ -31,7 +31,7 @@ const AIAssistantPage: React.FC = () => {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
-  const [threadId, setThreadId] = useState<string | null>(null);
+  const [threadId, setThreadId] = useState<string | null>(() => loadAiThreadId());
   const pendingActionRef = useRef<PendingAction | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
@@ -84,7 +84,10 @@ const AIAssistantPage: React.FC = () => {
           ? { confirmAction: true, pendingAction: pendingActionRef.current }
           : {}),
       });
-      if (data.threadId) setThreadId(data.threadId);
+      if (data.threadId) {
+        setThreadId(data.threadId);
+        saveAiThreadId(data.threadId);
+      }
 
       if (data.requiresConfirmation && data.pendingAction) {
         pendingActionRef.current = data.pendingAction;

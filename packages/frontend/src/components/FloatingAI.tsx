@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import apiClient from '../services/apiClient';
 import { useVoiceQuery } from '../hooks/useVoiceQuery';
-import { getAiErrorMessage, isAiUnavailableIntent } from '../lib/aiChat';
+import { getAiErrorMessage, isAiUnavailableIntent, loadAiThreadId, saveAiThreadId } from '../lib/aiChat';
 
 interface PendingAction {
   action: string;
@@ -48,7 +48,7 @@ const FloatingAI: React.FC = () => {
   const [messages, setMessages] = useState<Message[]>([WELCOME_MESSAGE]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
-  const [threadId, setThreadId] = useState<string | null>(null);
+  const [threadId, setThreadId] = useState<string | null>(() => loadAiThreadId());
   const pendingActionRef = useRef<PendingAction | null>(null);
   const [selectedImages, setSelectedImages] = useState<File[]>([]);
   const [imagePreviews, setImagePreviews] = useState<string[]>([]);
@@ -99,7 +99,10 @@ const FloatingAI: React.FC = () => {
         confirmAction: true,
         pendingAction: pending,
       });
-      if (data.threadId) setThreadId(data.threadId);
+      if (data.threadId) {
+        setThreadId(data.threadId);
+        saveAiThreadId(data.threadId);
+      }
       pendingActionRef.current = null;
       setMessages((prev) => [...prev, {
         id: crypto.randomUUID(),
@@ -169,7 +172,10 @@ const FloatingAI: React.FC = () => {
           ? { confirmAction: true, pendingAction: pendingActionRef.current }
           : {}),
       });
-      if (data.threadId) setThreadId(data.threadId);
+      if (data.threadId) {
+        setThreadId(data.threadId);
+        saveAiThreadId(data.threadId);
+      }
 
       if (data.requiresConfirmation && data.pendingAction) {
         pendingActionRef.current = data.pendingAction;

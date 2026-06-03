@@ -154,6 +154,17 @@ else
   echo "INFO SMTP not fully configured — email notifications disabled"
 fi
 
+# ─── Conversation memory (encrypted DB threads) ─────────────────────────────
+CONV_KEY="$(read_merged_env CONVERSATION_MASTER_KEY)"
+
+echo ""
+echo "--- Conversation memory ---"
+if [[ -n "$CONV_KEY" && ${#CONV_KEY} -ge 32 ]]; then
+  echo "OK   CONVERSATION_MASTER_KEY is set (32+ chars)"
+else
+  echo "WARN CONVERSATION_MASTER_KEY missing or shorter than 32 chars — encrypted chat memory disabled"
+fi
+
 # ─── M-Pesa (optional) ───────────────────────────────────────────────────────
 MPESA_KEY="$(read_merged_env MPESA_CONSUMER_KEY)"
 MPESA_SECRET="$(read_merged_env MPESA_CONSUMER_SECRET)"

@@ -1,5 +1,5 @@
-import { describe, expect, it } from 'vitest';
-import { buildRoleActionsPromptSection } from './roleActionsPrompt';
+import { afterEach, describe, expect, it } from 'vitest';
+import { buildRoleActionsPromptSection, isConversationMemoryEnabled } from './roleActionsPrompt';
 import { UserRole } from '@sams/shared';
 
 describe('buildRoleActionsPromptSection', () => {
@@ -11,5 +11,29 @@ describe('buildRoleActionsPromptSection', () => {
 
   it('returns empty string for unknown role', () => {
     expect(buildRoleActionsPromptSection('UNKNOWN_ROLE')).toBe('');
+  });
+});
+
+describe('isConversationMemoryEnabled', () => {
+  const previous = process.env.CONVERSATION_MASTER_KEY;
+
+  afterEach(() => {
+    if (previous === undefined) {
+      delete process.env.CONVERSATION_MASTER_KEY;
+    } else {
+      process.env.CONVERSATION_MASTER_KEY = previous;
+    }
+  });
+
+  it('is false when key is missing or too short', () => {
+    delete process.env.CONVERSATION_MASTER_KEY;
+    expect(isConversationMemoryEnabled()).toBe(false);
+    process.env.CONVERSATION_MASTER_KEY = 'short';
+    expect(isConversationMemoryEnabled()).toBe(false);
+  });
+
+  it('is true when key has at least 32 characters', () => {
+    process.env.CONVERSATION_MASTER_KEY = 'a'.repeat(32);
+    expect(isConversationMemoryEnabled()).toBe(true);
   });
 });

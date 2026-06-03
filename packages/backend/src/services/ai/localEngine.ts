@@ -1556,8 +1556,22 @@ export async function localQuery(
       case 'about_sams':
         return await handleAboutSams(user);
       case 'super_admin_help':
+        if (user.role !== UserRole.SUPER_ADMIN) {
+          return {
+            answer:
+              'Platform administration guides are for Super Admins only. Ask about your school\'s attendance, timetable, or reports, or say "what is SAMS" for a feature overview.',
+            intent: 'super_admin_help',
+          };
+        }
         return handleSuperAdminHelp(question);
       case 'system_stats':
+        if (user.role !== UserRole.SUPER_ADMIN) {
+          return {
+            answer:
+              'Platform-wide statistics are only available to Super Admins. Try asking about your school\'s attendance rate, absent students, or class reports.',
+            intent: 'system_stats',
+          };
+        }
         return await handleSystemStats();
       case 'custom_knowledge':
         return await handleCustomKnowledge(user);
