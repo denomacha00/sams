@@ -1,14 +1,20 @@
 #!/usr/bin/env node
 /**
- * PM2 entry resolver — loads dist/index.js or legacy dist/backend/src/index.js.
+ * PM2 entry — loads packages/backend/.env synchronously, then starts the built app.
  */
 const fs = require('fs');
 const path = require('path');
+const { loadEnvFromFile } = require('./load-env-from-file');
 
-const root = path.join(__dirname, '..');
+const backendRoot = path.join(__dirname, '..');
+const envPath = loadEnvFromFile();
+if (!envPath) {
+  console.error('[SAMS] Missing packages/backend/.env (cwd:', process.cwd(), ')');
+}
+
 const candidates = [
-  path.join(root, 'dist/index.js'),
-  path.join(root, 'dist/backend/src/index.js'),
+  path.join(backendRoot, 'dist/index.js'),
+  path.join(backendRoot, 'dist/backend/src/index.js'),
 ];
 
 const entry = candidates.find((file) => fs.existsSync(file));
