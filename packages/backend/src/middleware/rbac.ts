@@ -30,11 +30,11 @@ export type Permission =
 // ─── Role → Permissions map ───────────────────────────────────────────────────
 
 export const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
-  [UserRole.SUPER_ADMIN]:  ['super:admin', 'view:reports'],
-  [UserRole.SCHOOL_ADMIN]: ['manage:users', 'view:timetable', 'view:reports', 'view:risk', 'manage:payments', 'manage:knowledge'],
-  [UserRole.HOD]:          ['manage:users', 'manage:timetable', 'view:timetable', 'view:reports', 'view:risk', 'manage:knowledge'],
-  [UserRole.TEACHER]:      ['start:session', 'mark:attendance', 'view:timetable', 'view:reports', 'manage:knowledge'],
-  [UserRole.STUDENT]:      ['view:reports', 'view:timetable'],
+  SUPER_ADMIN: ['super:admin', 'view:reports'],
+  SCHOOL_ADMIN: ['manage:users', 'view:timetable', 'view:reports', 'view:risk', 'manage:payments', 'manage:knowledge'],
+  HOD: ['manage:users', 'manage:timetable', 'view:timetable', 'view:reports', 'view:risk', 'manage:knowledge'],
+  TEACHER: ['start:session', 'mark:attendance', 'view:timetable', 'view:reports', 'manage:knowledge'],
+  STUDENT: ['view:reports', 'view:timetable'],
 };
 
 // ─── requirePermission ────────────────────────────────────────────────────────

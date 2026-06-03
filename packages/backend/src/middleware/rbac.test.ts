@@ -50,27 +50,29 @@ describe('ROLE_PERMISSIONS', () => {
     expect(perms).toContain('manage:payments');
   });
 
-  it('HOD has manage:users, manage:timetable, view:reports, view:risk', () => {
+  it('HOD has manage:users, manage:timetable, view:timetable, view:reports, view:risk', () => {
     const perms = ROLE_PERMISSIONS[UserRole.HOD];
     expect(perms).toContain('manage:users');
     expect(perms).toContain('manage:timetable');
+    expect(perms).toContain('view:timetable');
     expect(perms).toContain('view:reports');
     expect(perms).toContain('view:risk');
     expect(perms).not.toContain('manage:payments');
     expect(perms).not.toContain('super:admin');
   });
 
-  it('TEACHER has start:session, mark:attendance, view:reports', () => {
+  it('TEACHER has start:session, mark:attendance, view:timetable, view:reports', () => {
     const perms = ROLE_PERMISSIONS[UserRole.TEACHER];
     expect(perms).toContain('start:session');
     expect(perms).toContain('mark:attendance');
+    expect(perms).toContain('view:timetable');
     expect(perms).toContain('view:reports');
     expect(perms).not.toContain('manage:users');
   });
 
-  it('STUDENT has only view:reports', () => {
+  it('STUDENT has view:reports and view:timetable', () => {
     const perms = ROLE_PERMISSIONS[UserRole.STUDENT];
-    expect(perms).toEqual(['view:reports']);
+    expect(perms).toEqual(['view:reports', 'view:timetable']);
   });
 
   it('SUPER_ADMIN does not have manage:users or manage:payments', () => {
