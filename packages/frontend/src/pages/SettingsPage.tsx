@@ -321,94 +321,206 @@ const SettingsPage: React.FC = () => {
           </div>
         )}
 
-        {/* SMS (School Admin) */}
+        {/* Integrations (School Admin only) */}
         {isSchoolAdmin && (
-          <div className="backdrop-blur-xl bg-white/5 border border-white/10 rounded-2xl p-6 mb-6">
-            <div className="flex items-center gap-3 mb-4">
-              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-amber-500/20 to-orange-500/20 border border-amber-500/30 flex items-center justify-center">
+          <>
+            <div className="mb-4">
+              <h2 className="text-lg font-semibold text-white flex items-center gap-2">
                 <svg className="w-5 h-5 text-amber-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" />
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
                 </svg>
-              </div>
-              <div>
-                <h3 className="text-lg font-semibold text-white">SMS (Africa&apos;s Talking)</h3>
-                <p className="text-xs text-gray-400">
-                  {smsStatus?.configured
-                    ? smsStatus.sandbox
-                      ? `Connected (sandbox · ${smsStatus.username})`
-                      : `Connected (production · ${smsStatus.username})`
-                    : 'Not configured on server — add AT_API_KEY in backend .env'}
-                </p>
-              </div>
+                Integrations
+              </h2>
+              <p className="text-xs text-gray-500 mt-1">SMS and email delivery for notifications and OTP</p>
             </div>
-            {smsStatus?.configured && (
-              <div className="space-y-3">
-                <p className="text-xs text-gray-500">
-                  Sandbox only delivers to phone numbers you add in the Africa&apos;s Talking dashboard.
-                </p>
-                <input
-                  type="tel"
-                  value={testPhone}
-                  onChange={(e) => setTestPhone(e.target.value)}
-                  placeholder="e.g. 0712345678 or +254712345678"
-                  className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-amber-500/50"
-                />
-                <button
-                  type="button"
-                  disabled={testSmsLoading || !testPhone.trim()}
-                  onClick={handleTestSms}
-                  className="w-full bg-amber-600/80 hover:bg-amber-600 text-white font-semibold py-3 rounded-xl disabled:opacity-50 transition-all"
-                >
-                  {testSmsLoading ? 'Sending test...' : 'Send test SMS'}
-                </button>
-                {smsTestMsg && (
-                  <p className="text-xs text-amber-200/90">{smsTestMsg}</p>
+
+            {/* SMS — Africa&apos;s Talking */}
+            <div className="backdrop-blur-xl bg-white/5 border border-white/10 rounded-2xl p-6 mb-6">
+              <div className="flex items-start justify-between gap-3 mb-4">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-amber-500/20 to-orange-500/20 border border-amber-500/30 flex items-center justify-center shrink-0">
+                    <svg className="w-5 h-5 text-amber-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" />
+                    </svg>
+                  </div>
+                  <div>
+                    <h3 className="text-lg font-semibold text-white">SMS · Africa&apos;s Talking</h3>
+                    <p className="text-xs text-gray-400 mt-0.5">Parent alerts, OTP codes, and notification SMS</p>
+                  </div>
+                </div>
+                {smsStatus && (
+                  <span
+                    className={`shrink-0 px-2.5 py-1 text-xs font-medium rounded-full border ${
+                      smsStatus.configured
+                        ? smsStatus.sandbox
+                          ? 'bg-yellow-500/10 text-yellow-300 border-yellow-500/30'
+                          : 'bg-emerald-500/10 text-emerald-300 border-emerald-500/30'
+                        : 'bg-gray-500/10 text-gray-400 border-gray-500/30'
+                    }`}
+                  >
+                    {smsStatus.configured
+                      ? smsStatus.sandbox
+                        ? 'Sandbox'
+                        : 'Production'
+                      : 'Not configured'}
+                  </span>
                 )}
               </div>
-            )}
-          </div>
-        )}
 
-        {/* Email / SMTP (School Admin) */}
-        {isSchoolAdmin && (
-          <div className="backdrop-blur-xl bg-white/5 border border-white/10 rounded-2xl p-6 mb-6">
-            <div className="flex items-center gap-3 mb-4">
-              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-sky-500/20 to-indigo-500/20 border border-sky-500/30 flex items-center justify-center">
-                <svg className="w-5 h-5 text-sky-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
-                </svg>
-              </div>
-              <div>
-                <h3 className="text-lg font-semibold text-white">Email (SMTP)</h3>
-                <p className="text-xs text-gray-400">
-                  {emailStatus?.configured
-                    ? `Connected (${emailStatus.host} · from ${emailStatus.fromEmail})`
-                    : 'Not configured — add SMTP_USER and SMTP_PASS in backend .env'}
-                </p>
-              </div>
+              {smsStatus?.configured ? (
+                <>
+                  <dl className="grid grid-cols-2 gap-x-4 gap-y-2 mb-4 text-sm">
+                    <div>
+                      <dt className="text-xs text-gray-500">Username</dt>
+                      <dd className="text-gray-200 font-mono text-xs mt-0.5">{smsStatus.username ?? '—'}</dd>
+                    </div>
+                    <div>
+                      <dt className="text-xs text-gray-500">Sender ID</dt>
+                      <dd className="text-gray-200 font-mono text-xs mt-0.5">{smsStatus.senderId ?? 'SAMS'}</dd>
+                    </div>
+                  </dl>
+
+                  {smsStatus.sandbox ? (
+                    <div className="mb-4 p-3 rounded-xl bg-yellow-500/10 border border-yellow-500/20">
+                      <p className="text-xs text-yellow-200/90">
+                        <span className="font-semibold">Sandbox mode.</span> SMS only reaches phone numbers you register at{' '}
+                        <span className="font-mono">account.africastalking.com</span> → SMS → phone numbers.
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="mb-4 p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/20">
+                      <p className="text-xs text-emerald-200/90">
+                        <span className="font-semibold">Production mode.</span> Messages are sent to real numbers using your approved sender ID.
+                      </p>
+                    </div>
+                  )}
+
+                  <div className="pt-4 border-t border-white/10 space-y-3">
+                    <div>
+                      <label htmlFor="test-sms-phone" className="block text-sm font-medium text-gray-300 mb-1.5">
+                        Send test SMS
+                      </label>
+                      <input
+                        id="test-sms-phone"
+                        type="tel"
+                        value={testPhone}
+                        onChange={(e) => setTestPhone(e.target.value)}
+                        placeholder="0712345678 or +254712345678"
+                        className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-amber-500/50"
+                      />
+                      <p className="text-xs text-gray-500 mt-1.5">
+                        {smsStatus.sandbox
+                          ? 'Use a number registered in your AT sandbox dashboard.'
+                          : 'Use a valid mobile number in E.164 or local format.'}
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      disabled={testSmsLoading || !testPhone.trim()}
+                      onClick={handleTestSms}
+                      className="w-full bg-amber-600/80 hover:bg-amber-600 text-white font-semibold py-3 rounded-xl disabled:opacity-50 transition-all"
+                    >
+                      {testSmsLoading ? 'Sending test...' : 'Send test SMS'}
+                    </button>
+                    {smsTestMsg && (
+                      <p className="text-xs text-amber-200/90 p-3 rounded-xl bg-amber-500/10 border border-amber-500/20">
+                        {smsTestMsg}
+                      </p>
+                    )}
+                  </div>
+                </>
+              ) : (
+                <div className="p-4 rounded-xl bg-white/[0.03] border border-white/10">
+                  <p className="text-sm text-gray-400 mb-3">
+                    SMS is not configured on the server. Add these to <span className="font-mono text-gray-300">packages/backend/.env</span>:
+                  </p>
+                  <ul className="text-xs font-mono text-gray-500 space-y-1">
+                    <li>AT_API_KEY</li>
+                    <li>AT_USERNAME <span className="text-gray-600">(use &quot;sandbox&quot; for testing)</span></li>
+                    <li>AT_SENDER_ID <span className="text-gray-600">(optional, default SAMS)</span></li>
+                  </ul>
+                </div>
+              )}
             </div>
-            {emailStatus?.configured && (
-              <div className="space-y-3">
-                <p className="text-xs text-gray-500">Used for OTP codes, password reset, and admin alerts.</p>
-                <input
-                  type="email"
-                  value={testEmailTo}
-                  onChange={(e) => setTestEmailTo(e.target.value)}
-                  placeholder="your-email@example.com"
-                  className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-sky-500/50"
-                />
-                <button
-                  type="button"
-                  disabled={testEmailLoading || !testEmailTo.trim()}
-                  onClick={handleTestEmail}
-                  className="w-full bg-sky-600/80 hover:bg-sky-600 text-white font-semibold py-3 rounded-xl disabled:opacity-50 transition-all"
-                >
-                  {testEmailLoading ? 'Sending test...' : 'Send test email'}
-                </button>
-                {emailTestMsg && <p className="text-xs text-sky-200/90">{emailTestMsg}</p>}
+
+            {/* Email — SMTP */}
+            <div className="backdrop-blur-xl bg-white/5 border border-white/10 rounded-2xl p-6 mb-6">
+              <div className="flex items-start justify-between gap-3 mb-4">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-sky-500/20 to-indigo-500/20 border border-sky-500/30 flex items-center justify-center shrink-0">
+                    <svg className="w-5 h-5 text-sky-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                    </svg>
+                  </div>
+                  <div>
+                    <h3 className="text-lg font-semibold text-white">Email · SMTP</h3>
+                    <p className="text-xs text-gray-400 mt-0.5">OTP codes, password reset, and admin alerts</p>
+                  </div>
+                </div>
+                {emailStatus && (
+                  <span
+                    className={`shrink-0 px-2.5 py-1 text-xs font-medium rounded-full border ${
+                      emailStatus.configured
+                        ? 'bg-emerald-500/10 text-emerald-300 border-emerald-500/30'
+                        : 'bg-gray-500/10 text-gray-400 border-gray-500/30'
+                    }`}
+                  >
+                    {emailStatus.configured ? 'Connected' : 'Not configured'}
+                  </span>
+                )}
               </div>
-            )}
-          </div>
+              {emailStatus?.configured ? (
+                <div className="space-y-3">
+                  <dl className="grid grid-cols-2 gap-x-4 gap-y-2 mb-4 text-sm">
+                    <div>
+                      <dt className="text-xs text-gray-500">Host</dt>
+                      <dd className="text-gray-200 font-mono text-xs mt-0.5">{emailStatus.host ?? '—'}</dd>
+                    </div>
+                    <div>
+                      <dt className="text-xs text-gray-500">From</dt>
+                      <dd className="text-gray-200 font-mono text-xs mt-0.5">{emailStatus.fromEmail ?? '—'}</dd>
+                    </div>
+                  </dl>
+                  <div className="pt-4 border-t border-white/10 space-y-3">
+                    <div>
+                      <label htmlFor="test-email-to" className="block text-sm font-medium text-gray-300 mb-1.5">
+                        Send test email
+                      </label>
+                      <input
+                        id="test-email-to"
+                        type="email"
+                        value={testEmailTo}
+                        onChange={(e) => setTestEmailTo(e.target.value)}
+                        placeholder="your-email@example.com"
+                        className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-sky-500/50"
+                      />
+                    </div>
+                    <button
+                      type="button"
+                      disabled={testEmailLoading || !testEmailTo.trim()}
+                      onClick={handleTestEmail}
+                      className="w-full bg-sky-600/80 hover:bg-sky-600 text-white font-semibold py-3 rounded-xl disabled:opacity-50 transition-all"
+                    >
+                      {testEmailLoading ? 'Sending test...' : 'Send test email'}
+                    </button>
+                    {emailTestMsg && (
+                      <p className="text-xs text-sky-200/90 p-3 rounded-xl bg-sky-500/10 border border-sky-500/20">
+                        {emailTestMsg}
+                      </p>
+                    )}
+                  </div>
+                </div>
+              ) : (
+                <div className="p-4 rounded-xl bg-white/[0.03] border border-white/10">
+                  <p className="text-sm text-gray-400 mb-3">
+                    Email is not configured. Add <span className="font-mono text-gray-300">SMTP_USER</span> and{' '}
+                    <span className="font-mono text-gray-300">SMTP_PASS</span> to{' '}
+                    <span className="font-mono text-gray-300">packages/backend/.env</span>.
+                  </p>
+                </div>
+              )}
+            </div>
+          </>
         )}
 
         {/* Security Section Header */}
