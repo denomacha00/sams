@@ -41,12 +41,14 @@ describe('roleActionRegistry permissions', () => {
         'view_timetable',
         'view_today_schedule',
         'list_my_teachers',
+        'list_my_hod',
         'explain_reminders',
       ]),
     );
     expect(names).not.toContain('start_session');
     expect(isActionPermitted(UserRole.STUDENT, 'send_class_message')).toBe(false);
     expect(isActionPermitted(UserRole.STUDENT, 'list_my_teachers')).toBe(true);
+    expect(isActionPermitted(UserRole.STUDENT, 'list_my_hod')).toBe(true);
   });
 
   it('unknown role has no permitted actions', () => {

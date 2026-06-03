@@ -7,9 +7,17 @@ export interface StudentClassTeacherInfo {
   isClassTeacher: boolean;
 }
 
+export interface StudentClassHodInfo {
+  id: string;
+  fullName: string;
+}
+
 export interface StudentClassContext {
   classId: string;
   className: string;
+  departmentId: string;
+  departmentName: string;
+  hod: StudentClassHodInfo | null;
   teachers: StudentClassTeacherInfo[];
 }
 
@@ -20,9 +28,23 @@ export interface StudentClassContext {
 export async function getStudentClassContext(classId: string): Promise<StudentClassContext | null> {
   const cls = await prisma.class.findUnique({
     where: { id: classId },
-    select: { id: true, name: true, classTeacherId: true },
+    select: {
+      id: true,
+      name: true,
+      classTeacherId: true,
+      departmentId: true,
+      department: { select: { name: true } },
+    },
   });
   if (!cls) return null;
+
+  const hodUser = await prisma.user.findFirst({
+    where: { departmentId: cls.departmentId, role: 'HOD' },
+    select: { id: true, fullName: true },
+  });
+  const hod: StudentClassHodInfo | null = hodUser
+    ? { id: hodUser.id, fullName: hodUser.fullName }
+    : null;
 
   const teacherIds = new Set<string>();
   if (cls.classTeacherId) teacherIds.add(cls.classTeacherId);
@@ -33,8 +55,17 @@ export async function getStudentClassContext(classId: string): Promise<StudentCl
   });
   for (const e of entries) teacherIds.add(e.teacherId);
 
+  const departmentName = cls.department.name;
+  const base = {
+    classId: cls.id,
+    className: cls.name,
+    departmentId: cls.departmentId,
+    departmentName,
+    hod,
+  };
+
   if (teacherIds.size === 0) {
-    return { classId: cls.id, className: cls.name, teachers: [] };
+    return { ...base, teachers: [] };
   }
 
   const users = await prisma.user.findMany({
@@ -60,7 +91,15 @@ export async function getStudentClassContext(classId: string): Promise<StudentCl
       return a.fullName.localeCompare(b.fullName);
     });
 
-  return { classId: cls.id, className: cls.name, teachers };
+  return { ...base, teachers };
+}
+
+export function formatStudentHodAnswer(ctx: StudentClassContext): string {
+  const dept = ctx.departmentName;
+  if (ctx.hod) {
+    return `👤 **Your Head of Department** (${dept})\n\n**${ctx.hod.fullName}** is the HOD for your class department.\n\nYou may see messages from them on your **Notifications** page when they send department announcements.`;
+  }
+  return `Your class **${ctx.className}** is in the **${dept}** department, but no Head of Department is assigned in SAMS yet. Ask your class teacher or school office.`;
 }
 
 export function formatStudentTeachersAnswer(ctx: StudentClassContext): string {
@@ -78,8 +117,12 @@ export function formatStudentTeachersAnswer(ctx: StudentClassContext): string {
 }
 
 export function formatStudentClassContextForPrompt(ctx: StudentClassContext): string {
+  const hodPart = ctx.hod
+    ? `HOD (${ctx.departmentName}): ${ctx.hod.fullName}.`
+    : `Department: ${ctx.departmentName}. No HOD assigned in SAMS yet.`;
+
   if (ctx.teachers.length === 0) {
-    return `Class: ${ctx.className}. No teachers on timetable yet.`;
+    return `Class: ${ctx.className}. ${hodPart} No teachers on timetable yet.`;
   }
   const teacherLines = ctx.teachers.map((t) => {
     const parts = [t.fullName];
@@ -87,5 +130,5 @@ export function formatStudentClassContextForPrompt(ctx: StudentClassContext): st
     if (t.subjects.length) parts.push(`subjects: ${t.subjects.join(', ')}`);
     return parts.join(' — ');
   });
-  return `Class: ${ctx.className}. Teachers the student may reference: ${teacherLines.join('; ')}.`;
+  return `Class: ${ctx.className}. ${hodPart} Teachers the student may reference: ${teacherLines.join('; ')}.`;
 }

@@ -149,4 +149,25 @@ describe('actionIntentDetector role scoping (regex path)', () => {
     expect(result.isAction).toBe(true);
     expect(result.action).toBe('explain_reminders');
   });
+
+  it('detects student list_my_hod for natural phrasing', async () => {
+    const cases = [
+      'who is my hod',
+      'who are is my hod',
+      'head of my department',
+      'who is my head of department',
+    ];
+    for (const message of cases) {
+      const result = await actionIntentDetector.detect(message, UserRole.STUDENT);
+      expect(result.isAction).toBe(true);
+      expect(result.action).toBe('list_my_hod');
+      expect(result.requiresConfirmation).toBe(false);
+    }
+  });
+
+  it('does not treat HOD question as list_my_teachers', async () => {
+    const result = await actionIntentDetector.detect('who is my hod', UserRole.STUDENT);
+    expect(result.action).toBe('list_my_hod');
+    expect(result.action).not.toBe('list_my_teachers');
+  });
 });

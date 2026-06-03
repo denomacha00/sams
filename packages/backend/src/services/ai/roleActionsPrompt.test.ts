@@ -28,6 +28,7 @@ describe('buildRoleActionsPromptSection', () => {
     const section = buildRoleActionsPromptSection(UserRole.STUDENT);
     expect(section).toContain('view_attendance');
     expect(section).toContain('list_my_teachers');
+    expect(section).toContain('list_my_hod');
     expect(section).toContain('teachers assigned to your class');
     expect(section).toContain('FORBIDDEN');
     expect(section).toContain('add_user');

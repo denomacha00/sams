@@ -24,6 +24,9 @@ vi.mock('../../../lib/studentClassTeachers', () => ({
   getStudentClassContext: vi.fn().mockResolvedValue({
     classId: 'class-1',
     className: 'Form 2A',
+    departmentId: 'dept-1',
+    departmentName: 'General',
+    hod: null,
     teachers: [{ fullName: 'Ms. Wanjiku' }],
   }),
   formatStudentTeachersAnswer: vi.fn(),

@@ -1,5 +1,6 @@
 import type { ActionDefinition, ActionHandler } from '../roleActionRegistry';
 import {
+  formatStudentHodAnswer,
   formatStudentTeachersAnswer,
   getStudentClassContext,
 } from '../../../lib/studentClassTeachers';
@@ -38,6 +39,30 @@ const viewAttendanceHandler: ActionHandler = async (_params, scope) => {
   return {
     answer: `📊 **Your Attendance**\n\nOverall: ${percentage}% (${present}/${total} sessions)\n\n**Recent:**\n${recent.join('\n')}`,
     data: { percentage: parseFloat(percentage), total, present, records: records.length },
+  };
+};
+
+const listMyHodHandler: ActionHandler = async (_params, scope) => {
+  if (!scope.classId) {
+    return {
+      answer:
+        'Your account is not linked to a class yet, so I cannot look up your Head of Department. Contact your school admin.',
+    };
+  }
+
+  const ctx = await getStudentClassContext(scope.classId);
+  if (!ctx) {
+    return { answer: 'I could not find your class. Contact your school admin.' };
+  }
+
+  return {
+    answer: formatStudentHodAnswer(ctx),
+    data: {
+      classId: ctx.classId,
+      departmentId: ctx.departmentId,
+      departmentName: ctx.departmentName,
+      hod: ctx.hod,
+    },
   };
 };
 
@@ -155,6 +180,14 @@ const explainRemindersHandler: ActionHandler = async (_params, scope) => {
   return { answer, data: { remindersSupported: false } };
 };
 
+const HOD_QUESTION_PATTERNS: RegExp[] = [
+  /(?:who|which)\s+(?:are\s+)?(?:is\s+)?(?:my|our)\s+hod\b/i,
+  /(?:who|which)\s+(?:are\s+)?(?:is\s+)?(?:my|our)\s+head\s+of\s+department/i,
+  /head\s+of\s+(?:my|our)\s+department/i,
+  /(?:my|our)\s+(?:department\s+)?hod\b/i,
+  /who\s+is\s+(?:the\s+)?hod\s+for\s+(?:my|our)\s+(?:class|department)/i,
+];
+
 const TEACHER_QUESTION_PATTERNS: RegExp[] = [
   /(?:who|which)\s+(?:are\s+)?(?:my|our)\s+teachers?/i,
   /(?:name|names)\s+of\s+(?:my|our)\s+teachers?/i,
@@ -209,6 +242,16 @@ export const studentActions: ActionDefinition[] = [
     extractParams: () => ({}),
     descriptionTemplate: () => `View your class schedule for ${schemaDayName(jsDateToSchemaDayOfWeek())}.`,
     handler: viewTodayScheduleHandler,
+  },
+  {
+    action: 'list_my_hod',
+    description: 'Name your Head of Department for your class department',
+    destructive: false,
+    patterns: HOD_QUESTION_PATTERNS,
+    extractParams: () => ({}),
+    descriptionTemplate: () =>
+      'Tell the student who their Head of Department is for their class department.',
+    handler: listMyHodHandler,
   },
   {
     action: 'list_my_teachers',
