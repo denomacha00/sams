@@ -285,6 +285,16 @@ const AtAGlancePanel: React.FC<{ role?: UserRole; userId?: string }> = ({ role, 
         </div>
       ) : role === UserRole.TEACHER ? (
         <div className="space-y-3">
+          <div className="flex items-center justify-between p-3 rounded-xl bg-white/[0.03] border border-white/5">
+            <span className="text-sm text-gray-300">Unread messages</span>
+            <span className="text-sm font-semibold text-indigo-300">{unreadCount}</span>
+          </div>
+          <Link
+            to="/notifications"
+            className="block p-3 rounded-xl bg-white/[0.03] hover:bg-white/[0.07] border border-white/5 text-sm text-gray-200"
+          >
+            Send or read class messages →
+          </Link>
           {activeSessions.length === 0 ? (
             <div className="text-center py-6">
               <p className="text-gray-500 text-sm mb-4">No active sessions right now</p>
@@ -606,20 +616,19 @@ function useDashboardStats(user?: { id: string; role?: UserRole; classId?: strin
             break;
           }
           case UserRole.TEACHER: {
-            // Use classId from JWT to get the correct class report
-            const classId = user?.classId;
-            const [studentsRes, sessionsRes, reportsRes] = await Promise.allSettled([
-              classId
-                ? apiClient.get('/users', { params: { role: 'STUDENT', classId } })
-                : apiClient.get('/users', { params: { role: 'STUDENT' } }),
+            const [meRes, studentsRes, sessionsRes] = await Promise.allSettled([
+              apiClient.get('/users/me'),
+              apiClient.get('/users/class-roster'),
               apiClient.get('/sessions', { params: { teacherId: user?.id } }),
-              classId
-                ? apiClient.get(`/reports/class/${classId}`)
-                : Promise.reject(new Error('No classId')),
             ]);
+            const classId =
+              meRes.status === 'fulfilled' ? (meRes.value.data.classId as string | undefined) : user?.classId;
+            const reportsRes = classId
+              ? await Promise.allSettled([apiClient.get(`/reports/class/${classId}`)]).then((r) => r[0])
+              : { status: 'rejected' as const, reason: new Error('No classId') };
 
             const myStudents = studentsRes.status === 'fulfilled'
-              ? (Array.isArray(studentsRes.value.data) ? studentsRes.value.data.length : '—')
+              ? (Array.isArray(studentsRes.value.data) ? studentsRes.value.data.length : 0)
               : '—';
             const todaySessions = sessionsRes.status === 'fulfilled'
               ? (Array.isArray(sessionsRes.value.data) ? sessionsRes.value.data.length : 0)
@@ -722,12 +731,162 @@ function useDashboardStats(user?: { id: string; role?: UserRole; classId?: strin
   return { stats, loading };
 }
 
+// ─── Teacher class panel (uses class-roster — teachers lack manage:users) ─────
+
+interface TeacherStudentPreview {
+  id: string;
+  fullName: string;
+  admissionNumber?: string | null;
+  isClassRep?: boolean;
+}
+
+const TeacherClassPanel: React.FC<{ classId?: string; attendanceRate?: string }> = ({
+  classId,
+  attendanceRate,
+}) => {
+  const [students, setStudents] = useState<TeacherStudentPreview[]>([]);
+  const [className, setClassName] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function load() {
+      setLoading(true);
+      try {
+        if (!classId) {
+          if (!cancelled) {
+            setStudents([]);
+            setClassName(null);
+          }
+          return;
+        }
+
+        const [rosterRes, classesRes] = await Promise.allSettled([
+          apiClient.get('/users/class-roster'),
+          apiClient.get('/classes'),
+        ]);
+
+        if (!cancelled && rosterRes.status === 'fulfilled') {
+          setStudents(Array.isArray(rosterRes.value.data) ? rosterRes.value.data : []);
+        }
+        if (!cancelled && classesRes.status === 'fulfilled') {
+          const classes = Array.isArray(classesRes.value.data) ? classesRes.value.data : [];
+          const match = classes.find((c: { id: string; name?: string }) => c.id === classId);
+          setClassName(match?.name ?? null);
+        }
+      } catch {
+        // Non-critical widget
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    }
+
+    void load();
+    return () => {
+      cancelled = true;
+    };
+  }, [classId]);
+
+  if (!classId) {
+    return (
+      <div
+        className="rounded-2xl border border-amber-500/30 bg-amber-500/10 p-6 min-h-[280px]"
+        style={{ animation: 'fadeInUp 0.5s ease-out 0.7s forwards', opacity: 0 }}
+      >
+        <h3 className="text-lg font-semibold text-amber-100 mb-2">No class assigned</h3>
+        <p className="text-sm text-amber-200/90 mb-4">
+          You must be assigned as class teacher before you can see students. Ask your HOD or school admin to assign your class in user management.
+        </p>
+        <Link to="/profile" className="text-sm text-indigo-300 hover:text-indigo-200">
+          View profile →
+        </Link>
+      </div>
+    );
+  }
+
+  const preview = students.slice(0, 5);
+
+  return (
+    <div
+      className="rounded-2xl border border-slate-700 bg-slate-900/80 p-6 min-h-[280px]"
+      style={{ animation: 'fadeInUp 0.5s ease-out 0.7s forwards', opacity: 0 }}
+    >
+      <div className="flex items-center justify-between gap-3 mb-5">
+        <div className="flex items-center gap-3">
+          <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-green-500 to-emerald-500 flex items-center justify-center shadow-lg shadow-green-500/20">
+            <svg className="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={ICONS.academic} />
+            </svg>
+          </div>
+          <div>
+            <h3 className="text-lg font-semibold text-white">My Class</h3>
+            {className && <p className="text-xs text-gray-400">{className}</p>}
+          </div>
+        </div>
+        <span className="text-sm font-semibold text-teal-400">
+          {loading ? '…' : `${students.length} student${students.length !== 1 ? 's' : ''}`}
+        </span>
+      </div>
+
+      <div className="flex flex-wrap gap-2 mb-4">
+        <Link to="/class/students" className="btn-primary text-xs py-2 px-4">
+          My Students
+        </Link>
+        <Link
+          to="/class-roster"
+          className="text-xs py-2 px-4 rounded-xl border border-white/10 text-gray-200 hover:bg-white/5 transition-colors"
+        >
+          Class Roster
+        </Link>
+      </div>
+
+      <div className="flex items-center justify-between p-3 rounded-xl bg-white/[0.03] border border-white/5 mb-4">
+        <span className="text-sm text-gray-300">Class attendance rate</span>
+        <span className="text-sm font-semibold text-blue-400">{attendanceRate ?? '—'}</span>
+      </div>
+
+      {loading ? (
+        <div className="space-y-2">
+          {[1, 2, 3].map((i) => (
+            <div key={i} className="animate-pulse h-10 rounded-xl bg-white/5" />
+          ))}
+        </div>
+      ) : preview.length === 0 ? (
+        <p className="text-sm text-gray-500 text-center py-4">No students in this class yet.</p>
+      ) : (
+        <ul className="space-y-2">
+          {preview.map((s) => (
+            <li
+              key={s.id}
+              className="flex items-center justify-between p-3 rounded-xl bg-white/[0.03] border border-white/5"
+            >
+              <span className="text-sm text-white">{s.fullName}</span>
+              {s.isClassRep && (
+                <span className="text-xs text-indigo-300 font-medium">Class rep</span>
+              )}
+            </li>
+          ))}
+          {students.length > preview.length && (
+            <li className="text-center pt-1">
+              <Link to="/class/students" className="text-xs text-indigo-300 hover:text-indigo-200">
+                View all {students.length} students →
+              </Link>
+            </li>
+          )}
+        </ul>
+      )}
+    </div>
+  );
+};
+
 // ─── Main Dashboard Component ────────────────────────────────────────────────
 
 const DashboardPage: React.FC = () => {
   const user = useAuthStore((s) => s.user);
   const accessToken = useAuthStore((s) => s.accessToken);
   const logout = useAuthStore((s) => s.logout);
+  const updateUser = useAuthStore((s) => s.updateUser);
   const navigate = useNavigate();
   const location = useLocation();
   const [currentTime, setCurrentTime] = useState(formatTime());
@@ -748,6 +907,16 @@ const DashboardPage: React.FC = () => {
       .then(({ data }) => setUnreadCount(data.count ?? 0))
       .catch(() => {});
   }, []);
+
+  // Teachers: refresh effective classId (class teacher assignment may not be in JWT yet)
+  useEffect(() => {
+    if (user?.role !== UserRole.TEACHER) return;
+    apiClient.get('/users/me').then(({ data }) => {
+      if (data.classId && data.classId !== user?.classId) {
+        updateUser({ classId: data.classId });
+      }
+    }).catch(() => {});
+  }, [user?.role, user?.classId, updateUser]);
 
   // Real-time: increment badge on new notification
   useEffect(() => {
@@ -899,6 +1068,11 @@ const DashboardPage: React.FC = () => {
               <p className="text-slate-400 text-base max-w-lg">
                 {getRoleGreeting(user?.role)}
               </p>
+              {user?.role === UserRole.TEACHER && !user?.classId && (
+                <p className="mt-3 text-sm text-amber-300/90 max-w-lg">
+                  No class is assigned to your account yet — student lists and class stats stay empty until an admin assigns you as class teacher.
+                </p>
+              )}
               {user?.role === UserRole.STUDENT && (
                 <Link
                   to="/sessions/scan"
@@ -949,34 +1123,12 @@ const DashboardPage: React.FC = () => {
             {user?.role === UserRole.SCHOOL_ADMIN && <ActivityFeed />}
 
             {user?.role === UserRole.TEACHER && (
-              <div className="rounded-2xl border border-slate-700 bg-slate-900/80 p-6 min-h-[280px]" style={{ animation: 'fadeInUp 0.5s ease-out 0.7s forwards', opacity: 0 }}>
-                <div className="flex items-center gap-3 mb-5">
-                  <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-green-500 to-emerald-500 flex items-center justify-center shadow-lg shadow-green-500/20">
-                    <svg className="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={ICONS.academic} />
-                    </svg>
-                  </div>
-                  <h3 className="text-lg font-semibold text-white">Class Overview</h3>
-                </div>
-                <div className="space-y-3">
-                  <div className="flex items-center justify-between p-3 rounded-xl bg-white/[0.03] border border-white/5">
-                    <span className="text-sm text-gray-300">Sessions This Week</span>
-                    <span className="text-sm font-semibold text-teal-400">—</span>
-                  </div>
-                  <div className="flex items-center justify-between p-3 rounded-xl bg-white/[0.03] border border-white/5">
-                    <span className="text-sm text-gray-300">Average Attendance</span>
-                    <span className="text-sm font-semibold text-blue-400">—</span>
-                  </div>
-                  <div className="flex items-center justify-between p-3 rounded-xl bg-white/[0.03] border border-white/5">
-                    <span className="text-sm text-gray-300">Students At Risk</span>
-                    <span className="text-sm font-semibold text-orange-400">—</span>
-                  </div>
-                  <div className="flex items-center justify-between p-3 rounded-xl bg-white/[0.03] border border-white/5">
-                    <span className="text-sm text-gray-300">Completion Rate</span>
-                    <span className="text-sm font-semibold text-purple-400">—</span>
-                  </div>
-                </div>
-              </div>
+              <TeacherClassPanel
+                classId={user?.classId}
+                attendanceRate={
+                  stats.find((s) => s.label === 'Attendance Rate')?.value?.toString()
+                }
+              />
             )}
 
             {user?.role === UserRole.STUDENT && (

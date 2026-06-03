@@ -78,6 +78,8 @@ export const useAuthStore = create<AuthState>()(
               email: me.email ?? current.email,
               phone: me.phone ?? current.phone,
               avatarUrl: me.avatarUrl ?? undefined,
+              classId: me.classId ?? current.classId,
+              departmentId: me.departmentId ?? current.departmentId,
             },
           });
         } catch {
@@ -148,6 +150,8 @@ export const useAuthStore = create<AuthState>()(
                   email: me.email ?? state.user.email,
                   phone: me.phone,
                   avatarUrl: me.avatarUrl,
+                  classId: me.classId ?? state.user.classId,
+                  departmentId: me.departmentId ?? state.user.departmentId,
                 }
               : state.user,
           }));

@@ -5,6 +5,7 @@ import { requirePermission } from '../middleware/rbac';
 import { reportService } from '../services/reportService';
 import { AppError } from '../middleware/errors';
 import { prisma } from '../lib/prisma';
+import { resolveTeacherClassId } from '../lib/teacherScope';
 
 // ─── Validation Schemas ───────────────────────────────────────────────────────
 
@@ -119,9 +120,12 @@ reportsRouter.get('/class/:classId', requirePermission('view:reports'), async (r
     }
 
     // Teachers can only view reports for their assigned class
-    if (role === UserRole.TEACHER && targetClassId !== userClassId) {
-      res.status(403).json({ error: 'Forbidden', code: 'FORBIDDEN', message: 'Teachers can only view reports for their assigned class' });
-      return;
+    if (role === UserRole.TEACHER) {
+      const teacherClassId = await resolveTeacherClassId(req.user.sub, userClassId);
+      if (!teacherClassId || targetClassId !== teacherClassId) {
+        res.status(403).json({ error: 'Forbidden', code: 'FORBIDDEN', message: 'Teachers can only view reports for their assigned class' });
+        return;
+      }
     }
 
     // HODs can only view reports for classes in their department

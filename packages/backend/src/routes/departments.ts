@@ -279,10 +279,32 @@ classesRouter.post('/:id/assign-teacher', async (req: Request, res: Response): P
       }
     }
 
-    const updated = await prisma.class.update({
-      where: { id: cls.id },
-      data: { classTeacherId: String(teacherId) },
-      include: { classTeacher: { select: { fullName: true } } },
+    const updated = await prisma.$transaction(async (tx) => {
+      const previousTeacherId = cls.classTeacherId;
+      const classRow = await tx.class.update({
+        where: { id: cls.id },
+        data: { classTeacherId: String(teacherId) },
+        include: { classTeacher: { select: { fullName: true } } },
+      });
+
+      await tx.user.update({
+        where: { id: String(teacherId) },
+        data: { classId: cls.id },
+      });
+
+      if (previousTeacherId && previousTeacherId !== String(teacherId)) {
+        const stillTeaches = await tx.class.findFirst({
+          where: { classTeacherId: previousTeacherId, id: { not: cls.id } },
+        });
+        if (!stillTeaches) {
+          await tx.user.updateMany({
+            where: { id: previousTeacherId, classId: cls.id },
+            data: { classId: null },
+          });
+        }
+      }
+
+      return classRow;
     });
 
     res.json({ ...updated, classTeacherName: updated.classTeacher?.fullName ?? null });

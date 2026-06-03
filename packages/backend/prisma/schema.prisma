@@ -146,6 +146,7 @@ model User {
   classesAsTeacher  Class[]             @relation("ClassTeacher")
 
   @@unique([schoolId, admissionNumber])
+  @@unique([schoolId, phone])
   @@index([schoolId, role])
 }
 

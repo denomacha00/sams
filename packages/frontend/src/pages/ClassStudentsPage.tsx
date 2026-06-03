@@ -14,19 +14,30 @@ interface Student {
 
 const ClassStudentsPage: React.FC = () => {
   const user = useAuthStore((s) => s.user);
+  const updateUser = useAuthStore((s) => s.updateUser);
+
+  useEffect(() => {
+    if (user?.role !== 'TEACHER') return;
+    apiClient.get('/users/me').then(({ data }) => {
+      if (data.classId && data.classId !== user?.classId) {
+        updateUser({ classId: data.classId });
+      }
+    }).catch(() => {});
+  }, [user?.role, user?.classId, updateUser]);
   const [students, setStudents] = useState<Student[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [error, setError] = useState('');
 
   useEffect(() => {
-    if (!user?.classId) {
-      setError('You are not assigned to a class. Contact your HOD.');
-      setLoading(false);
-      return;
-    }
-    apiClient.get('/users', { params: { role: 'STUDENT', classId: user.classId } })
-      .then(({ data }) => setStudents(data.users || data || []))
+    apiClient.get('/users/class-roster')
+      .then(({ data }) => {
+        const list = Array.isArray(data) ? data : [];
+        setStudents(list);
+        if (list.length === 0) {
+          setError('You are not assigned to a class, or your class has no students yet. Contact your HOD.');
+        }
+      })
       .catch((err: any) => setError(err.response?.data?.error || 'Failed to load students'))
       .finally(() => setLoading(false));
   }, [user?.classId]);

@@ -1,8 +1,9 @@
-import { Router, type Request, type Response } from 'express';
+import { Router, type Request, type Response, type NextFunction } from 'express';
 import { z } from 'zod';
 import { createId } from '@paralleldrive/cuid2';
 import { prisma } from '../lib/prisma';
 import { getSocketIO } from '../lib/socket';
+import { resolveTeacherClassId } from '../lib/teacherScope';
 import { AppError } from '../middleware/errors';
 
 const NOTIFICATION_INSERT_CHUNK = 500;
@@ -131,10 +132,14 @@ notificationsRouter.post('/test-sms', async (req: Request, res: Response): Promi
 
   const result = await notificationService.sendSMSTest(parsed.data.phone, message);
   if (!result.ok) {
+    const { formatSmsDeliveryError } = await import('../services/notificationService');
     res.status(502).json({
-      error: result.error || 'SMS send failed',
+      error: formatSmsDeliveryError(result.error || 'SMS send failed', status.sandbox),
       code: 'SMS_SEND_FAILED',
       sandbox: status.sandbox,
+      hint: status.sandbox
+        ? 'Register the recipient at account.africastalking.com → SMS → phone numbers (E.164, e.g. +2547XXXXXXXX).'
+        : undefined,
     });
     return;
   }
@@ -605,7 +610,7 @@ notificationsRouter.post('/reply', async (req: Request, res: Response): Promise<
  *   HOD          → their department / classes within it, any targetRole
  *   TEACHER      → their own class, targetRole=STUDENT only
  */
-notificationsRouter.post('/send', async (req: Request, res: Response): Promise<void> => {
+notificationsRouter.post('/send', async (req: Request, res: Response, next: NextFunction): Promise<void> => {
   try {
     const allowedRoles = ['SCHOOL_ADMIN', 'HOD', 'TEACHER'];
     if (!allowedRoles.includes(req.user.role)) {
@@ -622,9 +627,14 @@ notificationsRouter.post('/send', async (req: Request, res: Response): Promise<v
     const title = parsed.data.title || 'New Message';
     const batchId = createId();
 
+    const teacherClassId =
+      req.user.role === 'TEACHER'
+        ? await resolveTeacherClassId(req.user.sub, req.user.classId)
+        : null;
+
     // Teachers: default to their assigned class when none selected in the UI
-    if (req.user.role === 'TEACHER' && scope === 'class' && !targetId && req.user.classId) {
-      targetId = req.user.classId;
+    if (req.user.role === 'TEACHER' && scope === 'class' && !targetId && teacherClassId) {
+      targetId = teacherClassId;
     }
 
     // ── Build user filter ──────────────────────────────────────────────────
@@ -661,10 +671,10 @@ notificationsRouter.post('/send', async (req: Request, res: Response): Promise<v
       if (scope !== 'class') {
         throw new AppError(403, 'FORBIDDEN', 'Teachers can only send to their class');
       }
-      if (!req.user.classId) {
+      if (!teacherClassId) {
         throw new AppError(403, 'FORBIDDEN', 'You are not assigned to a class');
       }
-      if (targetId !== req.user.classId) {
+      if (targetId !== teacherClassId) {
         throw new AppError(403, 'FORBIDDEN', 'Teachers can only send notifications to their own class');
       }
       // Teachers can only message students
@@ -739,8 +749,12 @@ notificationsRouter.post('/send', async (req: Request, res: Response): Promise<v
     setImmediate(() => {
       try {
         if (channels.includes('inapp')) {
-          // One broadcast per school (all connected clients joined school:{id} on connect)
-          getSocketIO().to(`school:${schoolId}`).emit('notification:new', payload);
+          const io = getSocketIO();
+          // Per-recipient delivery (user rooms) plus school room for clients that only listen there
+          for (const u of targetUsers) {
+            io.to(`user:${u.id}`).emit('notification:new', payload);
+          }
+          io.to(`school:${schoolId}`).emit('notification:new', payload);
         }
         if (channels.includes('sms')) {
           void import('../services/notificationService').then(({ notificationService }) => {
@@ -760,7 +774,6 @@ notificationsRouter.post('/send', async (req: Request, res: Response): Promise<v
       }
     });
   } catch (err) {
-    if (err instanceof AppError) throw err;
-    throw new AppError(500, 'INTERNAL_ERROR', 'Failed to send notification');
+    next(err instanceof AppError ? err : new AppError(500, 'INTERNAL_ERROR', 'Failed to send notification'));
   }
 });

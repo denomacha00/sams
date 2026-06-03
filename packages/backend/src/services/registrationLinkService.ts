@@ -4,7 +4,7 @@ import { UserRole } from '@sams/shared';
 import { prisma } from '../lib/prisma';
 import { licenseService } from './licenseService';
 import { AppError } from '../middleware/errors';
-import { onboardPhoneForSms, optionalPhoneForStorage } from './phoneOnboardingService';
+import { assertPhoneAvailableInSchool, onboardPhoneForSms, optionalPhoneForStorage } from './phoneOnboardingService';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -225,6 +225,7 @@ export class RegistrationLinkService {
     // Hash the provided password
     const passwordHash = await bcrypt.hash(password, BCRYPT_ROUNDS);
     const storedPhone = optionalPhoneForStorage(phone);
+    await assertPhoneAvailableInSchool(link.schoolId, storedPhone);
 
     // Create the user
     const user = await prisma.user.create({
@@ -388,6 +389,7 @@ export class RegistrationLinkService {
     // Hash the password
     const passwordHash = await bcrypt.hash(data.password, BCRYPT_ROUNDS);
     const storedPhone = optionalPhoneForStorage(data.phone);
+    await assertPhoneAvailableInSchool(schoolId, storedPhone);
 
     // Create the student
     const user = await prisma.user.create({

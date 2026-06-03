@@ -40,6 +40,21 @@ function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+export function formatSmsDeliveryError(errorMessage: string, sandbox: boolean): string {
+  const lower = errorMessage.toLowerCase();
+  const looksLikeWhitelist =
+    lower.includes('invalid') ||
+    lower.includes('whitelist') ||
+    lower.includes('not allowed') ||
+    lower.includes('rejected') ||
+    lower.includes('unknown');
+
+  if (sandbox && looksLikeWhitelist) {
+    return `${errorMessage} Sandbox SMS only delivers to numbers added at account.africastalking.com → SMS → phone numbers (use +254 format).`;
+  }
+  return errorMessage;
+}
+
 function parseAtSmsResponse(data: unknown): SmsSendResult {
   const body = data as {
     SMSMessageData?: {
@@ -203,7 +218,10 @@ export class NotificationService {
         },
       });
 
-      return { ok: false, error: errorMessage };
+      return {
+        ok: false,
+        error: formatSmsDeliveryError(errorMessage, this.atConfig.sandbox),
+      };
     }
   }
 

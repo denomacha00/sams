@@ -11,7 +11,8 @@ import { userService } from '../services/userService';
 import { registrationLinkService } from '../services/registrationLinkService';
 import { prisma } from '../lib/prisma';
 import { AppError } from '../middleware/errors';
-import { onboardPhoneForSms, optionalPhoneForStorage } from '../services/phoneOnboardingService';
+import { assertPhoneAvailableInSchool, onboardPhoneForSms, optionalPhoneForStorage } from '../services/phoneOnboardingService';
+import { resolveTeacherClassId } from '../lib/teacherScope';
 
 // ─── Avatar Upload Config ─────────────────────────────────────────────────────
 
@@ -108,9 +109,15 @@ usersRouter.get('/me', async (req: Request, res: Response, next: NextFunction): 
       throw new AppError(404, 'USER_NOT_FOUND', 'User not found');
     }
 
+    const effectiveClassId =
+      user.role === UserRole.TEACHER
+        ? await resolveTeacherClassId(user.id, user.classId)
+        : user.classId;
+
     const { _count, biometricTemplate, ...profile } = user;
     res.status(200).json({
       ...profile,
+      classId: effectiveClassId,
       fingerprintRegistered: _count.webauthnCredentials > 0,
       bioEnrolled: !!biometricTemplate,
     });
@@ -153,6 +160,9 @@ usersRouter.patch('/me', async (req: Request, res: Response, next: NextFunction)
       select: { phone: true },
     });
     const phone = parsed.data.phone !== undefined ? optionalPhoneForStorage(parsed.data.phone) : undefined;
+    if (phone !== undefined) {
+      await assertPhoneAvailableInSchool(req.schoolId, phone, req.user.sub);
+    }
 
     const updated = await prisma.user.update({
       where: { id: req.user.sub },
@@ -307,11 +317,12 @@ usersRouter.get('/class-roster', async (req: Request, res: Response, next: NextF
     };
 
     if (role === UserRole.TEACHER) {
-      if (!req.user.classId) {
+      const teacherClassId = await resolveTeacherClassId(req.user.sub, req.user.classId);
+      if (!teacherClassId) {
         res.status(200).json([]);
         return;
       }
-      filters.classId = req.user.classId;
+      filters.classId = teacherClassId;
     } else if (role === UserRole.HOD) {
       if (!req.user.departmentId) {
         res.status(200).json([]);

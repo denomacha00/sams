@@ -3,7 +3,7 @@ import { UserRole } from '@sams/shared';
 import { prisma } from '../lib/prisma';
 import { licenseService } from './licenseService';
 import { AppError } from '../middleware/errors';
-import { onboardPhoneForSms, optionalPhoneForStorage } from './phoneOnboardingService';
+import { assertPhoneAvailableInSchool, onboardPhoneForSms, optionalPhoneForStorage } from './phoneOnboardingService';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -85,6 +85,7 @@ export class UserService {
     // Hash the password
     const passwordHash = await bcrypt.hash(data.password, BCRYPT_ROUNDS);
     const phone = optionalPhoneForStorage(data.phone);
+    await assertPhoneAvailableInSchool(schoolId, phone);
 
     const user = await prisma.user.create({
       data: {
@@ -139,6 +140,9 @@ export class UserService {
     }
 
     const phone = data.phone !== undefined ? optionalPhoneForStorage(data.phone) : undefined;
+    if (phone !== undefined) {
+      await assertPhoneAvailableInSchool(schoolId, phone, userId);
+    }
 
     const updated = await prisma.user.update({
       where: { id: userId },

@@ -1,4 +1,6 @@
 import { getAfricasTalkingConfig, isSmsConfigured, normalizeSmsPhone } from '../config/africasTalking';
+import { prisma } from '../lib/prisma';
+import { AppError } from '../middleware/errors';
 import { notificationService } from './notificationService';
 
 /** Normalize Kenyan phone numbers to E.164 (+254...) for storage and SMS. */
@@ -46,4 +48,29 @@ export function onboardPhoneForSms(phone: string, fullName?: string): void {
 export function optionalPhoneForStorage(phone?: string | null): string | null {
   if (!phone?.trim()) return null;
   return preparePhoneForStorage(phone);
+}
+
+/** One phone number per school (OTP/SMS). Skips when phone is empty. */
+export async function assertPhoneAvailableInSchool(
+  schoolId: string,
+  phone: string | null | undefined,
+  excludeUserId?: string,
+): Promise<void> {
+  if (!phone) return;
+
+  const existing = await prisma.user.findFirst({
+    where: {
+      schoolId,
+      phone,
+      ...(excludeUserId ? { NOT: { id: excludeUserId } } : {}),
+    },
+  });
+
+  if (existing) {
+    throw new AppError(
+      409,
+      'DUPLICATE_PHONE',
+      'This phone number is already registered in your school. Use a different number or contact your admin.',
+    );
+  }
 }

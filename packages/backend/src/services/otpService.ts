@@ -5,6 +5,7 @@ import { notificationService } from './notificationService';
 import { isEmailConfigured } from '../config/email';
 import { isSmsConfigured, getAfricasTalkingConfig } from '../config/africasTalking';
 import { preparePhoneForStorage } from './phoneOnboardingService';
+import { formatSmsDeliveryError } from './notificationService';
 
 export type OtpPurpose = 'login' | 'password_reset';
 
@@ -134,7 +135,9 @@ export async function deliverOtp(
     const result = await notificationService.sendSMSTest(smsTo, smsText);
     smsSent = result.ok;
     if (!result.ok) {
-      smsError = result.error;
+      smsError = result.error
+        ? formatSmsDeliveryError(result.error, sandbox)
+        : 'SMS delivery failed';
       console.error(`[OTP] SMS failed for user ${user.id}:`, smsError);
     }
   } else if (user.phone && !isSmsConfigured()) {
