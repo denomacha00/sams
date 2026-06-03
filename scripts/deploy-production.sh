@@ -98,6 +98,7 @@ mkdir -p "$UPLOADS_ROOT/avatars"
 find "$UPLOADS_ROOT" -maxdepth 1 -type f -name '*.jpg' -exec mv -n -t "$UPLOADS_ROOT/avatars/" {} + 2>/dev/null || true
 
 echo "==> Restarting services"
+mkdir -p /var/log/sams
 # delete + start applies ecosystem changes (instances, exec_mode); reload keeps old cluster layout
 pm2 delete sams-api 2>/dev/null || true
 set -a

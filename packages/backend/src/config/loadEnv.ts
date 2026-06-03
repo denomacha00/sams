@@ -1,7 +1,7 @@
 import { existsSync, readFileSync } from 'fs';
 import path from 'path';
 
-/** Load packages/backend/.env when not already set (PM2 does not read this file by default). */
+/** Load packages/backend/.env — fills missing or empty vars (PM2 env_file often leaves blanks). */
 function loadEnvFile(): void {
   const envPath = path.resolve(__dirname, '../../.env');
   if (!existsSync(envPath)) return;
@@ -14,7 +14,10 @@ function loadEnvFile(): void {
     if (eq === -1) continue;
 
     const key = trimmed.slice(0, eq).trim();
-    if (!key || process.env[key] !== undefined) continue;
+    if (!key) continue;
+
+    const existing = process.env[key];
+    if (existing !== undefined && existing !== '') continue;
 
     let value = trimmed.slice(eq + 1).trim();
     if (

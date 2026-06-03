@@ -1,8 +1,13 @@
+const path = require('path');
+
+const root = __dirname;
+
 module.exports = {
   apps: [
     {
       name: 'sams-api',
-      script: './packages/backend/bin/pm2-start.js',
+      script: path.join(root, 'packages/backend/dist/index.js'),
+      cwd: root,
       instances: 1,
       exec_mode: 'fork',
       autorestart: true,
@@ -20,23 +25,18 @@ module.exports = {
         NODE_ENV: 'staging',
         PORT: 3001,
       },
-      env_file: './packages/backend/.env',
-      // Log configuration
+      // .env is loaded at runtime by packages/backend/src/config/loadEnv.ts
       error_file: '/var/log/sams/sams-api-error.log',
       out_file: '/var/log/sams/sams-api-out.log',
       log_date_format: 'YYYY-MM-DD HH:mm:ss Z',
       merge_logs: true,
-      // Graceful shutdown
       kill_timeout: 8000,
-      listen_timeout: 15000,
       shutdown_with_message: true,
-      // Zero-downtime reload: wait for process.send('ready') before killing old instance
-      wait_ready: true,
-      // Restart policy
+      // wait_ready caused crash loops on some PM2 builds; app loads .env via loadEnv.ts
+      wait_ready: false,
       max_restarts: 10,
       min_uptime: '10s',
       restart_delay: 4000,
-      // Exponential backoff restart
       exp_backoff_restart_delay: 100,
     },
   ],
