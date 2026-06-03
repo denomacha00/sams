@@ -27,9 +27,11 @@ import { aiRouter } from './routes/ai';
 import { biometricRouter } from './routes/biometric';
 import { notificationsRouter } from './routes/notifications';
 import { knowledgeRouter } from './routes/knowledge';
+import { registerSocketServer } from './lib/socket';
 import { setupAttendanceSocket } from './sockets/attendanceSocket';
 import { startQRRefreshJob, stopQRRefreshJob } from './jobs/qrRefresh';
 import { startNotificationJob, stopNotificationJob } from './jobs/notifications';
+import { getNotificationService } from './services/notificationService';
 
 // ─── App & HTTP Server ────────────────────────────────────────────────────────
 
@@ -132,6 +134,8 @@ const io = new SocketIOServer(httpServer, {
   },
 });
 
+registerSocketServer(io);
+
 // Set up attendance socket handlers (auth, session:join, qr:subscribe)
 setupAttendanceSocket(io);
 
@@ -147,7 +151,18 @@ redis.on('error', (err) => console.error('[Redis] Error:', err));
 
 // ─── Health Check ─────────────────────────────────────────────────────────────
 
+let apiReady = false;
+
 app.get('/health', async (_req, res) => {
+  if (!apiReady) {
+    res.status(503).json({
+      status: 'starting',
+      timestamp: new Date().toISOString(),
+      checks: { database: false, redis: false },
+    });
+    return;
+  }
+
   const atCfg = isSmsConfigured() ? getAfricasTalkingConfig() : null;
   const smtpCfg = isEmailConfigured() ? getSmtpConfig() : null;
 
@@ -188,33 +203,48 @@ app.get('/health', async (_req, res) => {
 
 const PORT = process.env.PORT ?? 3001;
 
+async function connectDependencies(): Promise<void> {
+  await redis.connect();
+  await prisma.$connect();
+  apiReady = true;
+  console.log('[SAMS] Database and Redis connected — API ready');
+
+  // SMS/SMTP providers (sync SDK init) — after listen so deploy health checks can reach the port
+  getNotificationService();
+
+  if (!process.env.CONVERSATION_MASTER_KEY || process.env.CONVERSATION_MASTER_KEY.length < 32) {
+    console.warn('[STARTUP] CONVERSATION_MASTER_KEY not set or too short. Conversation memory will be disabled.');
+  }
+  if (!isSmsConfigured()) {
+    console.warn('[STARTUP] SMS disabled — set AT_API_KEY and AT_USERNAME in .env to enable Africa\'s Talking.');
+  }
+  if (!isEmailConfigured()) {
+    console.warn('[STARTUP] Email disabled — set SMTP_USER and SMTP_PASS in .env to enable SMTP.');
+  }
+
+  startQRRefreshJob();
+  startNotificationJob();
+
+  if (process.send) {
+    process.send('ready');
+  }
+}
+
 async function start(): Promise<void> {
   try {
     validateProductionSecrets();
-    await redis.connect();
-    await prisma.$connect();
 
-    httpServer.listen(PORT, () => {
-      console.log(`[SAMS] API listening on port ${PORT}`);
+    await new Promise<void>((resolve, reject) => {
+      httpServer.listen(PORT, () => {
+        console.log(`[SAMS] API listening on port ${PORT}`);
+        resolve();
+      });
+      httpServer.once('error', reject);
+    });
 
-      // Conversation memory encryption check
-      if (!process.env.CONVERSATION_MASTER_KEY || process.env.CONVERSATION_MASTER_KEY.length < 32) {
-        console.warn('[STARTUP] CONVERSATION_MASTER_KEY not set or too short. Conversation memory will be disabled.');
-      }
-      if (!isSmsConfigured()) {
-        console.warn('[STARTUP] SMS disabled — set AT_API_KEY and AT_USERNAME in .env to enable Africa\'s Talking.');
-      }
-      if (!isEmailConfigured()) {
-        console.warn('[STARTUP] Email disabled — set SMTP_USER and SMTP_PASS in .env to enable SMTP.');
-      }
-
-      startQRRefreshJob();
-      startNotificationJob();
-
-      // Signal PM2 that this instance is ready (enables zero-downtime cluster reload)
-      if (process.send) {
-        process.send('ready');
-      }
+    void connectDependencies().catch((err) => {
+      console.error('[SAMS] Failed to connect dependencies:', err);
+      process.exit(1);
     });
   } catch (err) {
     console.error('[SAMS] Failed to start server:', err);

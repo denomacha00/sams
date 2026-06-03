@@ -1,6 +1,7 @@
 import nodemailer from 'nodemailer';
 import AfricasTalking from 'africastalking';
-import { io, prisma } from '../index';
+import { prisma } from '../lib/prisma';
+import { getSocketIO } from '../lib/socket';
 import { auditService } from './auditService';
 import {
   getAfricasTalkingConfig,
@@ -252,12 +253,29 @@ export class NotificationService {
       console.error('[NotificationService] Failed to persist in-app notification:', err);
     }
 
-    io.to(`user:${userId}`).emit('notification:new', {
+    getSocketIO().to(`user:${userId}`).emit('notification:new', {
       ...notification,
       timestamp: new Date().toISOString(),
     });
   }
 }
 
-export const notificationService = new NotificationService();
+let notificationServiceInstance: NotificationService | null = null;
+
+/** Lazy init — avoids blocking HTTP listen on Africa's Talking / SMTP setup at import time. */
+export function getNotificationService(): NotificationService {
+  if (!notificationServiceInstance) {
+    notificationServiceInstance = new NotificationService();
+  }
+  return notificationServiceInstance;
+}
+
+export const notificationService: NotificationService = new Proxy({} as NotificationService, {
+  get(_target, prop, receiver) {
+    const svc = getNotificationService();
+    const value = Reflect.get(svc, prop, receiver);
+    return typeof value === 'function' ? (value as (...args: unknown[]) => unknown).bind(svc) : value;
+  },
+});
+
 export { isSmsConfigured, isEmailConfigured };

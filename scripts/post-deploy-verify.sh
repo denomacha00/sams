@@ -7,6 +7,9 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT"
 
+# shellcheck source=lib/health-wait.sh
+source "$ROOT/scripts/lib/health-wait.sh"
+
 PORT="${PORT:-3001}"
 API="http://127.0.0.1:${PORT}"
 FAIL=0
@@ -47,14 +50,11 @@ else
   warn "pm2 not in PATH — skipping process check"
 fi
 
-# Health API — retry while the process connects DB/Redis and binds the port
+# Health API — retry until HTTP 200 (503 = still starting or DB/Redis down)
 HEALTH=""
-for attempt in 1 2 3 4 5 6 7 8 9 10; do
-  if HEALTH="$(curl -sf --max-time 5 "${API}/health" 2>/dev/null)"; then
-    break
-  fi
-  [[ "$attempt" -lt 10 ]] && sleep 2
-done
+if wait_for_health_200 "$API" 30 2; then
+  HEALTH="$(curl -sS --max-time 5 "${API}/health" 2>/dev/null || true)"
+fi
 
 if [[ -n "$HEALTH" ]]; then
   pass "GET /health"
@@ -71,7 +71,8 @@ if [[ -n "$HEALTH" ]]; then
     if(h.otp) console.log('       otp login:', h.otp.loginEnabled, '| reset:', h.otp.passwordResetEnabled);
   " 2>/dev/null || true
 else
-  fail "GET /health — API not responding on ${API}"
+  fail "GET /health — no HTTP 200 on ${API} (connection refused or 503 starting/degraded)"
+  health_curl_verbose "$API"
 fi
 
 # Auth login (optional — set VERIFY_LOGIN_IDENTIFIER + VERIFY_LOGIN_PASSWORD in env)
