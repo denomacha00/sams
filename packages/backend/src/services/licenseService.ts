@@ -22,7 +22,7 @@ const PLAN_STUDENT_LIMITS: Record<PlanTier, number> = {
  */
 const FEATURE_ACCESS: Record<string, PlanTier[]> = {
   biometric: [PlanTier.PROFESSIONAL, PlanTier.ENTERPRISE],
-  ai: [PlanTier.PROFESSIONAL, PlanTier.ENTERPRISE],
+  ai: [PlanTier.TRIAL, PlanTier.BASIC, PlanTier.PROFESSIONAL, PlanTier.ENTERPRISE],
   api_access: [PlanTier.BASIC, PlanTier.PROFESSIONAL, PlanTier.ENTERPRISE],
   custom_branding: [PlanTier.ENTERPRISE],
 };

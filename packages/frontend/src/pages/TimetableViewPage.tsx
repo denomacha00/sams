@@ -1,7 +1,8 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import apiClient from '../services/apiClient';
 import { useAuthStore } from '../store/authStore';
+import { UserRole } from '@sams/shared';
 
 interface TimetableEntry {
   id: string;
@@ -12,22 +13,34 @@ interface TimetableEntry {
   startTime: string;
   endTime: string;
   room?: string;
-  class?: { name: string };
+  class?: { name: string; departmentId?: string };
   teacher?: { fullName: string };
+}
+
+interface Department {
+  id: string;
+  name: string;
+  classes?: { id: string; name: string }[];
 }
 
 const DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
 
 const TimetableViewPage: React.FC = () => {
   const user = useAuthStore((s) => s.user);
+  const isSchoolAdmin = user?.role === UserRole.SCHOOL_ADMIN;
   const [entries, setEntries] = useState<TimetableEntry[]>([]);
+  const [departments, setDepartments] = useState<Department[]>([]);
+  const [filterDepartmentId, setFilterDepartmentId] = useState('');
+  const [filterClassId, setFilterClassId] = useState('');
   const [loading, setLoading] = useState(true);
   const [viewMode, setViewMode] = useState<'table' | 'grid'>('grid');
 
   useEffect(() => {
     const fetchEntries = async () => {
       try {
-        const { data } = await apiClient.get('/timetable');
+        const params: Record<string, string> = {};
+        if (filterClassId) params.classId = filterClassId;
+        const { data } = await apiClient.get('/timetable', { params });
         const list = Array.isArray(data) ? data : (data.entries || []);
         setEntries(list);
       } catch (err) {
@@ -37,35 +50,107 @@ const TimetableViewPage: React.FC = () => {
         setLoading(false);
       }
     };
-    fetchEntries();
-  }, []);
+    void fetchEntries();
+  }, [filterClassId]);
+
+  useEffect(() => {
+    if (!isSchoolAdmin) return;
+    const loadDepartments = async () => {
+      try {
+        const { data } = await apiClient.get('/departments');
+        const depts: Department[] = Array.isArray(data) ? data : (data.departments || []);
+        const enriched = await Promise.all(
+          depts.map(async (d) => {
+            try {
+              const { data: cd } = await apiClient.get(`/departments/${d.id}/classes`);
+              return { ...d, classes: Array.isArray(cd) ? cd : [] };
+            } catch {
+              return { ...d, classes: [] };
+            }
+          }),
+        );
+        setDepartments(enriched);
+      } catch {
+        /* ignore */
+      }
+    };
+    void loadDepartments();
+  }, [isSchoolAdmin]);
+
+  const classOptions = useMemo(() => {
+    if (!filterDepartmentId) return [];
+    return departments.find((d) => d.id === filterDepartmentId)?.classes || [];
+  }, [departments, filterDepartmentId]);
+
+  const filteredEntries = useMemo(() => {
+    if (!filterDepartmentId) return entries;
+    const classIds = new Set(classOptions.map((c) => c.id));
+    return entries.filter((e) => classIds.has(e.classId));
+  }, [entries, filterDepartmentId, classOptions]);
 
   const getEntriesForDay = (day: number) =>
-    entries.filter((e) => e.dayOfWeek === day).sort((a, b) => a.startTime.localeCompare(b.startTime));
+    filteredEntries.filter((e) => e.dayOfWeek === day).sort((a, b) => a.startTime.localeCompare(b.startTime));
 
-  const todayIndex = (new Date().getDay() + 6) % 7; // Convert JS Sunday=0 to Monday=0
+  const todayIndex = (new Date().getDay() + 6) % 7;
+
+  const pageTitle = isSchoolAdmin ? 'School Timetable' : 'My Timetable';
 
   return (
     <div className="page-shell">
-      {/* Header */}
       <header className="border-b border-slate-800 bg-slate-950/95">
         <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <Link to="/dashboard" className="text-gray-400 hover:text-indigo-300 transition-colors">
               ← Dashboard
             </Link>
-            <h1 className="text-lg font-bold text-white">My Timetable</h1>
+            <h1 className="text-lg font-bold text-white">{pageTitle}</h1>
           </div>
-          <button
-            onClick={() => setViewMode(viewMode === 'table' ? 'grid' : 'table')}
-            className="px-3 py-2 rounded-lg bg-slate-900 border border-slate-700 text-gray-300 text-sm hover:bg-slate-800 transition-colors"
-          >
-            {viewMode === 'table' ? '📅 Grid View' : '📋 Table View'}
-          </button>
+          <div className="flex items-center gap-3">
+            {isSchoolAdmin && (
+              <Link
+                to="/ai"
+                className="px-3 py-2 rounded-lg bg-violet-600/20 border border-violet-500/30 text-violet-300 text-sm hover:bg-violet-600/30 transition-colors"
+              >
+                Ask AI about timetable
+              </Link>
+            )}
+            <button
+              onClick={() => setViewMode(viewMode === 'table' ? 'grid' : 'table')}
+              className="px-3 py-2 rounded-lg bg-slate-900 border border-slate-700 text-gray-300 text-sm hover:bg-slate-800 transition-colors"
+            >
+              {viewMode === 'table' ? '📅 Grid View' : '📋 Table View'}
+            </button>
+          </div>
         </div>
       </header>
 
       <main className="max-w-7xl mx-auto px-6 py-8">
+        {isSchoolAdmin && (
+          <div className="flex flex-wrap gap-4 mb-6">
+            <select
+              value={filterDepartmentId}
+              onChange={(e) => { setFilterDepartmentId(e.target.value); setFilterClassId(''); setLoading(true); }}
+              className="px-4 py-2 rounded-xl bg-slate-900 border border-slate-700 text-white text-sm min-w-[14rem]"
+            >
+              <option value="">All departments</option>
+              {departments.map((d) => (
+                <option key={d.id} value={d.id}>{d.name}</option>
+              ))}
+            </select>
+            <select
+              value={filterClassId}
+              onChange={(e) => { setFilterClassId(e.target.value); setLoading(true); }}
+              disabled={!filterDepartmentId}
+              className="px-4 py-2 rounded-xl bg-slate-900 border border-slate-700 text-white text-sm min-w-[14rem] disabled:opacity-50"
+            >
+              <option value="">All classes in department</option>
+              {classOptions.map((c) => (
+                <option key={c.id} value={c.id}>{c.name}</option>
+              ))}
+            </select>
+          </div>
+        )}
+
         {loading ? (
           <div className="text-center text-gray-400 py-12">
             <div className="flex items-center justify-center gap-3">
@@ -76,7 +161,7 @@ const TimetableViewPage: React.FC = () => {
               Loading timetable...
             </div>
           </div>
-        ) : entries.length === 0 ? (
+        ) : filteredEntries.length === 0 ? (
           <div className="text-center py-16">
             <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-slate-900 border border-slate-700 mb-4">
               <svg className="w-8 h-8 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -84,10 +169,11 @@ const TimetableViewPage: React.FC = () => {
               </svg>
             </div>
             <p className="text-gray-400">No timetable entries found</p>
-            <p className="text-gray-500 text-sm mt-1">Your school admin hasn't set up the timetable yet.</p>
+            <p className="text-gray-500 text-sm mt-1">
+              {isSchoolAdmin ? 'Try another department or class, or ask your HOD to set up timetables.' : 'Your HOD has not set up the timetable yet.'}
+            </p>
           </div>
         ) : viewMode === 'grid' ? (
-          /* Grid View */
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4">
             {DAYS.slice(0, 5).map((day, idx) => (
               <div
@@ -123,7 +209,6 @@ const TimetableViewPage: React.FC = () => {
             ))}
           </div>
         ) : (
-          /* Table View */
           <div className="bg-slate-900/80 border border-slate-700 rounded-2xl overflow-hidden">
             <div className="overflow-x-auto">
               <table className="w-full">
@@ -138,7 +223,7 @@ const TimetableViewPage: React.FC = () => {
                   </tr>
                 </thead>
                 <tbody>
-                  {entries
+                  {filteredEntries
                     .sort((a, b) => a.dayOfWeek - b.dayOfWeek || a.startTime.localeCompare(b.startTime))
                     .map((entry) => (
                       <tr
@@ -167,7 +252,6 @@ const TimetableViewPage: React.FC = () => {
         )}
       </main>
 
-      {/* Footer */}
       <footer className="border-t border-white/5 mt-20 py-6">
         <div className="max-w-7xl mx-auto px-6 text-center">
           <p className="text-xs text-gray-500">© 2025 SAMS · Developed by Denis Macharia</p>

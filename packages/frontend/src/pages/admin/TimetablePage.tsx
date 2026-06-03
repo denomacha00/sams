@@ -1,6 +1,8 @@
 import React, { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import apiClient from '../../services/apiClient';
+import { useAuthStore } from '../../store/authStore';
+import { UserRole } from '@sams/shared';
 
 interface TimetableEntry {
   id: string;
@@ -46,6 +48,9 @@ const emptyForm: EntryFormData = {
 const DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
 
 const TimetablePage: React.FC = () => {
+  const user = useAuthStore((s) => s.user);
+  const navigate = useNavigate();
+  const canManage = user?.role === UserRole.HOD;
   const [entries, setEntries] = useState<TimetableEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
@@ -61,10 +66,14 @@ const TimetablePage: React.FC = () => {
   const [teachers, setTeachers] = useState<{id: string; fullName: string}[]>([]);
 
   useEffect(() => {
+    if (user?.role === UserRole.SCHOOL_ADMIN) {
+      navigate('/timetable', { replace: true });
+      return;
+    }
     fetchEntries();
     fetchDepartments();
     fetchTeachers();
-  }, []);
+  }, [user?.role, navigate]);
 
   const fetchDepartments = async () => {
     try {
@@ -215,12 +224,14 @@ const TimetablePage: React.FC = () => {
             >
               {viewMode === 'table' ? '📅 Grid View' : '📋 Table View'}
             </button>
+            {canManage && (
             <button
               onClick={openAddModal}
               className="px-4 py-2 rounded-xl bg-indigo-600 text-white text-sm font-semibold hover:bg-indigo-500 transition-colors"
             >
               + Add Entry
             </button>
+            )}
           </div>
         </div>
       </header>
@@ -285,6 +296,8 @@ const TimetablePage: React.FC = () => {
                           <td className="px-6 py-4 text-sm text-gray-400">{entry.startTime} - {entry.endTime}</td>
                           <td className="px-6 py-4 text-sm text-gray-400">{entry.room || '—'}</td>
                           <td className="px-6 py-4 text-right">
+                            {canManage && (
+                              <>
                             <button
                               onClick={() => openEditModal(entry)}
                               className="text-cyan-400 hover:text-cyan-300 text-sm mr-3 transition-colors"
@@ -297,6 +310,8 @@ const TimetablePage: React.FC = () => {
                             >
                               Delete
                             </button>
+                              </>
+                            )}
                           </td>
                         </tr>
                       ))

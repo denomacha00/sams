@@ -1,9 +1,11 @@
 import { Router, type Request, type Response, type NextFunction } from 'express';
 import { z } from 'zod';
 import { createHash } from 'crypto';
+import Redis from 'ioredis';
 import { PlanTier } from '@sams/shared';
 import { encodeLicenseKey } from '@sams/shared';
 import { getLicenseSecret } from '../config/secrets';
+import { getSmtpConfig, isEmailConfigured } from '../config/email';
 import { prisma } from '../index';
 import { licenseService } from '../services/licenseService';
 import { auditService } from '../services/auditService';
@@ -206,6 +208,50 @@ superAdminRouter.post('/licenses/:id/revoke', async (req: Request, res: Response
   });
 
   res.json({ message: 'License key revoked successfully', licenseId });
+});
+
+// ─── GET /super/system-status — Platform health (no secrets, no SMS) ────────────
+
+superAdminRouter.get('/system-status', async (_req: Request, res: Response): Promise<void> => {
+  let dbOk = false;
+  let redisOk = false;
+
+  try {
+    await prisma.$queryRaw`SELECT 1`;
+    dbOk = true;
+  } catch {
+    dbOk = false;
+  }
+
+  try {
+    const redis = new Redis(process.env.REDIS_URL ?? 'redis://localhost:6379', {
+      lazyConnect: true,
+      maxRetriesPerRequest: 1,
+      connectTimeout: 3000,
+    });
+    await redis.connect();
+    redisOk = (await redis.ping()) === 'PONG';
+    await redis.quit();
+  } catch {
+    redisOk = false;
+  }
+
+  const smtpCfg = isEmailConfigured() ? getSmtpConfig() : null;
+  const ready = dbOk && redisOk;
+
+  res.status(ready ? 200 : 503).json({
+    status: ready ? 'ok' : 'degraded',
+    timestamp: new Date().toISOString(),
+    environment: process.env.NODE_ENV ?? 'development',
+    checks: { database: dbOk, redis: redisOk },
+    email: smtpCfg
+      ? { configured: true, host: smtpCfg.host, from: smtpCfg.fromEmail }
+      : { configured: false },
+    otp: {
+      loginEnabled: process.env.OTP_LOGIN_ENABLED === 'true',
+      passwordResetEnabled: process.env.OTP_PASSWORD_RESET_ENABLED === 'true',
+    },
+  });
 });
 
 // ─── GET /super/analytics — System-wide analytics ─────────────────────────────

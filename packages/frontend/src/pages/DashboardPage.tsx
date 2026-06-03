@@ -477,10 +477,10 @@ function getQuickActions(role?: UserRole): QuickAction[] {
         { to: '/admin/users', label: 'Manage Users', icon: ICONS.users, gradient: 'from-indigo-600 to-slate-700' },
         { to: '/admin/links', label: 'Generate Links', icon: ICONS.link, gradient: 'from-slate-600 to-indigo-600' },
         { to: '/reports', label: 'View Reports', icon: ICONS.chart, gradient: 'from-indigo-600 to-slate-700' },
-        { to: '/admin/timetable', label: 'Timetable', icon: ICONS.calendar, gradient: 'from-orange-500 to-amber-500' },
+        { to: '/timetable', label: 'View Timetable', icon: ICONS.calendar, gradient: 'from-orange-500 to-amber-500' },
         { to: '/admin/departments', label: 'Departments', icon: ICONS.building, gradient: 'from-green-500 to-emerald-500' },
         { to: '/admin/knowledge', label: 'Knowledge Base', icon: ICONS.book, gradient: 'from-amber-500 to-yellow-500' },
-        { to: '/notifications', label: 'Notifications', icon: ICONS.bell, gradient: 'from-rose-500 to-red-500' },
+        { to: '/notifications', label: 'Messages', icon: ICONS.bell, gradient: 'from-rose-500 to-red-500' },
         { to: '/ai', label: 'AI Assistant', icon: ICONS.ai, gradient: 'from-violet-500 to-purple-500' },
       ];
     case UserRole.TEACHER:
@@ -499,6 +499,7 @@ function getQuickActions(role?: UserRole): QuickAction[] {
       return [
         { to: '/sessions/scan', label: 'Scan QR', icon: ICONS.qr, gradient: 'from-teal-500 to-cyan-500' },
         { to: '/timetable', label: 'View Timetable', icon: ICONS.calendar, gradient: 'from-blue-500 to-indigo-500' },
+        { to: '/notifications', label: 'Messages', icon: ICONS.bell, gradient: 'from-rose-500 to-red-500' },
         { to: '/reports', label: 'My Reports', icon: ICONS.chart, gradient: 'from-purple-500 to-pink-500' },
         { to: '/ai', label: 'AI Assistant', icon: ICONS.ai, gradient: 'from-violet-500 to-purple-500' },
         { to: '/profile', label: 'Profile', icon: ICONS.profile, gradient: 'from-cyan-500 to-blue-500' },
@@ -513,7 +514,7 @@ function getQuickActions(role?: UserRole): QuickAction[] {
         { to: '/admin/users', label: 'Manage Users', icon: ICONS.users, gradient: 'from-blue-500 to-indigo-500' },
         { to: '/admin/timetable', label: 'Timetable', icon: ICONS.calendar, gradient: 'from-purple-500 to-pink-500' },
         { to: '/admin/knowledge', label: 'Knowledge Base', icon: ICONS.book, gradient: 'from-amber-500 to-yellow-500' },
-        { to: '/notifications', label: 'Notifications', icon: ICONS.bell, gradient: 'from-rose-500 to-red-500' },
+        { to: '/notifications', label: 'Messages', icon: ICONS.bell, gradient: 'from-rose-500 to-red-500' },
         { to: '/ai', label: 'AI Assistant', icon: ICONS.ai, gradient: 'from-violet-500 to-purple-500' },
       ];
     default:

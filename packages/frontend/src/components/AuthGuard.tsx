@@ -1,10 +1,12 @@
 import React, { useEffect } from 'react';
 import { Navigate, Outlet, useLocation } from 'react-router-dom';
 import { useAuthStore } from '../store/authStore';
-import type { UserRole } from '@sams/shared';
+import { UserRole } from '@sams/shared';
+import type { UserRole as UserRoleType } from '@sams/shared';
+import { redirectToSuperAdminPortal } from '../utils/superAdminPortal';
 
 interface AuthGuardProps {
-  allowedRoles?: UserRole[];
+  allowedRoles?: UserRoleType[];
 }
 
 /**
@@ -26,6 +28,15 @@ const AuthGuard: React.FC<AuthGuardProps> = ({ allowedRoles }) => {
 
   if (!isAuthenticated) {
     return <Navigate to="/login" state={{ from: location }} replace />;
+  }
+
+  if (user?.role === UserRole.SUPER_ADMIN) {
+    redirectToSuperAdminPortal();
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-slate-900 text-gray-300 p-6 text-center">
+        <p>Redirecting to the Super Admin portal…</p>
+      </div>
+    );
   }
 
   if (allowedRoles && user && !allowedRoles.includes(user.role)) {

@@ -34,7 +34,7 @@ export const timetableRouter = Router();
  * GET /api/v1/timetable
  * List timetable entries scoped to the school.
  */
-timetableRouter.get('/', async (req: Request, res: Response): Promise<void> => {
+timetableRouter.get('/', requirePermission('view:timetable'), async (req: Request, res: Response): Promise<void> => {
   try {
     const filters = {
       classId: req.query.classId as string | undefined,

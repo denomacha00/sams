@@ -587,8 +587,7 @@ async function dispatchFunctionCall(
 // ─── OpenAI Engine ────────────────────────────────────────────────────────────
 
 /**
- * OpenAI-powered query engine using function calling.
- * Gated behind LicenseService.checkFeatureAccess('ai') — Pro/Enterprise only.
+ * OpenAI-powered query engine using function calling with knowledge base context.
  *
  * Requirements: 14.5, 14.6
  */

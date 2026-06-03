@@ -331,7 +331,9 @@ const SettingsPage: React.FC = () => {
                 </svg>
                 Integrations
               </h2>
-              <p className="text-xs text-gray-500 mt-1">SMS and email delivery for notifications and OTP</p>
+              <p className="text-xs text-gray-500 mt-1">
+                School-level SMS and email only — not available in the Super Admin portal.
+              </p>
             </div>
 
             {/* SMS — Africa&apos;s Talking */}

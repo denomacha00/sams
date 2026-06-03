@@ -15,7 +15,17 @@ interface Notification {
   senderName: string | null;
   senderRole: string | null;
   batchId: string | null;
+  scope?: string | null;
+  targetId?: string | null;
+  targetRole?: string | null;
+  targetScopeLabel?: string | null;
 }
+
+interface SentNotification extends Notification {
+  recipientCount: number;
+}
+
+type Folder = 'inbox' | 'sent';
 
 interface Department {
   id: string;
@@ -59,7 +69,11 @@ const NotificationsPage: React.FC = () => {
   const user = useAuthStore((s) => s.user);
   const accessToken = useAuthStore((s) => s.accessToken);
   const [notifications, setNotifications] = useState<Notification[]>([]);
+  const [sentMessages, setSentMessages] = useState<SentNotification[]>([]);
+  const [folder, setFolder] = useState<Folder>('inbox');
   const [loading, setLoading] = useState(true);
+  const [sentLoading, setSentLoading] = useState(false);
+  const [isClassRep, setIsClassRep] = useState(false);
   const [showSendForm, setShowSendForm] = useState(false);
   const socketRef = useRef<Socket | null>(null);
 
@@ -90,8 +104,14 @@ const NotificationsPage: React.FC = () => {
   const [deleteLoading, setDeleteLoading] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
 
+  // Reply modal (class rep only)
+  const [replyingTo, setReplyingTo] = useState<Notification | null>(null);
+  const [replyMessage, setReplyMessage] = useState('');
+  const [replyLoading, setReplyLoading] = useState(false);
+  const [replyError, setReplyError] = useState<string | null>(null);
+
   const canSend = user && ['SCHOOL_ADMIN', 'HOD', 'TEACHER'].includes(user.role);
-  const isAdmin = user && ['SCHOOL_ADMIN', 'HOD'].includes(user.role);
+  const isSchoolAdmin = user?.role === 'SCHOOL_ADMIN';
 
   const [departments, setDepartments] = useState<Department[]>([]);
   const [classes, setClasses] = useState<{ id: string; name: string }[]>([]);
@@ -101,6 +121,9 @@ const NotificationsPage: React.FC = () => {
   useEffect(() => {
     fetchNotifications();
     if (canSend) fetchScopeData();
+    if (user?.role === 'STUDENT') {
+      apiClient.get('/users/me').then(({ data }) => setIsClassRep(!!data.isClassRep)).catch(() => {});
+    }
   }, []);
 
   // Teachers: pre-select their class so send is not submitted with an empty target
@@ -156,6 +179,21 @@ const NotificationsPage: React.FC = () => {
       setLoading(false);
     }
   };
+
+  const fetchSentMessages = async () => {
+    if (!canSend) return;
+    setSentLoading(true);
+    try {
+      const { data } = await apiClient.get('/notifications/sent');
+      setSentMessages(data);
+    } catch { /* ignore */ } finally {
+      setSentLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (folder === 'sent' && canSend) void fetchSentMessages();
+  }, [folder, canSend]);
 
   const fetchScopeData = async () => {
     try {
@@ -235,8 +273,8 @@ const NotificationsPage: React.FC = () => {
         setTargetId('');
         setTargetRole('ALL');
       }
-      // Refresh inbox in background — do not block the Send button
       void fetchNotifications();
+      if (folder === 'sent') void fetchSentMessages();
       setTimeout(() => setSendSuccess(false), 3000);
     } catch (err: any) {
       if (err.code === 'ECONNABORTED') {
@@ -311,6 +349,15 @@ const NotificationsPage: React.FC = () => {
           return n;
         })
       );
+      setSentMessages((prev) =>
+        prev.map((n) => {
+          if (editingNotification.batchId && n.batchId === editingNotification.batchId) {
+            return { ...n, message: editMessage.trim(), updatedAt: new Date().toISOString() };
+          }
+          if (n.id === editingNotification.id) return { ...n, message: editMessage.trim(), updatedAt: new Date().toISOString() };
+          return n;
+        })
+      );
       setEditingNotification(null);
     } catch (err: any) {
       setEditError(err.response?.data?.error || 'Failed to edit notification');
@@ -327,10 +374,11 @@ const NotificationsPage: React.FC = () => {
       if (deletingNotification.batchId) {
         await apiClient.delete(`/notifications/batch/${deletingNotification.batchId}`);
         setNotifications((prev) => prev.filter((n) => n.batchId !== deletingNotification.batchId));
+        setSentMessages((prev) => prev.filter((n) => n.batchId !== deletingNotification.batchId));
       } else {
-        // Non-batched (system notifications) — delete single record
         await apiClient.delete(`/notifications/${deletingNotification.id}`);
         setNotifications((prev) => prev.filter((n) => n.id !== deletingNotification.id));
+        setSentMessages((prev) => prev.filter((n) => n.id !== deletingNotification.id));
       }
       setDeletingNotification(null);
     } catch (err: any) {
@@ -340,13 +388,135 @@ const NotificationsPage: React.FC = () => {
     }
   };
 
-  const isOwnNotification = (notif: Notification): boolean => {
+  const handleReply = async () => {
+    if (!replyingTo) return;
+    if (replyMessage.trim().length < 1) {
+      setReplyError('Message is required');
+      return;
+    }
+    setReplyLoading(true);
+    setReplyError(null);
+    try {
+      await apiClient.post('/notifications/reply', {
+        parentNotificationId: replyingTo.id,
+        message: replyMessage.trim(),
+      });
+      setReplyingTo(null);
+      setReplyMessage('');
+    } catch (err: any) {
+      setReplyError(err.response?.data?.error || 'Failed to send reply');
+    } finally {
+      setReplyLoading(false);
+    }
+  };
+
+  const isOwnSentMessage = (notif: Notification): boolean => {
     if (!user) return false;
-    if (isAdmin) return true;
     return !!notif.senderId && notif.senderId === user.id;
   };
 
   const unreadCount = notifications.filter((n) => !n.read).length;
+  const displayList = folder === 'inbox' ? notifications : sentMessages;
+  const listLoading = folder === 'inbox' ? loading : sentLoading;
+
+  const renderMessageCard = (notif: Notification, isSentFolder: boolean) => {
+    const senderDisplay = truncateName(notif.senderName || (notif.senderId === null ? 'System' : 'Deleted User'));
+    const roleDisplay = formatRole(notif.senderRole);
+    const isOwn = isOwnSentMessage(notif);
+    const canModify = isSentFolder && isOwn && (!!isSchoolAdmin || isWithin24Hours(notif.createdAt));
+    const windowExpired = isSentFolder && isOwn && !isSchoolAdmin && !isWithin24Hours(notif.createdAt);
+    const canReply = !isSentFolder && isClassRep && notif.senderRole === 'TEACHER' && !!notif.senderId;
+    const recipientCount = isSentFolder ? (notif as SentNotification).recipientCount : undefined;
+
+    return (
+      <div key={notif.id} onClick={() => !isSentFolder && !notif.read && markAsRead(notif.id)}
+        className={`p-4 rounded-xl border transition-all ${isSentFolder ? '' : 'cursor-pointer'} backdrop-blur-sm ${
+          !isSentFolder && !notif.read ? 'bg-slate-900 border-indigo-500/30 hover:border-indigo-500/50' : 'bg-slate-900/60 border-slate-700/60'
+        }`}>
+        <div className="flex items-start justify-between gap-3">
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-2 flex-wrap">
+              {!isSentFolder && !notif.read && <div className="w-2 h-2 rounded-full bg-indigo-400 flex-shrink-0" />}
+              <h3 className={`text-sm font-semibold ${!isSentFolder && !notif.read ? 'text-white' : 'text-gray-400'}`}>{notif.title}</h3>
+              {notif.updatedAt && <span className="text-xs text-amber-400/70 italic">edited</span>}
+              {notif.targetScopeLabel && (
+                <span className="text-xs px-2 py-0.5 rounded-full bg-indigo-500/15 text-indigo-300 border border-indigo-500/20">
+                  {notif.targetScopeLabel}
+                </span>
+              )}
+              {recipientCount != null && (
+                <span className="text-xs px-2 py-0.5 rounded-full bg-slate-800 text-gray-400 border border-slate-700">
+                  {recipientCount} recipient{recipientCount !== 1 ? 's' : ''}
+                </span>
+              )}
+            </div>
+            <p className={`text-sm mt-1.5 ${!isSentFolder && !notif.read ? 'text-gray-300' : 'text-gray-500'}`}>{notif.message}</p>
+
+            <div className="flex items-center gap-2 mt-2 flex-wrap">
+              <div className="flex items-center gap-1.5">
+                <div className="w-5 h-5 rounded-full bg-indigo-600 flex items-center justify-center text-[10px] font-bold text-white flex-shrink-0">
+                  {senderDisplay.charAt(0).toUpperCase()}
+                </div>
+                <span className="text-xs text-gray-400 font-medium">
+                  {isSentFolder ? 'You' : `From ${senderDisplay}`}
+                </span>
+                {roleDisplay && !isSentFolder && (
+                  <span className="text-xs px-1.5 py-0.5 rounded-full bg-white/10 text-gray-500 border border-white/5">{roleDisplay}</span>
+                )}
+              </div>
+              <span className="text-gray-600 text-xs">·</span>
+              <span className="text-xs text-gray-500">{formatDateTime(notif.createdAt)}</span>
+              {notif.updatedAt && (
+                <><span className="text-gray-600 text-xs">·</span>
+                <span className="text-xs text-amber-400/60">edited {formatDateTime(notif.updatedAt)}</span></>
+              )}
+            </div>
+          </div>
+
+          <div className="flex items-center gap-1 flex-shrink-0">
+            {canReply && (
+              <button onClick={(e) => { e.stopPropagation(); setReplyingTo(notif); setReplyMessage(''); setReplyError(null); }}
+                className="px-2 py-1 text-xs rounded-lg bg-indigo-600/20 text-indigo-300 hover:bg-indigo-600/30 border border-indigo-500/30 transition-all">
+                Reply
+              </button>
+            )}
+            {canModify && (
+              <>
+                <div className="relative group">
+                  <button onClick={(e) => { e.stopPropagation(); if (canModify) { setEditingNotification(notif); setEditMessage(notif.message); setEditError(null); } }}
+                    disabled={!canModify}
+                    className={`p-1.5 rounded-lg transition-all ${canModify ? 'hover:bg-white/10 text-gray-400 hover:text-teal-400' : 'text-gray-600 cursor-not-allowed'}`}>
+                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                    </svg>
+                  </button>
+                  {windowExpired && (
+                    <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2 py-1 text-xs text-white bg-gray-800 border border-white/10 rounded-lg whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10">
+                      Edit window expired (24h)
+                    </div>
+                  )}
+                </div>
+                <div className="relative group">
+                  <button onClick={(e) => { e.stopPropagation(); if (canModify) { setDeletingNotification(notif); setDeleteError(null); } }}
+                    disabled={!canModify}
+                    className={`p-1.5 rounded-lg transition-all ${canModify ? 'hover:bg-white/10 text-gray-400 hover:text-red-400' : 'text-gray-600 cursor-not-allowed'}`}>
+                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                    </svg>
+                  </button>
+                  {windowExpired && (
+                    <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2 py-1 text-xs text-white bg-gray-800 border border-white/10 rounded-lg whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10">
+                      Delete window expired (24h)
+                    </div>
+                  )}
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  };
 
   return (
     <div className="page-shell p-6">
@@ -355,17 +525,35 @@ const NotificationsPage: React.FC = () => {
         <div className="flex items-center justify-between mb-8">
           <div>
             <h1 className="text-2xl font-bold text-white flex items-center gap-3">
-              Notifications
-              {unreadCount > 0 && (
+              Messages
+              {unreadCount > 0 && folder === 'inbox' && (
                 <span className="inline-flex items-center justify-center px-2 py-0.5 rounded-full text-xs font-bold bg-indigo-600 text-white min-w-[1.5rem]">
                   {unreadCount}
                 </span>
               )}
             </h1>
-            <p className="text-gray-400 text-sm mt-1">View and manage your messages</p>
+            <p className="text-gray-400 text-sm mt-1">
+              {folder === 'inbox' ? 'Messages you received' : 'Messages you sent'}
+            </p>
           </div>
           <div className="flex items-center gap-3">
-            {unreadCount > 0 && (
+            {canSend && (
+              <div className="flex rounded-xl border border-slate-700 overflow-hidden">
+                <button
+                  onClick={() => setFolder('inbox')}
+                  className={`px-3 py-2 text-sm transition-all ${folder === 'inbox' ? 'bg-indigo-600 text-white' : 'text-gray-400 hover:text-white hover:bg-slate-800'}`}
+                >
+                  Inbox
+                </button>
+                <button
+                  onClick={() => setFolder('sent')}
+                  className={`px-3 py-2 text-sm transition-all ${folder === 'sent' ? 'bg-indigo-600 text-white' : 'text-gray-400 hover:text-white hover:bg-slate-800'}`}
+                >
+                  Sent
+                </button>
+              </div>
+            )}
+            {folder === 'inbox' && unreadCount > 0 && (
               <button
                 onClick={markAllAsRead}
                 className="px-3 py-2 text-sm text-gray-400 hover:text-white border border-slate-700 rounded-xl hover:bg-slate-800 transition-all"
@@ -505,104 +693,49 @@ const NotificationsPage: React.FC = () => {
           </div>
         )}
 
-        {/* Notifications List */}
-        {loading ? (
+        {/* Message List */}
+        {listLoading ? (
           <div className="flex items-center justify-center py-12">
             <svg className="animate-spin h-6 w-6 text-indigo-400" viewBox="0 0 24 24">
               <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
               <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
             </svg>
           </div>
-        ) : notifications.length === 0 ? (
+        ) : displayList.length === 0 ? (
           <div className="text-center py-12">
             <svg className="w-16 h-16 text-gray-600 mx-auto mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
             </svg>
-            <p className="text-gray-400">No notifications yet</p>
+            <p className="text-gray-400">{folder === 'inbox' ? 'No messages in your inbox' : 'No sent messages yet'}</p>
           </div>
         ) : (
           <div className="space-y-3">
-            {notifications.map((notif) => {
-              const senderDisplay = truncateName(notif.senderName || (notif.senderId === null ? 'System' : 'Deleted User'));
-              const roleDisplay = formatRole(notif.senderRole);
-              const isOwn = isOwnNotification(notif);
-              const canModify = isOwn && (!!isAdmin || isWithin24Hours(notif.createdAt));
-              const windowExpired = isOwn && !isAdmin && !isWithin24Hours(notif.createdAt);
-
-              return (
-                <div key={notif.id} onClick={() => !notif.read && markAsRead(notif.id)}
-                  className={`p-4 rounded-xl border transition-all cursor-pointer backdrop-blur-sm ${
-                    notif.read ? 'bg-slate-900/60 border-slate-700/60' : 'bg-slate-900 border-indigo-500/30 hover:border-indigo-500/50'
-                  }`}>
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        {!notif.read && <div className="w-2 h-2 rounded-full bg-indigo-400 flex-shrink-0" />}
-                        <h3 className={`text-sm font-semibold ${notif.read ? 'text-gray-400' : 'text-white'}`}>{notif.title}</h3>
-                        {notif.updatedAt && <span className="text-xs text-amber-400/70 italic">edited</span>}
-                      </div>
-                      <p className={`text-sm mt-1.5 ${notif.read ? 'text-gray-500' : 'text-gray-300'}`}>{notif.message}</p>
-
-                      {/* Sender info + time */}
-                      <div className="flex items-center gap-2 mt-2 flex-wrap">
-                        <div className="flex items-center gap-1.5">
-                          <div className="w-5 h-5 rounded-full bg-indigo-600 flex items-center justify-center text-[10px] font-bold text-white flex-shrink-0">
-                            {senderDisplay.charAt(0).toUpperCase()}
-                          </div>
-                          <span className="text-xs text-gray-400 font-medium">{senderDisplay}</span>
-                          {roleDisplay && (
-                            <span className="text-xs px-1.5 py-0.5 rounded-full bg-white/10 text-gray-500 border border-white/5">{roleDisplay}</span>
-                          )}
-                        </div>
-                        <span className="text-gray-600 text-xs">·</span>
-                        <span className="text-xs text-gray-500">{formatDateTime(notif.createdAt)}</span>
-                        {notif.updatedAt && (
-                          <><span className="text-gray-600 text-xs">·</span>
-                          <span className="text-xs text-amber-400/60">edited {formatDateTime(notif.updatedAt)}</span></>
-                        )}
-                      </div>
-                    </div>
-
-                    {/* Edit / Delete controls */}
-                    {isOwn && (
-                      <div className="flex items-center gap-1 flex-shrink-0">
-                        <div className="relative group">
-                          <button onClick={(e) => { e.stopPropagation(); if (canModify) { setEditingNotification(notif); setEditMessage(notif.message); setEditError(null); } }}
-                            disabled={!canModify}
-                            className={`p-1.5 rounded-lg transition-all ${canModify ? 'hover:bg-white/10 text-gray-400 hover:text-teal-400' : 'text-gray-600 cursor-not-allowed'}`}>
-                            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                            </svg>
-                          </button>
-                          {windowExpired && (
-                            <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2 py-1 text-xs text-white bg-gray-800 border border-white/10 rounded-lg whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10">
-                              Edit window expired (24h)
-                            </div>
-                          )}
-                        </div>
-                        <div className="relative group">
-                          <button onClick={(e) => { e.stopPropagation(); if (canModify) { setDeletingNotification(notif); setDeleteError(null); } }}
-                            disabled={!canModify}
-                            className={`p-1.5 rounded-lg transition-all ${canModify ? 'hover:bg-white/10 text-gray-400 hover:text-red-400' : 'text-gray-600 cursor-not-allowed'}`}>
-                            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                            </svg>
-                          </button>
-                          {windowExpired && (
-                            <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2 py-1 text-xs text-white bg-gray-800 border border-white/10 rounded-lg whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10">
-                              Delete window expired (24h)
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              );
-            })}
+            {displayList.map((notif) => renderMessageCard(notif, folder === 'sent'))}
           </div>
         )}
       </div>
+
+      {/* Reply Modal (class rep) */}
+      {replyingTo && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setReplyingTo(null)} />
+          <div className="relative w-full max-w-lg bg-slate-800/95 backdrop-blur-xl border border-white/10 rounded-2xl p-6 shadow-2xl">
+            <h2 className="text-lg font-semibold text-white mb-1">Reply to {replyingTo.senderName}</h2>
+            <p className="text-xs text-gray-500 mb-4">Your reply goes only to this teacher.</p>
+            {replyError && <div className="mb-4 p-3 bg-red-500/20 border border-red-400/30 rounded-xl"><p className="text-sm text-red-300">{replyError}</p></div>}
+            <textarea value={replyMessage} onChange={(e) => setReplyMessage(e.target.value)} rows={4} maxLength={1000}
+              className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/40 transition-all resize-none"
+              placeholder="Type your reply..." />
+            <div className="flex gap-3 justify-end mt-4">
+              <button onClick={() => setReplyingTo(null)} className="px-4 py-2 text-sm font-medium text-gray-300 bg-white/5 border border-white/10 rounded-xl hover:bg-white/10 transition-all">Cancel</button>
+              <button onClick={handleReply} disabled={replyLoading || !replyMessage.trim()}
+                className="px-4 py-2 text-sm font-semibold text-white bg-indigo-600 rounded-xl hover:bg-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed transition-all">
+                {replyLoading ? 'Sending...' : 'Send Reply'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Edit Modal */}
       {editingNotification && (

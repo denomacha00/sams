@@ -21,6 +21,7 @@ export type Permission =
   | 'mark:attendance'
   | 'view:reports'
   | 'manage:timetable'
+  | 'view:timetable'
   | 'view:risk'
   | 'manage:payments'
   | 'manage:knowledge'
@@ -30,10 +31,10 @@ export type Permission =
 
 export const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
   [UserRole.SUPER_ADMIN]:  ['super:admin', 'view:reports'],
-  [UserRole.SCHOOL_ADMIN]: ['manage:users', 'manage:timetable', 'view:reports', 'view:risk', 'manage:payments', 'manage:knowledge'],
-  [UserRole.HOD]:          ['manage:users', 'manage:timetable', 'view:reports', 'view:risk', 'manage:knowledge'],
-  [UserRole.TEACHER]:      ['start:session', 'mark:attendance', 'view:reports', 'manage:knowledge'],
-  [UserRole.STUDENT]:      ['view:reports'],
+  [UserRole.SCHOOL_ADMIN]: ['manage:users', 'view:timetable', 'view:reports', 'view:risk', 'manage:payments', 'manage:knowledge'],
+  [UserRole.HOD]:          ['manage:users', 'manage:timetable', 'view:timetable', 'view:reports', 'view:risk', 'manage:knowledge'],
+  [UserRole.TEACHER]:      ['start:session', 'mark:attendance', 'view:timetable', 'view:reports', 'manage:knowledge'],
+  [UserRole.STUDENT]:      ['view:reports', 'view:timetable'],
 };
 
 // ─── requirePermission ────────────────────────────────────────────────────────

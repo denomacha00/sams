@@ -3,6 +3,7 @@ import { useNavigate, Link, useSearchParams } from 'react-router-dom';
 import { useAuthStore } from '../store/authStore';
 import apiClient from '../services/apiClient';
 import { UserRole } from '@sams/shared';
+import { redirectToSuperAdminPortal } from '../utils/superAdminPortal';
 
 const LoginPage: React.FC = () => {
   const [identifier, setIdentifier] = useState('');
@@ -27,19 +28,32 @@ const LoginPage: React.FC = () => {
     return () => clearInterval(t);
   }, [resendCooldown]);
 
-  const getRoleRedirect = useCallback((role: UserRole): string => {
+  const getRoleRedirect = useCallback((role: UserRole): string | null => {
+    if (role === UserRole.SUPER_ADMIN) return null;
     if (redirectTo && redirectTo.startsWith('/') && !redirectTo.startsWith('//')) {
       return redirectTo;
     }
     return '/dashboard';
   }, [redirectTo]);
 
+  const navigateAfterAuth = useCallback(
+    (role: UserRole) => {
+      if (role === UserRole.SUPER_ADMIN) {
+        redirectToSuperAdminPortal();
+        return;
+      }
+      const path = getRoleRedirect(role);
+      if (path) navigate(path, { replace: true });
+    },
+    [getRoleRedirect, navigate],
+  );
+
   useEffect(() => {
     if (isAuthenticated) {
       const user = useAuthStore.getState().user;
-      navigate(user ? getRoleRedirect(user.role) : '/dashboard', { replace: true });
+      if (user) navigateAfterAuth(user.role);
     }
-  }, [isAuthenticated, navigate, getRoleRedirect]);
+  }, [isAuthenticated, navigateAfterAuth]);
 
   // Check if WebAuthn is available in this browser
   const webauthnAvailable = typeof window !== 'undefined' && !!window.PublicKeyCredential;
@@ -103,7 +117,7 @@ const LoginPage: React.FC = () => {
       // Step 4: Store tokens and redirect
       if (authResult.token) {
         useAuthStore.getState().setAuth(authResult.user, authResult.token, authResult.refreshToken);
-        navigate(getRoleRedirect(authResult.user.role), { replace: true });
+        navigateAfterAuth(authResult.user.role);
       }
     } catch (err: any) {
       if (err.name === 'NotAllowedError') {
@@ -116,7 +130,7 @@ const LoginPage: React.FC = () => {
     } finally {
       setWebauthnLoading(false);
     }
-  }, [webauthnAvailable, navigate, getRoleRedirect]);
+  }, [webauthnAvailable, navigateAfterAuth]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -124,7 +138,7 @@ const LoginPage: React.FC = () => {
     try {
       await login(identifier, password);
       const user = useAuthStore.getState().user;
-      if (user) navigate(getRoleRedirect(user.role), { replace: true });
+      if (user) navigateAfterAuth(user.role);
     } catch (err: any) {
       if (err.message === 'OTP_REQUIRED') {
         setOtpChallenge(err.otpChallenge);
@@ -141,7 +155,7 @@ const LoginPage: React.FC = () => {
     try {
       await verifyLoginOtp(otpChallenge, otpCode, identifier);
       const user = useAuthStore.getState().user;
-      if (user) navigate(getRoleRedirect(user.role), { replace: true });
+      if (user) navigateAfterAuth(user.role);
     } catch { /* error in store */ }
   };
 

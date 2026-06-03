@@ -49,6 +49,7 @@ const updateUserSchema = z.object({
   departmentId: z.string().optional(),
   classId: z.string().optional(),
   isLocked: z.boolean().optional(),
+  isClassRep: z.boolean().optional(),
 });
 
 const generateLinkSchema = z.object({
@@ -98,6 +99,7 @@ usersRouter.get('/me', async (req: Request, res: Response, next: NextFunction): 
         schoolId: true,
         departmentId: true,
         classId: true,
+        isClassRep: true,
         _count: { select: { webauthnCredentials: true } },
         biometricTemplate: { select: { id: true } },
       },

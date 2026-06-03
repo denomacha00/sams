@@ -9,6 +9,7 @@ import SchoolsListPage from './pages/SchoolsListPage';
 import RevenuePage from './pages/RevenuePage';
 import AuditLogPage from './pages/AuditLogPage';
 import KnowledgeBasePage from './pages/KnowledgeBasePage';
+import SettingsPage from './pages/SettingsPage';
 import { useAuthStore } from './store/authStore';
 
 const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
@@ -39,7 +40,7 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
             to="/licenses"
             className="block px-4 py-2 text-gray-300 hover:bg-gray-700 hover:text-white rounded-lg transition-colors"
           >
-            License Generator
+            License Management
           </Link>
           <Link
             to="/schools"
@@ -64,6 +65,12 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
             className="block px-4 py-2 text-gray-300 hover:bg-gray-700 hover:text-white rounded-lg transition-colors"
           >
             Knowledge Base
+          </Link>
+          <Link
+            to="/settings"
+            className="block px-4 py-2 text-gray-300 hover:bg-gray-700 hover:text-white rounded-lg transition-colors"
+          >
+            Settings
           </Link>
         </nav>
         <div className="p-4 border-t border-gray-700">
@@ -138,6 +145,14 @@ function App(): React.ReactElement {
           element={
             <Layout>
               <KnowledgeBasePage />
+            </Layout>
+          }
+        />
+        <Route
+          path="/settings"
+          element={
+            <Layout>
+              <SettingsPage />
             </Layout>
           }
         />

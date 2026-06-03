@@ -25,6 +25,11 @@ const editNotificationSchema = z.object({
   message: z.string().min(1).max(1000),
 });
 
+const replyNotificationSchema = z.object({
+  parentNotificationId: z.string().min(1),
+  message: z.string().min(1).max(1000),
+});
+
 const testSmsSchema = z.object({
   phone: z.string().min(9).max(20),
   message: z.string().min(1).max(160).optional(),
@@ -38,6 +43,46 @@ const testEmailSchema = z.object({
 // ─── Router ───────────────────────────────────────────────────────────────────
 
 export const notificationsRouter = Router();
+
+/** Resolve human-readable target scope label for a notification batch. */
+async function resolveTargetScopeLabel(
+  scope: string | null | undefined,
+  targetId: string | null | undefined,
+  targetRole: string | null | undefined,
+): Promise<string> {
+  let label = 'Message';
+  if (scope === 'school') {
+    label = 'Whole School';
+  } else if (scope === 'department' && targetId) {
+    const dept = await prisma.department.findUnique({ where: { id: targetId }, select: { name: true } });
+    label = dept ? `Department: ${dept.name}` : 'Department';
+  } else if (scope === 'class' && targetId) {
+    const cls = await prisma.class.findUnique({ where: { id: targetId }, select: { name: true } });
+    label = cls ? `Class: ${cls.name}` : 'Class';
+  } else if (scope) {
+    label = scope.charAt(0).toUpperCase() + scope.slice(1);
+  }
+  if (targetRole) {
+    label += ` (${targetRole.replace('_', ' ').toLowerCase()}s)`;
+  }
+  return label;
+}
+
+/** Teachers assigned to a student's class (class teacher + timetable). */
+async function getTeachersForClass(classId: string): Promise<string[]> {
+  const teacherIds = new Set<string>();
+  const cls = await prisma.class.findUnique({
+    where: { id: classId },
+    select: { classTeacherId: true },
+  });
+  if (cls?.classTeacherId) teacherIds.add(cls.classTeacherId);
+  const entries = await prisma.timetableEntry.findMany({
+    where: { classId },
+    select: { teacherId: true },
+  });
+  for (const e of entries) teacherIds.add(e.teacherId);
+  return [...teacherIds];
+}
 
 /**
  * GET /api/v1/notifications/sms-status
@@ -189,7 +234,8 @@ notificationsRouter.get('/sent', async (req: Request, res: Response): Promise<vo
         const recipientCount = n.batchId
           ? await prisma.notification.count({ where: { batchId: n.batchId } })
           : 1;
-        return { ...n, recipientCount };
+        const targetScopeLabel = await resolveTargetScopeLabel(n.scope, n.targetId, n.targetRole);
+        return { ...n, recipientCount, targetScopeLabel };
       }),
     );
 
@@ -228,7 +274,8 @@ notificationsRouter.get('/', async (req: Request, res: Response): Promise<void> 
       senders.map((s) => [s.id, { name: s.fullName, role: s.role }]),
     );
 
-    const enriched = notifications.map((n) => {
+    const enriched = await Promise.all(
+      notifications.map(async (n) => {
       let senderName: string;
       let senderRole: string | null = null;
 
@@ -244,8 +291,11 @@ notificationsRouter.get('/', async (req: Request, res: Response): Promise<void> 
         }
       }
 
-      return { ...n, senderName, senderRole };
-    });
+      const targetScopeLabel = await resolveTargetScopeLabel(n.scope, n.targetId, n.targetRole);
+
+      return { ...n, senderName, senderRole, targetScopeLabel };
+    }),
+    );
 
     res.status(200).json(enriched);
   } catch (err) {
@@ -328,12 +378,13 @@ notificationsRouter.patch('/:id', async (req: Request, res: Response): Promise<v
     const notification = await prisma.notification.findUnique({ where: { id } });
     if (!notification) throw new AppError(404, 'NOT_FOUND', 'Notification not found');
 
-    const isAdmin = req.user.role === 'SCHOOL_ADMIN' || req.user.role === 'HOD';
-    if (!isAdmin && notification.senderId !== req.user.sub) {
+    // Only the original sender may edit their message (not HOD/admin on others' messages)
+    if (notification.senderId !== req.user.sub) {
       throw new AppError(403, 'FORBIDDEN', 'You can only edit notifications you sent');
     }
 
-    if (!isAdmin) {
+    const isSchoolAdmin = req.user.role === 'SCHOOL_ADMIN';
+    if (!isSchoolAdmin) {
       const hoursSince = (Date.now() - notification.createdAt.getTime()) / (1000 * 60 * 60);
       if (hoursSince > 24) {
         throw new AppError(403, 'WINDOW_EXPIRED', 'Notifications can only be edited within 24 hours of sending');
@@ -390,20 +441,20 @@ notificationsRouter.delete('/batch/:batchId', async (req: Request, res: Response
     const batchNotification = await prisma.notification.findFirst({ where: { batchId } });
     if (!batchNotification) throw new AppError(404, 'NOT_FOUND', 'Batch not found');
 
-    const isAdmin = req.user.role === 'SCHOOL_ADMIN' || req.user.role === 'HOD';
-    if (!isAdmin && batchNotification.senderId !== req.user.sub) {
+    if (batchNotification.senderId !== req.user.sub) {
       throw new AppError(403, 'FORBIDDEN', 'You can only delete notifications you sent');
     }
 
-    if (!isAdmin) {
+    const isSchoolAdmin = req.user.role === 'SCHOOL_ADMIN';
+    if (!isSchoolAdmin) {
       const hoursSince = (Date.now() - batchNotification.createdAt.getTime()) / (1000 * 60 * 60);
       if (hoursSince > 24) {
         throw new AppError(403, 'WINDOW_EXPIRED', 'Notifications can only be deleted within 24 hours of sending');
       }
     }
 
-    if (isAdmin) {
-      await prisma.notification.deleteMany({ where: { batchId } });
+    if (isSchoolAdmin) {
+      await prisma.notification.deleteMany({ where: { batchId, senderId: req.user.sub } });
     } else {
       await prisma.notification.deleteMany({ where: { batchId, senderId: req.user.sub } });
     }
@@ -427,11 +478,18 @@ notificationsRouter.delete('/:id', async (req: Request, res: Response): Promise<
 
     if (!notification) throw new AppError(404, 'NOT_FOUND', 'Notification not found');
 
-    const isAdmin = req.user.role === 'SCHOOL_ADMIN' || req.user.role === 'HOD';
+    const isSchoolAdmin = req.user.role === 'SCHOOL_ADMIN';
     const isRecipient = notification.userId === req.user.sub;
     const isSender = notification.senderId === req.user.sub;
 
-    if (!isAdmin && !isRecipient && !isSender) {
+    // Recipients may remove from their inbox; senders use batch delete for outbound messages
+    if (isRecipient && !isSender) {
+      await prisma.notification.delete({ where: { id } });
+      res.status(204).send();
+      return;
+    }
+
+    if (!isSchoolAdmin && !isSender) {
       throw new AppError(403, 'FORBIDDEN', 'You cannot delete this notification');
     }
 
@@ -440,6 +498,83 @@ notificationsRouter.delete('/:id', async (req: Request, res: Response): Promise<
   } catch (err) {
     if (err instanceof AppError) throw err;
     throw new AppError(500, 'INTERNAL_ERROR', 'Failed to delete notification');
+  }
+});
+
+/**
+ * POST /api/v1/notifications/reply
+ * Class representatives may reply to teachers who teach their class.
+ */
+notificationsRouter.post('/reply', async (req: Request, res: Response): Promise<void> => {
+  try {
+    if (req.user.role !== 'STUDENT') {
+      throw new AppError(403, 'FORBIDDEN', 'Only students can use direct reply');
+    }
+
+    const student = await prisma.user.findUnique({
+      where: { id: req.user.sub },
+      select: { isClassRep: true, classId: true, fullName: true },
+    });
+    if (!student?.isClassRep) {
+      throw new AppError(403, 'FORBIDDEN', 'Only class representatives can reply to teachers');
+    }
+    if (!student.classId) {
+      throw new AppError(403, 'FORBIDDEN', 'You are not assigned to a class');
+    }
+
+    const parsed = replyNotificationSchema.safeParse(req.body);
+    if (!parsed.success) {
+      res.status(400).json({ error: 'Validation failed', code: 'VALIDATION_ERROR', details: parsed.error.flatten().fieldErrors });
+      return;
+    }
+
+    const { parentNotificationId, message } = parsed.data;
+    const parent = await prisma.notification.findUnique({ where: { id: parentNotificationId } });
+    if (!parent || parent.userId !== req.user.sub) {
+      throw new AppError(404, 'NOT_FOUND', 'Message not found');
+    }
+    if (!parent.senderId) {
+      throw new AppError(400, 'VALIDATION_ERROR', 'Cannot reply to system messages');
+    }
+
+    const allowedTeachers = await getTeachersForClass(student.classId);
+    if (!allowedTeachers.includes(parent.senderId)) {
+      throw new AppError(403, 'FORBIDDEN', 'You can only reply to teachers who teach your class');
+    }
+
+    const batchId = createId();
+    const title = `Reply from ${student.fullName} (Class Rep)`;
+
+    await prisma.notification.create({
+      data: {
+        schoolId: req.schoolId,
+        userId: parent.senderId,
+        senderId: req.user.sub,
+        batchId,
+        title,
+        message,
+        type: 'MESSAGE',
+        scope: 'class',
+        targetId: student.classId,
+        targetRole: 'TEACHER',
+      },
+    });
+
+    res.status(200).json({ success: true, batchId });
+
+    setImmediate(() => {
+      io.to(`user:${parent.senderId}`).emit('notification:new', {
+        title,
+        message,
+        type: 'MESSAGE',
+        senderId: req.user.sub,
+        batchId,
+        timestamp: new Date().toISOString(),
+      });
+    });
+  } catch (err) {
+    if (err instanceof AppError) throw err;
+    throw new AppError(500, 'INTERNAL_ERROR', 'Failed to send reply');
   }
 });
 
@@ -567,6 +702,9 @@ notificationsRouter.post('/send', async (req: Request, res: Response): Promise<v
         title,
         message,
         type: 'MESSAGE',
+        scope,
+        targetId: targetId ?? null,
+        targetRole: targetRole ?? null,
       }));
       for (let i = 0; i < rows.length; i += NOTIFICATION_INSERT_CHUNK) {
         await prisma.notification.createMany({

@@ -1162,7 +1162,7 @@ async function handleSessionStatus(scope: QueryScope): Promise<AIQueryResult> {
 
 // ─── About SAMS Handler ───────────────────────────────────────────────────────
 
-function handleAboutSams(): AIQueryResult {
+async function handleAboutSams(user: AccessTokenPayload): Promise<AIQueryResult> {
   const answer = `🎓 **SAMS — Smart Attendance Management System**
 
 SAMS is a multi-school platform designed for Kenyan educational institutions to streamline attendance tracking and school management.
@@ -1194,8 +1194,22 @@ SAMS is a multi-school platform designed for Kenyan educational institutions to 
 
 Developed by Denis Macharia for Kenyan schools. Ask me anything specific!`;
 
+  let knowledgeAppendix = '';
+  if (user.sub !== 'guest' && user.schoolId && user.schoolId !== 'none') {
+    try {
+      const { knowledgeService } = await import('../knowledgeService');
+      const entries = await knowledgeService.getForAIContext(user);
+      if (entries.length > 0) {
+        knowledgeAppendix = '\n\n**School policies & documentation:**\n' +
+          entries.map((e) => `• **${e.title}**: ${e.content}`).join('\n');
+      }
+    } catch {
+      // continue without scoped knowledge
+    }
+  }
+
   return {
-    answer,
+    answer: answer + knowledgeAppendix,
     intent: 'about_sams',
   };
 }
@@ -1478,10 +1492,18 @@ ${planBreakdown || '  • No schools registered yet'}`;
 
 // ─── Custom Knowledge Handler ─────────────────────────────────────────────────
 
-async function handleCustomKnowledge(): Promise<AIQueryResult> {
-  const entries = await prisma.aIKnowledge.findMany({
-    orderBy: { createdAt: 'desc' },
-  });
+async function handleCustomKnowledge(user: AccessTokenPayload): Promise<AIQueryResult> {
+  let entries: Array<{ title: string; content: string; category: string }> = [];
+  if (user.sub !== 'guest' && user.schoolId && user.schoolId !== 'none') {
+    const { knowledgeService } = await import('../knowledgeService');
+    entries = await knowledgeService.getForAIContext(user);
+  } else {
+    entries = await prisma.aIKnowledge.findMany({
+      where: { createdBy: { role: 'SUPER_ADMIN' } },
+      select: { title: true, content: true, category: true },
+      orderBy: { createdAt: 'desc' },
+    });
+  }
 
   if (entries.length === 0) {
     return {
@@ -1519,13 +1541,13 @@ export async function localQuery(
   try {
     switch (intent) {
       case 'about_sams':
-        return handleAboutSams();
+        return await handleAboutSams(user);
       case 'super_admin_help':
         return handleSuperAdminHelp(question);
       case 'system_stats':
         return await handleSystemStats();
       case 'custom_knowledge':
-        return await handleCustomKnowledge();
+        return await handleCustomKnowledge(user);
       case 'attendance_percentage':
         return await handleAttendancePercentage(scope);
       case 'absent_students':
