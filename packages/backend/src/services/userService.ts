@@ -167,6 +167,42 @@ export class UserService {
   }
 
   /**
+   * Assign or remove class representative flag (students only).
+   * At most one class rep per class when enabling.
+   */
+  async setClassRep(schoolId: string, studentId: string, isClassRep: boolean) {
+    const user = await prisma.user.findUnique({ where: { id: studentId } });
+    if (!user || user.schoolId !== schoolId) {
+      throw new AppError(404, 'USER_NOT_FOUND', 'User not found');
+    }
+    if (user.role !== UserRole.STUDENT) {
+      throw new AppError(400, 'VALIDATION_ERROR', 'Only students can be class representatives');
+    }
+    if (!user.classId) {
+      throw new AppError(400, 'VALIDATION_ERROR', 'Student must be assigned to a class');
+    }
+
+    if (isClassRep) {
+      await prisma.user.updateMany({
+        where: {
+          schoolId,
+          classId: user.classId,
+          role: UserRole.STUDENT,
+          isClassRep: true,
+          NOT: { id: studentId },
+        },
+        data: { isClassRep: false },
+      });
+    }
+
+    const updated = await prisma.user.update({
+      where: { id: studentId },
+      data: { isClassRep },
+    });
+    return excludePasswordHash(updated);
+  }
+
+  /**
    * Delete a user. Asserts school ownership before deleting.
    *
    * Requirements: 4.3

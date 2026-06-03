@@ -12,6 +12,11 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT"
 
+NODE_MAJOR="$(node -p "process.versions.node.split('.')[0]" 2>/dev/null || echo 0)"
+if [[ "$NODE_MAJOR" -lt 20 ]]; then
+  echo "WARN: Node $(node -v) — SAMS requires Node 20+ (see .nvmrc). Run: nvm use" >&2
+fi
+
 echo "==> SAMS production deploy ($(date -Iseconds))"
 
 # Clean match to GitHub main (avoids dist merge conflicts)
@@ -99,3 +104,9 @@ sudo systemctl reload nginx
 echo "==> Deploy finished successfully"
 echo "    App:         https://app.smart-managment.com"
 echo "    Super Admin: https://super.smart-managment.com"
+
+echo "==> Running post-deploy verification"
+bash "$ROOT/scripts/post-deploy-verify.sh" || {
+  echo "WARN: Post-deploy verification reported issues (see above)" >&2
+  exit 1
+}

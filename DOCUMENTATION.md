@@ -412,7 +412,7 @@ Can execute via natural language:
 
 ### Server Setup
 - VPS: 185.143.228.182 (Ubuntu)
-- Node.js v18
+- Node.js v20+ (see repo `.nvmrc`; run `nvm use` on the VPS)
 - PostgreSQL 15
 - Redis 7
 - PM2 process manager
@@ -421,11 +421,9 @@ Can execute via natural language:
 ### Deploy Commands
 ```bash
 cd /var/www/sams
-git pull origin main
-cd packages/backend && npm run build
-cd /var/www/sams/packages/frontend && npm run build
-cd /var/www/sams && pm2 reload sams-api --update-env
-pm2 save
+nvm use   # Node 20 per .nvmrc
+bash scripts/deploy-production.sh
+bash scripts/post-deploy-verify.sh   # optional smoke check (also runs at end of deploy)
 ```
 
 > Use `pm2 reload` (not `pm2 restart`) for zero-downtime deploys. The backend signals PM2 with `process.send('ready')` after startup, and `wait_ready: true` in ecosystem.config.js ensures the old instance is only killed after the new one is healthy.

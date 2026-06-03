@@ -294,6 +294,84 @@ usersRouter.get('/', requirePermission('manage:users'), async (req: Request, res
   }
 });
 
+const classRepSchema = z.object({ isClassRep: z.boolean() });
+
+/**
+ * GET /api/v1/users/class-roster
+ * Teachers: students in assigned class. HOD: students in department (optional classId query).
+ */
+usersRouter.get('/class-roster', async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+  try {
+    const role = req.user.role;
+    const filters: { role?: UserRole; departmentId?: string; classId?: string } = {
+      role: UserRole.STUDENT,
+    };
+
+    if (role === UserRole.TEACHER) {
+      if (!req.user.classId) {
+        res.status(200).json([]);
+        return;
+      }
+      filters.classId = req.user.classId;
+    } else if (role === UserRole.HOD) {
+      if (!req.user.departmentId) {
+        res.status(200).json([]);
+        return;
+      }
+      filters.departmentId = req.user.departmentId;
+      if (typeof req.query.classId === 'string') filters.classId = req.query.classId;
+    } else if (role === UserRole.SCHOOL_ADMIN) {
+      if (typeof req.query.classId === 'string') filters.classId = req.query.classId;
+      if (typeof req.query.departmentId === 'string') filters.departmentId = req.query.departmentId;
+    } else {
+      throw new AppError(403, 'FORBIDDEN', 'Only teachers, HODs, and school admins can view class roster');
+    }
+
+    const users = await userService.listUsers(req.schoolId, filters);
+    res.status(200).json(users);
+  } catch (err) {
+    next(err instanceof AppError ? err : new AppError(500, 'INTERNAL_ERROR', 'Failed to load class roster'));
+  }
+});
+
+/**
+ * PATCH /api/v1/users/:id/class-rep
+ * Assign class representative (one per class). Teachers: own class only.
+ */
+usersRouter.patch('/:id/class-rep', async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+  const parsed = classRepSchema.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({
+      error: 'Validation failed',
+      code: 'VALIDATION_ERROR',
+      details: parsed.error.flatten().fieldErrors,
+    });
+    return;
+  }
+
+  try {
+    const target = await userService.getUser(req.schoolId, req.params.id as string);
+    const role = req.user.role;
+
+    if (role === UserRole.TEACHER) {
+      if (!req.user.classId || (target as { classId?: string }).classId !== req.user.classId) {
+        throw new AppError(403, 'FORBIDDEN', 'Teachers can only assign class rep for students in their class');
+      }
+    } else if (role === UserRole.HOD) {
+      if (!req.user.departmentId || (target as { departmentId?: string }).departmentId !== req.user.departmentId) {
+        throw new AppError(403, 'FORBIDDEN', 'HODs can only assign class rep in their department');
+      }
+    } else if (role !== UserRole.SCHOOL_ADMIN) {
+      throw new AppError(403, 'FORBIDDEN', 'Not allowed to assign class representative');
+    }
+
+    const user = await userService.setClassRep(req.schoolId, req.params.id as string, parsed.data.isClassRep);
+    res.status(200).json(user);
+  } catch (err) {
+    next(err instanceof AppError ? err : new AppError(500, 'INTERNAL_ERROR', 'Failed to update class rep'));
+  }
+});
+
 /**
  * POST /api/v1/users
  * Create a new user within the school.

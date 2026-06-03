@@ -11,6 +11,7 @@ import LoginPage from './pages/LoginPage';
 import ForgotPasswordPage from './pages/ForgotPasswordPage';
 import ResetPasswordPage from './pages/ResetPasswordPage';
 import ClassStudentsPage from './pages/ClassStudentsPage';
+import ClassRosterPage from './pages/ClassRosterPage';
 import ActivationPage from './pages/ActivationPage';
 import RegisterPage from './pages/RegisterPage';
 import DashboardPage from './pages/DashboardPage';
@@ -93,6 +94,7 @@ ReactDOM.createRoot(document.getElementById('root') as HTMLElement).render(
           <Route path="/attendance" element={<ManualAttendancePage />} />
           <Route path="/biometric/attendance" element={<BiometricAttendancePage />} />
           <Route path="/class/students" element={<ClassStudentsPage />} />
+          <Route path="/class-roster" element={<ClassRosterPage />} />
           <Route path="/admin/knowledge" element={<KnowledgeManagementPage />} />
         </Route>
 

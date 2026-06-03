@@ -480,6 +480,7 @@ function getQuickActions(role?: UserRole): QuickAction[] {
         { to: '/timetable', label: 'View Timetable', icon: ICONS.calendar, gradient: 'from-orange-500 to-amber-500' },
         { to: '/admin/departments', label: 'Departments', icon: ICONS.building, gradient: 'from-green-500 to-emerald-500' },
         { to: '/admin/knowledge', label: 'Knowledge Base', icon: ICONS.book, gradient: 'from-amber-500 to-yellow-500' },
+        { to: '/class-roster', label: 'Class Roster', icon: ICONS.users, gradient: 'from-amber-500 to-orange-500' },
         { to: '/notifications', label: 'Messages', icon: ICONS.bell, gradient: 'from-rose-500 to-red-500' },
         { to: '/ai', label: 'AI Assistant', icon: ICONS.ai, gradient: 'from-violet-500 to-purple-500' },
       ];
@@ -487,6 +488,7 @@ function getQuickActions(role?: UserRole): QuickAction[] {
       return [
         { to: '/sessions', label: 'Start Session', icon: ICONS.session, gradient: 'from-indigo-600 to-slate-700' },
         { to: '/class/students', label: 'My Students', icon: ICONS.users, gradient: 'from-slate-600 to-indigo-600' },
+        { to: '/class-roster', label: 'Class Roster', icon: ICONS.users, gradient: 'from-amber-500 to-orange-500' },
         { to: '/attendance', label: 'Mark Attendance', icon: ICONS.clipboard, gradient: 'from-indigo-600 to-slate-700' },
         { to: '/admin/links', label: 'Registration Links', icon: ICONS.link, gradient: 'from-emerald-500 to-teal-500' },
         { to: '/reports', label: 'View Reports', icon: ICONS.chart, gradient: 'from-indigo-600 to-slate-700' },
@@ -512,6 +514,7 @@ function getQuickActions(role?: UserRole): QuickAction[] {
         { to: '/risk-scores', label: 'Risk Scores', icon: ICONS.warning, gradient: 'from-orange-500 to-red-500' },
         { to: '/admin/links', label: 'Registration Links', icon: ICONS.link, gradient: 'from-emerald-500 to-teal-500' },
         { to: '/admin/users', label: 'Manage Users', icon: ICONS.users, gradient: 'from-blue-500 to-indigo-500' },
+        { to: '/class-roster', label: 'Class Roster', icon: ICONS.users, gradient: 'from-amber-500 to-orange-500' },
         { to: '/admin/timetable', label: 'Timetable', icon: ICONS.calendar, gradient: 'from-purple-500 to-pink-500' },
         { to: '/admin/knowledge', label: 'Knowledge Base', icon: ICONS.book, gradient: 'from-amber-500 to-yellow-500' },
         { to: '/notifications', label: 'Messages', icon: ICONS.bell, gradient: 'from-rose-500 to-red-500' },
