@@ -132,6 +132,21 @@ verify_backend_dist
 echo "==> Database & super admin bootstrap"
 cd "$ROOT/packages/backend"
 npx prisma generate
+# Existing VPS DBs (db push / incremental migrations only): mark init as applied once.
+if [[ -f "$ENV_FILE" ]]; then
+  set -a
+  # shellcheck disable=SC1090
+  source "$ENV_FILE"
+  set +a
+fi
+if [[ -n "${DATABASE_URL:-}" ]] && command -v psql >/dev/null 2>&1; then
+  if psql "$DATABASE_URL" -tAc "SELECT 1 FROM information_schema.tables WHERE table_schema='public' AND table_name='User' LIMIT 1" 2>/dev/null | grep -q 1; then
+    if ! psql "$DATABASE_URL" -tAc "SELECT 1 FROM _prisma_migrations WHERE migration_name='20240101000000_init' LIMIT 1" 2>/dev/null | grep -q 1; then
+      echo "==> Baselining 20240101000000_init on existing database"
+      npx prisma migrate resolve --applied 20240101000000_init
+    fi
+  fi
+fi
 npx prisma migrate deploy
 npm run create-super-admin || true
 cd "$ROOT"
