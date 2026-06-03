@@ -17,6 +17,25 @@ interface School {
   };
 }
 
+interface SchoolDetail extends School {
+  logoUrl: string | null;
+  primaryColor: string | null;
+  updatedAt: string;
+  stats: {
+    totalUsers: number;
+    totalSessions: number;
+    totalPayments: number;
+  };
+  recentPayments: Array<{
+    id: string;
+    amount: number;
+    planTier: string;
+    status: string;
+    completedAt: string | null;
+    mpesaReceiptNumber: string | null;
+  }>;
+}
+
 const SchoolsListPage: React.FC = () => {
   const [schools, setSchools] = useState<School[]>([]);
   const [loading, setLoading] = useState(true);
@@ -24,6 +43,9 @@ const SchoolsListPage: React.FC = () => {
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [extendModal, setExtendModal] = useState<{ schoolId: string; schoolName: string } | null>(null);
   const [newExpiry, setNewExpiry] = useState('');
+  const [detailModal, setDetailModal] = useState<SchoolDetail | null>(null);
+  const [detailLoading, setDetailLoading] = useState<string | null>(null);
+  const [search, setSearch] = useState('');
 
   const fetchSchools = async () => {
     try {
@@ -81,6 +103,19 @@ const SchoolsListPage: React.FC = () => {
     }
   };
 
+  const handleViewDetail = async (schoolId: string) => {
+    setDetailLoading(schoolId);
+    try {
+      const { data } = await apiClient.get(`/super/schools/${schoolId}`);
+      setDetailModal(data);
+    } catch (err) {
+      console.error('Failed to load school details:', err);
+      alert(getSuperAdminApiError(err, 'Failed to load school details.'));
+    } finally {
+      setDetailLoading(null);
+    }
+  };
+
   const handleExtend = async () => {
     if (!extendModal || !newExpiry) return;
     setActionLoading(extendModal.schoolId);
@@ -106,9 +141,28 @@ const SchoolsListPage: React.FC = () => {
     );
   }
 
+  const filteredSchools = schools.filter((s) => {
+    const q = search.trim().toLowerCase();
+    if (!q) return true;
+    return (
+      s.name.toLowerCase().includes(q) ||
+      s.schoolCode.toLowerCase().includes(q) ||
+      s.planTier.toLowerCase().includes(q)
+    );
+  });
+
   return (
     <div className="space-y-6">
-      <h1 className="text-2xl font-bold text-white">Schools</h1>
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <h1 className="text-2xl font-bold text-white">Schools</h1>
+        <input
+          type="search"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          placeholder="Search by name, code, or plan…"
+          className="w-full sm:w-72 px-4 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white text-sm placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
+        />
+      </div>
 
       {apiError && (
         <div className="bg-red-900/50 border border-red-500 text-red-200 px-4 py-3 rounded-lg text-sm">
@@ -130,9 +184,18 @@ const SchoolsListPage: React.FC = () => {
             </tr>
           </thead>
           <tbody>
-            {schools.map((school) => (
+            {filteredSchools.map((school) => (
               <tr key={school.id} className="border-b border-gray-800 hover:bg-gray-800/50">
-                <td className="px-4 py-3 text-white font-medium">{school.name}</td>
+                <td className="px-4 py-3 text-white font-medium">
+                  <button
+                    type="button"
+                    onClick={() => void handleViewDetail(school.id)}
+                    disabled={detailLoading === school.id}
+                    className="text-left hover:text-blue-300 transition-colors disabled:opacity-50"
+                  >
+                    {school.name}
+                  </button>
+                </td>
                 <td className="px-4 py-3 text-gray-300 font-mono text-sm">{school.schoolCode}</td>
                 <td className="px-4 py-3">
                   <span className="px-2 py-1 text-xs rounded bg-blue-900/50 text-blue-300">
@@ -159,7 +222,14 @@ const SchoolsListPage: React.FC = () => {
                   )}
                 </td>
                 <td className="px-4 py-3">
-                  <div className="flex gap-2">
+                  <div className="flex flex-wrap gap-2">
+                    <button
+                      onClick={() => void handleViewDetail(school.id)}
+                      disabled={detailLoading === school.id}
+                      className="px-3 py-1 text-xs bg-gray-700 hover:bg-gray-600 disabled:opacity-50 text-white rounded transition-colors"
+                    >
+                      View
+                    </button>
                     {school.isSuspended ? (
                       <button
                         onClick={() => handleUnsuspend(school.id)}
@@ -201,6 +271,93 @@ const SchoolsListPage: React.FC = () => {
 
       {schools.length === 0 && (
         <div className="text-center text-gray-400 py-12">No schools registered yet.</div>
+      )}
+      {schools.length > 0 && filteredSchools.length === 0 && (
+        <div className="text-center text-gray-400 py-12">No schools match your search.</div>
+      )}
+
+      {/* School Detail Modal */}
+      {detailModal && (
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
+          <div className="bg-gray-800 rounded-lg w-full max-w-lg border border-gray-700 max-h-[90vh] overflow-y-auto">
+            <div className="p-6 border-b border-gray-700 flex items-start justify-between gap-4">
+              <div>
+                <h3 className="text-lg font-semibold text-white">{detailModal.name}</h3>
+                <p className="text-sm text-gray-400 font-mono mt-1">{detailModal.schoolCode}</p>
+              </div>
+              <button
+                onClick={() => setDetailModal(null)}
+                className="text-gray-400 hover:text-white text-xl leading-none"
+                aria-label="Close"
+              >
+                ×
+              </button>
+            </div>
+            <div className="p-6 space-y-4 text-sm">
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <p className="text-gray-500">Plan</p>
+                  <p className="text-white">{detailModal.planTier}</p>
+                </div>
+                <div>
+                  <p className="text-gray-500">License expires</p>
+                  <p className="text-white">
+                    {new Date(detailModal.licenseExpiresAt).toLocaleDateString()}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-gray-500">Users</p>
+                  <p className="text-white">{detailModal.stats.totalUsers}</p>
+                </div>
+                <div>
+                  <p className="text-gray-500">Sessions</p>
+                  <p className="text-white">{detailModal.stats.totalSessions}</p>
+                </div>
+                <div>
+                  <p className="text-gray-500">Payments</p>
+                  <p className="text-white">{detailModal.stats.totalPayments}</p>
+                </div>
+                <div>
+                  <p className="text-gray-500">Status</p>
+                  <p className="text-white">
+                    {detailModal.isSuspended
+                      ? 'Suspended'
+                      : detailModal.isReadOnly
+                        ? 'Read-only'
+                        : 'Active'}
+                  </p>
+                </div>
+              </div>
+              <div>
+                <p className="text-gray-500 mb-2">Recent successful payments</p>
+                {detailModal.recentPayments.length === 0 ? (
+                  <p className="text-gray-400">None recorded</p>
+                ) : (
+                  <ul className="space-y-2">
+                    {detailModal.recentPayments.map((p) => (
+                      <li
+                        key={p.id}
+                        className="flex justify-between gap-2 bg-gray-900/50 rounded px-3 py-2"
+                      >
+                        <span className="text-gray-300">
+                          KES {p.amount.toLocaleString()} · {p.planTier}
+                        </span>
+                        <span className="text-gray-500 text-xs">
+                          {p.completedAt
+                            ? new Date(p.completedAt).toLocaleDateString()
+                            : '—'}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+              <p className="text-xs text-gray-500">
+                Created {new Date(detailModal.createdAt).toLocaleString()}
+              </p>
+            </div>
+          </div>
+        </div>
       )}
 
       {/* Extend License Modal */}

@@ -59,6 +59,23 @@ export const useAuthStore = create<AuthState>()(
             loading: false,
             error: null,
           });
+
+          try {
+            const profileRes = await apiClient.get('/users/me', {
+              headers: { Authorization: `Bearer ${data.accessToken}` },
+            });
+            const profile = profileRes.data;
+            set({
+              user: {
+                id: profile.id,
+                fullName: profile.fullName,
+                email: profile.email ?? identifier,
+                role: profile.role,
+              },
+            });
+          } catch {
+            // keep JWT-derived profile if /users/me fails
+          }
         } catch (err: unknown) {
           const message = getSuperAdminApiError(
             err,

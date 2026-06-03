@@ -20,24 +20,32 @@ interface RevenueByTier {
   paymentCount: number;
 }
 
+interface SystemStatus {
+  status: 'ok' | 'degraded';
+  checks: { database: boolean; redis: boolean };
+}
+
 const DashboardPage: React.FC = () => {
   const [analytics, setAnalytics] = useState<Analytics | null>(null);
   const [revenue, setRevenue] = useState<{ totalRevenue: number; byPlanTier: RevenueByTier[] }>({
     totalRevenue: 0,
     byPlanTier: [],
   });
+  const [systemStatus, setSystemStatus] = useState<SystemStatus | null>(null);
   const [loading, setLoading] = useState(true);
   const [apiError, setApiError] = useState<string | null>(null);
 
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const [analyticsRes, revenueRes] = await Promise.all([
+        const [analyticsRes, revenueRes, statusRes] = await Promise.all([
           apiClient.get('/super/analytics'),
           apiClient.get('/super/revenue'),
+          apiClient.get('/super/system-status'),
         ]);
         setAnalytics(analyticsRes.data);
         setRevenue(revenueRes.data);
+        setSystemStatus(statusRes.data);
         setApiError(null);
       } catch (err: unknown) {
         setApiError(getSuperAdminApiError(err, 'Failed to load dashboard. Check login and server logs.'));
@@ -63,7 +71,30 @@ const DashboardPage: React.FC = () => {
 
   return (
     <div className="space-y-8">
-      <h1 className="text-2xl font-bold text-white">Dashboard</h1>
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+        <h1 className="text-2xl font-bold text-white">Dashboard</h1>
+        {systemStatus && (
+          <Link
+            to="/settings"
+            className={`inline-flex items-center gap-2 px-3 py-1.5 text-sm rounded-lg border transition-colors ${
+              systemStatus.status === 'ok'
+                ? 'bg-green-900/30 border-green-700 text-green-300 hover:bg-green-900/50'
+                : 'bg-yellow-900/30 border-yellow-700 text-yellow-300 hover:bg-yellow-900/50'
+            }`}
+          >
+            <span
+              className={`w-2 h-2 rounded-full ${
+                systemStatus.status === 'ok' ? 'bg-green-400' : 'bg-yellow-400'
+              }`}
+            />
+            {systemStatus.status === 'ok' ? 'Platform healthy' : 'Platform degraded'}
+            <span className="text-xs opacity-75">
+              DB {systemStatus.checks.database ? '✓' : '✗'} · Redis{' '}
+              {systemStatus.checks.redis ? '✓' : '✗'}
+            </span>
+          </Link>
+        )}
+      </div>
 
       {apiError && (
         <div className="bg-red-900/50 border border-red-500 text-red-200 px-4 py-3 rounded-lg text-sm">
