@@ -68,6 +68,7 @@ function formatDateTime(dateStr: string): string {
 const NotificationsPage: React.FC = () => {
   const user = useAuthStore((s) => s.user);
   const accessToken = useAuthStore((s) => s.accessToken);
+  const updateUser = useAuthStore((s) => s.updateUser);
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [sentMessages, setSentMessages] = useState<SentNotification[]>([]);
   const [folder, setFolder] = useState<Folder>('inbox');
@@ -127,12 +128,21 @@ const NotificationsPage: React.FC = () => {
   const [classes, setClasses] = useState<{ id: string; name: string }[]>([]);
   const [selectedDepartmentId, setSelectedDepartmentId] = useState('');
 
-  // Fetch notifications on mount
+  // Fetch notifications on mount; refresh classId for teachers (JWT may be stale)
   useEffect(() => {
     fetchNotifications();
     if (canSend) fetchScopeData();
     if (user?.role === 'STUDENT') {
       apiClient.get('/users/me').then(({ data }) => setIsClassRep(!!data.isClassRep)).catch(() => {});
+    } else if (user?.role === 'TEACHER') {
+      apiClient.get('/users/me').then(({ data }) => {
+        if (data.classId) {
+          updateUser({ classId: data.classId });
+          setScope('class');
+          setTargetId(data.classId);
+          setTargetRole('STUDENT');
+        }
+      }).catch(() => {});
     }
   }, []);
 
