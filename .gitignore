@@ -52,6 +52,7 @@ secrets/ai.env
 secrets/providers.env.backup.*
 secrets/ai.env.backup.*
 secrets/*.backup.*
+backups/
 
 # Logs
 *.log
