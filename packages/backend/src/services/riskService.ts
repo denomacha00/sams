@@ -1,4 +1,4 @@
-import { prisma } from '../index';
+import { prisma } from '../lib/prisma';
 import { AppError } from '../middleware/errors';
 import { RiskLevel } from '@sams/shared';
 import { notificationService } from './notificationService';

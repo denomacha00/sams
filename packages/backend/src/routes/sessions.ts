@@ -3,7 +3,7 @@ import { z } from 'zod';
 import { UserRole } from '@sams/shared';
 import { requirePermission } from '../middleware/rbac';
 import { sessionService } from '../services/sessionService';
-import { prisma } from '../index';
+import { prisma } from '../lib/prisma';
 import { AppError } from '../middleware/errors';
 
 // ─── Validation Schemas ───────────────────────────────────────────────────────

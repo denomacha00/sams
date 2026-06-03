@@ -1,7 +1,7 @@
 import bcrypt from 'bcrypt';
 import { createId } from '@paralleldrive/cuid2';
 import { UserRole } from '@sams/shared';
-import { prisma } from '../index';
+import { prisma } from '../lib/prisma';
 import { licenseService } from './licenseService';
 import { AppError } from '../middleware/errors';
 import { onboardPhoneForSms, optionalPhoneForStorage } from './phoneOnboardingService';

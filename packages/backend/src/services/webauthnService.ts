@@ -1,5 +1,5 @@
 import crypto from 'crypto';
-import { prisma } from '../index';
+import { prisma } from '../lib/prisma';
 import { AppError } from '../middleware/errors';
 
 // ─── Types ────────────────────────────────────────────────────────────────────

@@ -1,215 +1,25 @@
 import './config/loadEnv';
-import express, { type Request, type Response, type NextFunction } from 'express';
-import { validateProductionSecrets } from './config/secrets';
-import { UPLOADS_ROOT } from './config/uploads';
-import { getAfricasTalkingConfig, isSmsConfigured } from './config/africasTalking';
-import { getSmtpConfig, isEmailConfigured } from './config/email';
+import express from 'express';
 import { createServer } from 'http';
-import { Server as SocketIOServer } from 'socket.io';
-import Redis from 'ioredis';
+import { validateProductionSecrets } from './config/secrets';
+import { isSmsConfigured } from './config/africasTalking';
+import { isEmailConfigured } from './config/email';
 import { prisma } from './lib/prisma';
-import { applyGlobalMiddleware } from './middleware/globalMiddleware';
-import { authenticate } from './middleware/auth';
-import { enforceSchoolScope } from './middleware/rbac';
-import { errorHandler } from './middleware/errors';
-import { authRouter } from './routes/auth';
-import { activationRouter } from './routes/activation';
-import { usersRouter, registrationLinksRouter } from './routes/users';
-import { timetableRouter } from './routes/timetable';
-import { sessionsRouter } from './routes/sessions';
-import { attendanceRouter } from './routes/attendance';
-import { paymentsRouter } from './routes/payments';
-import { reportsRouter } from './routes/reports';
-import { riskScoresRouter } from './routes/riskScores';
-import { superAdminRouter } from './routes/superAdmin';
-import { departmentsRouter, classesRouter } from './routes/departments';
-import { aiRouter } from './routes/ai';
-import { biometricRouter } from './routes/biometric';
-import { notificationsRouter } from './routes/notifications';
-import { knowledgeRouter } from './routes/knowledge';
-import { registerSocketServer } from './lib/socket';
-import { setupAttendanceSocket } from './sockets/attendanceSocket';
-import { startQRRefreshJob, stopQRRefreshJob } from './jobs/qrRefresh';
-import { startNotificationJob, stopNotificationJob } from './jobs/notifications';
-import { getNotificationService } from './services/notificationService';
-
-// ─── App & HTTP Server ────────────────────────────────────────────────────────
+import { redis } from './lib/redis';
+import { setApiReady } from './apiState';
 
 const app = express();
 const httpServer = createServer(app);
-
-// ─── Global Middleware ────────────────────────────────────────────────────────
-
-applyGlobalMiddleware(app);
-
-// Serve uploaded assets (avatars) from disk.
-app.use('/uploads', express.static(UPLOADS_ROOT));
-
-// ─── Public API routes (no auth required) ────────────────────────────────────
-// These are registered before the global auth guard so they remain accessible
-// without a Bearer token.
-//
-//   POST /api/v1/auth/login
-//   POST /api/v1/auth/refresh
-//   POST /api/v1/activate
-//
-// Route modules will be mounted here as they are implemented (Task 4.5, 5.2).
-
-// ─── Global auth + school-scope guard for /api/v1 ────────────────────────────
-// Every request to /api/v1/* that is NOT one of the public paths above must
-// carry a valid Bearer token. `authenticate` verifies the JWT and attaches
-// `req.user`; `enforceSchoolScope` copies `req.user.schoolId` → `req.schoolId`
-// so all downstream DB queries are automatically tenant-scoped.
-//
-// Public paths are excluded via a simple path-prefix check so they never reach
-// the auth middleware.
-
-const PUBLIC_PATHS = [
-  '/api/v1/auth/login',
-  '/api/v1/auth/refresh',
-  '/api/v1/auth/forgot-password',
-  '/api/v1/auth/reset-password',
-  '/api/v1/auth/verify-otp',
-  '/api/v1/auth/forgot-password-otp',
-  '/api/v1/auth/reset-password-otp',
-  '/api/v1/auth/webauthn/authenticate/options',
-  '/api/v1/auth/webauthn/authenticate/verify',
-  '/api/v1/activate',
-  '/api/v1/payments/callback',
-  '/api/v1/ai/query',
-  '/api/v1/ai/voice',
-];
-
-// Registration link public paths: only token resolution and self-registration
-// are public. List/create/delete require authentication.
-const PUBLIC_REGISTRATION_LINK_PATHS = [
-  { method: 'GET', pattern: /^\/api\/v1\/registration-links\/[^/]+$/ },       // GET /:token
-  { method: 'POST', pattern: /^\/api\/v1\/registration-links\/[^/]+\/register$/ }, // POST /:token/register
-];
-
-function isPublicPath(path: string, method?: string): boolean {
-  if (PUBLIC_PATHS.some((pub) => path === pub || path.startsWith(pub + '/') || path.startsWith(pub))) {
-    return true;
-  }
-  // Check registration link public paths
-  return PUBLIC_REGISTRATION_LINK_PATHS.some(
-    (p) => (!method || p.method === method) && p.pattern.test(path),
-  );
-}
-
-app.use('/api/v1', (req: Request, res: Response, next: NextFunction) => {
-  if (isPublicPath(req.baseUrl + req.path, req.method)) {
-    next();
-    return;
-  }
-  authenticate(req, res, () => enforceSchoolScope(req, res, next));
-});
-
-// ─── API Routes ───────────────────────────────────────────────────────────────
-
-app.use('/api/v1/auth', authRouter);
-app.use('/api/v1/activate', activationRouter);
-app.use('/api/v1/users', usersRouter);
-app.use('/api/v1/registration-links', registrationLinksRouter);
-app.use('/api/v1/timetable', timetableRouter);
-app.use('/api/v1/sessions', sessionsRouter);
-app.use('/api/v1/attendance', attendanceRouter);
-app.use('/api/v1/payments', paymentsRouter);
-app.use('/api/v1/reports', reportsRouter);
-app.use('/api/v1/risk-scores', riskScoresRouter);
-app.use('/api/v1/departments', departmentsRouter);
-app.use('/api/v1/classes', classesRouter);
-app.use('/api/v1/ai', aiRouter);
-app.use('/api/v1/biometric', biometricRouter);
-app.use('/api/v1/notifications', notificationsRouter);
-app.use('/api/v1/knowledge', knowledgeRouter);
-app.use('/api/v1/super', superAdminRouter);
-
-// ─── Socket.io ────────────────────────────────────────────────────────────────
-
-const io = new SocketIOServer(httpServer, {
-  cors: {
-    origin: process.env.CORS_ORIGIN ?? '*',
-    methods: ['GET', 'POST'],
-  },
-});
-
-registerSocketServer(io);
-
-// Set up attendance socket handlers (auth, session:join, qr:subscribe)
-setupAttendanceSocket(io);
-
-// ─── Redis Client ─────────────────────────────────────────────────────────────
-
-const redis = new Redis(process.env.REDIS_URL ?? 'redis://localhost:6379', {
-  lazyConnect: true,
-  maxRetriesPerRequest: 3,
-});
-
-redis.on('connect', () => console.log('[Redis] Connected'));
-redis.on('error', (err) => console.error('[Redis] Error:', err));
-
-// ─── Health Check ─────────────────────────────────────────────────────────────
-
-let apiReady = false;
-
-app.get('/health', async (_req, res) => {
-  if (!apiReady) {
-    res.status(503).json({
-      status: 'starting',
-      timestamp: new Date().toISOString(),
-      checks: { database: false, redis: false },
-    });
-    return;
-  }
-
-  const atCfg = isSmsConfigured() ? getAfricasTalkingConfig() : null;
-  const smtpCfg = isEmailConfigured() ? getSmtpConfig() : null;
-
-  let dbOk = false;
-  let redisOk = false;
-  try {
-    await prisma.$queryRaw`SELECT 1`;
-    dbOk = true;
-  } catch {
-    dbOk = false;
-  }
-  try {
-    const pong = await redis.ping();
-    redisOk = pong === 'PONG';
-  } catch {
-    redisOk = false;
-  }
-
-  const ready = dbOk && redisOk;
-  res.status(ready ? 200 : 503).json({
-    status: ready ? 'ok' : 'degraded',
-    timestamp: new Date().toISOString(),
-    checks: { database: dbOk, redis: redisOk },
-    sms: atCfg
-      ? { configured: true, sandbox: atCfg.sandbox, username: atCfg.username }
-      : { configured: false },
-    email: smtpCfg
-      ? { configured: true, host: smtpCfg.host, from: smtpCfg.fromEmail }
-      : { configured: false },
-    otp: {
-      loginEnabled: process.env.OTP_LOGIN_ENABLED === 'true',
-      passwordResetEnabled: process.env.OTP_PASSWORD_RESET_ENABLED === 'true',
-    },
-  });
-});
-
-// ─── Start Server ─────────────────────────────────────────────────────────────
 
 const PORT = process.env.PORT ?? 3001;
 
 async function connectDependencies(): Promise<void> {
   await redis.connect();
   await prisma.$connect();
-  apiReady = true;
+  setApiReady(true);
   console.log('[SAMS] Database and Redis connected — API ready');
 
-  // SMS/SMTP providers (sync SDK init) — after listen so deploy health checks can reach the port
+  const { getNotificationService } = await import('./services/notificationService');
   getNotificationService();
 
   if (!process.env.CONVERSATION_MASTER_KEY || process.env.CONVERSATION_MASTER_KEY.length < 32) {
@@ -222,6 +32,8 @@ async function connectDependencies(): Promise<void> {
     console.warn('[STARTUP] Email disabled — set SMTP_USER and SMTP_PASS in .env to enable SMTP.');
   }
 
+  const { startQRRefreshJob } = await import('./jobs/qrRefresh');
+  const { startNotificationJob } = await import('./jobs/notifications');
   startQRRefreshJob();
   startNotificationJob();
 
@@ -230,17 +42,23 @@ async function connectDependencies(): Promise<void> {
   }
 }
 
-async function start(): Promise<void> {
+/** Start HTTP server and background jobs. Call from pm2-start.js or when run as main. */
+export async function boot(): Promise<void> {
   try {
     validateProductionSecrets();
 
+    console.log(`[SAMS] Binding port ${PORT}...`);
     await new Promise<void>((resolve, reject) => {
       httpServer.listen(PORT, () => {
+        console.log(`[SAMS] Bound port ${PORT} — accepting connections`);
         console.log(`[SAMS] API listening on port ${PORT}`);
         resolve();
       });
       httpServer.once('error', reject);
     });
+
+    const { registerApplication } = await import('./registerApplication');
+    registerApplication(app, httpServer);
 
     void connectDependencies().catch((err) => {
       console.error('[SAMS] Failed to connect dependencies:', err);
@@ -252,21 +70,18 @@ async function start(): Promise<void> {
   }
 }
 
-// ─── Graceful Shutdown (PM2-compatible) ───────────────────────────────────────
-
 async function shutdown(signal: string): Promise<void> {
   console.log(`[SAMS] Received ${signal}. Shutting down gracefully...`);
 
-  // Stop cron jobs
+  const { stopQRRefreshJob } = await import('./jobs/qrRefresh');
+  const { stopNotificationJob } = await import('./jobs/notifications');
   stopQRRefreshJob();
   stopNotificationJob();
 
-  // Stop accepting new connections
   httpServer.close(async () => {
     console.log('[SAMS] HTTP server closed.');
 
     try {
-      // Disconnect Redis
       await redis.quit();
       console.log('[Redis] Disconnected.');
     } catch (err) {
@@ -274,7 +89,6 @@ async function shutdown(signal: string): Promise<void> {
     }
 
     try {
-      // Disconnect Prisma
       await prisma.$disconnect();
       console.log('[Prisma] Disconnected.');
     } catch (err) {
@@ -284,7 +98,6 @@ async function shutdown(signal: string): Promise<void> {
     process.exit(0);
   });
 
-  // Force exit if graceful shutdown takes too long (PM2 kill timeout is 5s by default)
   setTimeout(() => {
     console.error('[SAMS] Graceful shutdown timed out. Forcing exit.');
     process.exit(1);
@@ -294,17 +107,9 @@ async function shutdown(signal: string): Promise<void> {
 process.on('SIGTERM', () => void shutdown('SIGTERM'));
 process.on('SIGINT', () => void shutdown('SIGINT'));
 
-// ─── Global Error Handler ─────────────────────────────────────────────────────
-// Must be registered after all routes. Catches any AppError (or unexpected
-// error) thrown or passed to next(err) in route handlers / middleware.
+export { app, httpServer as server, prisma, redis };
+export { getIo as io } from './registerApplication';
 
-app.use(errorHandler);
-
-// ─── Exports ──────────────────────────────────────────────────────────────────
-
-export { app, httpServer as server, io, redis, prisma };
-
-// Start the server (skip when imported in tests)
 if (require.main === module) {
-  void start();
+  void boot();
 }

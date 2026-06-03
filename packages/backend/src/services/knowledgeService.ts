@@ -1,6 +1,6 @@
 import { createId } from '@paralleldrive/cuid2';
 import { type AccessTokenPayload, UserRole } from '@sams/shared';
-import { prisma } from '../index';
+import { prisma } from '../lib/prisma';
 import { AppError } from '../middleware/errors';
 
 // ─── Interfaces ───────────────────────────────────────────────────────────────

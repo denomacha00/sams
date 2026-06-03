@@ -4,7 +4,7 @@ import jwt from 'jsonwebtoken';
 import { UserRole, AttendanceStatus } from '@sams/shared';
 import { requirePermission } from '../middleware/rbac';
 import { attendanceService } from '../services/attendanceService';
-import { prisma } from '../index';
+import { prisma } from '../lib/prisma';
 import { getQrSecret } from '../config/secrets';
 import { AppError } from '../middleware/errors';
 

@@ -1,5 +1,5 @@
 import cron from 'node-cron';
-import { prisma } from '../index';
+import { prisma } from '../lib/prisma';
 import { sessionService } from '../services/sessionService';
 
 // ─── QR Refresh Cron Job ──────────────────────────────────────────────────────

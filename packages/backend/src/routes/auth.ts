@@ -7,7 +7,7 @@ import { loginRateLimiter } from '../middleware/loginRateLimiter';
 import { otpResendRateLimiter } from '../middleware/otpResendRateLimiter';
 import { authService } from '../services/authService';
 import { webauthnService } from '../services/webauthnService';
-import { prisma } from '../index';
+import { prisma } from '../lib/prisma';
 import { notificationService } from '../services/notificationService';
 import {
   assertOtpResendAllowed,

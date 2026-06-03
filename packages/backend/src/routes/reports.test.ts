@@ -4,7 +4,7 @@ import request from 'supertest';
 import { UserRole } from '@sams/shared';
 
 // Mock prisma before importing the router
-vi.mock('../index', () => ({
+vi.mock('../lib/prisma', () => ({
   prisma: {
     user: {
       findUnique: vi.fn(),
@@ -53,7 +53,7 @@ vi.mock('../services/reportService', () => ({
 }));
 
 import { reportsRouter } from './reports';
-import { prisma } from '../index';
+import { prisma } from '../lib/prisma';
 
 // ─── Test App Setup ───────────────────────────────────────────────────────────
 

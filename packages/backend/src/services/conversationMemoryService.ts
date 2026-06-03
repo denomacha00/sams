@@ -1,4 +1,4 @@
-import { prisma } from '../index';
+import { prisma } from '../lib/prisma';
 import { conversationEncryptionService, type EncryptedConversationData } from './conversationEncryption';
 import { type DecryptedConversationRecord } from './ai/tokenBudgetManager';
 import { auditService } from './auditService';

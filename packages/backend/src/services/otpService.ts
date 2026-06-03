@@ -1,6 +1,6 @@
 import crypto from 'crypto';
 import jwt from 'jsonwebtoken';
-import { redis } from '../index';
+import { redis } from '../lib/redis';
 import { notificationService } from './notificationService';
 import { isEmailConfigured } from '../config/email';
 import { isSmsConfigured, getAfricasTalkingConfig } from '../config/africasTalking';

@@ -1,7 +1,7 @@
 import { createHash } from 'crypto';
 import bcrypt from 'bcrypt';
 import { decodeLicenseKey } from '@sams/shared';
-import { prisma } from '../index';
+import { prisma } from '../lib/prisma';
 import { auditService } from './auditService';
 
 // ─── Constants ────────────────────────────────────────────────────────────────

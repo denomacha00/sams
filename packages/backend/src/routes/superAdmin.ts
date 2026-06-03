@@ -6,7 +6,7 @@ import { PlanTier } from '@sams/shared';
 import { encodeLicenseKey } from '@sams/shared';
 import { getLicenseSecret } from '../config/secrets';
 import { getSmtpConfig, isEmailConfigured } from '../config/email';
-import { prisma } from '../index';
+import { prisma } from '../lib/prisma';
 import { licenseService } from '../services/licenseService';
 import { auditService } from '../services/auditService';
 import { requirePermission } from '../middleware/rbac';

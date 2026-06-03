@@ -1,4 +1,4 @@
-import { prisma } from '../../index';
+import { prisma } from '../../lib/prisma';
 import { type AccessTokenPayload, UserRole } from '@sams/shared';
 
 // ─── Types ────────────────────────────────────────────────────────────────────

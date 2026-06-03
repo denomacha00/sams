@@ -24,22 +24,15 @@ const EVENT_TTL_SECONDS = 2 * 60 * 60;
 
 // ─── Redis Helper ─────────────────────────────────────────────────────────────
 
-/**
- * Get the Redis client from the main index module.
- * Lazy-loaded to avoid circular dependency issues at module load time.
- */
 function getRedis() {
   // eslint-disable-next-line @typescript-eslint/no-require-imports
-  const { redis } = require('../index');
+  const { redis } = require('../lib/redis') as typeof import('../lib/redis');
   return redis;
 }
 
-/**
- * Get the Prisma client from the main index module.
- */
 function getPrisma() {
   // eslint-disable-next-line @typescript-eslint/no-require-imports
-  const { prisma } = require('../index');
+  const { prisma } = require('../lib/prisma') as typeof import('../lib/prisma');
   return prisma;
 }
 

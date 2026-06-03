@@ -1,6 +1,6 @@
 import jwt from 'jsonwebtoken';
 import { createId } from '@paralleldrive/cuid2';
-import { prisma } from '../index';
+import { prisma } from '../lib/prisma';
 import { AppError } from '../middleware/errors';
 import { getQrSecret } from '../config/secrets';
 import { broadcastQRRefresh, broadcastSessionEnd } from '../sockets/attendanceSocket';

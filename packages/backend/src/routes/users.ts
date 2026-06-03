@@ -9,7 +9,7 @@ import { UserRole } from '@sams/shared';
 import { requirePermission } from '../middleware/rbac';
 import { userService } from '../services/userService';
 import { registrationLinkService } from '../services/registrationLinkService';
-import { prisma } from '../index';
+import { prisma } from '../lib/prisma';
 import { AppError } from '../middleware/errors';
 import { onboardPhoneForSms, optionalPhoneForStorage } from '../services/phoneOnboardingService';
 

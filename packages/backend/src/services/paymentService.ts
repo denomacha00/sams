@@ -1,5 +1,5 @@
 import axios from 'axios';
-import { prisma } from '../index';
+import { prisma } from '../lib/prisma';
 import { AppError } from '../middleware/errors';
 import { auditService } from './auditService';
 

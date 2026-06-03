@@ -1,5 +1,5 @@
 import cron from 'node-cron';
-import { prisma } from '../index';
+import { prisma } from '../lib/prisma';
 import { notificationService } from '../services/notificationService';
 
 // ─── Configuration ────────────────────────────────────────────────────────────

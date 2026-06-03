@@ -4,7 +4,7 @@ import { UserRole } from '@sams/shared';
 import { requirePermission } from '../middleware/rbac';
 import { reportService } from '../services/reportService';
 import { AppError } from '../middleware/errors';
-import { prisma } from '../index';
+import { prisma } from '../lib/prisma';
 
 // ─── Validation Schemas ───────────────────────────────────────────────────────
 

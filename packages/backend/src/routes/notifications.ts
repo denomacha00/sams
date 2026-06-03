@@ -1,8 +1,8 @@
 import { Router, type Request, type Response } from 'express';
 import { z } from 'zod';
 import { createId } from '@paralleldrive/cuid2';
-import { prisma } from '../index';
-import { io } from '../index';
+import { prisma } from '../lib/prisma';
+import { getSocketIO } from '../lib/socket';
 import { AppError } from '../middleware/errors';
 
 const NOTIFICATION_INSERT_CHUNK = 500;
@@ -406,7 +406,7 @@ notificationsRouter.patch('/:id', async (req: Request, res: Response): Promise<v
         select: { userId: true, id: true },
       });
       for (const n of affected) {
-        io.to(`user:${n.userId}`).emit('notification:updated', {
+        getSocketIO().to(`user:${n.userId}`).emit('notification:updated', {
           id: n.id,
           message,
           updatedAt: now.toISOString(),
@@ -414,7 +414,7 @@ notificationsRouter.patch('/:id', async (req: Request, res: Response): Promise<v
       }
     } else {
       await prisma.notification.update({ where: { id }, data: { message, updatedAt: now } });
-      io.to(`user:${notification.userId}`).emit('notification:updated', {
+      getSocketIO().to(`user:${notification.userId}`).emit('notification:updated', {
         id,
         message,
         updatedAt: now.toISOString(),
@@ -571,7 +571,7 @@ notificationsRouter.post('/reply', async (req: Request, res: Response): Promise<
     res.status(200).json({ success: true, batchId });
 
     setImmediate(() => {
-      io.to(`user:${parent.senderId}`).emit('notification:new', {
+      getSocketIO().to(`user:${parent.senderId}`).emit('notification:new', {
         title,
         message,
         type: 'MESSAGE',
@@ -740,7 +740,7 @@ notificationsRouter.post('/send', async (req: Request, res: Response): Promise<v
       try {
         if (channels.includes('inapp')) {
           // One broadcast per school (all connected clients joined school:{id} on connect)
-          io.to(`school:${schoolId}`).emit('notification:new', payload);
+          getSocketIO().to(`school:${schoolId}`).emit('notification:new', payload);
         }
         if (channels.includes('sms')) {
           void import('../services/notificationService').then(({ notificationService }) => {

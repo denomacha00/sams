@@ -26,4 +26,5 @@ if (!entry) {
   process.exit(1);
 }
 
+console.log('[SAMS] Starting API via pm2-start.js →', entry);
 require(entry);

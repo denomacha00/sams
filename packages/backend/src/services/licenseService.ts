@@ -1,5 +1,5 @@
 import { PlanTier } from '@sams/shared';
-import { prisma } from '../index';
+import { prisma } from '../lib/prisma';
 import { auditService } from './auditService';
 import { notificationService } from './notificationService';
 

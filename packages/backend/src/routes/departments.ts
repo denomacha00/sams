@@ -1,7 +1,7 @@
 import { Router, type Request, type Response } from 'express';
 import { z } from 'zod';
 import { requirePermission } from '../middleware/rbac';
-import { prisma } from '../index';
+import { prisma } from '../lib/prisma';
 import { AppError } from '../middleware/errors';
 
 const createDeptSchema = z.object({ name: z.string().min(1).max(200) });
