@@ -31,7 +31,8 @@ mask_line() {
     | sed -E 's/(MPESA_(CONSUMER_)?SECRET=).*/\1***masked***/' \
     | sed -E 's/(MPESA_PASSKEY=).*/\1***masked***/' \
     | sed -E 's/(JWT_(REFRESH_)?SECRET=).*/\1***masked***/' \
-    | sed -E 's/(SUPER_ADMIN_PASSWORD=).*/\1***masked***/'
+    | sed -E 's/(SUPER_ADMIN_PASSWORD=).*/\1***masked***/' \
+    | sed -E 's/(CONVERSATION_MASTER_KEY=).*/\1***masked***/'
 }
 
 is_real_key() {
@@ -129,6 +130,14 @@ else
 fi
 
 if [[ "$AI_ONLY" -eq 1 ]]; then
+  CONV_KEY="$(read_merged_env CONVERSATION_MASTER_KEY)"
+  echo ""
+  echo "--- Conversation memory ---"
+  if [[ -n "$CONV_KEY" && ${#CONV_KEY} -ge 32 ]]; then
+    echo "OK   CONVERSATION_MASTER_KEY is set (32+ chars)"
+  else
+    echo "WARN CONVERSATION_MASTER_KEY missing or shorter than 32 chars — encrypted chat memory disabled"
+  fi
   if [[ "$ERR" -eq 0 ]]; then
     echo ""
     echo "==> AI env looks usable. Reload: bash scripts/restart-api.sh"
@@ -195,9 +204,9 @@ fi
 echo ""
 echo "==> Configured provider lines (masked, all sources):"
 {
-  grep -E '^(OPENAI_|VISION_MODEL=|AT_|SMTP_|MPESA_CONSUMER_|MPESA_PASSKEY=)' "$ENV_FILE" 2>/dev/null || true
+  grep -E '^(OPENAI_|VISION_MODEL=|CONVERSATION_MASTER_KEY=|AT_|SMTP_|MPESA_CONSUMER_|MPESA_PASSKEY=)' "$ENV_FILE" 2>/dev/null || true
   while IFS= read -r f; do
-    [[ -f "$f" ]] && grep -E '^(OPENAI_|VISION_MODEL=|AT_|SMTP_|MPESA_CONSUMER_|MPESA_PASSKEY=)' "$f" 2>/dev/null || true
+    [[ -f "$f" ]] && grep -E '^(OPENAI_|VISION_MODEL=|CONVERSATION_MASTER_KEY=|AT_|SMTP_|MPESA_CONSUMER_|MPESA_PASSKEY=)' "$f" 2>/dev/null || true
   done < <(merged_env_secrets_paths)
 } | mask_line | sort -u || echo "    (no matching lines)"
 
