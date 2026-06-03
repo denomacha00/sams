@@ -5,7 +5,7 @@
   "main": "dist/index.js",
   "scripts": {
     "dev": "tsx watch src/index.ts",
-    "build": "prisma generate && tsc --project tsconfig.json",
+    "build": "prisma generate && tsc --project tsconfig.json && node -e \"require('fs').accessSync('dist/index.js')\"",
     "start": "node dist/index.js",
     "test": "vitest run",
     "test:watch": "vitest",
@@ -17,6 +17,7 @@
     "lint": "tsc --noEmit"
   },
   "dependencies": {
+    "@sams/shared": "1.0.0",
     "@paralleldrive/cuid2": "^2.2.2",
     "@prisma/client": "^5.22.0",
     "africastalking": "^0.6.4",
