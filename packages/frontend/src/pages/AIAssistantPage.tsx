@@ -13,6 +13,7 @@ interface Message {
   id: string;
   role: 'user' | 'assistant';
   content: string;
+  userImages?: string[];
   timestamp: Date;
   pendingAction?: PendingAction;
   isError?: boolean;
@@ -34,6 +35,33 @@ const AIAssistantPage: React.FC = () => {
   const [threadId, setThreadId] = useState<string | null>(() => loadAiThreadId());
   const pendingActionRef = useRef<PendingAction | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [selectedImages, setSelectedImages] = useState<File[]>([]);
+  const [imagePreviews, setImagePreviews] = useState<string[]>([]);
+
+  const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || []);
+    const remaining = 4 - selectedImages.length;
+    const toAdd = files.slice(0, remaining).filter((f) => f.size <= 5 * 1024 * 1024);
+    if (toAdd.length === 0) return;
+    setSelectedImages((prev) => [...prev, ...toAdd]);
+    toAdd.forEach((file) => {
+      const reader = new FileReader();
+      reader.onload = () => setImagePreviews((prev) => [...prev, reader.result as string]);
+      reader.readAsDataURL(file);
+    });
+    if (fileInputRef.current) fileInputRef.current.value = '';
+  };
+
+  const removeImage = (index: number) => {
+    setSelectedImages((prev) => prev.filter((_, i) => i !== index));
+    setImagePreviews((prev) => prev.filter((_, i) => i !== index));
+  };
+
+  const clearImages = () => {
+    setSelectedImages([]);
+    setImagePreviews([]);
+  };
 
   const confirmPendingAction = async (pending: PendingAction) => {
     setLoading(true);
@@ -63,12 +91,13 @@ const AIAssistantPage: React.FC = () => {
   };
 
   const submitQuery = async (text: string) => {
-    if (!text.trim()) return;
+    if (!text.trim() && selectedImages.length === 0) return;
 
     const userMessage: Message = {
       id: crypto.randomUUID(),
       role: 'user',
-      content: text.trim(),
+      content: text.trim() || 'What is in this image?',
+      userImages: imagePreviews.length > 0 ? [...imagePreviews] : undefined,
       timestamp: new Date(),
     };
     setMessages((prev) => [...prev, userMessage]);
@@ -76,6 +105,22 @@ const AIAssistantPage: React.FC = () => {
     setLoading(true);
 
     try {
+      if (selectedImages.length > 0) {
+        const formData = new FormData();
+        selectedImages.forEach((file) => formData.append('images', file));
+        formData.append('question', text.trim() || 'What is in this image?');
+        clearImages();
+        const { data } = await apiClient.post('/ai/query-with-image', formData);
+        setMessages((prev) => [...prev, {
+          id: crypto.randomUUID(),
+          role: 'assistant',
+          content: data.answer,
+          timestamp: new Date(),
+          isError: isAiUnavailableIntent(data.intent),
+        }]);
+        return;
+      }
+
       const isConfirm = CONFIRM_RE.test(text.trim()) && pendingActionRef.current;
       const { data } = await apiClient.post('/ai/query', {
         question: text.trim(),
@@ -198,6 +243,13 @@ const AIAssistantPage: React.FC = () => {
                 }`}
               >
                 <p className="whitespace-pre-wrap text-sm">{msg.content}</p>
+                {msg.userImages && msg.userImages.length > 0 && (
+                  <div className="flex flex-wrap gap-2 mt-2">
+                    {msg.userImages.map((src, i) => (
+                      <img key={i} src={src} alt="" className="max-h-24 rounded-lg border border-white/10" />
+                    ))}
+                  </div>
+                )}
                 {msg.pendingAction && (
                   <button
                     type="button"
@@ -238,12 +290,42 @@ const AIAssistantPage: React.FC = () => {
       {/* Input */}
       <div className="border-t border-white/10 backdrop-blur-sm bg-white/5 px-6 py-4">
         <div className="max-w-3xl mx-auto">
+          {imagePreviews.length > 0 && (
+            <div className="flex flex-wrap gap-2 mb-3">
+              {imagePreviews.map((img, i) => (
+                <div key={i} className="relative">
+                  <img src={img} alt="" className="h-16 w-16 object-cover rounded-lg border border-white/10" />
+                  <button
+                    type="button"
+                    onClick={() => removeImage(i)}
+                    className="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-red-500 text-white text-xs"
+                    aria-label="Remove image"
+                  >
+                    ×
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
           <form onSubmit={handleSubmit} className="flex gap-3">
+            <input ref={fileInputRef} type="file" accept="image/*" multiple onChange={handleImageSelect} className="hidden" />
+            <button
+              type="button"
+              onClick={() => fileInputRef.current?.click()}
+              disabled={loading || selectedImages.length >= 4}
+              className="p-3 rounded-xl bg-white/10 text-gray-400 border border-white/10 hover:bg-white/20 hover:text-white disabled:opacity-50"
+              title="Upload images (max 4)"
+              aria-label="Upload images"
+            >
+              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+              </svg>
+            </button>
             <input
               type="text"
               value={input}
               onChange={(e) => setInput(e.target.value)}
-              placeholder="Type your question..."
+              placeholder={selectedImages.length > 0 ? 'Ask about these images...' : 'Type your question...'}
               disabled={loading}
               className="flex-1 bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-purple-500/50 disabled:opacity-50 transition-all duration-200"
             />
@@ -269,7 +351,7 @@ const AIAssistantPage: React.FC = () => {
 
             <button
               type="submit"
-              disabled={loading || !input.trim()}
+              disabled={loading || (!input.trim() && selectedImages.length === 0)}
               className="bg-gradient-to-r from-blue-600 to-purple-600 text-white py-3 px-5 rounded-xl shadow-lg shadow-purple-500/25 hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200"
             >
               <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">

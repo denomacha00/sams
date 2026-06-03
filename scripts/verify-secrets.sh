@@ -81,6 +81,7 @@ MODEL="$(read_merged_env OPENAI_MODEL)"
 FALLBACK_KEY="$(read_merged_env OPENAI_FALLBACK_KEY)"
 FALLBACK_URL="$(read_merged_env OPENAI_FALLBACK_URL)"
 FALLBACK_MODEL="$(read_merged_env OPENAI_FALLBACK_MODEL)"
+VISION_MODEL="$(read_merged_env VISION_MODEL)"
 
 echo "--- AI (Groq / OpenRouter) ---"
 if is_real_key "$PRIMARY_KEY"; then
@@ -108,9 +109,23 @@ else
 fi
 
 if is_real_key "$FALLBACK_KEY"; then
-  echo "OK   OPENAI_FALLBACK_KEY is set (OpenRouter backup)"
+  if [[ -n "$FALLBACK_URL" && "$FALLBACK_URL" == *groq.com* ]]; then
+    echo "OK   OPENAI_FALLBACK_KEY is set (Groq backup)"
+  else
+    echo "OK   OPENAI_FALLBACK_KEY is set (OpenRouter backup)"
+  fi
 else
   echo "INFO OPENAI_FALLBACK_KEY not set — optional"
+fi
+
+if [[ -n "$VISION_MODEL" ]]; then
+  if [[ -n "$BASE_URL" && "$BASE_URL" == *groq.com* && "$VISION_MODEL" == *scout* && ! is_real_key "$FALLBACK_KEY" ]]; then
+    echo "WARN VISION_MODEL=$VISION_MODEL — Groq-only setup may need OpenRouter for image upload"
+  else
+    echo "OK   VISION_MODEL=$VISION_MODEL"
+  fi
+else
+  echo "INFO VISION_MODEL unset — runtime default: meta-llama/llama-4-scout-17b-16e-instruct"
 fi
 
 if [[ "$AI_ONLY" -eq 1 ]]; then
@@ -180,9 +195,9 @@ fi
 echo ""
 echo "==> Configured provider lines (masked, all sources):"
 {
-  grep -E '^(OPENAI_|AT_|SMTP_|MPESA_CONSUMER_|MPESA_PASSKEY=)' "$ENV_FILE" 2>/dev/null || true
+  grep -E '^(OPENAI_|VISION_MODEL=|AT_|SMTP_|MPESA_CONSUMER_|MPESA_PASSKEY=)' "$ENV_FILE" 2>/dev/null || true
   while IFS= read -r f; do
-    [[ -f "$f" ]] && grep -E '^(OPENAI_|AT_|SMTP_|MPESA_CONSUMER_|MPESA_PASSKEY=)' "$f" 2>/dev/null || true
+    [[ -f "$f" ]] && grep -E '^(OPENAI_|VISION_MODEL=|AT_|SMTP_|MPESA_CONSUMER_|MPESA_PASSKEY=)' "$f" 2>/dev/null || true
   done < <(merged_env_secrets_paths)
 } | mask_line | sort -u || echo "    (no matching lines)"
 

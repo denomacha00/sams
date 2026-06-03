@@ -1,10 +1,13 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import {
   DEFAULT_GROQ_CHAT_MODEL,
+  DEFAULT_VISION_MODEL,
   DEPRECATED_MODEL_MIGRATIONS,
   formatProviderError,
   getMissingAIKeyMessage,
+  getVisionClientConfigs,
   resolveChatModel,
+  resolveVisionModel,
 } from './aiProviderConfig';
 
 describe('aiProviderConfig', () => {
@@ -35,5 +38,40 @@ describe('aiProviderConfig', () => {
 
   it('includes setup hints when API key is missing', () => {
     expect(getMissingAIKeyMessage()).toContain('OPENAI_API_KEY');
+  });
+
+  it('defaults vision model to llama-4-scout', () => {
+    delete process.env.VISION_MODEL;
+    expect(resolveVisionModel()).toBe(DEFAULT_VISION_MODEL);
+    process.env.VISION_MODEL = 'custom/vision-model';
+    expect(resolveVisionModel()).toBe('custom/vision-model');
+  });
+
+  it('uses OpenRouter fallback client for vision when primary is Groq', () => {
+    process.env.OPENAI_API_KEY = 'gsk_test';
+    process.env.OPENAI_BASE_URL = 'https://api.groq.com/openai/v1';
+    process.env.OPENAI_MODEL = 'llama-3.3-70b-versatile';
+    process.env.OPENAI_FALLBACK_KEY = 'sk-or-test';
+    process.env.OPENAI_FALLBACK_URL = 'https://openrouter.ai/api/v1';
+    delete process.env.VISION_MODEL;
+
+    const configs = getVisionClientConfigs();
+    expect(configs[0]?.label).toBe('fallback');
+  });
+
+  it('uses primary client for vision when primary is OpenRouter', () => {
+    process.env.OPENAI_API_KEY = 'sk-or-test';
+    process.env.OPENAI_BASE_URL = 'https://openrouter.ai/api/v1';
+    process.env.OPENAI_FALLBACK_KEY = 'gsk_test';
+    process.env.OPENAI_FALLBACK_URL = 'https://api.groq.com/openai/v1';
+
+    const configs = getVisionClientConfigs();
+    expect(configs[0]?.label).toBe('primary');
+    expect(configs.some((c) => c.label === 'fallback')).toBe(false);
+  });
+
+  it('formats vision-related provider errors', () => {
+    const msg = formatProviderError(new Error('Model does not support image input'));
+    expect(msg).toContain('VISION_MODEL');
   });
 });

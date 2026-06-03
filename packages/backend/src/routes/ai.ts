@@ -9,8 +9,8 @@ import { AppError } from '../middleware/errors';
 import {
   formatProviderError,
   getMissingAIKeyMessage,
-  getOpenAIClient,
   hasPrimaryAIKey,
+  runVisionChatCompletion,
 } from '../services/ai/aiProviderConfig';
 
 // Multer config for multi-image uploads (max 4 images, 5MB each)
@@ -316,23 +316,10 @@ aiRouter.post('/query-with-image', aiUpload.array('images', 4), async (req: Requ
       throw new AppError(503, 'CONFIG_ERROR', getMissingAIKeyMessage());
     }
 
-    const client = getOpenAIClient({ timeoutMs: 60000 });
-
-    const response = await client.chat.completions.create({
-      model: process.env.VISION_MODEL || 'meta-llama/llama-4-scout-17b-16e-instruct',
-      messages: [
-        {
-          role: 'user',
-          content: [
-            { type: 'text', text: question },
-            ...imageContent,
-          ],
-        },
-      ],
-      max_tokens: 1024,
-    });
-
-    const answer = response.choices[0]?.message?.content || 'I could not analyze the image(s).';
+    const answer = await runVisionChatCompletion(
+      [{ type: 'text', text: question }, ...imageContent],
+      { timeoutMs: 60000 },
+    );
 
     res.status(200).json({
       answer,

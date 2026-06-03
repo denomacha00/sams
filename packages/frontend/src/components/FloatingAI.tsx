@@ -144,9 +144,7 @@ const FloatingAI: React.FC = () => {
         formData.append('question', text.trim() || 'What is in this image?');
         clearImages();
 
-        const { data } = await apiClient.post('/ai/query-with-image', formData, {
-          headers: { 'Content-Type': 'multipart/form-data' },
-        });
+        const { data } = await apiClient.post('/ai/query-with-image', formData);
         setMessages((prev) => [...prev, {
           id: crypto.randomUUID(), role: 'assistant', content: data.answer, timestamp: new Date(),
         }]);

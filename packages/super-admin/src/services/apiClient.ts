@@ -5,8 +5,11 @@ const apiClient = axios.create({
   headers: { 'Content-Type': 'application/json' },
 });
 
-// Inject Authorization header from localStorage
+// Inject Authorization header from localStorage; let axios set multipart boundaries for FormData
 apiClient.interceptors.request.use((config: InternalAxiosRequestConfig) => {
+  if (config.data instanceof FormData && config.headers) {
+    delete config.headers['Content-Type'];
+  }
   const stored = localStorage.getItem('super-auth-storage');
   if (stored) {
     try {

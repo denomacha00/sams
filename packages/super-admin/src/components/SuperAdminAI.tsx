@@ -147,9 +147,7 @@ const SuperAdminAI: React.FC = () => {
         setSelectedImages([]);
         setImagePreviews([]);
 
-        const { data } = await apiClient.post('/ai/query-with-image', formData, {
-          headers: { 'Content-Type': 'multipart/form-data' },
-        });
+        const { data } = await apiClient.post('/ai/query-with-image', formData);
         appendAssistant(data.answer);
         return;
       }
