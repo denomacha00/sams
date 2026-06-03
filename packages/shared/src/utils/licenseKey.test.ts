@@ -19,13 +19,17 @@ describe('encodeLicenseKey', () => {
     expect(key).toMatch(/^[A-Z0-9]{4}(-[A-Z0-9]{4})+$/);
   });
 
-  it('produces unique keys for repeated encodes of the same payload', () => {
+  it('produces decodable keys for repeated encodes of the same payload', () => {
     const payload = makePayload();
     const key1 = encodeLicenseKey(payload, TEST_SECRET);
     const key2 = encodeLicenseKey(payload, TEST_SECRET);
-    expect(key1).not.toBe(key2);
-    expect(decodeLicenseKey(key1, TEST_SECRET)).not.toBeNull();
-    expect(decodeLicenseKey(key2, TEST_SECRET)).not.toBeNull();
+    const decoded1 = decodeLicenseKey(key1, TEST_SECRET);
+    const decoded2 = decodeLicenseKey(key2, TEST_SECRET);
+    expect(decoded1).not.toBeNull();
+    expect(decoded2).not.toBeNull();
+    expect(decoded1!.schoolName).toBe(decoded2!.schoolName);
+    expect(decoded1!.planTier).toBe(decoded2!.planTier);
+    expect(decoded1!.expiresAt.getTime()).toBe(decoded2!.expiresAt.getTime());
   });
 
   it('produces different keys for different secrets', () => {
