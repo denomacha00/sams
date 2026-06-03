@@ -187,6 +187,12 @@ export function formatProviderError(err: unknown): string {
   if (lower.includes('openai_api_key') || lower.includes('api key is not set')) {
     return getMissingAIKeyMessage();
   }
+  if (isModelProviderMismatch()) {
+    return (
+      `OPENAI_MODEL=${process.env.OPENAI_MODEL} does not work with Groq. Set OPENAI_MODEL=llama-3.3-70b-versatile ` +
+      '(or point OPENAI_BASE_URL to OpenRouter/OpenAI), then restart the API.'
+    );
+  }
   if (lower.includes('decommissioned') || lower.includes('model_decommissioned') || lower.includes('model_not_found')) {
     return (
       'The configured AI model is no longer available. On the server, set OPENAI_MODEL=llama-3.3-70b-versatile for Groq ' +

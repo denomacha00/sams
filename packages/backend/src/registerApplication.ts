@@ -28,6 +28,7 @@ import { knowledgeRouter } from './routes/knowledge';
 import { registerSocketServer } from './lib/socket';
 import { setupAttendanceSocket } from './sockets/attendanceSocket';
 import { isApiReady } from './apiState';
+import { getAIHealthSummary, probeAIProvider } from './services/ai/aiProviderConfig';
 
 const PUBLIC_PATHS = [
   '/api/v1/auth/login',
@@ -137,11 +138,28 @@ export function registerApplication(app: express.Express, httpServer: HttpServer
       redisOk = false;
     }
 
+    const aiSummary = getAIHealthSummary();
+    const aiProbeRequested =
+      _req.query.ai_probe === '1' || _req.query.ai_probe === 'true';
+
+    let aiProbe: Awaited<ReturnType<typeof probeAIProvider>> | undefined;
+    if (aiProbeRequested && aiSummary.configured && !aiSummary.modelMismatch) {
+      try {
+        aiProbe = await probeAIProvider(12000);
+      } catch (err) {
+        aiProbe = { ok: false, provider: 'none', error: (err as Error).message };
+      }
+    }
+
     const ready = dbOk && redisOk;
     res.status(ready ? 200 : 503).json({
       status: ready ? 'ok' : 'degraded',
       timestamp: new Date().toISOString(),
       checks: { database: dbOk, redis: redisOk },
+      ai: {
+        ...aiSummary,
+        ...(aiProbe ? { probe: aiProbe } : {}),
+      },
       sms: atCfg
         ? { configured: true, sandbox: atCfg.sandbox, username: atCfg.username }
         : { configured: false },

@@ -38,13 +38,21 @@ async function connectDependencies(): Promise<void> {
     );
   }
 
+  const { isModelProviderMismatch } = await import('./services/ai/aiProviderConfig');
   if (!hasPrimaryAIKey()) {
-    console.warn('[STARTUP] AI chat disabled — set OPENAI_API_KEY (see packages/backend/.env.example).');
+    console.warn(
+      '[STARTUP] AI chat disabled — set OPENAI_API_KEY in secrets/providers.env (not .env.example placeholders).',
+    );
   } else {
     const configuredModel = process.env.OPENAI_MODEL?.trim();
     if (configuredModel && configuredModel in DEPRECATED_MODEL_MIGRATIONS) {
       console.warn(
         `[STARTUP] OPENAI_MODEL=${configuredModel} is decommissioned; runtime will use ${resolveChatModel()} instead.`,
+      );
+    }
+    if (isModelProviderMismatch()) {
+      console.warn(
+        `[STARTUP] OPENAI_MODEL=${configuredModel} is not valid for Groq — set OPENAI_MODEL=llama-3.3-70b-versatile or use OpenRouter as primary.`,
       );
     }
   }
