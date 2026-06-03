@@ -1,9 +1,11 @@
 const PLACEHOLDER_FRAGMENTS = ['change-me', 'qr-secret-dev', 'default-license-secret'];
 
-function isPlaceholder(value: string | undefined): boolean {
+const PRODUCTION_SECRET_MIN_LENGTH = 64;
+
+function isPlaceholder(value: string | undefined, minLength = 32): boolean {
   if (!value) return true;
   const lower = value.toLowerCase();
-  return value.length < 32 || PLACEHOLDER_FRAGMENTS.some((frag) => lower.includes(frag));
+  return value.length < minLength || PLACEHOLDER_FRAGMENTS.some((frag) => lower.includes(frag));
 }
 
 export function isProductionEnv(): boolean {
@@ -21,7 +23,7 @@ export function validateProductionSecrets(): void {
   ];
 
   for (const [name, value] of required) {
-    if (isPlaceholder(value)) {
+    if (isPlaceholder(value, PRODUCTION_SECRET_MIN_LENGTH)) {
       throw new Error(
         `[STARTUP] ${name} must be set to a secure random value (64+ chars) in production`,
       );

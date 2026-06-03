@@ -29,11 +29,13 @@ set_env() {
   fi
 }
 
+# Matches packages/backend/src/config/secrets.ts (64+ chars in production).
 is_placeholder_secret() {
   local val="$1"
   [[ -z "$val" ]] && return 0
-  [[ ${#val} -lt 32 ]] && return 0
+  [[ ${#val} -lt 64 ]] && return 0
   [[ "$val" == *change-me* ]] && return 0
+  [[ "$val" == *qr-secret-dev* ]] && return 0
   return 1
 }
 
