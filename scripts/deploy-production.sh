@@ -61,6 +61,7 @@ verify_spa_dist() {
 verify_backend_dist() {
   local dir="$ROOT/packages/backend/dist"
   local entry="$dir/index.js"
+  local health_module="$dir/registerApplication.js"
   local legacy="$dir/backend/src/index.js"
   if [[ ! -f "$entry" ]]; then
     if [[ -f "$legacy" ]]; then
@@ -72,12 +73,14 @@ verify_backend_dist() {
       exit 1
     fi
   fi
-  if ! grep -q 'passwordResetEnabled' "$entry" 2>/dev/null; then
-    echo "ERROR: Backend $entry looks stale (missing expanded /health handler)." >&2
+  # /health (ai, otp, sms) lives in registerApplication.js — not index.js (dynamic import).
+  if [[ ! -f "$health_module" ]] \
+    || ! grep -qE 'getAIHealthSummary|passwordResetEnabled' "$health_module" 2>/dev/null; then
+    echo "ERROR: Backend dist looks stale (missing expanded /health in registerApplication.js)." >&2
     echo "       Fix: rm -rf packages/backend/dist && npm run build -w @sams/backend" >&2
     exit 1
   fi
-  echo "    OK Backend ($entry)"
+  echo "    OK Backend ($entry + registerApplication.js)"
 }
 
 echo "==> Verifying build output"

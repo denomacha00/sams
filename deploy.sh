@@ -10,6 +10,7 @@ git pull origin main
 npm ci --production=false
 
 # Build each package from root to avoid cd path issues
+rm -rf packages/backend/dist
 npm run build --workspace=packages/backend
 npm run build --workspace=packages/frontend
 npm run build --workspace=packages/super-admin
