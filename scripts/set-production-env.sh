@@ -58,6 +58,7 @@ if is_placeholder_secret "$QR_SECRET"; then QR_SECRET="$(gen_secret)"; fi
 
 set_env NODE_ENV production
 set_env APP_URL "https://app.smart-managment.com"
+set_env FRONTEND_URL "https://app.smart-managment.com"
 set_env CORS_ORIGIN "https://app.smart-managment.com"
 set_env OTP_LOGIN_ENABLED false
 
@@ -74,7 +75,7 @@ set_env JWT_REFRESH_SECRET "$JWT_REFRESH_SECRET"
 set_env QR_SECRET "$QR_SECRET"
 
 echo "==> Production env applied to $ENV_FILE"
-grep -E '^(NODE_ENV|APP_URL|CORS_ORIGIN|OTP_|JWT_|QR_SECRET)=' "$ENV_FILE"
+grep -E '^(NODE_ENV|APP_URL|FRONTEND_URL|CORS_ORIGIN|OTP_|JWT_|QR_SECRET)=' "$ENV_FILE"
 
 echo "==> Reload PM2"
 cd "$ROOT"

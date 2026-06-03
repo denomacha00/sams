@@ -1,6 +1,5 @@
 import { UserRole } from '@sams/shared';
 import type { ActionHandler, ActionResult, ActionScope } from '../roleActionRegistry';
-import { buildRegistrationLinkUrl } from '../../../lib/registrationLinkUrl';
 import { resolveTeacherClassId } from '../../../lib/teacherScope';
 import { registrationLinkService } from '../../registrationLinkService';
 
@@ -112,7 +111,7 @@ export const createRegistrationLinkHandler: ActionHandler = async (
     { targetRole },
   );
 
-  const url = buildRegistrationLinkUrl(link.token);
+  const url = link.url;
   const namePart = studentName ? ` (for **${studentName}**)` : '';
 
   return {

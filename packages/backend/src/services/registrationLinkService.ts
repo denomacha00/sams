@@ -5,6 +5,7 @@ import { prisma } from '../lib/prisma';
 import { licenseService } from './licenseService';
 import { AppError } from '../middleware/errors';
 import { assertPhoneAvailableInSchool, onboardPhoneForSms, optionalPhoneForStorage } from './phoneOnboardingService';
+import { buildRegistrationLinkUrl } from '../lib/registrationLinkUrl';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -143,7 +144,7 @@ export class RegistrationLinkService {
       },
     });
 
-    return link;
+    return { ...link, url: buildRegistrationLinkUrl(token) };
   }
 
   /**
