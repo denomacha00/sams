@@ -1,4 +1,5 @@
 import type { ActionDefinition, ActionHandler } from '../roleActionRegistry';
+import { extractMessageBody, parseNotificationTargetRole } from '../notificationActionParams';
 
 // ─── Handlers ─────────────────────────────────────────────────────────────────
 
@@ -91,6 +92,178 @@ const createDepartmentHandler: ActionHandler = async (params, scope) => {
   };
 };
 
+const sendSchoolNotificationHandler: ActionHandler = async (params, scope) => {
+  const {
+    assertAiNotificationChannels,
+    ScopedNotificationError,
+    sendScopedNotification,
+  } = await import('../../scopedNotificationSend');
+
+  const message = (params.message as string)?.trim();
+  if (!message) {
+    return { answer: 'Please include the message (e.g. "notify school: Holiday on Friday").' };
+  }
+
+  const targetRole = (params.targetRole as 'TEACHER' | 'STUDENT' | 'HOD' | undefined) ?? undefined;
+
+  try {
+    assertAiNotificationChannels(['inapp']);
+    const result = await sendScopedNotification(
+      { sub: scope.userId, role: scope.role, schoolId: scope.schoolId },
+      {
+        scope: 'school',
+        targetRole,
+        title: (params.title as string)?.trim() || 'School announcement',
+        message,
+        channels: ['inapp'],
+      },
+    );
+
+    if (!result.success) {
+      return { answer: result.warning ?? 'No users matched for this school-wide message.' };
+    }
+
+    return {
+      answer: `✅ In-app message sent to ${result.recipientCount} user(s) school-wide. (Use the Notifications page for SMS.)`,
+      data: { batchId: result.batchId, recipientCount: result.recipientCount },
+    };
+  } catch (err) {
+    if (err instanceof ScopedNotificationError) {
+      return { answer: `❌ ${err.message}` };
+    }
+    throw err;
+  }
+};
+
+const sendClassNotificationHandler: ActionHandler = async (params, scope) => {
+  const { prisma } = await import('../../../index');
+  const {
+    assertAiNotificationChannels,
+    ScopedNotificationError,
+    sendScopedNotification,
+  } = await import('../../scopedNotificationSend');
+
+  const message = (params.message as string)?.trim();
+  if (!message) {
+    return { answer: 'What is the message text for this class notification?' };
+  }
+
+  let classId = params.classId as string | undefined;
+  const className = (params.className as string)?.trim();
+  if (!classId && className) {
+    const cls = await prisma.class.findFirst({
+      where: {
+        schoolId: scope.schoolId,
+        name: { contains: className, mode: 'insensitive' },
+      },
+      select: { id: true, name: true },
+    });
+    if (!cls) return { answer: `Class "${className}" not found.` };
+    classId = cls.id;
+  }
+
+  if (!classId) {
+    return { answer: 'Which class should receive this? (Reply with the class name.)' };
+  }
+
+  const targetRole = (params.targetRole as 'TEACHER' | 'STUDENT' | undefined) ?? undefined;
+
+  try {
+    assertAiNotificationChannels(['inapp']);
+    const result = await sendScopedNotification(
+      { sub: scope.userId, role: scope.role, schoolId: scope.schoolId },
+      {
+        scope: 'class',
+        targetId: classId,
+        targetRole,
+        title: (params.title as string)?.trim() || 'Class message',
+        message,
+        channels: ['inapp'],
+      },
+    );
+
+    if (!result.success) {
+      return { answer: result.warning ?? 'No users matched in that class.' };
+    }
+
+    return {
+      answer: `✅ In-app message sent to ${result.recipientCount} user(s) in the class.`,
+      data: { batchId: result.batchId, recipientCount: result.recipientCount, classId },
+    };
+  } catch (err) {
+    if (err instanceof ScopedNotificationError) {
+      return { answer: `❌ ${err.message}` };
+    }
+    throw err;
+  }
+};
+
+const sendDepartmentNotificationHandler: ActionHandler = async (params, scope) => {
+  const { prisma } = await import('../../../index');
+  const {
+    assertAiNotificationChannels,
+    ScopedNotificationError,
+    sendScopedNotification,
+  } = await import('../../scopedNotificationSend');
+
+  const message = (params.message as string)?.trim();
+  if (!message) {
+    return {
+      answer:
+        'Please include the message (e.g. "notify Science department students: Exam Monday").',
+    };
+  }
+
+  const departmentName = (params.departmentName as string)?.trim();
+  const dept = departmentName
+    ? await prisma.department.findFirst({
+        where: {
+          schoolId: scope.schoolId,
+          name: { contains: departmentName, mode: 'insensitive' },
+        },
+      })
+    : await prisma.department.findFirst({ where: { schoolId: scope.schoolId } });
+
+  if (!dept) {
+    return {
+      answer: departmentName
+        ? `Department "${departmentName}" not found.`
+        : 'No departments found in your school.',
+    };
+  }
+
+  const targetRole = (params.targetRole as 'TEACHER' | 'STUDENT' | undefined) ?? undefined;
+
+  try {
+    assertAiNotificationChannels(['inapp']);
+    const result = await sendScopedNotification(
+      { sub: scope.userId, role: scope.role, schoolId: scope.schoolId },
+      {
+        scope: 'department',
+        targetId: dept.id,
+        targetRole,
+        title: (params.title as string)?.trim() || 'Department message',
+        message,
+        channels: ['inapp'],
+      },
+    );
+
+    if (!result.success) {
+      return { answer: result.warning ?? `No users matched in department "${dept.name}".` };
+    }
+
+    return {
+      answer: `✅ In-app message sent to ${result.recipientCount} user(s) in "${dept.name}". (Use the Notifications page for SMS.)`,
+      data: { batchId: result.batchId, recipientCount: result.recipientCount, departmentId: dept.id },
+    };
+  } catch (err) {
+    if (err instanceof ScopedNotificationError) {
+      return { answer: `❌ ${err.message}` };
+    }
+    throw err;
+  }
+};
+
 const getSchoolStatsHandler: ActionHandler = async (_params, scope) => {
   const { prisma } = await import('../../../index');
 
@@ -126,6 +299,7 @@ export const schoolAdminActions: ActionDefinition[] = [
     description: 'Add a new user (student, teacher, or staff) to the school',
     destructive: false,
     patterns: [
+      /^(?:add|create|register)\s+(?:a\s+)?user\s*$/i,
       /add\s+(?:a\s+)?(?:user|student|teacher|staff)\s+(.+)/i,
       /create\s+(?:a\s+)?(?:user|student|teacher|staff)\s+(.+)/i,
       /register\s+(?:a\s+)?(?:user|student|teacher|staff)\s+(.+)/i,
@@ -154,6 +328,7 @@ export const schoolAdminActions: ActionDefinition[] = [
     description: 'Remove a user from the school',
     destructive: true,
     patterns: [
+      /^(?:remove|delete)\s+(?:a\s+)?user\s*$/i,
       /remove\s+(?:the\s+)?(?:user|student|teacher|staff)\s+(.+)/i,
       /delete\s+(?:the\s+)?(?:user|student|teacher|staff)\s+(.+)/i,
       /remove\s+(.+)\s+from\s+(?:the\s+)?school/i,
@@ -218,5 +393,71 @@ export const schoolAdminActions: ActionDefinition[] = [
     descriptionTemplate: (params) =>
       `Get school statistics for ${params.entity || 'all'}.`,
     handler: getSchoolStatsHandler,
+  },
+  {
+    action: 'send_school_notification',
+    description: 'Send an in-app notification school-wide (optional role filter)',
+    destructive: true,
+    patterns: [
+      /^(?:post|send)\s+(?:a\s+)?(?:notification|message|announcement)\s*$/i,
+      /^(?:notify|message)\s+(?:the\s+)?school\s*$/i,
+      /(?:notify|message|send)\s+(?:to\s+)?(?:the\s+)?(?:whole\s+)?school\s*[:,-]?\s*(.+)/i,
+      /(?:notify|message)\s+(?:all\s+)?school\s+(?:students?|teachers?|staff)\s*[:,-]?\s*(.+)/i,
+      /school[\s-]wide\s+(?:message|notification)\s*[:,-]?\s*(.+)/i,
+    ],
+    extractParams: (message: string, match: RegExpMatchArray | null) => ({
+      message: extractMessageBody(match),
+      targetRole: parseNotificationTargetRole(message),
+    }),
+    descriptionTemplate: (params) =>
+      `Send in-app notification school-wide: "${String(params.message).slice(0, 80)}${String(params.message).length > 80 ? '…' : ''}"`,
+    handler: sendSchoolNotificationHandler,
+  },
+  {
+    action: 'send_class_notification',
+    description: 'Send an in-app notification to a class (by name)',
+    destructive: true,
+    patterns: [
+      /(?:notify|message|send)\s+(?:to\s+)?class\s+(.+?)\s*[:,-]?\s*(.+)/i,
+      /notify\s+(?:the\s+)?class\s+(.+?)\s*[:,-]?\s*(.+)/i,
+    ],
+    extractParams: (message: string, match: RegExpMatchArray | null) => {
+      if (match && match[2]) {
+        return {
+          className: match[1]?.trim(),
+          message: match[2].trim(),
+          targetRole: parseNotificationTargetRole(message),
+        };
+      }
+      return { message: extractMessageBody(match), targetRole: parseNotificationTargetRole(message) };
+    },
+    descriptionTemplate: (params) =>
+      `Send in-app notification to class${params.className ? ` "${params.className}"` : ''}: "${String(params.message).slice(0, 80)}${String(params.message).length > 80 ? '…' : ''}"`,
+    handler: sendClassNotificationHandler,
+  },
+  {
+    action: 'send_department_notification',
+    description: 'Send an in-app notification to a department (by name if given)',
+    destructive: true,
+    patterns: [
+      /(?:notify|message|send)\s+(?:to\s+)?(?:the\s+)?(.+?)\s+department\s*[:,-]?\s*(.+)/i,
+      /(?:notify|message)\s+department\s+(.+?)\s*[:,-]\s*(.+)/i,
+    ],
+    extractParams: (message: string, match: RegExpMatchArray | null) => {
+      if (match && match[2]) {
+        return {
+          departmentName: match[1]?.trim(),
+          message: match[2].trim(),
+          targetRole: parseNotificationTargetRole(message),
+        };
+      }
+      return {
+        message: extractMessageBody(match),
+        targetRole: parseNotificationTargetRole(message),
+      };
+    },
+    descriptionTemplate: (params) =>
+      `Send in-app notification to department${params.departmentName ? ` "${params.departmentName}"` : ''}: "${String(params.message).slice(0, 80)}${String(params.message).length > 80 ? '…' : ''}"`,
+    handler: sendDepartmentNotificationHandler,
   },
 ];

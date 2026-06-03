@@ -3,12 +3,11 @@ import { z } from 'zod';
 import { createId } from '@paralleldrive/cuid2';
 import { prisma } from '../lib/prisma';
 import { getSocketIO } from '../lib/socket';
-import { resolveTeacherClassId } from '../lib/teacherScope';
 import { AppError } from '../middleware/errors';
-
-const NOTIFICATION_INSERT_CHUNK = 500;
-/** Cap parallel SMS attempts so whole-school sends do not spawn hundreds of 60s retries */
-const SMS_MAX_RECIPIENTS = 25;
+import {
+  ScopedNotificationError,
+  sendScopedNotification,
+} from '../services/scopedNotificationSend';
 
 // ─── Validation Schemas ───────────────────────────────────────────────────────
 
@@ -612,168 +611,50 @@ notificationsRouter.post('/reply', async (req: Request, res: Response): Promise<
  */
 notificationsRouter.post('/send', async (req: Request, res: Response, next: NextFunction): Promise<void> => {
   try {
-    const allowedRoles = ['SCHOOL_ADMIN', 'HOD', 'TEACHER'];
-    if (!allowedRoles.includes(req.user.role)) {
-      throw new AppError(403, 'FORBIDDEN', 'You do not have permission to send notifications');
-    }
-
     const parsed = sendNotificationSchema.safeParse(req.body);
     if (!parsed.success) {
       res.status(400).json({ error: 'Validation failed', code: 'VALIDATION_ERROR', details: parsed.error.flatten().fieldErrors });
       return;
     }
 
-    let { scope, targetId, targetRole, message, channels } = parsed.data;
+    const { scope, targetId, targetRole, message, channels } = parsed.data;
     const title = parsed.data.title || 'New Message';
-    const batchId = createId();
 
-    const teacherClassId =
-      req.user.role === 'TEACHER'
-        ? await resolveTeacherClassId(req.user.sub, req.user.classId)
-        : null;
-
-    // Teachers: default to their assigned class when none selected in the UI
-    if (req.user.role === 'TEACHER' && scope === 'class' && !targetId && teacherClassId) {
-      targetId = teacherClassId;
+    if (!channels.includes('inapp') && channels.includes('sms')) {
+      console.warn(
+        `[Notifications] Send by ${req.user.sub}: SMS-only (no in-app). AT sandbox may not deliver to real numbers.`,
+      );
     }
 
-    // ── Build user filter ──────────────────────────────────────────────────
-    const userFilter: any = { schoolId: req.schoolId };
-
-    if (scope === 'department') {
-      if (!targetId) throw new AppError(400, 'VALIDATION_ERROR', 'targetId is required for department scope');
-      userFilter.departmentId = targetId;
-    } else if (scope === 'class') {
-      if (!targetId) throw new AppError(400, 'VALIDATION_ERROR', 'targetId is required for class scope');
-      userFilter.classId = targetId;
-    }
-
-    // Apply role filter if specified
-    if (targetRole) {
-      userFilter.role = targetRole;
-    }
-
-    // ── Role-based scope enforcement ───────────────────────────────────────
-    if (req.user.role === 'HOD') {
-      if (scope === 'school') {
-        throw new AppError(403, 'FORBIDDEN', 'HODs can only send to their department or classes within it');
-      }
-      if (scope === 'department' && targetId !== req.user.departmentId) {
-        throw new AppError(403, 'FORBIDDEN', 'HODs can only send to their own department');
-      }
-      if (scope === 'class' && targetId) {
-        const classRecord = await prisma.class.findUnique({ where: { id: targetId }, select: { departmentId: true } });
-        if (!classRecord || classRecord.departmentId !== req.user.departmentId) {
-          throw new AppError(403, 'FORBIDDEN', 'HODs can only send to classes in their own department');
-        }
-      }
-    } else if (req.user.role === 'TEACHER') {
-      if (scope !== 'class') {
-        throw new AppError(403, 'FORBIDDEN', 'Teachers can only send to their class');
-      }
-      if (!teacherClassId) {
-        throw new AppError(403, 'FORBIDDEN', 'You are not assigned to a class');
-      }
-      if (targetId !== teacherClassId) {
-        throw new AppError(403, 'FORBIDDEN', 'Teachers can only send notifications to their own class');
-      }
-      // Teachers can only message students
-      if (targetRole && targetRole !== 'STUDENT') {
-        throw new AppError(403, 'FORBIDDEN', 'Teachers can only send notifications to students');
-      }
-      // Force student-only if no targetRole specified
-      if (!targetRole) {
-        userFilter.role = 'STUDENT';
-      }
-    }
-
-    // ── Fetch target users ─────────────────────────────────────────────────
-    const targetUsers = await prisma.user.findMany({
-      where: userFilter,
-      select: { id: true, phone: true },
+    const result = await sendScopedNotification(req.user, {
+      scope,
+      targetId,
+      targetRole,
+      title,
+      message,
+      channels,
     });
 
-    if (targetUsers.length === 0) {
+    if (!result.success) {
       res.status(200).json({
         success: false,
-        recipientCount: 0,
-        batchId,
-        warning:
-          'No users matched this target. Check that students/teachers are assigned to the selected class or department, and that the role filter is not too narrow.',
+        recipientCount: result.recipientCount,
+        batchId: result.batchId,
+        warning: result.warning,
       });
       return;
     }
 
-    if (!channels.includes('inapp') && channels.includes('sms')) {
-      console.warn(
-        `[Notifications] Send by ${req.user.sub}: SMS-only (no in-app). ${targetUsers.length} target(s); AT sandbox may not deliver to real numbers.`,
-      );
-    }
-
-    // ── In-app: chunked bulk insert (whole-school can be hundreds of rows) ─
-    if (channels.includes('inapp')) {
-      const rows = targetUsers.map((u) => ({
-        schoolId: req.schoolId,
-        userId: u.id,
-        senderId: req.user.sub,
-        batchId,
-        title,
-        message,
-        type: 'MESSAGE',
-        scope,
-        targetId: targetId ?? null,
-        targetRole: targetRole ?? null,
-      }));
-      for (let i = 0; i < rows.length; i += NOTIFICATION_INSERT_CHUNK) {
-        await prisma.notification.createMany({
-          data: rows.slice(i, i + NOTIFICATION_INSERT_CHUNK),
-        });
-      }
-    }
-
-    const recipientCount = targetUsers.length;
-    const schoolId = req.schoolId;
-    const senderId = req.user.sub;
-    const payload = {
-      title,
-      message,
-      type: 'MESSAGE' as const,
-      senderId,
-      batchId,
-      timestamp: new Date().toISOString(),
-    };
-
-    // Respond immediately — do not block on sockets/SMS (fixes "Sending..." forever)
-    res.status(200).json({ success: true, recipientCount, batchId });
-
-    setImmediate(() => {
-      try {
-        if (channels.includes('inapp')) {
-          const io = getSocketIO();
-          // Per-recipient delivery (user rooms) plus school room for clients that only listen there
-          for (const u of targetUsers) {
-            io.to(`user:${u.id}`).emit('notification:new', payload);
-          }
-          io.to(`school:${schoolId}`).emit('notification:new', payload);
-        }
-        if (channels.includes('sms')) {
-          void import('../services/notificationService').then(({ notificationService }) => {
-            const usersWithPhone = targetUsers.filter((u) => u.phone).slice(0, SMS_MAX_RECIPIENTS);
-            if (targetUsers.filter((u) => u.phone).length > SMS_MAX_RECIPIENTS) {
-              console.warn(
-                `[Notifications] SMS capped at ${SMS_MAX_RECIPIENTS} of ${targetUsers.length} users with phone numbers`,
-              );
-            }
-            for (const u of usersWithPhone) {
-              void notificationService.sendSMS(u.phone!, message).catch(() => {});
-            }
-          }).catch((err) => console.error('[Notifications] SMS module load failed:', err));
-        }
-      } catch (bgErr) {
-        console.error('[Notifications] Background delivery error:', bgErr);
-      }
+    res.status(200).json({
+      success: true,
+      recipientCount: result.recipientCount,
+      batchId: result.batchId,
     });
   } catch (err) {
+    if (err instanceof ScopedNotificationError) {
+      next(new AppError(err.statusCode, err.code, err.message));
+      return;
+    }
     next(err instanceof AppError ? err : new AppError(500, 'INTERNAL_ERROR', 'Failed to send notification'));
   }
 });

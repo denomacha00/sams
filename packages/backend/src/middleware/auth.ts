@@ -9,6 +9,8 @@ declare global {
   namespace Express {
     interface Request {
       user: AccessTokenPayload;
+      /** AI routes: Bearer was sent but JWT verification failed. */
+      aiAuthRejected?: boolean;
     }
   }
 }

@@ -17,6 +17,18 @@ import {
   hasPrimaryAIKey,
 } from './ai/aiProviderConfig';
 import { isConversationMemoryEnabled } from './ai/roleActionsPrompt';
+import {
+  applySlotAnswer,
+  buildSlotQuestion,
+  getNextMissingSlot,
+  mergePendingDescription,
+  resolveActionParams,
+  actionRequiresConfirmation,
+  buildPendingFromIntent,
+} from './ai/actionSlotFilling';
+import type { PendingAction } from './ai/aiTypes';
+
+export type { PendingAction };
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -28,12 +40,6 @@ export interface AIServiceResponse {
   threadId?: string;
   pendingAction?: PendingAction;
   requiresConfirmation?: boolean;
-}
-
-export interface PendingAction {
-  action: string;
-  params: Record<string, unknown>;
-  description: string;
 }
 
 // ─── AI Service ───────────────────────────────────────────────────────────────
@@ -65,13 +71,52 @@ export class AIService {
   ): Promise<AIServiceResponse> {
     let threadId = await this.resolveThreadForUser(user, options?.threadId);
 
-    // Step 1: Try local engine first — wrapped in try-catch so it never throws
+    let actionIntent: DetectedAction | null = null;
+
+    // Step 1: Action handling for authenticated users (detect once, reuse after local)
+    if (user.sub !== 'guest') {
+      if (options?.confirmAction && options?.pendingAction) {
+        if (!isActionPermitted(user.role, options.pendingAction.action)) {
+          const denial = this.buildDenialResponse(user.role, options.pendingAction.action);
+          threadId = await this.safelyPersist(user, question, denial.answer, threadId);
+          return { ...denial, threadId };
+        }
+        const result = await this.executeAction(user, options.pendingAction);
+        threadId = await this.safelyPersist(user, question, result.answer, threadId);
+        return { ...result, threadId };
+      }
+
+      if (options?.pendingAction && !options?.confirmAction) {
+        const continued = await this.continueSlotFilling(user, question, options.pendingAction);
+        threadId = await this.safelyPersist(user, question, continued.answer, threadId);
+        return { ...continued, threadId };
+      }
+
+      actionIntent = await actionIntentDetector.detect(question, user.role);
+
+      if (actionIntent.isAction) {
+        if (!isActionPermitted(user.role, actionIntent.action!)) {
+          const denial = this.buildDenialResponse(user.role, actionIntent.action!);
+          threadId = await this.safelyPersist(user, question, denial.answer, threadId);
+          return { ...denial, threadId };
+        }
+
+        const actionResult = await this.processDetectedAction(user, {
+          action: actionIntent.action!,
+          params: actionIntent.params ?? {},
+          description: actionIntent.description ?? actionIntent.action!,
+        });
+        threadId = await this.safelyPersist(user, question, actionResult.answer, threadId);
+        return { ...actionResult, threadId };
+      }
+    }
+
+    // Step 2: Try local engine — wrapped in try-catch so it never throws
     let localResult: AIQueryResult;
     try {
       localResult = await localQuery(user, question);
     } catch (err) {
       console.error('[AIService] Local engine error:', err);
-      // Return a helpful fallback instead of throwing
       return {
         answer: `I can help you with:\n• Attendance rates and percentages\n• Absent students today\n• Risk scores and at-risk students\n• Top students by attendance\n• Class attendance comparison\n• Timetable viewing and generation\n• Student counts\n• Active session status\n\nTry asking: "What is the attendance rate?" or "Show my timetable"`,
         intent: 'error_fallback',
@@ -79,7 +124,6 @@ export class AIService {
       };
     }
 
-    // If local engine resolved the query, persist to memory and return
     if (localResult.intent !== 'unknown') {
       if (user.sub !== 'guest') {
         threadId = await this.safelyPersist(user, question, localResult.answer, threadId);
@@ -97,57 +141,6 @@ export class AIService {
         engine: 'local',
         data: localResult.data,
       };
-    }
-
-    // Step 2: Action intent detection for ALL authenticated users (not just SUPER_ADMIN)
-    if (user.sub !== 'guest') {
-      // If user confirmed a pending action — execute it
-      if (options?.confirmAction && options?.pendingAction) {
-        if (!isActionPermitted(user.role, options.pendingAction.action)) {
-          const denial = this.buildDenialResponse(user.role, options.pendingAction.action);
-          threadId = await this.safelyPersist(user, question, denial.answer, threadId);
-          return { ...denial, threadId };
-        }
-        const result = await this.executeAction(user, options.pendingAction);
-        threadId = await this.safelyPersist(user, question, result.answer, threadId);
-        return { ...result, threadId };
-      }
-
-      // Detect action intent using the registry for the user's role
-      const actionIntent = await actionIntentDetector.detect(question, user.role);
-      if (actionIntent.isAction) {
-        // Defense in depth: verify action is permitted for this role
-        if (!isActionPermitted(user.role, actionIntent.action!)) {
-          const denial = this.buildDenialResponse(user.role, actionIntent.action!);
-          threadId = await this.safelyPersist(user, question, denial.answer, threadId);
-          return { ...denial, threadId };
-        }
-
-        if (actionIntent.requiresConfirmation) {
-          const confirmAnswer = `⚠️ **Confirm Action**: ${actionIntent.description}\n\nDo you want to proceed?`;
-          threadId = await this.safelyPersist(user, question, confirmAnswer, threadId);
-          return {
-            answer: confirmAnswer,
-            intent: 'action_confirmation',
-            engine: 'openai',
-            pendingAction: {
-              action: actionIntent.action!,
-              params: actionIntent.params!,
-              description: actionIntent.description!,
-            },
-            requiresConfirmation: true,
-            threadId,
-          };
-        }
-
-        const result = await this.executeAction(user, {
-          action: actionIntent.action!,
-          params: actionIntent.params!,
-          description: actionIntent.description!,
-        });
-        threadId = await this.safelyPersist(user, question, result.answer, threadId);
-        return { ...result, threadId };
-      }
     }
 
     // Step 3: Load encrypted conversation history for LLM context
@@ -247,6 +240,82 @@ export class AIService {
   }
 
   // ─── Private Helpers ──────────────────────────────────────────────────
+
+  /**
+   * Multi-turn slot filling: merge user reply, ask next slot, confirm, or execute.
+   */
+  private async continueSlotFilling(
+    user: AccessTokenPayload,
+    answer: string,
+    pending: PendingAction,
+  ): Promise<AIServiceResponse> {
+    const slot = pending.awaitingSlot;
+    if (!slot) {
+      return this.processDetectedAction(user, pending);
+    }
+
+    const { action, params } = applySlotAnswer(
+      pending.action,
+      slot as Parameters<typeof applySlotAnswer>[1],
+      answer,
+      pending.params,
+      user.role,
+    );
+
+    return this.processDetectedAction(user, {
+      action,
+      params,
+      description: mergePendingDescription(user.role, action, params),
+    });
+  }
+
+  /**
+   * Resolve slots → ask one question → confirm destructive → execute.
+   */
+  private async processDetectedAction(
+    user: AccessTokenPayload,
+    intent: { action: string; params: Record<string, unknown>; description: string },
+  ): Promise<AIServiceResponse> {
+    let { action, params } = intent;
+    params = await resolveActionParams(user, action, params);
+
+    const missingSlot = await getNextMissingSlot(user, action, params);
+    if (missingSlot) {
+      const question = await buildSlotQuestion(user, action, missingSlot, params);
+      const pending = buildPendingFromIntent(
+        action,
+        params,
+        mergePendingDescription(user.role, action, params),
+        missingSlot,
+      );
+      return {
+        answer: question,
+        intent: 'action_slot_fill',
+        engine: 'openai',
+        pendingAction: pending,
+        requiresConfirmation: false,
+      };
+    }
+
+    const needsConfirm = actionRequiresConfirmation(user.role, action);
+    if (needsConfirm) {
+      const description = mergePendingDescription(user.role, action, params);
+      const confirmAnswer = `⚠️ **Confirm Action**: ${description}\n\nReply **yes** to proceed.`;
+      return {
+        answer: confirmAnswer,
+        intent: 'action_confirmation',
+        engine: 'openai',
+        pendingAction: { action, params, description },
+        requiresConfirmation: true,
+      };
+    }
+
+    return this.executeAction(user, {
+      action,
+      params,
+      description: intent.description,
+    });
+  }
 
   private async resolveThreadForUser(
     user: AccessTokenPayload,

@@ -1,12 +1,21 @@
 import React, { useState, useRef, useEffect } from 'react';
 import apiClient from '../services/apiClient';
 import { useVoiceQuery } from '../hooks/useVoiceQuery';
-import { getAiErrorMessage, isAiUnavailableIntent, loadAiThreadId, saveAiThreadId } from '../lib/aiChat';
+import {
+  getAiAuthHint,
+  getAiErrorMessage,
+  isAiAuthIntent,
+  isAiUnavailableIntent,
+  loadAiThreadId,
+  saveAiThreadId,
+} from '../lib/aiChat';
+import { readAccessToken } from '../lib/authTokens';
 
 interface PendingAction {
   action: string;
   params: Record<string, unknown>;
   description: string;
+  awaitingSlot?: string;
 }
 
 interface Message {
@@ -121,20 +130,35 @@ const AIAssistantPage: React.FC = () => {
         return;
       }
 
+      if (!readAccessToken()) {
+        setMessages((prev) => [...prev, {
+          id: crypto.randomUUID(),
+          role: 'assistant',
+          content:
+            'No sign-in token was found for this browser. Please sign in again to use school data in AI.',
+          timestamp: new Date(),
+          isError: true,
+        }]);
+        return;
+      }
+
       const isConfirm = CONFIRM_RE.test(text.trim()) && pendingActionRef.current;
+      const pending = pendingActionRef.current;
       const { data } = await apiClient.post('/ai/query', {
         question: text.trim(),
         threadId,
-        ...(isConfirm
-          ? { confirmAction: true, pendingAction: pendingActionRef.current }
-          : {}),
+        ...(isConfirm && pending
+          ? { confirmAction: true, pendingAction: pending }
+          : pending
+            ? { pendingAction: pending }
+            : {}),
       });
       if (data.threadId) {
         setThreadId(data.threadId);
         saveAiThreadId(data.threadId);
       }
 
-      if (data.requiresConfirmation && data.pendingAction) {
+      if (data.pendingAction) {
         pendingActionRef.current = data.pendingAction;
         setMessages((prev) => [...prev, {
           id: crypto.randomUUID(),
@@ -147,12 +171,13 @@ const AIAssistantPage: React.FC = () => {
       }
 
       pendingActionRef.current = null;
+      const authHint = getAiAuthHint(data.intent);
       const assistantMessage: Message = {
         id: crypto.randomUUID(),
         role: 'assistant',
-        content: data.answer,
+        content: authHint ?? data.answer,
         timestamp: new Date(),
-        isError: isAiUnavailableIntent(data.intent),
+        isError: isAiUnavailableIntent(data.intent) || isAiAuthIntent(data.intent),
       };
       setMessages((prev) => [...prev, assistantMessage]);
     } catch (err: unknown) {

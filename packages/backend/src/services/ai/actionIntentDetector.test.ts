@@ -38,4 +38,53 @@ describe('actionIntentDetector role scoping (regex path)', () => {
     const teacher = await actionIntentDetector.detect('show my attendance', UserRole.TEACHER);
     expect(teacher.isAction).toBe(false);
   });
+
+  it('detects HOD view_department_stats for natural headcount questions', async () => {
+    const result = await actionIntentDetector.detect(
+      'how many teachers and students in my dep',
+      UserRole.HOD,
+    );
+    expect(result.isAction).toBe(true);
+    expect(result.action).toBe('view_department_stats');
+    expect(result.requiresConfirmation).toBe(false);
+  });
+
+  it('detects HOD view_department_stats for department stats phrasing', async () => {
+    const result = await actionIntentDetector.detect('show department statistics', UserRole.HOD);
+    expect(result.isAction).toBe(true);
+    expect(result.action).toBe('view_department_stats');
+  });
+
+  it('does not treat HOD department headcount as school admin action', async () => {
+    const result = await actionIntentDetector.detect(
+      'how many teachers and students in my dep',
+      UserRole.SCHOOL_ADMIN,
+    );
+    expect(result.action).not.toBe('view_department_stats');
+  });
+
+  it('detects teacher notify students in class', async () => {
+    const result = await actionIntentDetector.detect(
+      'notify students in my class: Bring calculators',
+      UserRole.TEACHER,
+    );
+    expect(result.isAction).toBe(true);
+    expect(result.action).toBe('send_class_message');
+  });
+
+  it('detects HOD notify department', async () => {
+    const result = await actionIntentDetector.detect(
+      'notify department: Staff meeting 3pm',
+      UserRole.HOD,
+    );
+    expect(result.action).toBe('send_department_notification');
+  });
+
+  it('detects school admin notify school', async () => {
+    const result = await actionIntentDetector.detect(
+      'notify school: Sports day Friday',
+      UserRole.SCHOOL_ADMIN,
+    );
+    expect(result.action).toBe('send_school_notification');
+  });
 });

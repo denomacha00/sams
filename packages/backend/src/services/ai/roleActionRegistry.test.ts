@@ -43,4 +43,19 @@ describe('roleActionRegistry permissions', () => {
     expect(getActionNames('UNKNOWN')).toEqual([]);
     expect(isActionPermitted('UNKNOWN', 'start_session')).toBe(false);
   });
+
+  it('HOD can view department stats', () => {
+    expect(isActionPermitted(UserRole.HOD, 'view_department_stats')).toBe(true);
+    expect(findAction(UserRole.HOD, 'view_department_stats')?.destructive).toBe(false);
+  });
+
+  it('HOD can send department notifications but not school-wide', () => {
+    expect(isActionPermitted(UserRole.HOD, 'send_department_notification')).toBe(true);
+    expect(isActionPermitted(UserRole.HOD, 'send_school_notification')).toBe(false);
+  });
+
+  it('SCHOOL_ADMIN can send school and department notifications', () => {
+    expect(isActionPermitted(UserRole.SCHOOL_ADMIN, 'send_school_notification')).toBe(true);
+    expect(isActionPermitted(UserRole.SCHOOL_ADMIN, 'send_department_notification')).toBe(true);
+  });
 });

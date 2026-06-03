@@ -123,13 +123,19 @@ const viewClassRosterHandler: ActionHandler = async (_params, scope) => {
 };
 
 const sendClassMessageHandler: ActionHandler = async (params, scope) => {
-  const { prisma } = await import('../../../index');
   const { resolveTeacherClassId } = await import('../../../lib/teacherScope');
-  const { createId } = await import('@paralleldrive/cuid2');
+  const {
+    assertAiNotificationChannels,
+    ScopedNotificationError,
+    sendScopedNotification,
+  } = await import('../../scopedNotificationSend');
 
   const message = (params.message as string)?.trim();
   if (!message) {
-    return { answer: 'Please provide the message to send to your class (e.g. "message my class: Homework due Friday").' };
+    return {
+      answer:
+        'Please provide the message to send to your class (e.g. "message my class: Homework due Friday").',
+    };
   }
 
   const classId = await resolveTeacherClassId(scope.userId, scope.classId);
@@ -137,37 +143,39 @@ const sendClassMessageHandler: ActionHandler = async (params, scope) => {
     return { answer: 'Your account is not associated with a class.' };
   }
 
-  const students = await prisma.user.findMany({
-    where: { schoolId: scope.schoolId, classId, role: 'STUDENT' },
-    select: { id: true },
-  });
+  try {
+    assertAiNotificationChannels(['inapp']);
+    const result = await sendScopedNotification(
+      {
+        sub: scope.userId,
+        role: scope.role,
+        schoolId: scope.schoolId,
+        classId: scope.classId,
+      },
+      {
+        scope: 'class',
+        targetId: classId,
+        targetRole: 'STUDENT',
+        title: (params.title as string)?.trim() || 'Class message',
+        message,
+        channels: ['inapp'],
+      },
+    );
 
-  if (students.length === 0) {
-    return { answer: 'No students in your class to message.' };
+    if (!result.success) {
+      return { answer: result.warning ?? 'No students in your class to message.' };
+    }
+
+    return {
+      answer: `✅ In-app message sent to ${result.recipientCount} student(s) in your class. (SMS is not available via AI — use the Notifications page if your school admin enables SMS.)`,
+      data: { batchId: result.batchId, recipientCount: result.recipientCount, classId },
+    };
+  } catch (err) {
+    if (err instanceof ScopedNotificationError) {
+      return { answer: `❌ ${err.message}` };
+    }
+    throw err;
   }
-
-  const batchId = createId();
-  const title = (params.title as string)?.trim() || 'Class message';
-
-  await prisma.notification.createMany({
-    data: students.map((s) => ({
-      schoolId: scope.schoolId,
-      userId: s.id,
-      senderId: scope.userId,
-      batchId,
-      title,
-      message,
-      type: 'MESSAGE',
-      scope: 'class',
-      targetId: classId,
-      targetRole: 'STUDENT',
-    })),
-  });
-
-  return {
-    answer: `✅ In-app message sent to ${students.length} student(s) in your class. (SMS is not available via AI — use the Notifications page if your school admin enables SMS.)`,
-    data: { batchId, recipientCount: students.length, classId },
-  };
 };
 
 // ─── Action Definitions ───────────────────────────────────────────────────────
@@ -245,10 +253,15 @@ export const teacherActions: ActionDefinition[] = [
     description: 'Send an in-app message to all students in your class (not SMS)',
     destructive: true,
     patterns: [
+      /^notify\s+(?:my\s+)?class\s*$/i,
+      /^(?:post|send)\s+(?:a\s+)?(?:notification|message)\s*$/i,
+      /^notify\s+(?:my\s+)?students?\s*$/i,
       /(?:send|message)\s+(?:to\s+)?(?:my\s+)?class\s*[:,-]?\s*(.+)/i,
       /notify\s+(?:my\s+)?class\s*[:,-]?\s*(.+)/i,
+      /notify\s+(?:the\s+)?students?\s+in\s+(?:my\s+)?class\s*[:,-]?\s*(.+)/i,
       /tell\s+(?:my\s+)?class\s*[:,-]?\s*(.+)/i,
       /message\s+(?:all\s+)?(?:my\s+)?students?\s*[:,-]?\s*(.+)/i,
+      /send\s+(?:a\s+)?message\s+to\s+(?:my\s+)?class\s*[:,-]?\s*(.+)/i,
     ],
     extractParams: (_message: string, match: RegExpMatchArray | null) => {
       const message = match && match[1] ? match[1].trim() : '';

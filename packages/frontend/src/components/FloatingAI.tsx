@@ -1,12 +1,20 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import apiClient from '../services/apiClient';
 import { useVoiceQuery } from '../hooks/useVoiceQuery';
-import { getAiErrorMessage, isAiUnavailableIntent, loadAiThreadId, saveAiThreadId } from '../lib/aiChat';
+import {
+  getAiAuthHint,
+  getAiErrorMessage,
+  isAiAuthIntent,
+  isAiUnavailableIntent,
+  loadAiThreadId,
+  saveAiThreadId,
+} from '../lib/aiChat';
 
 interface PendingAction {
   action: string;
   params: Record<string, unknown>;
   description: string;
+  awaitingSlot?: string;
 }
 
 interface Message {
@@ -163,19 +171,22 @@ const FloatingAI: React.FC = () => {
 
       // Case 3: Normal text query (with action confirmation support)
       const isConfirm = CONFIRM_RE.test(text.trim()) && pendingActionRef.current;
+      const pending = pendingActionRef.current;
       const { data } = await apiClient.post('/ai/query', {
         question: text.trim(),
         threadId,
-        ...(isConfirm
-          ? { confirmAction: true, pendingAction: pendingActionRef.current }
-          : {}),
+        ...(isConfirm && pending
+          ? { confirmAction: true, pendingAction: pending }
+          : pending
+            ? { pendingAction: pending }
+            : {}),
       });
       if (data.threadId) {
         setThreadId(data.threadId);
         saveAiThreadId(data.threadId);
       }
 
-      if (data.requiresConfirmation && data.pendingAction) {
+      if (data.pendingAction) {
         pendingActionRef.current = data.pendingAction;
         setMessages((prev) => [...prev, {
           id: crypto.randomUUID(),
@@ -188,12 +199,13 @@ const FloatingAI: React.FC = () => {
       }
 
       pendingActionRef.current = null;
+      const authHint = getAiAuthHint(data.intent);
       setMessages((prev) => [...prev, {
         id: crypto.randomUUID(),
         role: 'assistant',
-        content: data.answer,
+        content: authHint ?? data.answer,
         timestamp: new Date(),
-        isError: isAiUnavailableIntent(data.intent),
+        isError: isAiUnavailableIntent(data.intent) || isAiAuthIntent(data.intent),
       }]);
     } catch (err) {
       setMessages((prev) => [...prev, {

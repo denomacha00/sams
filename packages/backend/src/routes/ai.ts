@@ -28,7 +28,7 @@ export const aiRouter = Router();
 // ─── Optional Auth Middleware ─────────────────────────────────────────────────
 // Tries to parse the JWT token if present, but doesn't reject if missing.
 // This allows the AI route to work for both authenticated and unauthenticated users.
-aiRouter.use((req: Request, _res: Response, next: NextFunction) => {
+export function optionalAiAuth(req: Request, _res: Response, next: NextFunction): void {
   const authHeader = req.headers.authorization;
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
     return next();
@@ -37,6 +37,7 @@ aiRouter.use((req: Request, _res: Response, next: NextFunction) => {
   const token = authHeader.slice(7);
   const secret = process.env.JWT_SECRET;
   if (!secret) {
+    req.aiAuthRejected = true;
     return next();
   }
 
@@ -56,13 +57,17 @@ aiRouter.use((req: Request, _res: Response, next: NextFunction) => {
         iat: payload.iat,
         exp: payload.exp,
       };
+    } else {
+      req.aiAuthRejected = true;
     }
   } catch {
-    // Token invalid/expired — continue as unauthenticated
+    req.aiAuthRejected = true;
   }
 
   next();
-});
+}
+
+aiRouter.use(optionalAiAuth);
 
 // SAMS data intents that require authentication
 const DATA_INTENTS = [
@@ -78,6 +83,15 @@ const SAMS_DATA_KEYWORDS = [
   'absent', 'present', 'late', 'session', 'department report',
   'school report', 'how many students', 'attendance rate',
 ];
+
+/** True when a question needs a logged-in user (attendance, timetables, etc.). */
+export function isSamsDataQuestion(question: string, intent: string): boolean {
+  const lowerQuestion = question.trim().toLowerCase();
+  return (
+    DATA_INTENTS.includes(intent) ||
+    SAMS_DATA_KEYWORDS.some((kw) => lowerQuestion.includes(kw))
+  );
+}
 
 // ─── Conversation Management Endpoints ────────────────────────────────────────
 
@@ -190,18 +204,25 @@ aiRouter.post('/query', async (req: Request, res: Response): Promise<void> => {
       return;
     }
 
+    // Bearer sent but JWT invalid/expired — return 401 so the client refresh flow runs
+    if (req.aiAuthRejected) {
+      res.status(401).json({
+        error:
+          'Your session has expired or is invalid. Sign in again to use school data and AI features.',
+        code: 'SESSION_EXPIRED',
+        intent: 'session_expired',
+      });
+      return;
+    }
+
     // Unauthenticated user — check if it's a data query
     const { detectIntent } = require('../services/ai/localEngine');
     const intent = detectIntent(question.trim());
-    const lowerQuestion = question.trim().toLowerCase();
-
     // Block SAMS data queries for unauthenticated users (intent-based + keyword-based)
-    const isDataQuery = DATA_INTENTS.includes(intent) ||
-      SAMS_DATA_KEYWORDS.some((kw) => lowerQuestion.includes(kw));
-
-    if (isDataQuery) {
+    if (isSamsDataQuestion(question.trim(), intent)) {
       res.status(200).json({
-        answer: 'Please log in to access school data like attendance, timetables, and reports. I can answer general questions without login.\n\nTry asking: "What is SAMS?" or "What is photosynthesis?"',
+        answer:
+          'Sign in to access school data like attendance, timetables, and reports. I can answer general questions without login.\n\nIf you are already signed in, sign out and sign in again, or refresh the page.\n\nTry asking: "What is SAMS?" or "What is photosynthesis?"',
         intent: 'auth_required',
         engine: 'local',
       });

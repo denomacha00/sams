@@ -1,5 +1,40 @@
 import axios, { AxiosError, InternalAxiosRequestConfig } from 'axios';
 
+const SUPER_AUTH_STORAGE_KEY = 'super-auth-storage';
+
+function readSuperAccessToken(): string | null {
+  try {
+    const stored = localStorage.getItem(SUPER_AUTH_STORAGE_KEY);
+    if (!stored) return null;
+    const parsed = JSON.parse(stored) as { state?: { accessToken?: string } };
+    return parsed?.state?.accessToken ?? null;
+  } catch {
+    return null;
+  }
+}
+
+function readSuperRefreshToken(): string | null {
+  try {
+    const stored = localStorage.getItem(SUPER_AUTH_STORAGE_KEY);
+    if (!stored) return null;
+    const parsed = JSON.parse(stored) as { state?: { refreshToken?: string } };
+    return parsed?.state?.refreshToken ?? null;
+  } catch {
+    return null;
+  }
+}
+
+function writeSuperTokens(accessToken: string, refreshToken: string): void {
+  try {
+    const stored = localStorage.getItem(SUPER_AUTH_STORAGE_KEY);
+    const parsed = stored ? JSON.parse(stored) : { state: {} };
+    parsed.state = { ...parsed.state, accessToken, refreshToken };
+    localStorage.setItem(SUPER_AUTH_STORAGE_KEY, JSON.stringify(parsed));
+  } catch {
+    // ignore
+  }
+}
+
 const apiClient = axios.create({
   baseURL: import.meta.env.VITE_API_BASE_URL || '/api/v1',
   headers: { 'Content-Type': 'application/json' },
@@ -10,17 +45,9 @@ apiClient.interceptors.request.use((config: InternalAxiosRequestConfig) => {
   if (config.data instanceof FormData && config.headers) {
     delete config.headers['Content-Type'];
   }
-  const stored = localStorage.getItem('super-auth-storage');
-  if (stored) {
-    try {
-      const parsed = JSON.parse(stored);
-      const accessToken = parsed?.state?.accessToken;
-      if (accessToken && config.headers) {
-        config.headers.Authorization = `Bearer ${accessToken}`;
-      }
-    } catch {
-      // ignore parse errors
-    }
+  const accessToken = readSuperAccessToken();
+  if (accessToken && config.headers) {
+    config.headers.Authorization = `Bearer ${accessToken}`;
   }
   return config;
 });
@@ -68,11 +95,7 @@ apiClient.interceptors.response.use(
       isRefreshing = true;
 
       try {
-        const stored = localStorage.getItem('super-auth-storage');
-        if (!stored) throw new Error('No auth storage');
-
-        const parsed = JSON.parse(stored);
-        const refreshToken = parsed?.state?.refreshToken;
+        const refreshToken = readSuperRefreshToken();
         if (!refreshToken) throw new Error('No refresh token');
 
         const { data } = await axios.post(
@@ -83,10 +106,7 @@ apiClient.interceptors.response.use(
         const newAccessToken = data.accessToken;
         const newRefreshToken = data.refreshToken;
 
-        // Update localStorage
-        parsed.state.accessToken = newAccessToken;
-        parsed.state.refreshToken = newRefreshToken;
-        localStorage.setItem('super-auth-storage', JSON.stringify(parsed));
+        writeSuperTokens(newAccessToken, newRefreshToken);
 
         processQueue(null, newAccessToken);
 

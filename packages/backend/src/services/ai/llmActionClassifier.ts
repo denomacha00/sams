@@ -25,7 +25,9 @@ Rules:
 - Only classify as an action if confidence >= 0.7
 - Extract relevant parameters from the message
 - If ambiguous between multiple actions, pick the highest confidence one
-- Never classify informational questions as actions`;
+- Questions asking "how many" teachers, students, or classes in the user's department are action requests (e.g. view_department_stats, get_school_stats), not generic informational chat — classify them when a matching stats action exists
+- "Send message to class", "notify students", "notify department", "notify school" are action requests when a matching send_* action exists for the role
+- Do not classify general knowledge or policy questions as actions`;
 
 // ─── Classifier ───────────────────────────────────────────────────────────────
 

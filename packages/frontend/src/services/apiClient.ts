@@ -1,26 +1,19 @@
 import axios, { AxiosError, InternalAxiosRequestConfig } from 'axios';
+import { readAccessToken, readRefreshToken, writeTokens } from '../lib/authTokens';
 
 const apiClient = axios.create({
   baseURL: import.meta.env.VITE_API_BASE_URL || '/api/v1',
   headers: { 'Content-Type': 'application/json' },
 });
 
-// Inject Authorization header from localStorage; let axios set multipart boundaries for FormData
+// Inject Authorization from Zustand (then localStorage); let axios set multipart boundaries for FormData
 apiClient.interceptors.request.use((config: InternalAxiosRequestConfig) => {
   if (config.data instanceof FormData && config.headers) {
     delete config.headers['Content-Type'];
   }
-  const stored = localStorage.getItem('auth-storage');
-  if (stored) {
-    try {
-      const parsed = JSON.parse(stored);
-      const accessToken = parsed?.state?.accessToken;
-      if (accessToken && config.headers) {
-        config.headers.Authorization = `Bearer ${accessToken}`;
-      }
-    } catch {
-      // ignore parse errors
-    }
+  const accessToken = readAccessToken();
+  if (accessToken && config.headers) {
+    config.headers.Authorization = `Bearer ${accessToken}`;
   }
   return config;
 });
@@ -68,11 +61,7 @@ apiClient.interceptors.response.use(
       isRefreshing = true;
 
       try {
-        const stored = localStorage.getItem('auth-storage');
-        if (!stored) throw new Error('No auth storage');
-
-        const parsed = JSON.parse(stored);
-        const refreshToken = parsed?.state?.refreshToken;
+        const refreshToken = readRefreshToken();
         if (!refreshToken) throw new Error('No refresh token');
 
         const { data } = await axios.post(
@@ -83,10 +72,7 @@ apiClient.interceptors.response.use(
         const newAccessToken = data.accessToken;
         const newRefreshToken = data.refreshToken;
 
-        // Update localStorage
-        parsed.state.accessToken = newAccessToken;
-        parsed.state.refreshToken = newRefreshToken;
-        localStorage.setItem('auth-storage', JSON.stringify(parsed));
+        writeTokens(newAccessToken, newRefreshToken);
 
         processQueue(null, newAccessToken);
 
