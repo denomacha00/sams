@@ -501,11 +501,51 @@ bash scripts/deploy-production.sh
 bash scripts/post-deploy-verify.sh   # smoke check (also at end of deploy)
 ```
 
+### Upgrading Node.js to 20 on Ubuntu VPS
+
+SAMS requires **Node.js 20+** (see repo `.nvmrc`). If `node -v` shows v18 or lower, upgrade before the next deploy.
+
+**Install nvm (once per server user)** if `command -v nvm` fails:
+
+```bash
+curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.1/install.sh | bash
+# reload shell so nvm is on PATH:
+source ~/.bashrc   # or: source ~/.nvm/nvm.sh
+```
+
+**Install and default Node 20:**
+
+```bash
+nvm install 20
+nvm use 20
+nvm alias default 20
+node -v   # expect v20.x.x
+```
+
+**Rebuild and redeploy** (from app root):
+
+```bash
+cd /var/www/sams
+npm ci
+bash scripts/deploy-production.sh
+```
+
+Or run the idempotent helper (installs via nvm when Node < 20):
+
+```bash
+cd /var/www/sams
+bash scripts/upgrade-node20.sh
+bash scripts/deploy-production.sh
+```
+
+Ensure the same shell user that runs `pm2` uses nvm default 20 (`which node` should point under `~/.nvm/`). After upgrading, `bash scripts/post-deploy-verify.sh` should report `OK Node v20.x.x`.
+
 ### VPS helper scripts
 | Script | Purpose |
 |--------|---------|
 | `scripts/deploy-production.sh` | Pull main, `npm ci`, build all packages, migrate, PM2 reload |
 | `scripts/post-deploy-verify.sh` | Dist artifacts, PM2, `/health`, `.env` presence |
+| `scripts/upgrade-node20.sh` | Idempotent Node 20 via nvm when current version < 20 |
 | `scripts/set-production-env.sh` | JWT/QR secrets, `APP_URL`, `CORS`, OTP flags from AT key presence |
 | `scripts/configure-production-at.sh` | Interactive AT sandbox vs production (no committed secrets) |
 
@@ -521,6 +561,20 @@ bash scripts/post-deploy-verify.sh   # smoke check (also at end of deploy)
 - Runs tests with PostgreSQL + Redis containers
 - Builds all packages
 - Deploys via SSH to VPS
+
+### Production 100% checklist
+
+Use this after deploy or any production change:
+
+| Step | How to confirm |
+|------|----------------|
+| Deploy + verify passed | `bash scripts/deploy-production.sh` exits 0; `bash scripts/post-deploy-verify.sh` shows all critical checks passed |
+| Node 20+ | `node -v` → v20.x; verify script shows `OK Node` (not WARN) |
+| Production AT configured | `curl -s http://127.0.0.1:3001/health` → `"sms":{"configured":true,"sandbox":false}`; not sandbox username |
+| Test SMS | School admin → **Settings** → **SMS · Africa's Talking** → **Send test SMS** to a real number |
+| Login works | Sign in at https://app.smart-managment.com with a known account |
+| Class rep roster works | Class rep role can view assigned class roster / attendance as expected |
+| OTP login (optional) | Leave `OTP_LOGIN_ENABLED=false` until ready; then enable in `.env` and `pm2 reload` |
 
 ---
 

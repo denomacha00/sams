@@ -22,7 +22,7 @@ NODE_MAJOR="$(node -p "process.versions.node.split('.')[0]" 2>/dev/null || echo 
 if [[ "$NODE_MAJOR" -ge 20 ]]; then
   pass "Node $(node -v)"
 else
-  warn "Node $(node -v) — project recommends Node 20+"
+  warn "Node $(node -v) — SAMS requires Node 20+; run: bash scripts/upgrade-node20.sh (see DOCUMENTATION.md §9)"
 fi
 
 # Build artifacts
