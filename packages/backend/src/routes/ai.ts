@@ -40,19 +40,22 @@ function aiUploadMiddleware(
         return;
       }
       const code = (err as { code?: string }).code;
-      let answer = 'Image upload failed. Please try again.';
+      let answer = 'Could not attach that photo. Try again.';
+      let intent: 'upload_error' | 'image_analysis_error' = 'upload_error';
       if (code === 'LIMIT_FILE_SIZE') {
-        answer = 'Each image must be 5 MB or smaller.';
+        answer = 'Could not attach that photo. Try a screenshot or another image.';
       } else if (code === 'LIMIT_FILE_COUNT') {
-        answer = 'You can upload up to 4 images at once.';
+        answer = 'You can attach up to 4 photos at once.';
       } else if (code === 'LIMIT_UNEXPECTED_FILE') {
-        answer = 'Unexpected file field. Use the image upload button only.';
+        answer = 'Could not attach that file. Use the photo button only.';
       } else if (err instanceof Error && err.message.includes('Only image')) {
-        answer = 'Only image files are allowed (JPEG, PNG, WebP, etc.).';
+        answer = 'Only image files can be attached (JPEG, PNG, WebP).';
+      } else {
+        intent = 'image_analysis_error';
       }
       res.status(200).json({
         answer,
-        intent: 'image_analysis_error',
+        intent,
         engine: 'local',
       });
     });

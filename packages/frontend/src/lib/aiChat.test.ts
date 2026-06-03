@@ -10,9 +10,10 @@ describe('aiChat', () => {
     expect(msg).toBe('Vision model unavailable');
   });
 
-  it('maps 413 to a clear upload message', () => {
+  it('maps 413 to a short upload message', () => {
     const msg = getAiErrorMessage({ response: { status: 413, data: {} } }, 'fallback');
-    expect(msg).toContain('too large');
+    expect(msg).toContain('photo');
+    expect(msg).not.toContain('5 MB');
   });
 
   it('maps session expired responses', () => {

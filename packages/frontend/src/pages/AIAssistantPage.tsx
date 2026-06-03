@@ -6,10 +6,12 @@ import {
   getAiErrorMessage,
   isAiAuthIntent,
   isAiUnavailableIntent,
+  isAiUploadErrorIntent,
   isAiVisionFailureIntent,
   loadAiThreadId,
   saveAiThreadId,
 } from '../lib/aiChat';
+import { prepareImagesForAiUpload } from '../lib/aiImageUpload';
 import { AiMessageContent } from '../lib/aiMessageContent';
 import { readAccessToken } from '../lib/authTokens';
 
@@ -50,18 +52,32 @@ const AIAssistantPage: React.FC = () => {
   const [selectedImages, setSelectedImages] = useState<File[]>([]);
   const [imagePreviews, setImagePreviews] = useState<string[]>([]);
 
-  const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleImageSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []);
     const remaining = 4 - selectedImages.length;
-    const toAdd = files.slice(0, remaining).filter((f) => f.size <= 5 * 1024 * 1024);
-    if (toAdd.length === 0) return;
-    setSelectedImages((prev) => [...prev, ...toAdd]);
-    toAdd.forEach((file) => {
-      const reader = new FileReader();
-      reader.onload = () => setImagePreviews((prev) => [...prev, reader.result as string]);
-      reader.readAsDataURL(file);
-    });
-    if (fileInputRef.current) fileInputRef.current.value = '';
+    const slice = files.slice(0, remaining);
+    if (slice.length === 0) return;
+
+    try {
+      const toAdd = await prepareImagesForAiUpload(slice);
+      if (toAdd.length === 0) return;
+      setSelectedImages((prev) => [...prev, ...toAdd]);
+      toAdd.forEach((file) => {
+        const reader = new FileReader();
+        reader.onload = () => setImagePreviews((prev) => [...prev, reader.result as string]);
+        reader.readAsDataURL(file);
+      });
+    } catch {
+      setMessages((prev) => [...prev, {
+        id: crypto.randomUUID(),
+        role: 'assistant',
+        content: 'Could not prepare that photo. Try another image.',
+        timestamp: new Date(),
+        isError: true,
+      }]);
+    } finally {
+      if (fileInputRef.current) fileInputRef.current.value = '';
+    }
   };
 
   const removeImage = (index: number) => {
@@ -127,7 +143,10 @@ const AIAssistantPage: React.FC = () => {
           role: 'assistant',
           content: data.answer,
           timestamp: new Date(),
-          isError: isAiVisionFailureIntent(data.intent) || isAiUnavailableIntent(data.intent),
+          isError:
+            isAiUploadErrorIntent(data.intent) ||
+            isAiVisionFailureIntent(data.intent) ||
+            isAiUnavailableIntent(data.intent),
         }]);
         return;
       }

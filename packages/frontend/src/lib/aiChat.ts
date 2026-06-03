@@ -67,7 +67,7 @@ export function getAiErrorMessage(err: unknown, fallback: string): string {
     return getAiAuthHint('session_expired') ?? fallback;
   }
   if (status === 413) {
-    return 'The image upload is too large. Use images under 5 MB each (up to 4 images), then try again.';
+    return 'Could not send that photo. Try again or use a screenshot.';
   }
   if (status === 429 || data?.code === 'RATE_LIMITED') {
     return 'Too many requests. Wait a moment and try again.';
@@ -85,6 +85,11 @@ export function getAiErrorMessage(err: unknown, fallback: string): string {
   }
 
   return fallback;
+}
+
+/** Upload rejected (size/type/count) — show as system error, not a normal AI reply. */
+export function isAiUploadErrorIntent(intent?: string): boolean {
+  return intent === 'upload_error';
 }
 
 /** True when a 200 vision/query response still indicates a provider or config failure. */

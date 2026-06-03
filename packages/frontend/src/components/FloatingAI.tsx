@@ -6,10 +6,12 @@ import {
   getAiErrorMessage,
   isAiAuthIntent,
   isAiUnavailableIntent,
+  isAiUploadErrorIntent,
   isAiVisionFailureIntent,
   loadAiThreadId,
   saveAiThreadId,
 } from '../lib/aiChat';
+import { prepareImagesForAiUpload } from '../lib/aiImageUpload';
 import { AiMessageContent } from '../lib/aiMessageContent';
 
 interface PendingAction {
@@ -77,20 +79,33 @@ const FloatingAI: React.FC = () => {
 
   const isImageGenRequest = (text: string) => IMAGE_GEN_PATTERNS.some((p) => p.test(text.trim()));
 
-  const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleImageSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []);
     const remaining = 4 - selectedImages.length;
-    const toAdd = files.slice(0, remaining).filter((f) => f.size <= 5 * 1024 * 1024);
+    const slice = files.slice(0, remaining);
+    if (slice.length === 0) return;
 
-    if (toAdd.length === 0) return;
+    try {
+      const toAdd = await prepareImagesForAiUpload(slice);
+      if (toAdd.length === 0) return;
 
-    setSelectedImages((prev) => [...prev, ...toAdd]);
-    toAdd.forEach((file) => {
-      const reader = new FileReader();
-      reader.onload = () => setImagePreviews((prev) => [...prev, reader.result as string]);
-      reader.readAsDataURL(file);
-    });
-    if (fileInputRef.current) fileInputRef.current.value = '';
+      setSelectedImages((prev) => [...prev, ...toAdd]);
+      toAdd.forEach((file) => {
+        const reader = new FileReader();
+        reader.onload = () => setImagePreviews((prev) => [...prev, reader.result as string]);
+        reader.readAsDataURL(file);
+      });
+    } catch {
+      setMessages((prev) => [...prev, {
+        id: crypto.randomUUID(),
+        role: 'assistant',
+        content: 'Could not prepare that photo. Try another image.',
+        timestamp: new Date(),
+        isError: true,
+      }]);
+    } finally {
+      if (fileInputRef.current) fileInputRef.current.value = '';
+    }
   };
 
   const removeImage = (index: number) => {
@@ -160,7 +175,10 @@ const FloatingAI: React.FC = () => {
           role: 'assistant',
           content: data.answer,
           timestamp: new Date(),
-          isError: isAiVisionFailureIntent(data.intent) || isAiUnavailableIntent(data.intent),
+          isError:
+            isAiUploadErrorIntent(data.intent) ||
+            isAiVisionFailureIntent(data.intent) ||
+            isAiUnavailableIntent(data.intent),
         }]);
         return;
       }
