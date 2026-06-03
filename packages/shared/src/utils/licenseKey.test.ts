@@ -4,8 +4,6 @@ import { PlanTier, LicensePayload } from '../types/index';
 
 const TEST_SECRET = 'test-hmac-secret-key';
 
-// ─── Helper ───────────────────────────────────────────────────────────────────
-
 function makePayload(overrides: Partial<LicensePayload> = {}): LicensePayload {
   return {
     schoolName: 'Nairobi High School',
@@ -15,19 +13,19 @@ function makePayload(overrides: Partial<LicensePayload> = {}): LicensePayload {
   };
 }
 
-// ─── encodeLicenseKey ─────────────────────────────────────────────────────────
-
 describe('encodeLicenseKey', () => {
   it('returns a string matching the XXXX-YYYY-XXXX-XXXX pattern (groups of 4 uppercase alphanumeric chars)', () => {
     const key = encodeLicenseKey(makePayload(), TEST_SECRET);
     expect(key).toMatch(/^[A-Z0-9]{4}(-[A-Z0-9]{4})+$/);
   });
 
-  it('produces a deterministic key for the same payload and secret', () => {
+  it('produces unique keys for repeated encodes of the same payload', () => {
     const payload = makePayload();
     const key1 = encodeLicenseKey(payload, TEST_SECRET);
     const key2 = encodeLicenseKey(payload, TEST_SECRET);
-    expect(key1).toBe(key2);
+    expect(key1).not.toBe(key2);
+    expect(decodeLicenseKey(key1, TEST_SECRET)).not.toBeNull();
+    expect(decodeLicenseKey(key2, TEST_SECRET)).not.toBeNull();
   });
 
   it('produces different keys for different secrets', () => {
@@ -48,17 +46,24 @@ describe('encodeLicenseKey', () => {
     const shortName = 'A'.repeat(20);
     const keyLong = encodeLicenseKey(makePayload({ schoolName: longName }), TEST_SECRET);
     const keyShort = encodeLicenseKey(makePayload({ schoolName: shortName }), TEST_SECRET);
-    // Both should encode the same 20-char name
-    expect(keyLong).toBe(keyShort);
+    const decodedLong = decodeLicenseKey(keyLong, TEST_SECRET);
+    const decodedShort = decodeLicenseKey(keyShort, TEST_SECRET);
+    expect(decodedLong).not.toBeNull();
+    expect(decodedShort).not.toBeNull();
+    expect(decodedLong!.schoolName).toBe(decodedShort!.schoolName);
+    expect(decodedLong!.schoolName).toHaveLength(20);
   });
 
   it('encodes expiresAt as a Unix timestamp (second precision)', () => {
-    // Two dates that differ only in milliseconds should produce the same key
     const date1 = new Date('2026-06-15T12:00:00.000Z');
     const date2 = new Date('2026-06-15T12:00:00.999Z');
     const key1 = encodeLicenseKey(makePayload({ expiresAt: date1 }), TEST_SECRET);
     const key2 = encodeLicenseKey(makePayload({ expiresAt: date2 }), TEST_SECRET);
-    expect(key1).toBe(key2);
+    const decoded1 = decodeLicenseKey(key1, TEST_SECRET);
+    const decoded2 = decodeLicenseKey(key2, TEST_SECRET);
+    expect(decoded1).not.toBeNull();
+    expect(decoded2).not.toBeNull();
+    expect(decoded1!.expiresAt.getTime()).toBe(decoded2!.expiresAt.getTime());
   });
 
   it('produces different keys for different expiry dates', () => {
@@ -74,8 +79,6 @@ describe('encodeLicenseKey', () => {
   });
 });
 
-// ─── decodeLicenseKey ─────────────────────────────────────────────────────────
-
 describe('decodeLicenseKey', () => {
   it('round-trips: decoded payload matches original payload', () => {
     const payload = makePayload();
@@ -85,7 +88,6 @@ describe('decodeLicenseKey', () => {
     expect(decoded).not.toBeNull();
     expect(decoded!.schoolName).toBe(payload.schoolName);
     expect(decoded!.planTier).toBe(payload.planTier);
-    // expiresAt is stored at second precision
     expect(decoded!.expiresAt.getTime()).toBe(
       Math.floor(payload.expiresAt.getTime() / 1000) * 1000,
     );
@@ -102,7 +104,7 @@ describe('decodeLicenseKey', () => {
   });
 
   it('round-trips a school name with exactly 20 characters', () => {
-    const name = 'KenyaHighSchool12345'; // exactly 20 chars
+    const name = 'KenyaHighSchool12345';
     const payload = makePayload({ schoolName: name });
     const key = encodeLicenseKey(payload, TEST_SECRET);
     const decoded = decodeLicenseKey(key, TEST_SECRET);
@@ -129,7 +131,6 @@ describe('decodeLicenseKey', () => {
 
   it('returns null for a key with a tampered character', () => {
     const key = encodeLicenseKey(makePayload(), TEST_SECRET);
-    // Flip one character in the first group
     const tampered = key[0] === 'A' ? 'B' + key.slice(1) : 'A' + key.slice(1);
     expect(decodeLicenseKey(tampered, TEST_SECRET)).toBeNull();
   });
@@ -140,7 +141,6 @@ describe('decodeLicenseKey', () => {
   });
 
   it('returns null for a key with groups of wrong length', () => {
-    // 3-char groups instead of 4
     expect(decodeLicenseKey('ABC-DEF-GHI-JKL', TEST_SECRET)).toBeNull();
   });
 
@@ -153,11 +153,9 @@ describe('decodeLicenseKey', () => {
   });
 });
 
-// ─── Edge cases ───────────────────────────────────────────────────────────────
-
 describe('encodeLicenseKey / decodeLicenseKey edge cases', () => {
   it('handles a school name with special characters (truncated to 20)', () => {
-    const name = "St. Mary's Int'l Sch"; // 20 chars with punctuation
+    const name = "St. Mary's Int'l Sch";
     const payload = makePayload({ schoolName: name });
     const key = encodeLicenseKey(payload, TEST_SECRET);
     const decoded = decodeLicenseKey(key, TEST_SECRET);
@@ -165,7 +163,7 @@ describe('encodeLicenseKey / decodeLicenseKey edge cases', () => {
   });
 
   it('handles a school name with Unicode characters', () => {
-    const name = 'Shule ya Nairobi 2025'; // 21 chars — will be truncated to 20
+    const name = 'Shule ya Nairobi 2025';
     const payload = makePayload({ schoolName: name });
     const key = encodeLicenseKey(payload, TEST_SECRET);
     const decoded = decodeLicenseKey(key, TEST_SECRET);
@@ -173,12 +171,11 @@ describe('encodeLicenseKey / decodeLicenseKey edge cases', () => {
   });
 
   it('handles a far-future expiry date', () => {
-    const expiresAt = new Date('2099-06-15T12:00:00.000Z'); // mid-year to avoid timezone edge cases
+    const expiresAt = new Date('2099-06-15T12:00:00.000Z');
     const payload = makePayload({ expiresAt });
     const key = encodeLicenseKey(payload, TEST_SECRET);
     const decoded = decodeLicenseKey(key, TEST_SECRET);
     expect(decoded).not.toBeNull();
-    // Compare UTC full year to avoid local timezone issues
     expect(decoded!.expiresAt.getUTCFullYear()).toBe(2099);
   });
 
