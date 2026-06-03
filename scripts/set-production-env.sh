@@ -73,7 +73,13 @@ grep -E '^(NODE_ENV|APP_URL|CORS_ORIGIN|OTP_|JWT_|QR_SECRET)=' "$ENV_FILE"
 
 echo "==> Reload PM2"
 cd "$ROOT"
-pm2 reload ecosystem.config.js --env production
+mkdir -p /var/log/sams
+set -a
+# shellcheck disable=SC1091
+source "$ENV_FILE"
+set +a
+pm2 delete sams-api 2>/dev/null || true
+pm2 start ecosystem.config.js --env production --update-env
 
 echo "==> Health"
 sleep 2
