@@ -176,6 +176,8 @@ describe('actionIntentDetector role scoping (regex path)', () => {
       'unsuspend school Test Academy',
       'unblock school Test Academy',
       'reactivate school Test Academy',
+      'undo suspend Test Academy',
+      'undo suspension for Test Academy',
     ];
     for (const message of cases) {
       const result = await actionIntentDetector.detect(message, UserRole.SUPER_ADMIN);

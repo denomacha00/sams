@@ -57,19 +57,35 @@ is_weak_production_secret() {
 }
 
 # Source .env then secrets for PM2 shell (same order as load-env-from-file.js).
+# Only KEY=value lines are applied — ignores junk pasted into secrets files (e.g. shell commands).
+safe_source_env_file() {
+  local f="$1" line
+  [[ -f "$f" ]] || return 0
+  while IFS= read -r line || [[ -n "$line" ]]; do
+    line="${line//$'\r'/}"
+    [[ -z "${line//[[:space:]]/}" ]] && continue
+    [[ "$line" =~ ^[[:space:]]*# ]] && continue
+    if [[ "$line" =~ ^[[:space:]]*export[[:space:]]+ ]]; then
+      line="${line#export}"
+      line="${line#"${line%%[![:space:]]*}"}"
+    fi
+    [[ "$line" =~ ^[A-Za-z_][A-Za-z0-9_]*= ]] || continue
+    # shellcheck disable=SC2163
+    export "$line"
+  done < "$f"
+}
+
 source_merged_env() {
   local f
   if [[ -f "$MERGED_ENV_FILE" ]]; then
     set -a
-    # shellcheck disable=SC1090
-    source "$MERGED_ENV_FILE"
+    safe_source_env_file "$MERGED_ENV_FILE"
     set +a
   fi
   while IFS= read -r f; do
     [[ -z "$f" || ! -f "$f" ]] && continue
     set -a
-    # shellcheck disable=SC1090
-    source "$f"
+    safe_source_env_file "$f"
     set +a
   done < <(merged_env_secrets_paths)
 }

@@ -282,6 +282,8 @@ export const superAdminActions: ActionDefinition[] = [
       /\bunblock\s+(.+)/i,
       /\breactivate\s+(.+)/i,
       /\benabl(?:e|ing)\s+(.+)/i,
+      /\bundo\s+(?:the\s+)?suspend(?:sion)?\s+(?:for\s+)?(.+)/i,
+      /\bundo\s+(?:the\s+)?suspend(?:sion)?\s+of\s+(.+)/i,
     ],
     extractParams: (message: string, match: RegExpMatchArray | null) => {
       const schoolName = match && match[1] ? extractSchoolName(match[1]) : '';

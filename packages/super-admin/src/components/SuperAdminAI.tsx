@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import apiClient from '../services/apiClient';
+import { prepareImagesForAiUpload } from '../lib/aiImageUpload';
 
 interface PendingAction {
   action: string;
@@ -17,6 +18,7 @@ interface ChatMessage {
 }
 
 const AI_UNAVAILABLE_INTENTS = new Set(['ai_error', 'ai_not_configured']);
+const AI_VISION_FAILURE_INTENTS = new Set(['image_analysis_error', 'ai_not_configured', 'upload_error']);
 
 const CONFIRM_RE = /^(yes|y|confirm|proceed|ok|do it|go ahead)\.?$/i;
 
@@ -54,18 +56,27 @@ const SuperAdminAI: React.FC = () => {
 
   const generateId = () => Math.random().toString(36).substring(2, 10);
 
-  const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleImageSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []);
     const remaining = 4 - selectedImages.length;
-    const toAdd = files.slice(0, remaining).filter((f) => f.size <= 5 * 1024 * 1024);
-    if (toAdd.length === 0) return;
-    setSelectedImages((prev) => [...prev, ...toAdd]);
-    toAdd.forEach((file) => {
-      const reader = new FileReader();
-      reader.onload = () => setImagePreviews((prev) => [...prev, reader.result as string]);
-      reader.readAsDataURL(file);
-    });
-    if (fileInputRef.current) fileInputRef.current.value = '';
+    const slice = files.slice(0, remaining);
+    if (slice.length === 0) return;
+
+    try {
+      const toAdd = await prepareImagesForAiUpload(slice);
+      if (toAdd.length === 0) return;
+
+      setSelectedImages((prev) => [...prev, ...toAdd]);
+      toAdd.forEach((file) => {
+        const reader = new FileReader();
+        reader.onload = () => setImagePreviews((prev) => [...prev, reader.result as string]);
+        reader.readAsDataURL(file);
+      });
+    } catch {
+      appendAssistant('Could not prepare that photo. Try another image.', undefined, true);
+    } finally {
+      if (fileInputRef.current) fileInputRef.current.value = '';
+    }
   };
 
   const removeImage = (index: number) => {
@@ -150,7 +161,11 @@ const SuperAdminAI: React.FC = () => {
         setImagePreviews([]);
 
         const { data } = await apiClient.post('/ai/query-with-image', formData);
-        appendAssistant(data.answer);
+        appendAssistant(
+          data.answer,
+          undefined,
+          AI_VISION_FAILURE_INTENTS.has(data.intent) || AI_UNAVAILABLE_INTENTS.has(data.intent),
+        );
         return;
       }
 
@@ -164,11 +179,14 @@ const SuperAdminAI: React.FC = () => {
 
       await runQuery(question);
     } catch (err: any) {
+      const status = err.response?.status;
       const answer =
-        err.response?.data?.answer ||
-        err.response?.data?.error ||
-        err.message ||
-        'Unknown error';
+        status === 413
+          ? 'Could not send that photo — it is too large for the server. Try one image or a screenshot.'
+          : err.response?.data?.answer ||
+            err.response?.data?.error ||
+            err.message ||
+            'Unknown error';
       appendAssistant(`Sorry, I encountered an error: ${answer}`, undefined, true);
     } finally {
       setLoading(false);
