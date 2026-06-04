@@ -177,6 +177,7 @@ attendanceRouter.post('/link/generate', requirePermission('start:session'), asyn
     const result = await attendanceService.generateAttendanceLink(
       parsed.data.sessionId,
       req.schoolId,
+      req.user.sub,
       parsed.data.expiryMinutes,
       parsed.data.requireGps,
       parsed.data.gpsRadiusM,
@@ -256,8 +257,18 @@ attendanceRouter.get('/link/:token/info', async (req: Request, res: Response): P
       return;
     }
 
+    if (session.schoolId !== req.schoolId) {
+      res.status(200).json({ valid: false, error: 'INVALID' });
+      return;
+    }
+
     if (!session.isActive) {
       res.status(200).json({ valid: false, error: 'SESSION_ENDED' });
+      return;
+    }
+
+    if (session.currentLinkToken !== token) {
+      res.status(200).json({ valid: false, error: 'REVOKED' });
       return;
     }
 
@@ -375,8 +386,32 @@ attendanceRouter.get('/', async (req: Request, res: Response): Promise<void> => 
         }
         where.sessionId = { in: sessionIds };
       }
+    } else if (req.user.role === UserRole.HOD) {
+      if (!req.user.departmentId) {
+        res.status(200).json([]);
+        return;
+      }
+      const classes = await prisma.class.findMany({
+        where: { schoolId: req.schoolId, departmentId: req.user.departmentId },
+        select: { id: true },
+      });
+      const classIds = classes.map((c) => c.id);
+      if (classIds.length === 0) {
+        res.status(200).json([]);
+        return;
+      }
+      const sessions = await prisma.attendanceSession.findMany({
+        where: { schoolId: req.schoolId, classId: { in: classIds } },
+        select: { id: true },
+      });
+      const sessionIds = sessions.map((s) => s.id);
+      if (sessionIds.length === 0) {
+        res.status(200).json([]);
+        return;
+      }
+      where.sessionId = { in: sessionIds };
     }
-    // HOD and SCHOOL_ADMIN: can filter by studentId, sessionId, status from query params
+    // SCHOOL_ADMIN: can filter by studentId, sessionId, status from query params
 
     // Additional filters from query params (non-student roles only)
     if (req.query.studentId && req.user.role !== UserRole.STUDENT) {

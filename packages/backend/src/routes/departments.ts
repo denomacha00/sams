@@ -50,6 +50,10 @@ departmentsRouter.get('/', async (req: Request, res: Response): Promise<void> =>
 });
 
 departmentsRouter.post('/', requirePermission('manage:users'), async (req: Request, res: Response): Promise<void> => {
+  if (req.user.role !== 'SCHOOL_ADMIN') {
+    res.status(403).json({ error: 'Forbidden', code: 'FORBIDDEN' });
+    return;
+  }
   const parsed = createDeptSchema.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: 'Validation failed', code: 'VALIDATION_ERROR', details: parsed.error.flatten().fieldErrors });
@@ -65,6 +69,10 @@ departmentsRouter.post('/', requirePermission('manage:users'), async (req: Reque
 });
 
 departmentsRouter.put('/:id', requirePermission('manage:users'), async (req: Request, res: Response): Promise<void> => {
+  if (req.user.role !== 'SCHOOL_ADMIN') {
+    res.status(403).json({ error: 'Forbidden', code: 'FORBIDDEN' });
+    return;
+  }
   const parsed = createDeptSchema.safeParse(req.body);
   if (!parsed.success) { res.status(400).json({ error: 'Validation failed', code: 'VALIDATION_ERROR' }); return; }
   try {
@@ -80,6 +88,10 @@ departmentsRouter.put('/:id', requirePermission('manage:users'), async (req: Req
 });
 
 departmentsRouter.delete('/:id', requirePermission('manage:users'), async (req: Request, res: Response): Promise<void> => {
+  if (req.user.role !== 'SCHOOL_ADMIN') {
+    res.status(403).json({ error: 'Forbidden', code: 'FORBIDDEN' });
+    return;
+  }
   try {
     const id = String(req.params.id);
     const dept = await prisma.department.findUnique({ where: { id } });
@@ -168,6 +180,16 @@ classesRouter.post('/', requirePermission('manage:users'), async (req: Request, 
     return;
   }
   try {
+    const dept = await prisma.department.findUnique({ where: { id: parsed.data.departmentId } });
+    if (!dept || dept.schoolId !== req.schoolId) {
+      res.status(404).json({ error: 'Department not found', code: 'NOT_FOUND' });
+      return;
+    }
+    if (req.user.role === 'HOD' && dept.id !== req.user.departmentId) {
+      res.status(403).json({ error: 'Forbidden', code: 'FORBIDDEN' });
+      return;
+    }
+
     const cls = await prisma.class.create({
       data: {
         schoolId: req.schoolId,
@@ -202,6 +224,14 @@ classesRouter.put('/:id', requirePermission('manage:users'), async (req: Request
       }
       if (parsed.data.departmentId && parsed.data.departmentId !== req.user.departmentId) {
         res.status(403).json({ error: 'Forbidden: HODs cannot move classes to another department', code: 'FORBIDDEN' });
+        return;
+      }
+    }
+
+    if (parsed.data.departmentId) {
+      const dept = await prisma.department.findUnique({ where: { id: parsed.data.departmentId } });
+      if (!dept || dept.schoolId !== req.schoolId) {
+        res.status(404).json({ error: 'Department not found', code: 'NOT_FOUND' });
         return;
       }
     }

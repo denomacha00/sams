@@ -88,13 +88,17 @@ ReactDOM.createRoot(document.getElementById('root') as HTMLElement).render(
           <Route path="/notifications" element={<NotificationsPage />} />
         </Route>
 
-        {/* Teacher + HOD + Admin routes */}
-        <Route element={<AuthGuard allowedRoles={[UserRole.SCHOOL_ADMIN, UserRole.HOD, UserRole.TEACHER]} />}>
+        {/* Teacher + HOD attendance routes */}
+        <Route element={<AuthGuard allowedRoles={[UserRole.HOD, UserRole.TEACHER]} />}>
           <Route path="/sessions" element={<SessionPage />} />
           <Route path="/attendance" element={<ManualAttendancePage />} />
           <Route path="/biometric/attendance" element={<BiometricAttendancePage />} />
           <Route path="/class/students" element={<ClassStudentsPage />} />
           <Route path="/class-roster" element={<ClassRosterPage />} />
+        </Route>
+
+        {/* Knowledge management routes */}
+        <Route element={<AuthGuard allowedRoles={[UserRole.SCHOOL_ADMIN, UserRole.HOD, UserRole.TEACHER]} />}>
           <Route path="/admin/knowledge" element={<KnowledgeManagementPage />} />
         </Route>
 
@@ -113,8 +117,12 @@ ReactDOM.createRoot(document.getElementById('root') as HTMLElement).render(
           <Route path="/admin" element={<AdminDashboardPage />} />
           <Route path="/admin/users" element={<UserManagementPage />} />
           <Route path="/admin/timetable" element={<TimetablePage />} />
-          <Route path="/admin/departments" element={<DepartmentsPage />} />
           <Route path="/risk-scores" element={<RiskScorePage />} />
+        </Route>
+
+        {/* School admin-only department administration */}
+        <Route element={<AuthGuard allowedRoles={[UserRole.SCHOOL_ADMIN]} />}>
+          <Route path="/admin/departments" element={<DepartmentsPage />} />
         </Route>
 
         {/* Registration Links — accessible to SCHOOL_ADMIN, HOD, and TEACHER */}

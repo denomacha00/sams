@@ -48,6 +48,8 @@ export class TimetableService {
     // Validate required fields
     this._validateEntryData(data);
 
+    await this._assertReferencesBelongToSchool(schoolId, data.classId, data.teacherId);
+
     // Check for overlaps
     await this._checkOverlaps(schoolId, data.dayOfWeek, data.startTime, data.endTime, {
       teacherId: data.teacherId,
@@ -99,6 +101,8 @@ export class TimetableService {
       endTime: data.endTime ?? entry.endTime,
       room: data.room !== undefined ? data.room : entry.room,
     };
+
+    await this._assertReferencesBelongToSchool(schoolId, merged.classId, merged.teacherId);
 
     // Re-run overlap check excluding self
     await this._checkOverlaps(schoolId, merged.dayOfWeek, merged.startTime, merged.endTime, {
@@ -198,6 +202,25 @@ export class TimetableService {
     }
     if (data.startTime >= data.endTime) {
       throw new AppError(400, 'VALIDATION_ERROR', 'startTime must be before endTime');
+    }
+  }
+
+  private async _assertReferencesBelongToSchool(
+    schoolId: string,
+    classId: string,
+    teacherId: string,
+  ): Promise<void> {
+    const [cls, teacher] = await Promise.all([
+      prisma.class.findUnique({ where: { id: classId }, select: { schoolId: true } }),
+      prisma.user.findUnique({ where: { id: teacherId }, select: { schoolId: true, role: true } }),
+    ]);
+
+    if (!cls || cls.schoolId !== schoolId) {
+      throw new AppError(400, 'INVALID_CLASS', 'Class does not belong to this school');
+    }
+
+    if (!teacher || teacher.schoolId !== schoolId || (teacher.role !== 'TEACHER' && teacher.role !== 'HOD')) {
+      throw new AppError(400, 'INVALID_TEACHER', 'Teacher does not belong to this school');
     }
   }
 

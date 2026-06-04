@@ -3,6 +3,7 @@ import { UserRole } from '@sams/shared';
 import { requirePermission } from '../middleware/rbac';
 import { riskService } from '../services/riskService';
 import { AppError } from '../middleware/errors';
+import { prisma } from '../lib/prisma';
 
 // ─── Router ───────────────────────────────────────────────────────────────────
 
@@ -65,7 +66,23 @@ riskScoresRouter.get('/', requirePermission('view:risk'), async (req: Request, r
  */
 riskScoresRouter.get('/:studentId', requirePermission('view:risk'), async (req: Request, res: Response): Promise<void> => {
   try {
-    const score = await riskService.computeRiskScore(req.schoolId, req.params.studentId as string);
+    const studentId = req.params.studentId as string;
+
+    if (req.user.role === UserRole.STUDENT && studentId !== req.user.sub) {
+      throw new AppError(403, 'FORBIDDEN', 'Students can only view their own risk score');
+    }
+
+    if (req.user.role === UserRole.HOD) {
+      const student = await prisma.user.findUnique({
+        where: { id: studentId },
+        select: { schoolId: true, departmentId: true },
+      });
+      if (!student || student.schoolId !== req.schoolId || student.departmentId !== req.user.departmentId) {
+        throw new AppError(403, 'FORBIDDEN', 'HODs can only view risk scores for their department');
+      }
+    }
+
+    const score = await riskService.computeRiskScore(req.schoolId, studentId);
     res.status(200).json(score);
   } catch (err) {
     if (err instanceof AppError) {

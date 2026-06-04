@@ -196,6 +196,7 @@ export class AttendanceService {
   async generateAttendanceLink(
     sessionId: string,
     schoolId: string,
+    teacherId: string,
     expiryMinutes: number = 5,
     requireGps: boolean = true,
     gpsRadiusM: number = 100,
@@ -215,6 +216,10 @@ export class AttendanceService {
 
     if (session.schoolId !== schoolId) {
       throw new AppError(403, 'FORBIDDEN', 'Session does not belong to your school');
+    }
+
+    if (session.teacherId !== teacherId) {
+      throw new AppError(403, 'FORBIDDEN', 'You do not own this attendance session');
     }
 
     if (requireGps && !hasSessionGpsAnchor(session)) {

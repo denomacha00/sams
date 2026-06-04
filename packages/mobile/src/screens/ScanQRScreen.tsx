@@ -11,7 +11,9 @@ import * as Location from 'expo-location';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { Ionicons } from '@expo/vector-icons';
+import { UserRole } from '@sams/shared';
 import { colors } from '../theme/colors';
+import { useAuth } from '../auth/AuthContext';
 import { submitQrAttendance } from '../api/client';
 import { getApiErrorMessage } from '../lib/apiError';
 import type { MainStackParamList } from '../navigation/types';
@@ -20,6 +22,7 @@ type Nav = NativeStackNavigationProp<MainStackParamList, 'ScanQR'>;
 
 export function ScanQRScreen() {
   const navigation = useNavigation<Nav>();
+  const { user } = useAuth();
   const [permission, requestPermission] = useCameraPermissions();
   const [scanning, setScanning] = useState(true);
   const [loading, setLoading] = useState(false);
@@ -71,6 +74,21 @@ export function ScanQRScreen() {
     setGpsStatus('idle');
     setScanning(true);
   };
+
+  if (user?.role !== UserRole.STUDENT) {
+    return (
+      <View style={styles.container}>
+        <Header onBack={() => navigation.goBack()} />
+        <View style={styles.card}>
+          <Text style={styles.title}>Student QR only</Text>
+          <Text style={styles.hint}>
+            QR attendance is for students using their own phone. Teachers and HODs should start
+            sessions or use face attendance for class check-in.
+          </Text>
+        </View>
+      </View>
+    );
+  }
 
   if (!permission) {
     return (

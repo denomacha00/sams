@@ -2,6 +2,7 @@
   "name": "sams",
   "version": "1.0.0",
   "private": true,
+  "packageManager": "npm@10.0.0",
   "workspaces": [
     "packages/shared",
     "packages/backend",

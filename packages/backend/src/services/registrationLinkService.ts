@@ -68,11 +68,20 @@ export class RegistrationLinkService {
     let targetRole: UserRole;
 
     if (options && options.targetRole) {
-      // HOD-specific validation: only TEACHER or STUDENT allowed
-      if (creatorRole === UserRole.HOD) {
-        if (options.targetRole !== 'TEACHER' && options.targetRole !== 'STUDENT') {
+      if (creatorRole === UserRole.SCHOOL_ADMIN) {
+        if (![UserRole.HOD, UserRole.TEACHER, UserRole.STUDENT].includes(options.targetRole as UserRole)) {
+          throw new AppError(400, 'INVALID_TARGET_ROLE', 'School admins can only generate links for HOD, TEACHER, or STUDENT roles');
+        }
+      } else if (creatorRole === UserRole.HOD) {
+        if (options.targetRole !== UserRole.TEACHER && options.targetRole !== UserRole.STUDENT) {
           throw new AppError(400, 'INVALID_TARGET_ROLE', 'HOD can only generate links for TEACHER or STUDENT roles');
         }
+      } else if (creatorRole === UserRole.TEACHER) {
+        if (options.targetRole !== UserRole.STUDENT) {
+          throw new AppError(400, 'INVALID_TARGET_ROLE', 'Teachers can only generate links for STUDENT registrations');
+        }
+      } else {
+        throw new AppError(403, 'FORBIDDEN', 'Your role cannot generate registration links');
       }
       targetRole = options.targetRole as UserRole;
     } else {
@@ -88,6 +97,21 @@ export class RegistrationLinkService {
           break;
         default:
           throw new AppError(403, 'FORBIDDEN', 'Your role cannot generate registration links');
+      }
+    }
+
+    if (creatorRole === UserRole.TEACHER) {
+      const teacher = await prisma.user.findFirst({
+        where: { id: creatorId, schoolId, role: UserRole.TEACHER },
+        select: { classId: true, departmentId: true },
+      });
+      if (!teacher) {
+        throw new AppError(403, 'FORBIDDEN', 'Teacher account not found');
+      }
+      departmentId = teacher.departmentId ?? departmentId;
+      classId = teacher.classId ?? classId;
+      if (!classId) {
+        throw new AppError(400, 'CLASS_REQUIRED', 'Teachers must be assigned to a class before generating student registration links');
       }
     }
 

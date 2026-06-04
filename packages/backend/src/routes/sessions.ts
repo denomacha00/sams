@@ -71,10 +71,14 @@ sessionsRouter.get('/', async (req: Request, res: Response): Promise<void> => {
 
     const where: Record<string, unknown> = { schoolId: req.schoolId };
 
+    if (req.user.role === UserRole.TEACHER || req.user.role === UserRole.HOD) {
+      where.teacherId = req.user.sub;
+    }
+
     if (req.query.classId) {
       where.classId = req.query.classId;
     }
-    if (req.query.teacherId) {
+    if (req.query.teacherId && req.user.role !== UserRole.TEACHER && req.user.role !== UserRole.HOD) {
       where.teacherId = req.query.teacherId;
     }
     if (req.query.isActive !== undefined) {
@@ -112,6 +116,18 @@ sessionsRouter.get('/:id', async (req: Request, res: Response): Promise<void> =>
       throw new AppError(403, 'FORBIDDEN', 'Access to this resource is not allowed');
     }
 
+    if (req.user.role === UserRole.STUDENT) {
+      if (req.user.classId !== session.classId) {
+        throw new AppError(403, 'FORBIDDEN', 'Access to this session is not allowed');
+      }
+      res.status(200).json(formatSessionForClient(session));
+      return;
+    }
+
+    if ((req.user.role === UserRole.TEACHER || req.user.role === UserRole.HOD) && session.teacherId !== req.user.sub) {
+      throw new AppError(403, 'FORBIDDEN', 'You do not own this attendance session');
+    }
+
     const students = await prisma.user.findMany({
       where: {
         schoolId: req.schoolId,
@@ -144,6 +160,17 @@ sessionsRouter.get('/:id/qr', async (req: Request, res: Response): Promise<void>
     if (req.user.role === UserRole.STUDENT) {
       res.status(403).json({ error: 'Forbidden', code: 'FORBIDDEN' });
       return;
+    }
+
+    const session = await prisma.attendanceSession.findUnique({
+      where: { id: req.params.id as string },
+      select: { schoolId: true, teacherId: true },
+    });
+    if (!session || session.schoolId !== req.schoolId) {
+      throw new AppError(404, 'QR_NOT_FOUND', 'No active QR code for this session');
+    }
+    if ((req.user.role === UserRole.TEACHER || req.user.role === UserRole.HOD) && session.teacherId !== req.user.sub) {
+      throw new AppError(403, 'FORBIDDEN', 'You do not own this attendance session');
     }
 
     const qrToken = await sessionService.getActiveQR(req.params.id as string);

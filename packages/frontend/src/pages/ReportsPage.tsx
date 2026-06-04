@@ -52,12 +52,9 @@ const ReportsPage: React.FC = () => {
       case UserRole.STUDENT:
         return user.id ? `/reports/student/${user.id}` : null;
       case UserRole.TEACHER:
-        // Try class report first, then department report, then school
-        if (user.classId) return `/reports/class/${user.classId}`;
-        if (user.departmentId) return `/reports/department/${user.departmentId}`;
-        return null;
+        return user.classId ? `/reports/class/${user.classId}` : null;
       case UserRole.HOD:
-        return user.departmentId ? `/reports/department/${user.departmentId}` : '/reports/school';
+        return user.departmentId ? `/reports/department/${user.departmentId}` : null;
       case UserRole.SCHOOL_ADMIN:
         return '/reports/school';
       default:
@@ -70,11 +67,9 @@ const ReportsPage: React.FC = () => {
       case UserRole.STUDENT:
         return `student:${user.id}`;
       case UserRole.TEACHER:
-        if (user.classId) return `class:${user.classId}`;
-        if (user.departmentId) return `department:${user.departmentId}`;
-        return 'school';
+        return user.classId ? `class:${user.classId}` : '';
       case UserRole.HOD:
-        return user.departmentId ? `department:${user.departmentId}` : 'school';
+        return user.departmentId ? `department:${user.departmentId}` : '';
       case UserRole.SCHOOL_ADMIN:
         return 'school';
       default:
@@ -87,9 +82,7 @@ const ReportsPage: React.FC = () => {
       case UserRole.STUDENT:
         return 'Personal Report';
       case UserRole.TEACHER:
-        if (user?.classId) return 'Class Report';
-        if (user?.departmentId) return 'Department Report';
-        return 'Report';
+        return user?.classId ? 'Class Report' : 'Class assignment required';
       case UserRole.HOD:
         return 'Department Report';
       case UserRole.SCHOOL_ADMIN:
@@ -242,9 +235,13 @@ const ReportsPage: React.FC = () => {
   }, []);
 
   const handleExport = async (format: 'pdf' | 'excel') => {
+    const reportId = getExportReportId();
+    if (!reportId) {
+      setError('Unable to determine report scope. Please ensure your account is properly configured.');
+      return;
+    }
     setExporting(true);
     try {
-      const reportId = getExportReportId();
       const response = await apiClient.get(
         `/reports/${reportId}/export?format=${format}&from=${dateFrom}T00:00:00.000Z&to=${dateTo}T23:59:59.999Z`,
         { responseType: 'blob' }
@@ -416,7 +413,7 @@ const ReportsPage: React.FC = () => {
             <div className="flex gap-3">
               <button
                 onClick={() => handleExport('pdf')}
-                disabled={exporting}
+                disabled={exporting || !report}
                 className="flex items-center gap-2 bg-white/10 border border-red-500/30 text-red-300 py-2.5 px-5 rounded-xl hover:bg-red-500/20 disabled:opacity-50 transition-all duration-200"
               >
                 <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -426,8 +423,8 @@ const ReportsPage: React.FC = () => {
               </button>
               <button
                 onClick={() => handleExport('excel')}
-                disabled={exporting}
-                className="flex items-center gap-2 bg-white/10 border border-orange-500/30 text-indigo-300 py-2.5 px-5 rounded-xl hover:bg-indigo-500/20 disabled:opacity-50 transition-all duration-200"
+                disabled={exporting || !report}
+                className="flex items-center gap-2 bg-white/10 border border-indigo-500/30 text-indigo-300 py-2.5 px-5 rounded-xl hover:bg-indigo-500/20 disabled:opacity-50 transition-all duration-200"
               >
                 <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />

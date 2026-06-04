@@ -34,6 +34,59 @@ function parseDateRange(query: Record<string, unknown>) {
   return undefined;
 }
 
+async function assertReportScope(
+  req: Request,
+  type: 'student' | 'class' | 'department' | 'school',
+  targetId?: string,
+): Promise<void> {
+  const { role, sub: userId, classId: userClassId, departmentId: userDeptId } = req.user;
+
+  if (role === UserRole.STUDENT) {
+    if (type !== 'student' || targetId !== userId) {
+      throw new AppError(403, 'FORBIDDEN', 'Students can only access their own report');
+    }
+    return;
+  }
+
+  if (role === UserRole.TEACHER) {
+    const teacherClassId = await resolveTeacherClassId(userId, userClassId);
+    if (type === 'student' && targetId) {
+      const student = await prisma.user.findUnique({ where: { id: targetId }, select: { classId: true, schoolId: true } });
+      if (!student || student.schoolId !== req.schoolId || student.classId !== teacherClassId) {
+        throw new AppError(403, 'FORBIDDEN', 'Teachers can only access reports for students in their assigned class');
+      }
+      return;
+    }
+    if (type === 'class' && targetId === teacherClassId) return;
+    throw new AppError(403, 'FORBIDDEN', 'Teachers can only access their assigned class reports');
+  }
+
+  if (role === UserRole.HOD) {
+    if (type === 'student' && targetId) {
+      const student = await prisma.user.findUnique({ where: { id: targetId }, select: { departmentId: true, schoolId: true } });
+      if (!student || student.schoolId !== req.schoolId || student.departmentId !== userDeptId) {
+        throw new AppError(403, 'FORBIDDEN', 'HODs can only access reports for students in their department');
+      }
+      return;
+    }
+    if (type === 'class' && targetId) {
+      const classData = await prisma.class.findUnique({ where: { id: targetId }, select: { departmentId: true, schoolId: true } });
+      if (!classData || classData.schoolId !== req.schoolId || classData.departmentId !== userDeptId) {
+        throw new AppError(403, 'FORBIDDEN', 'HODs can only access reports for classes in their department');
+      }
+      return;
+    }
+    if (type === 'department' && targetId === userDeptId) return;
+    throw new AppError(403, 'FORBIDDEN', 'HODs can only access department-scoped reports');
+  }
+
+  if (role === UserRole.SCHOOL_ADMIN || role === UserRole.SUPER_ADMIN) {
+    return;
+  }
+
+  throw new AppError(403, 'FORBIDDEN', 'Report access denied');
+}
+
 // ─── Router ───────────────────────────────────────────────────────────────────
 
 export const reportsRouter = Router();
@@ -238,19 +291,21 @@ reportsRouter.get('/export', requirePermission('view:reports'), async (req: Requ
     const { format, type, targetId, from, to } = parsed.data;
     const dateRange = from && to ? { from: new Date(from), to: new Date(to) } : undefined;
 
+    if (type !== 'school' && !targetId) {
+      throw new AppError(400, 'VALIDATION_ERROR', 'targetId is required for this report type');
+    }
+    await assertReportScope(req, type, targetId);
+
     let reportData;
     switch (type) {
       case 'student':
-        if (!targetId) throw new AppError(400, 'VALIDATION_ERROR', 'targetId is required for student reports');
-        reportData = await reportService.getStudentReport(req.schoolId, targetId, dateRange);
+        reportData = await reportService.getStudentReport(req.schoolId, targetId!, dateRange);
         break;
       case 'class':
-        if (!targetId) throw new AppError(400, 'VALIDATION_ERROR', 'targetId is required for class reports');
-        reportData = await reportService.getClassReport(req.schoolId, targetId, dateRange);
+        reportData = await reportService.getClassReport(req.schoolId, targetId!, dateRange);
         break;
       case 'department':
-        if (!targetId) throw new AppError(400, 'VALIDATION_ERROR', 'targetId is required for department reports');
-        reportData = await reportService.getDepartmentReport(req.schoolId, targetId, dateRange);
+        reportData = await reportService.getDepartmentReport(req.schoolId, targetId!, dateRange);
         break;
       case 'school':
         reportData = await reportService.getSchoolReport(req.schoolId, dateRange);
