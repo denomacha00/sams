@@ -171,33 +171,6 @@ const DashboardPage: React.FC = () => {
         </div>
       </div>
 
-      {/* Quick Links */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <Link
-          to="/licenses"
-          className="bg-blue-600 hover:bg-blue-700 text-white rounded-lg p-4 text-center transition-colors"
-        >
-          Generate License Key
-        </Link>
-        <Link
-          to="/schools"
-          className="bg-gray-700 hover:bg-gray-600 text-white rounded-lg p-4 text-center transition-colors"
-        >
-          Manage Schools
-        </Link>
-        <Link
-          to="/audit-logs"
-          className="bg-gray-700 hover:bg-gray-600 text-white rounded-lg p-4 text-center transition-colors"
-        >
-          View Audit Logs
-        </Link>
-        <Link
-          to="/settings"
-          className="bg-gray-700 hover:bg-gray-600 text-white rounded-lg p-4 text-center transition-colors"
-        >
-          Settings & Status
-        </Link>
-      </div>
     </div>
   );
 };

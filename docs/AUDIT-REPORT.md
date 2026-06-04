@@ -322,4 +322,73 @@ Then on VPS: `bash scripts/deploy-production.sh`
 
 ---
 
+## UI polish pass (2026-06-04)
+
+**Scope:** Frontend and super-admin presentation only. No changes to `packages/backend` routes/services for attendance, AI, or notifications.
+
+### Palette (all school roles + super-admin)
+
+| Before | After |
+|--------|-------|
+| Teal/cyan/purple/pink neon gradients on dashboards | Indigo + slate primary; emerald/teal reserved for **attendance** CTAs |
+| Legacy admin pages (teal/cyan buttons) | Global CSS stitch in `index.css` remaps neon utility classes app-wide |
+| Floating AI purple accents | Indigo/slate chat chrome (`FloatingAI.tsx`) |
+
+### Dashboard deduplication
+
+| Surface | Change |
+|---------|--------|
+| `/admin` (HOD / school admin) | Redirects to `/dashboard` — single command center, no duplicate quick-action grid |
+| Admin sub-pages back links | Point to `/dashboard` instead of `/admin` |
+| Super-admin dashboard | Removed quick-action tiles that duplicated sidebar nav (Layout in `App.tsx`) |
+| Role dashboards | `/dashboard` keeps grouped Quick Actions per role (teacher/HOD/student/admin) |
+
+### Files changed (UI polish)
+
+| File | Change |
+|------|--------|
+| `packages/frontend/src/index.css` | `btn-attendance`, violet/hover-cyan/shadow neon stitch |
+| `packages/frontend/src/pages/DashboardPage.tsx` | Professional stat/action gradients; HOD dept badge indigo |
+| `packages/frontend/src/pages/admin/AdminDashboardPage.tsx` | Redirect to `/dashboard` |
+| `packages/frontend/src/pages/admin/*` | Back links → `/dashboard` |
+| `packages/frontend/src/components/FloatingAI.tsx` | Indigo loading dots; neutral subtitle |
+| `packages/super-admin/src/pages/DashboardPage.tsx` | Stats/plan/revenue only; no duplicate quick links |
+
+### Automated checks (UI polish)
+
+| Command | Result |
+|---------|--------|
+| `npm run lint` (backend, frontend, super-admin) | **PASS** |
+| `npx vitest run` (`packages/backend`) | **PASS** — 40 files, **304** tests |
+| `npx vitest run` (`packages/frontend`) | **PASS** — 14 tests |
+| `npm run build` (shared, backend, frontend, super-admin) | **PASS** |
+
+### UI smoke tests (manual, ~10 min)
+
+1. **SCHOOL_ADMIN** — `/dashboard` shows grouped quick actions; visiting `/admin` lands on same dashboard.
+2. **HOD** — Dept badge indigo; timetable/reports/risk links present once on dashboard.
+3. **TEACHER** — Emerald “Sign In Students” CTA; attendance quick actions emerald, not neon cyan.
+4. **STUDENT** — Scan QR + timetable shortcuts; no duplicate timetable block on dashboard.
+5. **Floating AI** — Open widget on dashboard; indigo send button; thread restore still works.
+6. **Super-admin** — Sidebar nav only; dashboard shows analytics cards without duplicate link row.
+7. **Admin users page** — “Back” goes to `/dashboard`.
+8. **Notifications send** (HOD) — unchanged flow; dept target still auto-filled.
+9. **Attendance session** (teacher) — start session + QR unchanged.
+10. **Profile avatar** — upload error messaging from `e4a158e1` still shows 413 hint.
+
+### Denis — push when ready (two local commits)
+
+```bash
+cd /var/www/sams   # or local clone
+git log -2 --oneline
+# expect: UI polish commit, then e4a158e1 HOD timetable + profile
+
+git push origin main
+bash scripts/deploy-production.sh
+```
+
+**Not pushed from agent session** — Denis pushes after review.
+
+---
+
 *End of audit report.*

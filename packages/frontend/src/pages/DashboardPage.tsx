@@ -506,7 +506,7 @@ function getQuickActionGroups(role?: UserRole): QuickActionGroup[] {
           title: 'Communication',
           actions: [
             { to: '/notifications', label: 'Notifications', icon: ICONS.bell, gradient: 'from-rose-500 to-red-500', variant: 'alert' },
-            { to: '/ai', label: 'AI Assistant', icon: ICONS.ai, gradient: 'from-violet-500 to-purple-500' },
+            { to: '/ai', label: 'AI Assistant', icon: ICONS.ai, gradient: 'from-indigo-600 to-slate-700' },
           ],
         },
       ];
@@ -517,7 +517,7 @@ function getQuickActionGroups(role?: UserRole): QuickActionGroup[] {
           actions: [
             { to: '/sessions', label: 'Sign In Students', icon: ICONS.qr, gradient: 'from-emerald-600 to-teal-600', variant: 'attendance' },
             { to: '/attendance', label: 'Mark Attendance', icon: ICONS.clipboard, gradient: 'from-emerald-500 to-teal-500', variant: 'attendance' },
-            { to: '/biometric/attendance', label: 'Face Scan', icon: ICONS.check, gradient: 'from-teal-500 to-cyan-500', variant: 'attendance' },
+            { to: '/biometric/attendance', label: 'Face Scan', icon: ICONS.check, gradient: 'from-emerald-600 to-teal-600', variant: 'attendance' },
           ],
         },
         {
@@ -540,7 +540,7 @@ function getQuickActionGroups(role?: UserRole): QuickActionGroup[] {
           title: 'Communication',
           actions: [
             { to: '/notifications', label: 'Notifications', icon: ICONS.bell, gradient: 'from-slate-600 to-indigo-700', variant: 'alert' },
-            { to: '/ai', label: 'AI Assistant', icon: ICONS.ai, gradient: 'from-violet-500 to-purple-500' },
+            { to: '/ai', label: 'AI Assistant', icon: ICONS.ai, gradient: 'from-indigo-600 to-slate-700' },
           ],
         },
       ];
@@ -557,14 +557,14 @@ function getQuickActionGroups(role?: UserRole): QuickActionGroup[] {
           title: 'Stay Informed',
           actions: [
             { to: '/notifications', label: 'Messages', icon: ICONS.bell, gradient: 'from-rose-500 to-red-500', variant: 'alert' },
-            { to: '/reports', label: 'My Reports', icon: ICONS.chart, gradient: 'from-purple-500 to-pink-500' },
-            { to: '/ai', label: 'AI Assistant', icon: ICONS.ai, gradient: 'from-violet-500 to-purple-500' },
+            { to: '/reports', label: 'My Reports', icon: ICONS.chart, gradient: 'from-indigo-600 to-slate-700' },
+            { to: '/ai', label: 'AI Assistant', icon: ICONS.ai, gradient: 'from-indigo-600 to-slate-700' },
           ],
         },
         {
           title: 'Account',
           actions: [
-            { to: '/profile', label: 'Profile', icon: ICONS.profile, gradient: 'from-cyan-500 to-blue-500' },
+            { to: '/profile', label: 'Profile', icon: ICONS.profile, gradient: 'from-slate-600 to-indigo-600' },
           ],
         },
       ];
@@ -583,8 +583,8 @@ function getQuickActionGroups(role?: UserRole): QuickActionGroup[] {
           title: 'Schedule & Insights',
           actions: [
             { to: '/timetable', label: 'View Timetable', icon: ICONS.calendar, gradient: 'from-orange-500 to-amber-500' },
-            { to: '/admin/timetable', label: 'Edit Timetable', icon: ICONS.calendar, gradient: 'from-purple-500 to-pink-500' },
-            { to: '/reports', label: 'View Reports', icon: ICONS.chart, gradient: 'from-teal-500 to-cyan-500' },
+            { to: '/admin/timetable', label: 'Edit Timetable', icon: ICONS.calendar, gradient: 'from-orange-500 to-amber-500' },
+            { to: '/reports', label: 'View Reports', icon: ICONS.chart, gradient: 'from-indigo-600 to-slate-700' },
             { to: '/risk-scores', label: 'Risk Scores', icon: ICONS.warning, gradient: 'from-orange-500 to-red-500', variant: 'alert' },
             { to: '/admin/knowledge', label: 'Knowledge Base', icon: ICONS.book, gradient: 'from-amber-500 to-yellow-500' },
           ],
@@ -593,7 +593,7 @@ function getQuickActionGroups(role?: UserRole): QuickActionGroup[] {
           title: 'Communication',
           actions: [
             { to: '/notifications', label: 'Notifications', icon: ICONS.bell, gradient: 'from-rose-500 to-red-500', variant: 'alert' },
-            { to: '/ai', label: 'AI Assistant', icon: ICONS.ai, gradient: 'from-violet-500 to-purple-500' },
+            { to: '/ai', label: 'AI Assistant', icon: ICONS.ai, gradient: 'from-indigo-600 to-slate-700' },
           ],
         },
       ];
@@ -613,23 +613,23 @@ function getDefaultStats(role?: UserRole): StatCard[] {
       ];
     case UserRole.TEACHER:
       return [
-        { label: 'My Students', value: '—', icon: ICONS.users, gradient: 'from-teal-500 to-cyan-500', shadowColor: 'shadow-teal-500/20' },
+        { label: 'My Students', value: '—', icon: ICONS.users, gradient: 'from-indigo-600 to-slate-700', shadowColor: 'shadow-indigo-500/20' },
         { label: "Today's Sessions", value: '—', icon: ICONS.session, gradient: 'from-blue-500 to-indigo-500', shadowColor: 'shadow-blue-500/20' },
-        { label: 'Attendance Rate', value: '—', icon: ICONS.chart, gradient: 'from-purple-500 to-pink-500', shadowColor: 'shadow-purple-500/20' },
+        { label: 'Attendance Rate', value: '—', icon: ICONS.chart, gradient: 'from-indigo-600 to-slate-700', shadowColor: 'shadow-indigo-500/20' },
         { label: 'Pending Marks', value: '—', icon: ICONS.clipboard, gradient: 'from-orange-500 to-amber-500', shadowColor: 'shadow-orange-500/20' },
       ];
     case UserRole.STUDENT:
       return [
-        { label: 'My Attendance %', value: '—', icon: ICONS.check, gradient: 'from-indigo-500 to-violet-500', shadowColor: 'shadow-indigo-500/20' },
+        { label: 'My Attendance %', value: '—', icon: ICONS.check, gradient: 'from-indigo-600 to-slate-700', shadowColor: 'shadow-indigo-500/20' },
         { label: 'Classes Today', value: '—', icon: ICONS.calendar, gradient: 'from-blue-500 to-indigo-500', shadowColor: 'shadow-blue-500/20' },
-        { label: 'Risk Score', value: '—', icon: ICONS.warning, gradient: 'from-purple-500 to-pink-500', shadowColor: 'shadow-purple-500/20' },
+        { label: 'Risk Score', value: '—', icon: ICONS.warning, gradient: 'from-amber-500 to-orange-500', shadowColor: 'shadow-amber-500/20' },
         { label: 'Days Present', value: '—', icon: ICONS.fire, gradient: 'from-slate-600 to-slate-700', shadowColor: 'shadow-slate-600/20' },
       ];
     case UserRole.HOD:
       return [
-        { label: 'Dept. Students', value: '—', icon: ICONS.users, gradient: 'from-teal-500 to-cyan-500', shadowColor: 'shadow-teal-500/20' },
+        { label: 'Dept. Students', value: '—', icon: ICONS.users, gradient: 'from-indigo-600 to-slate-700', shadowColor: 'shadow-indigo-500/20' },
         { label: 'Dept. Teachers', value: '—', icon: ICONS.academic, gradient: 'from-blue-500 to-indigo-500', shadowColor: 'shadow-blue-500/20' },
-        { label: 'Attendance Rate', value: '—', icon: ICONS.chart, gradient: 'from-purple-500 to-pink-500', shadowColor: 'shadow-purple-500/20' },
+        { label: 'Attendance Rate', value: '—', icon: ICONS.chart, gradient: 'from-indigo-600 to-slate-700', shadowColor: 'shadow-indigo-500/20' },
         { label: 'At-Risk Students', value: '—', icon: ICONS.warning, gradient: 'from-orange-500 to-amber-500', shadowColor: 'shadow-orange-500/20' },
       ];
     default:
@@ -706,9 +706,9 @@ function useDashboardStats(user?: { id: string; role?: UserRole; classId?: strin
 
             if (!cancelled) {
               setStats([
-                { label: 'My Students', value: myStudents, icon: ICONS.users, gradient: 'from-teal-500 to-cyan-500', shadowColor: 'shadow-teal-500/20' },
+                { label: 'My Students', value: myStudents, icon: ICONS.users, gradient: 'from-indigo-600 to-slate-700', shadowColor: 'shadow-indigo-500/20' },
                 { label: "Today's Sessions", value: todaySessions, icon: ICONS.session, gradient: 'from-blue-500 to-indigo-500', shadowColor: 'shadow-blue-500/20' },
-                { label: 'Attendance Rate', value: attendanceRate, icon: ICONS.chart, gradient: 'from-purple-500 to-pink-500', shadowColor: 'shadow-purple-500/20' },
+                { label: 'Attendance Rate', value: attendanceRate, icon: ICONS.chart, gradient: 'from-indigo-600 to-slate-700', shadowColor: 'shadow-indigo-500/20' },
                 { label: 'Pending Marks', value: '—', icon: ICONS.clipboard, gradient: 'from-orange-500 to-amber-500', shadowColor: 'shadow-orange-500/20' },
               ]);
             }
@@ -739,9 +739,9 @@ function useDashboardStats(user?: { id: string; role?: UserRole; classId?: strin
 
             if (!cancelled) {
               setStats([
-                { label: 'My Attendance %', value: attendancePct, icon: ICONS.check, gradient: 'from-indigo-500 to-violet-500', shadowColor: 'shadow-indigo-500/20' },
+                { label: 'My Attendance %', value: attendancePct, icon: ICONS.check, gradient: 'from-indigo-600 to-slate-700', shadowColor: 'shadow-indigo-500/20' },
                 { label: 'Classes Today', value: classesToday, icon: ICONS.calendar, gradient: 'from-blue-500 to-indigo-500', shadowColor: 'shadow-blue-500/20' },
-                { label: 'Risk Score', value: riskScore, icon: ICONS.warning, gradient: 'from-purple-500 to-pink-500', shadowColor: 'shadow-purple-500/20' },
+                { label: 'Risk Score', value: riskScore, icon: ICONS.warning, gradient: 'from-amber-500 to-orange-500', shadowColor: 'shadow-amber-500/20' },
                 { label: 'Days Present', value: daysPresent, icon: ICONS.fire, gradient: 'from-slate-600 to-slate-700', shadowColor: 'shadow-slate-600/20' },
               ]);
             }
@@ -775,9 +775,9 @@ function useDashboardStats(user?: { id: string; role?: UserRole; classId?: strin
 
             if (!cancelled) {
               setStats([
-                { label: 'Dept. Students', value: deptStudents, icon: ICONS.users, gradient: 'from-teal-500 to-cyan-500', shadowColor: 'shadow-teal-500/20' },
+                { label: 'Dept. Students', value: deptStudents, icon: ICONS.users, gradient: 'from-indigo-600 to-slate-700', shadowColor: 'shadow-indigo-500/20' },
                 { label: 'Dept. Teachers', value: deptTeachers, icon: ICONS.academic, gradient: 'from-blue-500 to-indigo-500', shadowColor: 'shadow-blue-500/20' },
-                { label: 'Attendance Rate', value: attendanceRate, icon: ICONS.chart, gradient: 'from-purple-500 to-pink-500', shadowColor: 'shadow-purple-500/20' },
+                { label: 'Attendance Rate', value: attendanceRate, icon: ICONS.chart, gradient: 'from-indigo-600 to-slate-700', shadowColor: 'shadow-indigo-500/20' },
                 { label: 'At-Risk Students', value: atRisk, icon: ICONS.warning, gradient: 'from-orange-500 to-amber-500', shadowColor: 'shadow-orange-500/20' },
               ]);
             }
@@ -1207,7 +1207,7 @@ const DashboardPage: React.FC = () => {
                   {getRoleLabel(user?.role)}
                 </span>
                 {user?.role === UserRole.HOD && departmentName && (
-                  <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium text-teal-100 bg-teal-600/20 border border-teal-500/30 w-fit">
+                  <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium text-indigo-100 bg-indigo-600/20 border border-indigo-500/30 w-fit">
                     {departmentName}
                   </span>
                 )}

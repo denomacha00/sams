@@ -212,7 +212,7 @@ const TimetablePage: React.FC = () => {
       <header className="border-b border-slate-800 bg-slate-950/95">
         <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <Link to="/admin" className="text-slate-400 hover:text-indigo-300 transition-colors">
+            <Link to="/dashboard" className="text-slate-400 hover:text-indigo-300 transition-colors">
               ← Admin
             </Link>
             <h1 className="text-lg font-bold text-white">Timetable Management</h1>

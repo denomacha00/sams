@@ -240,7 +240,7 @@ const UserManagementPage: React.FC = () => {
       <header className="border-b border-white/10 backdrop-blur-sm bg-white/5">
         <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <Link to="/admin" className="text-gray-400 hover:text-cyan-400 transition-colors">
+            <Link to="/dashboard" className="text-gray-400 hover:text-indigo-300 transition-colors">
               ← Admin
             </Link>
             <h1 className="text-lg font-bold text-white">

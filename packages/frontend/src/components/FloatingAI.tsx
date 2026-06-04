@@ -322,7 +322,7 @@ const FloatingAI: React.FC = () => {
             </div>
             <div>
               <h3 className="text-sm font-bold text-white">SAMS AI Assistant</h3>
-              <p className="text-[10px] text-purple-300/70">Powered by AI</p>
+              <p className="text-[10px] text-slate-400">Powered by AI</p>
             </div>
           </div>
           <button
@@ -398,9 +398,9 @@ const FloatingAI: React.FC = () => {
               </div>
               <div className="bg-slate-900 border border-slate-700 rounded-xl px-3 py-2">
                 <div className="flex space-x-1">
-                  <div className="w-1.5 h-1.5 bg-purple-400 rounded-full animate-bounce" />
-                  <div className="w-1.5 h-1.5 bg-purple-400 rounded-full animate-bounce" style={{ animationDelay: '0.1s' }} />
-                  <div className="w-1.5 h-1.5 bg-purple-400 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }} />
+                  <div className="w-1.5 h-1.5 bg-indigo-400 rounded-full animate-bounce" />
+                  <div className="w-1.5 h-1.5 bg-indigo-400 rounded-full animate-bounce" style={{ animationDelay: '0.1s' }} />
+                  <div className="w-1.5 h-1.5 bg-indigo-400 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }} />
                 </div>
               </div>
             </div>

@@ -235,7 +235,7 @@ const RegistrationLinksPage: React.FC = () => {
         <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <Link
-              to={isHOD ? '/dashboard' : isTeacher ? '/dashboard' : '/admin'}
+              to="/dashboard"
               className="text-gray-400 hover:text-cyan-400 transition-colors"
             >
               ← {isHOD || isTeacher ? 'Dashboard' : 'Admin'}
