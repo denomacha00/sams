@@ -102,6 +102,16 @@ export class SessionService {
     });
 
     if (existingSession) {
+      // Same teacher re-opening Sign In Students after refresh — resume instead of 409.
+      if (existingSession.teacherId === teacherId) {
+        const resumed = await prisma.attendanceSession.findUnique({
+          where: { id: existingSession.id },
+          include: { class: { select: { name: true } } },
+        });
+        if (resumed) {
+          return resumed;
+        }
+      }
       throw new AppError(
         409,
         'SESSION_ALREADY_ACTIVE',

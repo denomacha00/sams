@@ -1,10 +1,15 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { Link } from 'react-router-dom';
 import QRCode from 'qrcode';
 import { io, Socket } from 'socket.io-client';
+import type { AxiosError } from 'axios';
 import apiClient from '../services/apiClient';
 import { useAuthStore } from '../store/authStore';
 import { AttendanceStatus } from '@sams/shared';
 import { getApiErrorMessage } from '../lib/apiError';
+import { getTeacherLocation } from '../lib/geolocation';
+
+const SESSION_START_TIMEOUT_MS = 30_000;
 
 interface TimetableEntry {
   id: string;
@@ -56,8 +61,49 @@ const SessionPage: React.FC = () => {
   const [linkCopied, setLinkCopied] = useState(false);
   const [linkTimeRemaining, setLinkTimeRemaining] = useState<number>(0);
   const linkTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const [sessionRequireGps, setSessionRequireGps] = useState<boolean>(true);
+  const [sessionRequireGps, setSessionRequireGps] = useState<boolean>(false);
   const [sessionRadiusM, setSessionRadiusM] = useState<number>(100);
+
+  const applySessionFromApi = useCallback((data: {
+    id: string;
+    subject: string;
+    className?: string | null;
+    qrToken?: string | null;
+    currentQRToken?: string | null;
+    startedAt: string;
+    locationRadiusM?: number;
+  }) => {
+    setActiveSession({
+      id: data.id,
+      subject: data.subject,
+      className: data.className ?? 'Class',
+      qrToken: data.qrToken ?? data.currentQRToken ?? '',
+      startedAt: data.startedAt,
+      locationRadiusM: data.locationRadiusM || 100,
+      records: [],
+    });
+  }, []);
+
+  // Resume an in-progress session so the page is not blocked after navigation
+  useEffect(() => {
+    if (!user?.id || activeSession) return;
+    const resume = async () => {
+      try {
+        const { data } = await apiClient.get('/sessions', {
+          params: { isActive: true, teacherId: user.id },
+        });
+        const list = (Array.isArray(data) ? data : []).filter(
+          (s: { isActive?: boolean }) => s.isActive !== false,
+        );
+        if (list.length > 0) {
+          applySessionFromApi(list[0]);
+        }
+      } catch {
+        // ignore — teacher can start a new session
+      }
+    };
+    void resume();
+  }, [user?.id, activeSession, applySessionFromApi]);
 
   // Fetch today's timetable entries for this teacher
   useEffect(() => {
@@ -246,36 +292,71 @@ const SessionPage: React.FC = () => {
 
     try {
       let location: { lat: number; lng: number } | undefined;
-      if (sessionRequireGps && navigator.geolocation) {
-        try {
-          const pos = await new Promise<GeolocationPosition>((resolve, reject) =>
-            navigator.geolocation.getCurrentPosition(resolve, reject, { timeout: 10000 })
+      if (sessionRequireGps) {
+        if (!navigator.geolocation) {
+          setError(
+            'Location is not available in this browser. Use HTTPS, or turn off "Require GPS" to start without a location check.',
           );
-          location = { lat: pos.coords.latitude, lng: pos.coords.longitude };
-        } catch {
-          setError('Could not get your location. Allow GPS or turn off "Require GPS" for this session.');
+          return;
+        }
+        try {
+          location = await getTeacherLocation();
+        } catch (geoErr: unknown) {
+          const msg =
+            geoErr instanceof Error && geoErr.message === 'GPS_TIMEOUT'
+              ? 'Location timed out. Allow GPS access or turn off "Require GPS" for this session.'
+              : 'Could not get your location. Allow GPS or turn off "Require GPS" for this session.';
+          setError(msg);
           return;
         }
       }
 
-      const { data } = await apiClient.post('/sessions', {
-        timetableEntryId: selectedEntry,
-        requireGps: sessionRequireGps,
-        locationRadiusM: sessionRequireGps ? sessionRadiusM : 100,
-        ...(location ? { location } : {}),
-      });
+      const { data } = await apiClient.post(
+        '/sessions',
+        {
+          timetableEntryId: selectedEntry,
+          requireGps: sessionRequireGps,
+          locationRadiusM: sessionRequireGps ? sessionRadiusM : 100,
+          ...(location ? { location } : {}),
+        },
+        { timeout: SESSION_START_TIMEOUT_MS },
+      );
 
-      setActiveSession({
-        id: data.id,
-        subject: data.subject,
-        className: data.className ?? 'Class',
-        qrToken: data.qrToken ?? data.currentQRToken ?? '',
-        startedAt: data.startedAt,
-        locationRadiusM: data.locationRadiusM || 100,
-        records: [],
-      });
+      applySessionFromApi(data);
     } catch (err: unknown) {
-      setError(getApiErrorMessage(err, 'Failed to start session'));
+      const axiosErr = err as AxiosError<{ code?: string }>;
+      const code = axiosErr.response?.data?.code;
+      if (code === 'OUTSIDE_SCHEDULED_TIME' || code === 'WRONG_DAY') {
+        setError(getApiErrorMessage(err, 'Cannot start session outside the scheduled slot'));
+      } else if (code === 'TIMETABLE_NOT_FOUND') {
+        setError(
+          'This class is not assigned to your account for this period. Ask your HOD to set you as the teacher on the timetable entry.',
+        );
+      } else if (code === 'SESSION_ALREADY_ACTIVE') {
+        try {
+          const { data: sessions } = await apiClient.get('/sessions', {
+            params: { isActive: true, teacherId: user?.id },
+          });
+          const list = (Array.isArray(sessions) ? sessions : []).filter(
+            (s: { isActive?: boolean }) => s.isActive !== false,
+          );
+          const match =
+            list.find(
+              (s: { timetableEntryId?: string }) => s.timetableEntryId === selectedEntry,
+            ) ?? list[0];
+          if (match) {
+            applySessionFromApi(match);
+            return;
+          }
+        } catch {
+          // fall through
+        }
+        setError('A session is already active for this class. Open Sign In Students to continue it.');
+      } else if (axiosErr.code === 'ECONNABORTED') {
+        setError('Request timed out. Check your connection and try again.');
+      } else {
+        setError(getApiErrorMessage(err, 'Failed to start session'));
+      }
     } finally {
       setLoading(false);
     }
@@ -298,9 +379,11 @@ const SessionPage: React.FC = () => {
   const getStatusBadge = (status: AttendanceStatus) => {
     switch (status) {
       case AttendanceStatus.PRESENT:
-        return 'bg-orange-500/20 text-indigo-300 border border-orange-500/30';
+        return 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/35';
       case AttendanceStatus.LATE:
-        return 'bg-orange-500/20 text-orange-400 border border-orange-500/30';
+        return 'bg-orange-500/20 text-orange-300 border border-orange-500/30';
+      case AttendanceStatus.EXCUSED:
+        return 'bg-indigo-500/20 text-indigo-200 border border-indigo-500/30';
       default:
         return 'bg-red-500/20 text-red-300 border border-red-500/30';
     }
@@ -427,18 +510,26 @@ const SessionPage: React.FC = () => {
     <div className="page-shell p-6">
       <div className="max-w-2xl mx-auto">
         {/* Session header */}
-        <div className="flex items-center justify-between mb-6">
+        <div className="flex flex-wrap items-center justify-between gap-3 mb-6">
           <div>
             <h1 className="text-2xl font-bold text-ink">{activeSession.subject}</h1>
             <p className="text-ink-muted">{activeSession.className}</p>
           </div>
-          <button
-            onClick={endSession}
-            disabled={loading}
-            className="btn-secondary text-red-300 border-red-500/40 hover:bg-red-500/15 py-2 px-4 disabled:opacity-50 transition-all duration-200"
-          >
-            End Session
-          </button>
+          <div className="flex flex-wrap items-center gap-2">
+            <Link
+              to={`/attendance?sessionId=${activeSession.id}`}
+              className="btn-secondary py-2 px-4 text-sm font-medium text-orange-200 border-orange-500/35 hover:bg-orange-500/10 transition-all duration-200"
+            >
+              Manual roll call
+            </Link>
+            <button
+              onClick={endSession}
+              disabled={loading}
+              className="btn-secondary text-red-300 border-red-500/40 hover:bg-red-500/15 py-2 px-4 disabled:opacity-50 transition-all duration-200"
+            >
+              End Session
+            </button>
+          </div>
         </div>
 
         {error && (

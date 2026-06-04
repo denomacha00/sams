@@ -8,6 +8,9 @@ declare module 'axios' {
 import { readAccessToken, readRefreshToken, writeTokens } from '../lib/authTokens';
 import { clearAuthState, forceAuthRedirect, type AuthRedirectReason } from '../lib/clearAuthState';
 
+/** Prevent queued API calls (e.g. POST /sessions) from hanging forever when refresh stalls. */
+export const REFRESH_REQUEST_TIMEOUT_MS = 15_000;
+
 /** Refresh failures that mean the user must sign in again (not transient server/network errors). */
 const REFRESH_SESSION_END_CODES = new Set([
   'INVALID_REFRESH_TOKEN',
@@ -109,7 +112,8 @@ apiClient.interceptors.response.use(
 
         const { data } = await axios.post(
           `${import.meta.env.VITE_API_BASE_URL || '/api/v1'}/auth/refresh`,
-          { refreshToken }
+          { refreshToken },
+          { timeout: REFRESH_REQUEST_TIMEOUT_MS },
         );
 
         const newAccessToken = data.accessToken;
