@@ -173,7 +173,7 @@ function Header({ onBack }: { onBack: () => void }) {
       </Pressable>
       <View>
         <Text style={styles.headerTitle}>Scan QR Code</Text>
-        <Text style={styles.headerSub}>Mark attendance for active session</Text>
+        <Text style={styles.headerSub}>Scan teacher QR on your phone</Text>
       </View>
     </View>
   );

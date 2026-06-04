@@ -8,7 +8,9 @@ import { SplashScreen } from './src/screens/SplashScreen';
 import { LoginScreen } from './src/screens/LoginScreen';
 import { HomeScreen } from './src/screens/HomeScreen';
 import { ScanQRScreen } from './src/screens/ScanQRScreen';
+import { FaceScanScreen } from './src/screens/FaceScanScreen';
 import { PlaceholderScreen } from './src/screens/PlaceholderScreen';
+import { FaceDescriptorBridge } from './src/components/FaceDescriptorBridge';
 import { colors } from './src/theme/colors';
 import type { MainStackParamList } from './src/navigation/types';
 
@@ -43,6 +45,7 @@ function MainNavigator() {
     >
       <MainStack.Screen name="Home" component={HomeScreen} />
       <MainStack.Screen name="ScanQR" component={ScanQRScreen} />
+      <MainStack.Screen name="FaceScan" component={FaceScanScreen} />
       <MainStack.Screen name="Placeholder" component={PlaceholderScreen} />
     </MainStack.Navigator>
   );
@@ -74,6 +77,7 @@ export default function App() {
       <AuthProvider>
         <NavigationContainer theme={navTheme}>
           <StatusBar style="light" />
+          <FaceDescriptorBridge />
           <RootNavigator />
         </NavigationContainer>
       </AuthProvider>

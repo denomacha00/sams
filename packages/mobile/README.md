@@ -30,11 +30,13 @@ cp .env.example .env
 
 Set `EXPO_PUBLIC_API_URL`:
 
-| Environment | Example |
-|-------------|---------|
-| Production | `https://api.smart-managment.com/api/v1` |
-| Web parity (app host) | `https://app.smart-managment.com/api/v1` |
-| Local backend | `http://YOUR_LAN_IP:3001/api/v1` (not `localhost` on a physical device) |
+| Variable | Environment | Example |
+|----------|-------------|---------|
+| `EXPO_PUBLIC_API_URL` | Production | `https://api.smart-managment.com/api/v1` |
+| `EXPO_PUBLIC_API_URL` | Web parity (app host) | `https://app.smart-managment.com/api/v1` |
+| `EXPO_PUBLIC_API_URL` | Local backend | `http://YOUR_LAN_IP:3001/api/v1` (not `localhost` on a physical device) |
+
+Teacher/HOD **Face attendance** uses the device camera (`expo-camera`) and the same `POST /biometric/match` API as the web app. Start the session on web first.
 
 ## Run (development)
 

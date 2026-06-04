@@ -24,6 +24,8 @@ export function HomeScreen() {
 
   const items = navItemsForRole(user.role);
   const showScanShortcut = user.role === UserRole.STUDENT;
+  const showFaceShortcut =
+    user.role === UserRole.TEACHER || user.role === UserRole.HOD;
 
   return (
     <View style={styles.container}>
@@ -53,9 +55,23 @@ export function HomeScreen() {
           <Ionicons name="qr-code" size={28} color={colors.white} />
           <View style={styles.scanBannerText}>
             <Text style={styles.scanBannerTitle}>Quick scan</Text>
-            <Text style={styles.scanBannerSub}>Mark attendance now</Text>
+            <Text style={styles.scanBannerSub}>Scan teacher QR on your phone</Text>
           </View>
           <Ionicons name="chevron-forward" size={22} color={colors.emerald200} />
+        </Pressable>
+      ) : null}
+
+      {showFaceShortcut ? (
+        <Pressable
+          style={styles.faceBanner}
+          onPress={() => navigation.navigate('FaceScan')}
+        >
+          <Ionicons name="scan" size={28} color={colors.white} />
+          <View style={styles.scanBannerText}>
+            <Text style={styles.scanBannerTitle}>Face attendance</Text>
+            <Text style={styles.scanBannerSub}>Scan students on this device</Text>
+          </View>
+          <Ionicons name="chevron-forward" size={22} color={colors.indigo400} />
         </Pressable>
       ) : null}
 
@@ -69,6 +85,8 @@ export function HomeScreen() {
             onPress={() => {
               if (item.screen === 'ScanQR') {
                 navigation.navigate('ScanQR');
+              } else if (item.screen === 'FaceScan') {
+                navigation.navigate('FaceScan');
               } else {
                 navigation.navigate('Placeholder', {
                   title: item.title,
@@ -77,11 +95,21 @@ export function HomeScreen() {
               }
             }}
           >
-            <View style={[styles.navIcon, item.screen === 'ScanQR' && styles.navIconScan]}>
+            <View
+              style={[
+                styles.navIcon,
+                item.screen === 'ScanQR' && styles.navIconScan,
+                item.screen === 'FaceScan' && styles.navIconFace,
+              ]}
+            >
               <Ionicons
                 name={item.icon as keyof typeof Ionicons.glyphMap}
                 size={22}
-                color={item.screen === 'ScanQR' ? colors.white : colors.indigo400}
+                color={
+                  item.screen === 'ScanQR' || item.screen === 'FaceScan'
+                    ? colors.white
+                    : colors.indigo400
+                }
               />
             </View>
             <View style={styles.navBody}>
@@ -150,6 +178,15 @@ const styles = StyleSheet.create({
     backgroundColor: colors.emerald600,
     borderRadius: 16,
     padding: 16,
+    marginBottom: 12,
+  },
+  faceBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    backgroundColor: colors.indigo600,
+    borderRadius: 16,
+    padding: 16,
     marginBottom: 20,
   },
   scanBannerText: { flex: 1 },
@@ -177,6 +214,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   navIconScan: { backgroundColor: 'rgba(5, 150, 105, 0.35)' },
+  navIconFace: { backgroundColor: 'rgba(79, 70, 229, 0.45)' },
   navBody: { flex: 1 },
   navTitle: { color: colors.white, fontSize: 15, fontWeight: '700' },
   navSubtitle: { color: colors.slate400, fontSize: 12, marginTop: 3 },

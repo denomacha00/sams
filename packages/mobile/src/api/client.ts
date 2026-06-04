@@ -143,6 +143,65 @@ export async function submitQrAttendance(
   await apiClient.post('/attendance/qr', { qrToken, gpsCoords });
 }
 
+export interface ActiveSessionInfo {
+  id: string;
+  classId: string;
+  className?: string;
+  isActive: boolean;
+}
+
+export async function fetchActiveTeacherSession(
+  teacherId?: string,
+): Promise<ActiveSessionInfo | null> {
+  const params: Record<string, string> = { isActive: 'true' };
+  if (teacherId) params.teacherId = teacherId;
+
+  const { data } = await apiClient.get<ActiveSessionInfo[]>('/sessions', { params });
+  const active = Array.isArray(data)
+    ? data.filter((s) => s.isActive !== false)
+    : [];
+  return active[0] ?? null;
+}
+
+export async function checkBiometricFeatureAccess(): Promise<boolean> {
+  try {
+    await apiClient.get('/biometric/templates/check-access');
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+export interface BiometricMatchPayload {
+  descriptor: number[];
+  classId?: string;
+  sessionId: string;
+}
+
+export interface BiometricMatchResult {
+  matched: boolean;
+  studentName: string;
+  confidence: number;
+}
+
+export async function submitBiometricMatch(
+  payload: BiometricMatchPayload,
+): Promise<BiometricMatchResult> {
+  const { data } = await apiClient.post<{
+    matched?: boolean;
+    match?: boolean;
+    studentName?: string;
+    confidence?: number;
+  }>('/biometric/match', payload);
+
+  const matched = data.matched === true || data.match === true;
+  return {
+    matched,
+    studentName: data.studentName ?? 'Student',
+    confidence: data.confidence ?? 0,
+  };
+}
+
 export function userFromToken(accessToken: string, fallbackName: string): StoredUser {
   const payload = JSON.parse(atob(accessToken.split('.')[1] ?? '')) as {
     sub: string;

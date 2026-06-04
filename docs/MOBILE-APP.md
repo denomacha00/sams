@@ -9,7 +9,8 @@ The **SAMS** native client (`packages/mobile`) complements the web app. Producti
 | Runtime | Expo SDK 52, React Native, TypeScript |
 | Auth | `POST /api/v1/auth/login` → JWT in **expo-secure-store** |
 | API client | Axios with refresh-token queue (same pattern as web `apiClient.ts`) |
-| Attendance | Students scan session QR → `POST /api/v1/attendance/qr` (+ optional GPS) |
+| Attendance (student) | `ScanQRScreen` → `POST /api/v1/attendance/qr` (+ optional GPS) |
+| Attendance (teacher/HOD) | `FaceScanScreen` (`expo-camera` + face-api bridge) → `POST /api/v1/biometric/match` (teacher holds phone, scans student face; requires active session) |
 
 Default API base: `https://api.smart-managment.com/api/v1` (override with `EXPO_PUBLIC_API_URL`).
 
@@ -29,8 +30,9 @@ Unique SAMS mark: indigo `#4F46E5` tile with calendar/book motif and emerald `#0
 1. **Splash** — logo fade-in / scale animation  
 2. **Login** — school code, username, password  
 3. **Home** — avatar initials, welcome, role badge, sign out, role quick actions  
-4. **Scan QR** — `expo-camera` + GPS (`expo-location`), student attendance  
-5. **Placeholder** — navigable stubs for timetable, notifications, admin tools, etc.
+4. **Scan QR** — `expo-camera` + GPS (`expo-location`), **student** scans teacher’s session QR on **their** phone  
+5. **Face attendance** — `FaceScanScreen`: teacher/HOD uses **their** phone camera (`expo-camera`) + face-api descriptor bridge (`react-native-webview`) → same `POST /biometric/match` as web; copy clarifies students do not face-check-in on their own devices  
+6. **Placeholder** — navigable stubs for timetable, notifications, admin tools, etc.
 
 Role menus match web personas (student, teacher, HOD, school admin).
 
@@ -60,7 +62,9 @@ OTP-only login accounts must use the web app until mobile OTP is added.
 | P2 | Push notifications (Expo Notifications) |
 | P2 | Timetable and notifications native screens |
 | P3 | EAS production builds (Play Store / App Store) |
-| P3 | Teacher session QR display on mobile |
+| P2 | Teacher session start + QR display on mobile |
+| P2 | Face attendance offline queue (parity with web) |
+| P3 | Teacher session QR display on mobile (done for student scan; teacher show-QR still web) |
 
 ## Safety
 

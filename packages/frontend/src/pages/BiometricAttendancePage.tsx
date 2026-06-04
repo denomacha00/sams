@@ -110,7 +110,7 @@ const BiometricAttendancePage: React.FC = () => {
     setSubmitted(false);
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: 'user', width: 640, height: 480 },
+        video: { facingMode: 'environment', width: 640, height: 480 },
       });
       streamRef.current = stream;
       if (videoRef.current) {
@@ -147,7 +147,7 @@ const BiometricAttendancePage: React.FC = () => {
         .withFaceDescriptor();
 
       if (!detection) {
-        setError('No face detected. Please position your face clearly.');
+        setError('No face detected. Ask the student to face the camera clearly.');
         setLoading(false);
         return;
       }
@@ -235,8 +235,11 @@ const BiometricAttendancePage: React.FC = () => {
       <div className="max-w-lg mx-auto">
         {/* Header */}
         <div className="mb-8">
-          <h1 className="text-2xl font-bold text-white">Biometric Attendance</h1>
-          <p className="text-gray-400 text-sm mt-1">Use face recognition to mark attendance</p>
+          <h1 className="text-2xl font-bold text-white">Scan student face</h1>
+          <p className="text-gray-400 text-sm mt-1">
+            Scan student face on this device. Students do not use their phones for face check-in (they
+            scan QR on their own phone). Login fingerprint stays on each user&apos;s own device.
+          </p>
         </div>
 
         {error && (
@@ -273,14 +276,15 @@ const BiometricAttendancePage: React.FC = () => {
                 </svg>
               </div>
               <p className="text-gray-300 mb-6">
-                Look directly at the camera to verify your identity and mark attendance.
+                Point the camera at the student&apos;s face. You hold the device; attendance is recorded
+                for the matched student.
               </p>
               <button
                 onClick={startCamera}
                 disabled={!sessionId}
                 className="btn-primary py-3 px-8 hover:scale-[1.02] active:scale-[0.98] transition-all duration-200 disabled:opacity-50"
               >
-                Start Camera
+                Open camera
               </button>
             </div>
           )}
@@ -314,7 +318,7 @@ const BiometricAttendancePage: React.FC = () => {
                     Verifying...
                   </span>
                 ) : (
-                  'Verify Face'
+                  'Scan student face'
                 )}
               </button>
 
@@ -334,7 +338,7 @@ const BiometricAttendancePage: React.FC = () => {
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                 </svg>
               </div>
-              <p className="text-lg font-medium text-white">Attendance Recorded</p>
+              <p className="text-lg font-medium text-white">Student marked present</p>
               <p className="text-gray-400 mt-1">{matchResult.studentName}</p>
               <p className="text-xs text-gray-500 mt-1">
                 Confidence: {(matchResult.confidence * 100).toFixed(1)}%

@@ -47,16 +47,23 @@ export function navItemsForRole(role: string): NavItem[] {
     case UserRole.TEACHER:
       return [
         {
+          id: 'face-attendance',
+          title: 'Face attendance',
+          subtitle: 'Scan student faces on this device (after session started)',
+          icon: 'scan-outline',
+          screen: 'FaceScan',
+        },
+        {
           id: 'sign-in',
           title: 'Sign In Students',
-          subtitle: 'Manual attendance for your class',
+          subtitle: 'Start session & manual marks (web for full flow)',
           icon: 'people-outline',
           screen: 'Placeholder',
         },
         {
           id: 'mark-attendance',
           title: 'Mark Attendance',
-          subtitle: 'Sessions and QR codes',
+          subtitle: 'Sessions and QR codes (web)',
           icon: 'checkbox-outline',
           screen: 'Placeholder',
         },
@@ -70,6 +77,13 @@ export function navItemsForRole(role: string): NavItem[] {
       ];
     case UserRole.HOD:
       return [
+        {
+          id: 'face-attendance',
+          title: 'Face attendance',
+          subtitle: 'Scan student faces on this device (after session started)',
+          icon: 'scan-outline',
+          screen: 'FaceScan',
+        },
         {
           id: 'department',
           title: 'Department',

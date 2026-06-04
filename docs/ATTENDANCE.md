@@ -39,13 +39,25 @@ When enabled, QR and link proximity checks are skipped for that student (session
 
 ## Biometric
 
-- **Login**: WebAuthn passkey/fingerprint on login page (`/auth/webauthn/*`) — any user with a registered credential
-- **Enrollment**: Settings → fingerprint; students `/biometric/enroll`
-- **Class attendance**: `POST /api/v1/biometric/match` (requires Pro/Enterprise `biometric` feature + `mark:attendance`)
+- **Login** (each user’s own device): WebAuthn passkey/fingerprint on login page (`/auth/webauthn/*`)
+- **Enrollment**: Settings → fingerprint; students `/biometric/enroll` (face template stored server-side)
+- **Class attendance** (teacher/HOD device): Teacher or HOD holds the phone, camera scans **the student’s face**, server matches template and marks that student present via `POST /api/v1/biometric/match` (Pro/Enterprise `biometric` feature + `mark:attendance`). Requires an **active session** started by that teacher.
+- **Not** student self-scan at class time: students use **QR on their own phone**, not face match on their phone.
+
+| Channel | Who holds device | API |
+|---------|------------------|-----|
+| QR check-in | Student | `POST /attendance/qr` |
+| Face check-in | Teacher or HOD | `POST /biometric/match` |
+| Login fingerprint | Each user | `/auth/webauthn/*` |
+
+Web: `/biometric/attendance` (face-api.js + camera).
 
 ## Mobile
 
-`packages/mobile` — `ScanQRScreen` calls `POST /attendance/qr` with `{ qrToken, gpsCoords }` (same contract as web).
+`packages/mobile`:
+
+- **Students** — `ScanQRScreen` → `POST /attendance/qr` with `{ qrToken, gpsCoords }` (same as web).
+- **Teachers / HODs** — `FaceScanScreen`: `expo-camera` capture + face-api descriptor bridge → `POST /biometric/match` (same as web). Start session on web first (`teacherId` = logged-in teacher/HOD).
 
 ## Deploy notes
 
