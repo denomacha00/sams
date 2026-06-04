@@ -32,7 +32,13 @@ const ForgotPasswordPage: React.FC = () => {
       await apiClient.post('/auth/forgot-password', { schoolCode, identifier });
       setSuccess(true);
     } catch (err: any) {
-      setError(err.response?.data?.error || 'Failed to process request. Please try again.');
+      const code = err.response?.data?.code;
+      const msg = err.response?.data?.error || 'Failed to process request. Please try again.';
+      const emailHint =
+        code === 'EMAIL_NOT_CONFIGURED' || code === 'EMAIL_DELIVERY_FAILED'
+          ? ' Ask your school administrator to configure SMTP on the server, or use OTP reset via SMS if your account has a phone number.'
+          : '';
+      setError(`${msg}${emailHint}`);
     } finally {
       setLoading(false);
     }
@@ -59,11 +65,16 @@ const ForgotPasswordPage: React.FC = () => {
       if (typeof retryAfter === 'number') setResendCooldown(retryAfter);
       const msg = err.response?.data?.error || 'Failed to send verification code.';
       const smsErr = err.response?.data?.smsError;
+      const code = err.response?.data?.code;
       const hint = err.response?.data?.sandbox
         ? ' Add your phone at account.africastalking.com → SMS → phone numbers (sandbox mode).'
-        : err.response?.data?.code === 'NO_PHONE_ON_FILE'
-          ? ' Ask your school admin to add your phone number in User Management.'
-          : '';
+        : code === 'EMAIL_NOT_CONFIGURED'
+          ? ' Password reset by email requires SMTP on the server. Use SMS OTP if your account has a phone, or ask your admin to enable email.'
+          : code === 'NO_PHONE_ON_FILE'
+            ? ' Ask your school admin to add your phone number in User Management.'
+            : code === 'OTP_NOT_CONFIGURED'
+              ? ' Neither email nor SMS is configured on this server yet.'
+              : '';
       setError([msg, smsErr, hint].filter(Boolean).join(' '));
     } finally {
       setLoading(false);
@@ -106,6 +117,9 @@ const ForgotPasswordPage: React.FC = () => {
             <h2 className="text-2xl font-bold text-white mb-1">Forgot Password</h2>
             <p className="text-gray-400 text-sm">
               {mode === 'otp' ? 'Reset with a 6-digit code via email or SMS' : 'We will email or SMS you a reset link'}
+            </p>
+            <p className="text-gray-500 text-xs mt-2">
+              Email reset requires the school server to have SMTP configured. If email is unavailable, use OTP with the phone on your account.
             </p>
           </div>
 

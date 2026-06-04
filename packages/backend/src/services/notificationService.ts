@@ -10,6 +10,7 @@ import {
   type AfricasTalkingConfig,
 } from '../config/africasTalking';
 import {
+  EMAIL_NOT_CONFIGURED_MESSAGE,
   getSmtpConfig,
   isEmailConfigured,
   type SmtpConfig,
@@ -237,7 +238,7 @@ export class NotificationService {
   async sendEmail(to: string, subject: string, html: string): Promise<EmailSendResult> {
     if (!this.transporter || !this.smtpConfig) {
       console.warn(`[Email] SMTP not configured — skipping email to ${to} (subject: ${subject})`);
-      return { ok: false, error: 'Email not configured' };
+      return { ok: false, error: EMAIL_NOT_CONFIGURED_MESSAGE };
     }
 
     try {

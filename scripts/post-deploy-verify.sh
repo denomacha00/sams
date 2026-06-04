@@ -137,6 +137,27 @@ else
   health_diagnose_connection_refused "$API"
 fi
 
+# Forgot-password endpoints must not 500 on probe
+FP_OTP_CODE="$(curl -sS -o /dev/null -w '%{http_code}' --max-time 10 \
+  -X POST "${API}/api/v1/auth/forgot-password-otp" \
+  -H 'Content-Type: application/json' \
+  -d '{"schoolCode":"ZZZNOSCHOOL","identifier":"probe@example.com"}' 2>/dev/null || echo 000)"
+if [[ "$FP_OTP_CODE" != "500" && "$FP_OTP_CODE" != "000" ]]; then
+  pass "POST /api/v1/auth/forgot-password-otp probe (HTTP ${FP_OTP_CODE})"
+else
+  fail "POST /api/v1/auth/forgot-password-otp returned HTTP ${FP_OTP_CODE}"
+fi
+
+FP_LINK_CODE="$(curl -sS -o /dev/null -w '%{http_code}' --max-time 10 \
+  -X POST "${API}/api/v1/auth/forgot-password" \
+  -H 'Content-Type: application/json' \
+  -d '{"schoolCode":"AB","identifier":"x"}' 2>/dev/null || echo 000)"
+if [[ "$FP_LINK_CODE" != "500" && "$FP_LINK_CODE" != "000" ]]; then
+  pass "POST /api/v1/auth/forgot-password probe (HTTP ${FP_LINK_CODE})"
+else
+  fail "POST /api/v1/auth/forgot-password returned HTTP ${FP_LINK_CODE}"
+fi
+
 # Auth login (optional — set VERIFY_LOGIN_IDENTIFIER + VERIFY_LOGIN_PASSWORD in env)
 if [[ -n "${VERIFY_LOGIN_IDENTIFIER:-}" && -n "${VERIFY_LOGIN_PASSWORD:-}" ]]; then
   LOGIN_CODE="$(curl -s -o /tmp/sams-login.json -w "%{http_code}" -X POST "${API}/api/v1/auth/login" \
@@ -144,6 +165,17 @@ if [[ -n "${VERIFY_LOGIN_IDENTIFIER:-}" && -n "${VERIFY_LOGIN_PASSWORD:-}" ]]; t
     -d "{\"identifier\":\"${VERIFY_LOGIN_IDENTIFIER}\",\"password\":\"${VERIFY_LOGIN_PASSWORD}\"}")"
   if [[ "$LOGIN_CODE" == "200" ]] && grep -q accessToken /tmp/sams-login.json 2>/dev/null; then
     pass "Login test (${VERIFY_LOGIN_IDENTIFIER})"
+    TOKEN="$(node -e "const j=JSON.parse(require('fs').readFileSync('/tmp/sams-login.json','utf8'));process.stdout.write(j.accessToken||'')" 2>/dev/null || true)"
+    if [[ -n "$TOKEN" ]]; then
+      SESS_CODE="$(curl -sS -o /dev/null -w '%{http_code}' --max-time 10 \
+        -H "Authorization: Bearer ${TOKEN}" \
+        "${API}/api/v1/sessions?isActive=true" 2>/dev/null || echo 000)"
+      if [[ "$SESS_CODE" == "200" ]]; then
+        pass "GET /api/v1/sessions?isActive=true"
+      else
+        warn "GET /api/v1/sessions?isActive=true HTTP ${SESS_CODE}"
+      fi
+    fi
   else
     fail "Login test failed (HTTP ${LOGIN_CODE})"
   fi

@@ -131,10 +131,20 @@ fi
 
 if [[ "$AI_ONLY" -eq 1 ]]; then
   CONV_KEY="$(read_merged_env CONVERSATION_MASTER_KEY)"
+  CONV_PREV="$(read_merged_env CONVERSATION_MASTER_KEY_PREVIOUS)"
   echo ""
   echo "--- Conversation memory ---"
   if [[ -n "$CONV_KEY" && ${#CONV_KEY} -ge 32 ]]; then
     echo "OK   CONVERSATION_MASTER_KEY is set (32+ chars)"
+    if [[ -n "$CONV_PREV" ]]; then
+      if [[ ${#CONV_PREV} -ge 32 ]]; then
+        echo "OK   CONVERSATION_MASTER_KEY_PREVIOUS set (decrypt old threads after rotation)"
+      else
+        echo "WARN CONVERSATION_MASTER_KEY_PREVIOUS shorter than 32 chars — old AI threads may fail to decrypt"
+      fi
+    else
+      echo "INFO After rotating CONVERSATION_MASTER_KEY, set CONVERSATION_MASTER_KEY_PREVIOUS to the old key until threads re-encrypt"
+    fi
   else
     echo "WARN CONVERSATION_MASTER_KEY missing or shorter than 32 chars — encrypted chat memory disabled"
   fi
@@ -233,11 +243,21 @@ fi
 
 # ─── Conversation memory (encrypted DB threads) ─────────────────────────────
 CONV_KEY="$(read_merged_env CONVERSATION_MASTER_KEY)"
+CONV_PREV="$(read_merged_env CONVERSATION_MASTER_KEY_PREVIOUS)"
 
 echo ""
 echo "--- Conversation memory ---"
 if [[ -n "$CONV_KEY" && ${#CONV_KEY} -ge 32 ]]; then
   echo "OK   CONVERSATION_MASTER_KEY is set (32+ chars)"
+  if [[ -n "$CONV_PREV" ]]; then
+    if [[ ${#CONV_PREV} -ge 32 ]]; then
+      echo "OK   CONVERSATION_MASTER_KEY_PREVIOUS set (decrypt old threads after rotation)"
+    else
+      echo "WARN CONVERSATION_MASTER_KEY_PREVIOUS shorter than 32 chars — old AI threads may fail to decrypt"
+    fi
+  else
+    echo "INFO After rotating CONVERSATION_MASTER_KEY, set CONVERSATION_MASTER_KEY_PREVIOUS to the old key until threads re-encrypt"
+  fi
 else
   echo "WARN CONVERSATION_MASTER_KEY missing or shorter than 32 chars — encrypted chat memory disabled"
 fi

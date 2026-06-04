@@ -8,7 +8,7 @@ import {
   isOtpPasswordResetEnabled,
   assertOtpResendAllowed,
 } from './otpService';
-import { isEmailConfigured } from '../config/email';
+import { EMAIL_NOT_CONFIGURED_MESSAGE, isEmailConfigured } from '../config/email';
 import { isSmsConfigured } from '../config/africasTalking';
 
 const BCRYPT_ROUNDS = 12;
@@ -142,6 +142,14 @@ export async function triggerPasswordResetDelivery(user: User): Promise<{
     return {
       ok: false,
       message: 'User has no phone or email on file. Use temp_password mode instead.',
+    };
+  }
+
+  if (!isEmailConfigured() && user.email && !user.phone) {
+    return {
+      ok: false,
+      message: EMAIL_NOT_CONFIGURED_MESSAGE,
+      emailError: EMAIL_NOT_CONFIGURED_MESSAGE,
     };
   }
 

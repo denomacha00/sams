@@ -293,10 +293,34 @@ bash scripts/restart-api.sh
 
 ## 10. Email
 
-### Symptom: `[Email] SMTP not configured`
+### Symptom: `[Email] SMTP not configured` / `email.configured: false` on `/health`
 
-Optional. Set in `providers.env`: `SMTP_HOST`, `SMTP_USER`, `SMTP_PASS`, etc.  
-In-app notifications work without email.
+Optional for login (keep `OTP_LOGIN_ENABLED=false`). Required for **password-reset email** and OTP-by-email.
+
+Set in `secrets/providers.env` (or `packages/backend/.env`):
+
+- `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`
+- `SMTP_FROM_NAME`, `SMTP_FROM_EMAIL`
+
+Gmail: use an [App Password](https://support.google.com/accounts/answer/185833), not your normal password.
+
+```bash
+bash scripts/verify-secrets.sh   # shows SMTP OK/INFO
+bash scripts/restart-api.sh
+curl -sS http://127.0.0.1:3001/health | grep -o '"email":{[^}]*}'
+```
+
+API returns `503` + `EMAIL_NOT_CONFIGURED` when forgot-password needs email but SMTP is missing. In-app notifications still work without email.
+
+### Symptom: Old AI threads show decryption errors
+
+If `CONVERSATION_MASTER_KEY` was rotated without keeping the old key:
+
+1. Set `CONVERSATION_MASTER_KEY_PREVIOUS` to the **previous** key (32+ chars) in `providers.env`.
+2. `bash scripts/check-conversation-keys.sh`
+3. `bash scripts/restart-api.sh`
+
+Users may see a **memory notice** in AI chat for unreadable older messages until threads are re-encrypted.
 
 ---
 

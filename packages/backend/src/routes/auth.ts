@@ -20,7 +20,7 @@ import {
   verifyOtp,
   verifyOtpChallenge,
 } from '../services/otpService';
-import { isEmailConfigured } from '../config/email';
+import { EMAIL_NOT_CONFIGURED_MESSAGE, isEmailConfigured } from '../config/email';
 import { isSmsConfigured } from '../config/africasTalking';
 import { identifierMatchConditions } from '../utils/userIdentifier';
 
@@ -179,14 +179,7 @@ authRouter.post('/login', loginRateLimiter, async (req: Request, res: Response):
       const delivery = await deliverOtp(user, code, 'login');
 
       if (!delivery.email && !delivery.sms) {
-        res.status(502).json({
-          error: formatOtpDeliveryError(delivery),
-          code: 'OTP_DELIVERY_FAILED',
-          smsError: delivery.smsError,
-          emailError: delivery.emailError,
-          sandbox: delivery.sandbox,
-          requestId: req.id,
-        });
+        respondOtpDeliveryFailure(req, res, delivery);
         return;
       }
 
@@ -218,6 +211,35 @@ authRouter.post('/login', loginRateLimiter, async (req: Request, res: Response):
     });
   }
 });
+
+function respondOtpDeliveryFailure(
+  req: Request,
+  res: Response,
+  delivery: Awaited<ReturnType<typeof deliverOtp>>,
+): void {
+  const emailDisabled =
+    delivery.emailError === EMAIL_NOT_CONFIGURED_MESSAGE &&
+    (!delivery.sms || !isSmsConfigured());
+  if (emailDisabled) {
+    res.status(503).json({
+      error: EMAIL_NOT_CONFIGURED_MESSAGE,
+      code: 'EMAIL_NOT_CONFIGURED',
+      emailError: delivery.emailError,
+      smsError: delivery.smsError,
+      sandbox: delivery.sandbox,
+      requestId: req.id,
+    });
+    return;
+  }
+  res.status(502).json({
+    error: formatOtpDeliveryError(delivery),
+    code: 'OTP_DELIVERY_FAILED',
+    smsError: delivery.smsError,
+    emailError: delivery.emailError,
+    sandbox: delivery.sandbox,
+    requestId: req.id,
+  });
+}
 
 function formatOtpDeliveryError(delivery: Awaited<ReturnType<typeof deliverOtp>>): string {
   const parts: string[] = [];
@@ -292,14 +314,7 @@ authRouter.post('/resend-login-otp', otpResendRateLimiter, async (req: Request, 
     const delivery = await deliverOtp(user, code, 'login');
 
     if (!delivery.email && !delivery.sms) {
-      res.status(502).json({
-        error: formatOtpDeliveryError(delivery),
-        code: 'OTP_DELIVERY_FAILED',
-        smsError: delivery.smsError,
-        emailError: delivery.emailError,
-        sandbox: delivery.sandbox,
-        requestId: req.id,
-      });
+      respondOtpDeliveryFailure(req, res, delivery);
       return;
     }
 
@@ -432,6 +447,15 @@ authRouter.post('/forgot-password-otp', otpResendRateLimiter, async (req: Reques
       return;
     }
 
+    if (!isEmailConfigured() && user.email && !user.phone) {
+      res.status(503).json({
+        error: EMAIL_NOT_CONFIGURED_MESSAGE,
+        code: 'EMAIL_NOT_CONFIGURED',
+        requestId: req.id,
+      });
+      return;
+    }
+
     if (!isEmailConfigured() && !user.phone) {
       res.status(400).json({
         error:
@@ -468,14 +492,7 @@ authRouter.post('/forgot-password-otp', otpResendRateLimiter, async (req: Reques
     const delivery = await deliverOtp(user, code, 'password_reset');
 
     if (!delivery.email && !delivery.sms) {
-      res.status(502).json({
-        error: formatOtpDeliveryError(delivery),
-        code: 'OTP_DELIVERY_FAILED',
-        smsError: delivery.smsError,
-        emailError: delivery.emailError,
-        sandbox: delivery.sandbox,
-        requestId: req.id,
-      });
+      respondOtpDeliveryFailure(req, res, delivery);
       return;
     }
 
@@ -681,6 +698,16 @@ authRouter.post('/forgot-password', async (req: Request, res: Response): Promise
       return;
     }
 
+    const smsFallback = Boolean(user.phone) && isSmsConfigured();
+    if (user.email && !isEmailConfigured() && !smsFallback) {
+      res.status(503).json({
+        error: EMAIL_NOT_CONFIGURED_MESSAGE,
+        code: 'EMAIL_NOT_CONFIGURED',
+        requestId: req.id,
+      });
+      return;
+    }
+
     // Generate a secure reset token (valid for 1 hour)
     const resetToken = crypto.randomBytes(32).toString('hex');
     const resetExpires = new Date(Date.now() + 60 * 60 * 1000); // 1 hour
@@ -699,9 +726,9 @@ authRouter.post('/forgot-password', async (req: Request, res: Response): Promise
     const appUrl = process.env.APP_URL || 'https://app.smart-managment.com';
     const resetLink = `${appUrl}/reset-password?token=${resetToken}`;
 
-    // Send reset link via email if available
-    if (user.email) {
-      await notificationService.sendEmail(
+    let emailDelivered = !user.email;
+    if (user.email && isEmailConfigured()) {
+      const emailResult = await notificationService.sendEmail(
         user.email,
         'SAMS Password Reset',
         `
@@ -717,14 +744,32 @@ authRouter.post('/forgot-password', async (req: Request, res: Response): Promise
         </div>
         `,
       );
+      emailDelivered = emailResult.ok;
+      if (!emailResult.ok && !smsFallback) {
+        res.status(503).json({
+          error: emailResult.error || EMAIL_NOT_CONFIGURED_MESSAGE,
+          code: emailResult.error === EMAIL_NOT_CONFIGURED_MESSAGE ? 'EMAIL_NOT_CONFIGURED' : 'EMAIL_DELIVERY_FAILED',
+          requestId: req.id,
+        });
+        return;
+      }
     }
 
     // Send reset link via SMS if available (fire-and-forget — don't block response if AT is down)
-    if (user.phone) {
+    if (user.phone && isSmsConfigured()) {
       notificationService.sendSMS(
         user.phone,
         `SAMS Password Reset: Click this link to reset your password (expires in 1 hour): ${resetLink}`,
       ).catch(() => {});
+    }
+
+    if (user.email && isEmailConfigured() && !emailDelivered && !smsFallback) {
+      res.status(503).json({
+        error: 'Failed to send password reset email. Try again later or contact your school administrator.',
+        code: 'EMAIL_DELIVERY_FAILED',
+        requestId: req.id,
+      });
+      return;
     }
 
     res.status(200).json({ message: 'If the account exists, a reset link has been sent.' });

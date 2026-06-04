@@ -410,4 +410,19 @@ cd /var/www/sams && bash scripts/deploy-production.sh
 
 ---
 
+## Post-audit fixes (2026-06-04)
+
+| Area | Status | Artifacts |
+|------|--------|-----------|
+| SMTP / forgot-password | Fixed | `EMAIL_NOT_CONFIGURED` 503, frontend hints, runbook §10 |
+| Conversation key rotation | Documented + scripts | `check-conversation-keys.sh`, `verify-secrets.sh` PREVIOUS warn |
+| UI route coverage | Checklist | `scripts/smoke-ui-checklist.md` |
+| API smoke | Extended | `smoke-test-local.sh`, `post-deploy-verify.sh` (sessions, forgot-password) |
+| Light load | Script | `scripts/load-test-light.sh` (health loop only) |
+| SMS proof | Deferred | Denis / AT sender approval |
+
+Manual UI pass: see `scripts/smoke-ui-checklist.md`. Load test beyond health loop: deferred (use external tooling if needed).
+
+---
+
 *End of audit report.*

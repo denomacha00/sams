@@ -2,7 +2,7 @@ import crypto from 'crypto';
 import jwt from 'jsonwebtoken';
 import { redis } from '../lib/redis';
 import { notificationService } from './notificationService';
-import { isEmailConfigured } from '../config/email';
+import { EMAIL_NOT_CONFIGURED_MESSAGE, isEmailConfigured } from '../config/email';
 import { isSmsConfigured, getAfricasTalkingConfig } from '../config/africasTalking';
 import { preparePhoneForStorage } from './phoneOnboardingService';
 import { formatSmsDeliveryError } from './notificationService';
@@ -127,7 +127,7 @@ export async function deliverOtp(
     emailSent = result.ok;
     if (!result.ok) emailError = result.error;
   } else if (user.email && !isEmailConfigured()) {
-    emailError = 'Email not configured on server';
+    emailError = EMAIL_NOT_CONFIGURED_MESSAGE;
   }
 
   if (user.phone && isSmsConfigured()) {

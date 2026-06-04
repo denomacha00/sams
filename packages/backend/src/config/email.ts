@@ -1,3 +1,6 @@
+/** Shown in API responses when SMTP_USER/SMTP_PASS are missing (password reset, OTP email). */
+export const EMAIL_NOT_CONFIGURED_MESSAGE = 'Email is not configured on this server';
+
 export interface SmtpConfig {
   host: string;
   port: number;
