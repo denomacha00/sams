@@ -282,8 +282,13 @@ usersRouter.post('/me/avatar', upload.single('avatar'), async (req: Request, res
  */
 usersRouter.get('/', requirePermission('manage:users'), async (req: Request, res: Response, next: NextFunction): Promise<void> => {
   try {
-    const filters: { role?: UserRole; departmentId?: string; classId?: string } = {
-      role: req.query.role as UserRole | undefined,
+    const rolesParam = typeof req.query.roles === 'string' ? req.query.roles : undefined;
+    const parsedRoles = rolesParam
+      ? rolesParam.split(',').map((r) => r.trim()).filter(Boolean) as UserRole[]
+      : undefined;
+
+    const filters: { role?: UserRole; roles?: UserRole[]; departmentId?: string; classId?: string } = {
+      ...(parsedRoles?.length ? { roles: parsedRoles } : { role: req.query.role as UserRole | undefined }),
       departmentId: req.query.departmentId as string | undefined,
       classId: req.query.classId as string | undefined,
     };

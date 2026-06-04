@@ -47,6 +47,29 @@ const emptyForm: EntryFormData = {
 
 const DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
 
+function normalizeUsersList(data: unknown): { id: string; fullName: string }[] {
+  if (Array.isArray(data)) return data;
+  if (data && typeof data === 'object' && Array.isArray((data as { users?: unknown }).users)) {
+    return (data as { users: { id: string; fullName: string }[] }).users;
+  }
+  return [];
+}
+
+function sortTeachersForSelect(
+  teachers: { id: string; fullName: string }[],
+  currentUserId?: string,
+): { id: string; fullName: string }[] {
+  return [...teachers].sort((a, b) => {
+    if (a.id === currentUserId) return -1;
+    if (b.id === currentUserId) return 1;
+    return a.fullName.localeCompare(b.fullName);
+  });
+}
+
+function teacherSelectLabel(teacher: { id: string; fullName: string }, currentUserId?: string): string {
+  return teacher.id === currentUserId ? `Me (${teacher.fullName})` : teacher.fullName;
+}
+
 const TimetablePage: React.FC = () => {
   const user = useAuthStore((s) => s.user);
   const navigate = useNavigate();
@@ -73,7 +96,7 @@ const TimetablePage: React.FC = () => {
     fetchEntries();
     fetchDepartments();
     fetchTeachers();
-  }, [user?.role, navigate]);
+  }, [user?.role, user?.id, navigate]);
 
   const fetchDepartments = async () => {
     try {
@@ -103,11 +126,19 @@ const TimetablePage: React.FC = () => {
 
   const fetchTeachers = async () => {
     try {
-      const { data } = await apiClient.get('/users?role=TEACHER');
-      const users = data.users || data || [];
-      setTeachers(users);
+      const { data } = await apiClient.get('/users', {
+        params: { roles: 'TEACHER,HOD' },
+      });
+      let users = normalizeUsersList(data);
+      if (user?.role === UserRole.HOD && user.id && !users.some((t) => t.id === user.id)) {
+        users = [{ id: user.id, fullName: user.fullName }, ...users];
+      }
+      setTeachers(sortTeachersForSelect(users, user?.id));
     } catch (err) {
       console.error('Failed to fetch teachers:', err);
+      if (user?.role === UserRole.HOD && user.id) {
+        setTeachers([{ id: user.id, fullName: user.fullName }]);
+      }
     }
   };
 
@@ -256,7 +287,9 @@ const TimetablePage: React.FC = () => {
           >
             <option value="" className="bg-slate-900">All teachers</option>
             {teachers.map((teacher) => (
-              <option key={teacher.id} value={teacher.id} className="bg-slate-900">{teacher.fullName}</option>
+              <option key={teacher.id} value={teacher.id} className="bg-slate-900">
+                {teacherSelectLabel(teacher, user?.id)}
+              </option>
             ))}
           </select>
         </div>
@@ -412,8 +445,10 @@ const TimetablePage: React.FC = () => {
                     className="w-full px-4 py-2.5 rounded-xl input-field focus:outline-none focus:border-indigo-500/50 transition-colors"
                   >
                     <option value="" className="bg-slate-800">-- Select Teacher --</option>
-                    {teachers.map(t => (
-                      <option key={t.id} value={t.id} className="bg-slate-800">{t.fullName}</option>
+                    {teachers.map((t) => (
+                      <option key={t.id} value={t.id} className="bg-slate-800">
+                        {teacherSelectLabel(t, user?.id)}
+                      </option>
                     ))}
                   </select>
                 </div>

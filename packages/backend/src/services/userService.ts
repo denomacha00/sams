@@ -36,6 +36,8 @@ export interface UpdateUserData {
 
 export interface ListUsersFilters {
   role?: UserRole;
+  /** When set, matches any of these roles (takes precedence over `role`). */
+  roles?: UserRole[];
   departmentId?: string;
   classId?: string;
 }
@@ -242,7 +244,9 @@ export class UserService {
   async listUsers(schoolId: string, filters?: ListUsersFilters) {
     const where: Record<string, unknown> = { schoolId };
 
-    if (filters?.role) {
+    if (filters?.roles?.length) {
+      where.role = { in: filters.roles };
+    } else if (filters?.role) {
       where.role = filters.role;
     }
     if (filters?.departmentId) {
