@@ -206,11 +206,11 @@ const LoginPage: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen flex">
+    <div className="login-page min-h-screen flex bg-canvas">
       {/* Left panel — branding */}
       <div className="hidden lg:flex lg:w-1/2 relative overflow-hidden bg-canvas border-r border-line items-center justify-center">
         <div className="relative z-10 text-center px-12">
-          <div className="inline-flex w-28 h-28 rounded-2xl bg-orange-500 items-center justify-center shadow-card mb-8">
+          <div className="inline-flex w-28 h-28 rounded-2xl bg-brand items-center justify-center shadow-card mb-8">
             <svg className="w-14 h-14 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
             </svg>
@@ -226,7 +226,7 @@ const LoginPage: React.FC = () => {
       </div>
 
       {/* Right panel — login form */}
-      <div className="flex-1 flex items-center justify-center bg-surface-muted px-6 py-12 relative">
+      <div className="flex-1 flex items-center justify-center bg-canvas px-6 py-12 relative">
         <div className="w-full max-w-md">
           {/* Mobile logo (shown on small screens) */}
           <div className="lg:hidden text-center mb-8">
@@ -251,40 +251,40 @@ const LoginPage: React.FC = () => {
             </p>
 
             {authNotice && (
-              <div className="mb-6 p-3 rounded-xl bg-orange-500/15 border border-orange-500/40">
-                <p className="text-sm text-center font-medium text-orange-400">{authNotice}</p>
+              <div className="login-notice mb-6">
+                <p className="text-sm text-center font-medium">{authNotice}</p>
               </div>
             )}
 
             {error && (
               <div className={`mb-6 p-3 rounded-xl ${
                 error.toLowerCase().includes('locked')
-                  ? 'bg-orange-500/20 border border-orange-400/30'
+                  ? 'bg-slate-800/80 border border-slate-500/40'
                   : error.toLowerCase().includes('rate') || error.toLowerCase().includes('too many')
-                    ? 'bg-orange-500/20 border border-orange-500/30'
+                    ? 'bg-indigo-950/50 border border-indigo-500/35'
                     : 'bg-red-500/20 border border-red-400/30'
               }`}>
                 {error.toLowerCase().includes('locked') && (
                   <div className="flex items-center justify-center gap-2 mb-1">
-                    <svg className="w-4 h-4 text-orange-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <svg className="w-4 h-4 text-slate-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
                     </svg>
-                    <span className="text-xs font-semibold text-orange-300 uppercase tracking-wider">Account Locked</span>
+                    <span className="text-xs font-semibold text-slate-300 uppercase tracking-wider">Account Locked</span>
                   </div>
                 )}
                 {(error.toLowerCase().includes('rate') || error.toLowerCase().includes('too many')) && (
                   <div className="flex items-center justify-center gap-2 mb-1">
-                    <svg className="w-4 h-4 text-orange-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <svg className="w-4 h-4 text-indigo-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
                     </svg>
-                    <span className="text-xs font-semibold text-orange-400 uppercase tracking-wider">Too Many Attempts</span>
+                    <span className="text-xs font-semibold text-indigo-300 uppercase tracking-wider">Too Many Attempts</span>
                   </div>
                 )}
                 <p className={`text-sm text-center font-medium ${
                   error.toLowerCase().includes('locked')
-                    ? 'text-orange-300'
+                    ? 'text-slate-200'
                     : error.toLowerCase().includes('rate') || error.toLowerCase().includes('too many')
-                      ? 'text-orange-400'
+                      ? 'text-indigo-200'
                       : 'text-red-300'
                 }`}>{error}</p>
               </div>

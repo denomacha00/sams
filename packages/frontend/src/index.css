@@ -224,6 +224,15 @@
   .inner-page-header {
     @apply border-b border-line bg-surface backdrop-blur-sm sticky top-0 z-40;
   }
+
+  /* Login — slate canvas + indigo accents; orange reserved for Sign In (btn-primary) */
+  .login-page {
+    @apply bg-canvas text-ink;
+  }
+
+  .login-notice {
+    @apply p-3 rounded-xl bg-indigo-500/10 border border-indigo-500/30 text-indigo-200;
+  }
 }
 
 @layer utilities {
@@ -254,7 +263,7 @@
   }
 
   .border-yellow-500\/20, .border-yellow-500\/30, .border-amber-500\/20, .border-amber-500\/30 {
-    border-color: rgb(249 115 22 / 0.35) !important;
+    border-color: rgb(100 116 139 / 0.35) !important;
   }
 
   .bg-teal-500\/10, .bg-teal-500\/20, .bg-cyan-500\/10, .bg-cyan-500\/20,
@@ -265,7 +274,7 @@
   }
 
   .bg-yellow-500\/10, .bg-yellow-500\/20, .bg-amber-500\/10, .bg-amber-500\/20 {
-    background-color: rgb(249 115 22 / 0.12) !important;
+    background-color: rgb(51 65 85 / 0.4) !important;
   }
 
   .from-teal-500, .from-cyan-500, .from-purple-500, .from-pink-500,
@@ -302,7 +311,7 @@
   }
 
   .shadow-amber-500\/20, .shadow-yellow-500\/20 {
-    --tw-shadow-color: rgb(249 115 22 / 0.15);
+    --tw-shadow-color: rgb(15 23 42 / 0.35);
     --tw-shadow: var(--tw-shadow-colored);
   }
 }
