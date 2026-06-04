@@ -5,6 +5,7 @@ import {
   SESSION_SUSPENDED_FLAG,
   clearAuthState,
   clearSuspendedSessionFlags,
+  forceAuthRedirect,
 } from './clearAuthState';
 
 const storage = new Map<string, string>();
@@ -62,5 +63,22 @@ describe('clearAuthState', () => {
     session.set(SESSION_SUSPENDED_FLAG, '1');
     clearSuspendedSessionFlags();
     expect(session.has(SESSION_SUSPENDED_FLAG)).toBe(false);
+  });
+
+  it('forceAuthRedirect on /login clears auth without full navigation', () => {
+    const replace = vi.fn();
+    vi.stubGlobal('window', {
+      location: { pathname: '/login', search: '', replace: vi.fn() },
+      history: { replaceState: replace },
+    });
+
+    storage.set(AUTH_STORAGE_KEY, '{}');
+    useAuthStore.setState({ accessToken: 'a', isAuthenticated: true });
+
+    forceAuthRedirect('session_expired');
+
+    expect(useAuthStore.getState().isAuthenticated).toBe(false);
+    expect(replace).toHaveBeenCalledWith(null, '', '/login?reason=session_expired');
+    expect(window.location.replace).not.toHaveBeenCalled();
   });
 });

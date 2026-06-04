@@ -20,7 +20,7 @@ const LoginPage: React.FC = () => {
     authReason === 'school_suspended'
       ? 'Your school was suspended. If access has been restored, please sign in again.'
       : authReason === 'session_expired'
-        ? 'Your session ended (for example after a suspension). Please sign in again.'
+        ? 'Your session ended. Please sign in again.'
         : null;
   const [otpStep, setOtpStep] = useState(false);
   const [otpChallenge, setOtpChallenge] = useState('');
@@ -57,12 +57,17 @@ const LoginPage: React.FC = () => {
   );
 
   useEffect(() => {
+    if (authReason === 'session_expired' || authReason === 'school_suspended') {
+      clearAuthState({ markSuspended: authReason === 'school_suspended' });
+      return;
+    }
+
     if (!isAuthenticated) return;
 
     let cancelled = false;
     (async () => {
       try {
-        await apiClient.get('/users/me');
+        await apiClient.get('/users/me', { skipAuthRedirect: true });
         if (cancelled) return;
         const user = useAuthStore.getState().user;
         if (user) navigateAfterAuth(user.role);
@@ -74,7 +79,7 @@ const LoginPage: React.FC = () => {
     return () => {
       cancelled = true;
     };
-  }, [isAuthenticated, navigateAfterAuth]);
+  }, [isAuthenticated, navigateAfterAuth, authReason]);
 
   // Check if WebAuthn is available in this browser
   const webauthnAvailable = typeof window !== 'undefined' && !!window.PublicKeyCredential;

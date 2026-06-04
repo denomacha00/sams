@@ -1,6 +1,29 @@
 import axios, { AxiosError, InternalAxiosRequestConfig } from 'axios';
 import { readAccessToken, readRefreshToken, writeTokens } from '../lib/authTokens';
-import { forceAuthRedirect } from '../lib/clearAuthState';
+import { clearAuthState, forceAuthRedirect, type AuthRedirectReason } from '../lib/clearAuthState';
+
+/** Refresh failures that mean the user must sign in again (not transient server/network errors). */
+const REFRESH_SESSION_END_CODES = new Set([
+  'INVALID_REFRESH_TOKEN',
+  'REFRESH_TOKEN_EXPIRED',
+  'ACCOUNT_LOCKED',
+  'USER_NOT_FOUND',
+]);
+
+function refreshFailureRedirectReason(error: AxiosError): AuthRedirectReason | null {
+  const code = (error.response?.data as { code?: string } | undefined)?.code;
+  if (code === 'SCHOOL_SUSPENDED') return 'school_suspended';
+  if (error.response?.status === 401 && code && REFRESH_SESSION_END_CODES.has(code)) {
+    return 'session_expired';
+  }
+  return null;
+}
+
+export interface SamApiRequestConfig extends InternalAxiosRequestConfig {
+  _retry?: boolean;
+  /** When true, failed refresh clears auth locally without hard-redirect (login session probe). */
+  skipAuthRedirect?: boolean;
+}
 
 const apiClient = axios.create({
   baseURL: import.meta.env.VITE_API_BASE_URL || '/api/v1',
@@ -48,7 +71,7 @@ const processQueue = (error: unknown, token: string | null = null) => {
 apiClient.interceptors.response.use(
   (response) => response,
   async (error: AxiosError) => {
-    const originalRequest = error.config as InternalAxiosRequestConfig & { _retry?: boolean };
+    const originalRequest = error.config as SamApiRequestConfig;
     const responseCode = (error.response?.data as { code?: string } | undefined)?.code;
 
     if (error.response?.status === 403 && responseCode === 'SCHOOL_SUSPENDED') {
@@ -96,10 +119,15 @@ apiClient.interceptors.response.use(
         return apiClient(originalRequest);
       } catch (refreshError) {
         processQueue(refreshError, null);
-        const refreshCode = (refreshError as AxiosError).response?.data as { code?: string } | undefined;
-        forceAuthRedirect(
-          refreshCode?.code === 'SCHOOL_SUSPENDED' ? 'school_suspended' : 'session_expired',
-        );
+        const refreshAxios = refreshError as AxiosError;
+        const redirectReason = refreshFailureRedirectReason(refreshAxios);
+
+        if (originalRequest.skipAuthRedirect || !redirectReason) {
+          clearAuthState();
+          return Promise.reject(refreshError);
+        }
+
+        forceAuthRedirect(redirectReason);
         return Promise.reject(refreshError);
       } finally {
         isRefreshing = false;
