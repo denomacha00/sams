@@ -114,8 +114,8 @@ const DepartmentManagementPage: React.FC = () => {
   });
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900">
-      <header className="border-b border-white/10 backdrop-blur-sm bg-white/5">
+    <div className="page-shell">
+      <header className="inner-page-header">
         <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-500 to-blue-500 flex items-center justify-center shadow-lg shadow-indigo-500/20">
@@ -124,13 +124,13 @@ const DepartmentManagementPage: React.FC = () => {
               </svg>
             </div>
             <div>
-              <h1 className="text-lg font-bold text-white">Department Management</h1>
-              <p className="text-xs text-gray-400">Manage teachers, classes and students</p>
+              <h1 className="text-lg font-bold text-ink">Department Management</h1>
+              <p className="text-xs text-ink-muted">Manage teachers, classes and students</p>
             </div>
           </div>
           <div className="flex items-center gap-4">
-            <span className="text-sm text-gray-400">{user?.fullName}</span>
-            <Link to="/dashboard" className="text-sm text-gray-400 hover:text-cyan-400 transition-colors">
+            <span className="text-sm text-ink-muted">{user?.fullName}</span>
+            <Link to="/dashboard" className="text-sm text-ink-muted hover:text-cyan-400 transition-colors">
               ← Back to Dashboard
             </Link>
           </div>
@@ -139,14 +139,14 @@ const DepartmentManagementPage: React.FC = () => {
 
       <main className="max-w-7xl mx-auto px-6 py-10">
         <div className="mb-8">
-          <h2 className="text-3xl font-bold text-white mb-1">Department Management</h2>
-          <p className="text-gray-400">View and manage your department's teachers, classes and students.</p>
+          <h2 className="text-3xl font-bold text-ink mb-1">Department Management</h2>
+          <p className="text-ink-muted">View and manage your department's teachers, classes and students.</p>
         </div>
 
         {assignSuccess && (
           <div className="mb-6 p-4 rounded-xl bg-teal-500/10 border border-teal-500/20 text-teal-300 text-sm flex items-center justify-between">
             <span>{assignSuccess}</span>
-            <button onClick={() => setAssignSuccess('')} className="ml-4 text-teal-400 hover:text-white">✕</button>
+            <button onClick={() => setAssignSuccess('')} className="ml-4 text-teal-400 hover:text-ink">✕</button>
           </div>
         )}
 
@@ -159,7 +159,7 @@ const DepartmentManagementPage: React.FC = () => {
               className={`px-4 py-2 rounded-lg text-sm font-medium transition-all capitalize ${
                 activeTab === tab
                   ? 'bg-gradient-to-r from-teal-500 to-cyan-500 text-white shadow-lg shadow-cyan-500/20'
-                  : 'bg-white/5 text-gray-400 hover:bg-white/10 hover:text-white border border-white/10'
+                  : 'bg-white/5 text-ink-muted hover:bg-white/10 hover:text-ink border border-white/10'
               }`}
             >
               {tab} ({tab === 'teachers' ? teachers.length : tab === 'classes' ? classes.length : students.length})
@@ -170,7 +170,7 @@ const DepartmentManagementPage: React.FC = () => {
         {/* Search for students */}
         {activeTab === 'students' && (
           <div className="mb-6 relative">
-            <svg className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <svg className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-ink-muted" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
             </svg>
             <input
@@ -178,9 +178,9 @@ const DepartmentManagementPage: React.FC = () => {
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="Search by name or admission number..."
-              className="w-full pl-11 pr-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-teal-500/40 focus:border-teal-400 transition-all"
+              className="w-full pl-11 pr-4 py-3 bg-slate-50 border border-line rounded-xl text-white placeholder-ink-subtle focus:outline-none focus:ring-2 focus:ring-teal-500/40 focus:border-teal-400 transition-all"
             />
-            {searchQuery && <p className="text-xs text-gray-400 mt-1">{filteredStudents.length} result{filteredStudents.length !== 1 ? 's' : ''}</p>}
+            {searchQuery && <p className="text-xs text-ink-muted mt-1">{filteredStudents.length} result{filteredStudents.length !== 1 ? 's' : ''}</p>}
           </div>
         )}
 
@@ -189,17 +189,17 @@ const DepartmentManagementPage: React.FC = () => {
           <div className="space-y-3">
             {teachersError && <div className="p-3 rounded-xl bg-red-500/10 border border-red-500/20 text-red-300 text-sm">{teachersError}</div>}
             {loadingTeachers ? (
-              <div className="text-center text-gray-400 py-8">Loading teachers...</div>
+              <div className="text-center text-ink-muted py-8">Loading teachers...</div>
             ) : teachers.length === 0 ? (
-              <div className="text-center text-gray-400 py-8">No teachers in this department yet.</div>
+              <div className="text-center text-ink-muted py-8">No teachers in this department yet.</div>
             ) : teachers.map((teacher) => (
               <div key={teacher.id} className="rounded-2xl border border-white/10 bg-white/5 p-4 flex items-center gap-3">
                 <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-indigo-500/30 to-blue-500/30 border border-indigo-500/20 flex items-center justify-center shrink-0">
-                  <span className="text-sm font-semibold text-indigo-300">{teacher.fullName.charAt(0)}</span>
+                  <span className="text-sm font-semibold text-brand">{teacher.fullName.charAt(0)}</span>
                 </div>
                 <div>
-                  <p className="text-sm font-semibold text-white">{teacher.fullName}</p>
-                  <p className="text-xs text-gray-400">{teacher.email || teacher.phone || '—'}</p>
+                  <p className="text-sm font-semibold text-ink">{teacher.fullName}</p>
+                  <p className="text-xs text-ink-muted">{teacher.email || teacher.phone || '—'}</p>
                 </div>
               </div>
             ))}
@@ -213,23 +213,23 @@ const DepartmentManagementPage: React.FC = () => {
             {assignError && (
               <div className="p-3 rounded-xl bg-red-500/10 border border-red-500/20 text-red-300 text-sm flex items-center justify-between">
                 <span>{assignError}</span>
-                <button onClick={() => setAssignError('')} className="ml-4 text-red-400 hover:text-white">✕</button>
+                <button onClick={() => setAssignError('')} className="ml-4 text-red-400 hover:text-ink">✕</button>
               </div>
             )}
             {loadingClasses ? (
-              <div className="text-center text-gray-400 py-8">Loading classes...</div>
+              <div className="text-center text-ink-muted py-8">Loading classes...</div>
             ) : classes.length === 0 ? (
-              <div className="text-center text-gray-400 py-8">No classes in this department yet.</div>
+              <div className="text-center text-ink-muted py-8">No classes in this department yet.</div>
             ) : classes.map((cls) => (
               <div key={cls.id} className="rounded-2xl border border-white/10 bg-white/5 p-4">
                 <div className="flex items-start justify-between gap-3 mb-2">
                   <div>
-                    <p className="text-sm font-semibold text-white">{cls.name}</p>
-                    <p className="text-xs text-gray-400">Capacity: {cls.capacity}</p>
+                    <p className="text-sm font-semibold text-ink">{cls.name}</p>
+                    <p className="text-xs text-ink-muted">Capacity: {cls.capacity}</p>
                     <p className="text-xs mt-1">
                       {cls.classTeacherName
                         ? <span className="text-teal-300">Class Teacher: {cls.classTeacherName}</span>
-                        : <span className="text-gray-500 italic">No class teacher assigned</span>}
+                        : <span className="text-ink-subtle italic">No class teacher assigned</span>}
                     </p>
                   </div>
                   {selectedClassId !== cls.id && (
@@ -243,7 +243,7 @@ const DepartmentManagementPage: React.FC = () => {
                     <select
                       value={selectedTeacherId}
                       onChange={(e) => setSelectedTeacherId(e.target.value)}
-                      className="flex-1 px-3 py-2 rounded-xl bg-white/5 border border-white/10 text-white text-sm focus:outline-none focus:border-teal-500/50 transition-colors"
+                      className="flex-1 px-3 py-2 rounded-xl bg-slate-50 border border-line text-white text-sm focus:outline-none focus:border-teal-500/50 transition-colors"
                       disabled={assigning}
                     >
                       <option value="" className="bg-slate-800">— Choose a teacher —</option>
@@ -254,7 +254,7 @@ const DepartmentManagementPage: React.FC = () => {
                     <button onClick={() => handleAssign(cls.id)} disabled={assigning || !selectedTeacherId} className="px-4 py-2 rounded-xl text-xs font-medium text-white bg-gradient-to-r from-teal-500 to-cyan-500 disabled:opacity-50 transition-all">
                       {assigning ? 'Assigning…' : 'Assign'}
                     </button>
-                    <button onClick={cancelAssign} disabled={assigning} className="px-3 py-2 rounded-xl text-xs text-gray-400 hover:text-white hover:bg-white/10 transition-colors">
+                    <button onClick={cancelAssign} disabled={assigning} className="px-3 py-2 rounded-xl text-xs text-ink-muted hover:text-ink hover:bg-white/10 transition-colors">
                       Cancel
                     </button>
                   </div>
@@ -268,9 +268,9 @@ const DepartmentManagementPage: React.FC = () => {
         {activeTab === 'students' && (
           <div>
             {loadingStudents ? (
-              <div className="text-center text-gray-400 py-8">Loading students...</div>
+              <div className="text-center text-ink-muted py-8">Loading students...</div>
             ) : filteredStudents.length === 0 ? (
-              <div className="text-center text-gray-400 py-8">
+              <div className="text-center text-ink-muted py-8">
                 {searchQuery ? `No students found matching "${searchQuery}"` : 'No students in this department yet.'}
               </div>
             ) : (
@@ -281,8 +281,8 @@ const DepartmentManagementPage: React.FC = () => {
                       <span className="text-xs font-semibold text-blue-300">{s.fullName.charAt(0)}</span>
                     </div>
                     <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium text-white">{s.fullName}</p>
-                      <p className="text-xs text-gray-400">
+                      <p className="text-sm font-medium text-ink">{s.fullName}</p>
+                      <p className="text-xs text-ink-muted">
                         {s.admissionNumber ? `ADM: ${s.admissionNumber}` : '—'}
                         {s.classId && classes.find(c => c.id === s.classId) && (
                           <span className="ml-2 text-teal-400">· {classes.find(c => c.id === s.classId)?.name}</span>
@@ -299,7 +299,7 @@ const DepartmentManagementPage: React.FC = () => {
 
       <footer className="border-t border-white/5 mt-20 py-6">
         <div className="max-w-7xl mx-auto px-6 text-center">
-          <p className="text-xs text-gray-500">© 2025 SAMS · Developed by Denis Macharia</p>
+          <p className="text-xs text-ink-subtle">© 2025 SAMS · Developed by Denis Macharia</p>
         </div>
       </footer>
     </div>

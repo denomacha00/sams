@@ -309,30 +309,30 @@ const SessionPage: React.FC = () => {
   // If no active session, show start form
   if (!activeSession) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 p-6">
+      <div className="page-shell p-6">
         <div className="max-w-lg mx-auto">
           {/* Header */}
           <div className="mb-8">
-            <h1 className="text-2xl font-bold text-white">Start Attendance Session</h1>
-            <p className="text-gray-400 text-sm mt-1">Select a class to begin taking attendance</p>
+            <h1 className="text-2xl font-bold text-ink">Start Attendance Session</h1>
+            <p className="text-ink-muted text-sm mt-1">Select a class to begin taking attendance</p>
           </div>
 
           {error && (
-            <div className="mb-4 p-3 bg-red-500/20 border border-red-400/30 rounded-xl backdrop-blur-sm">
-              <p className="text-sm text-red-200">{error}</p>
+            <div className="mb-4 p-3 alert-error">
+              <p className="text-sm text-red-800">{error}</p>
             </div>
           )}
 
-          <div className="backdrop-blur-xl bg-white/5 border border-white/10 rounded-2xl p-6 space-y-5">
+          <div className="surface-card rounded-2xl p-6 space-y-5">
             <div>
-              <label htmlFor="timetableEntry" className="block text-xs font-semibold text-gray-300 uppercase tracking-wider mb-2">
+              <label htmlFor="timetableEntry" className="form-label">
                 Select Class / Subject
               </label>
               <select
                 id="timetableEntry"
                 value={selectedEntry}
                 onChange={(e) => setSelectedEntry(e.target.value)}
-                className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:ring-2 focus:ring-purple-500/50 transition-all duration-200 appearance-none"
+                className="w-full input-field focus:outline-none focus:ring-2 focus:ring-purple-500/50 transition-all duration-200 appearance-none"
               >
                 <option value="" className="bg-slate-800">-- Select --</option>
                 {timetableEntries.map((entry) => (
@@ -348,10 +348,10 @@ const SessionPage: React.FC = () => {
               )}
             </div>
 
-            <div className="flex items-center justify-between p-3 bg-white/5 border border-white/10 rounded-xl">
+            <div className="flex items-center justify-between p-3 bg-slate-50 border border-line rounded-xl">
               <div>
-                <p className="text-sm font-medium text-white">Require GPS (QR scan)</p>
-                <p className="text-xs text-gray-400 mt-0.5">
+                <p className="text-sm font-medium text-ink">Require GPS (QR scan)</p>
+                <p className="text-xs text-ink-muted mt-0.5">
                   {sessionRequireGps
                     ? 'Students must be within radius of your location when scanning'
                     : 'No location check for QR — use link GPS toggle separately if needed'}
@@ -374,7 +374,7 @@ const SessionPage: React.FC = () => {
 
             {sessionRequireGps && (
               <div>
-                <label htmlFor="sessionRadiusM" className="block text-xs font-semibold text-gray-300 uppercase tracking-wider mb-2">
+                <label htmlFor="sessionRadiusM" className="form-label">
                   QR allowed radius (meters)
                 </label>
                 <div className="flex items-center gap-3">
@@ -387,9 +387,9 @@ const SessionPage: React.FC = () => {
                     onChange={(e) =>
                       setSessionRadiusM(Math.max(10, Math.min(10000, parseInt(e.target.value, 10) || 100)))
                     }
-                    className="flex-1 bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:ring-2 focus:ring-purple-500/50 transition-all duration-200"
+                    className="flex-1 input-field focus:outline-none focus:ring-2 focus:ring-purple-500/50 transition-all duration-200"
                   />
-                  <span className="text-sm text-gray-400 shrink-0">m</span>
+                  <span className="text-sm text-ink-muted shrink-0">m</span>
                 </div>
               </div>
             )}
@@ -397,7 +397,7 @@ const SessionPage: React.FC = () => {
             <button
               onClick={startSession}
               disabled={!selectedEntry || loading}
-              className="w-full bg-gradient-to-r from-blue-600 to-purple-600 text-white font-semibold py-3.5 px-4 rounded-xl shadow-lg shadow-purple-500/25 hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200"
+              className="w-full btn-primary font-semibold py-3.5 px-4 rounded-xl shadow-lg shadow-purple-500/25 hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200"
             >
               {loading ? (
                 <span className="flex items-center justify-center gap-2">
@@ -414,7 +414,7 @@ const SessionPage: React.FC = () => {
           </div>
 
           {/* Footer */}
-          <p className="text-center text-xs text-gray-500 mt-8">
+          <p className="text-center text-xs text-ink-subtle mt-8">
             © 2025 SAMS · Developed by Denis Macharia
           </p>
         </div>
@@ -424,32 +424,32 @@ const SessionPage: React.FC = () => {
 
   // Active session view
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 p-6">
+    <div className="page-shell p-6">
       <div className="max-w-2xl mx-auto">
         {/* Session header */}
         <div className="flex items-center justify-between mb-6">
           <div>
-            <h1 className="text-2xl font-bold text-white">{activeSession.subject}</h1>
-            <p className="text-gray-400">{activeSession.className}</p>
+            <h1 className="text-2xl font-bold text-ink">{activeSession.subject}</h1>
+            <p className="text-ink-muted">{activeSession.className}</p>
           </div>
           <button
             onClick={endSession}
             disabled={loading}
-            className="bg-white/10 border border-red-500/30 text-red-300 py-2 px-4 rounded-xl hover:bg-red-500/20 hover:border-red-400/50 disabled:opacity-50 transition-all duration-200"
+            className="btn-secondary text-red-700 border-red-200 hover:bg-red-50 py-2 px-4 disabled:opacity-50 transition-all duration-200"
           >
             End Session
           </button>
         </div>
 
         {error && (
-          <div className="mb-4 p-3 bg-red-500/20 border border-red-400/30 rounded-xl backdrop-blur-sm">
-            <p className="text-sm text-red-200">{error}</p>
+          <div className="mb-4 p-3 alert-error">
+            <p className="text-sm text-red-800">{error}</p>
           </div>
         )}
 
         {/* QR Code Display */}
-        <div className="backdrop-blur-xl bg-white/5 border border-white/10 rounded-2xl p-6 mb-6 text-center">
-          <h2 className="text-lg font-semibold text-white mb-4">Scan QR Code</h2>
+        <div className="surface-card rounded-2xl p-6 mb-6 text-center">
+          <h2 className="text-lg font-semibold text-ink mb-4">Scan QR Code</h2>
           {qrDataUrl ? (
             <div className="inline-block p-4 bg-white rounded-2xl shadow-2xl shadow-purple-500/20">
               <img src={qrDataUrl} alt="Attendance QR Code" className="w-64 h-64" />
@@ -463,13 +463,13 @@ const SessionPage: React.FC = () => {
               </div>
             </div>
           )}
-          <p className="text-xs text-gray-500 mt-4">QR refreshes automatically every 30 seconds</p>
+          <p className="text-xs text-ink-subtle mt-4">QR refreshes automatically every 30 seconds</p>
         </div>
 
         {/* Link Generation Panel */}
-        <div className="backdrop-blur-xl bg-white/5 border border-white/10 rounded-2xl p-6 mb-6">
+        <div className="surface-card rounded-2xl p-6 mb-6">
           <div className="flex items-center justify-between mb-4">
-            <h2 className="text-lg font-semibold text-white">Share Attendance Link</h2>
+            <h2 className="text-lg font-semibold text-ink">Share Attendance Link</h2>
             {linkUrl && linkTimeRemaining > 0 && (
               <span className="px-3 py-1 bg-emerald-500/20 border border-emerald-500/30 rounded-full text-xs font-semibold text-emerald-300">
                 Active
@@ -487,14 +487,14 @@ const SessionPage: React.FC = () => {
             <div className="space-y-4 mb-4">
               {/* Expiry */}
               <div>
-                <label htmlFor="expiryMinutes" className="block text-xs font-semibold text-gray-300 uppercase tracking-wider mb-2">
+                <label htmlFor="expiryMinutes" className="form-label">
                   Link Expiry
                 </label>
                 <select
                   id="expiryMinutes"
                   value={expiryMinutes}
                   onChange={(e) => setExpiryMinutes(Number(e.target.value))}
-                  className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:ring-2 focus:ring-purple-500/50 transition-all duration-200 appearance-none"
+                  className="w-full input-field focus:outline-none focus:ring-2 focus:ring-purple-500/50 transition-all duration-200 appearance-none"
                 >
                   <option value={5} className="bg-slate-800">5 minutes</option>
                   <option value={10} className="bg-slate-800">10 minutes</option>
@@ -505,10 +505,10 @@ const SessionPage: React.FC = () => {
               </div>
 
               {/* GPS toggle */}
-              <div className="flex items-center justify-between p-3 bg-white/5 border border-white/10 rounded-xl">
+              <div className="flex items-center justify-between p-3 bg-slate-50 border border-line rounded-xl">
                 <div>
-                  <p className="text-sm font-medium text-white">Require GPS</p>
-                  <p className="text-xs text-gray-400 mt-0.5">
+                  <p className="text-sm font-medium text-ink">Require GPS</p>
+                  <p className="text-xs text-ink-muted mt-0.5">
                     {requireGps ? 'Students must be physically present' : 'No location check — use for permissions/excused'}
                   </p>
                 </div>
@@ -530,7 +530,7 @@ const SessionPage: React.FC = () => {
               {/* GPS radius — only shown when GPS is on */}
               {requireGps && (
                 <div>
-                  <label htmlFor="gpsRadiusM" className="block text-xs font-semibold text-gray-300 uppercase tracking-wider mb-2">
+                  <label htmlFor="gpsRadiusM" className="form-label">
                     Allowed Radius (meters)
                   </label>
                   <div className="flex items-center gap-3">
@@ -541,11 +541,11 @@ const SessionPage: React.FC = () => {
                       max={10000}
                       value={gpsRadiusM}
                       onChange={(e) => setGpsRadiusM(Math.max(10, Math.min(10000, parseInt(e.target.value) || 100)))}
-                      className="flex-1 bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:ring-2 focus:ring-purple-500/50 transition-all duration-200"
+                      className="flex-1 input-field focus:outline-none focus:ring-2 focus:ring-purple-500/50 transition-all duration-200"
                     />
-                    <span className="text-sm text-gray-400 shrink-0">m</span>
+                    <span className="text-sm text-ink-muted shrink-0">m</span>
                   </div>
-                  <p className="text-xs text-gray-500 mt-1">
+                  <p className="text-xs text-ink-subtle mt-1">
                     Students outside this radius will be rejected. Typical classroom: 50–150m.
                   </p>
                 </div>
@@ -554,7 +554,7 @@ const SessionPage: React.FC = () => {
               <button
                 onClick={generateLink}
                 disabled={linkLoading}
-                className="w-full bg-gradient-to-r from-blue-600 to-purple-600 text-white font-semibold py-3 px-5 rounded-xl shadow-lg shadow-purple-500/25 hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200"
+                className="w-full btn-primary font-semibold py-3 px-5 rounded-xl shadow-lg shadow-purple-500/25 hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200"
               >
                 {linkLoading ? (
                   <span className="flex items-center justify-center gap-2">
@@ -593,8 +593,8 @@ const SessionPage: React.FC = () => {
               </div>
 
               {/* Link URL display */}
-              <div className="flex items-center gap-2 bg-white/5 border border-white/10 rounded-xl p-3">
-                <div className="flex-1 truncate text-sm text-gray-300 font-mono">
+              <div className="flex items-center gap-2 bg-slate-50 border border-line rounded-xl p-3">
+                <div className="flex-1 truncate text-sm text-ink-muted font-mono">
                   {linkUrl}
                 </div>
                 <button
@@ -602,14 +602,14 @@ const SessionPage: React.FC = () => {
                   className={`shrink-0 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all duration-200 ${
                     linkCopied
                       ? 'bg-emerald-500/20 border border-emerald-500/30 text-emerald-300'
-                      : 'bg-white/10 border border-white/10 text-white hover:bg-white/20'
+                      : 'btn-secondary text-sm hover:bg-white/20'
                   }`}
                 >
                   {linkCopied ? '✓ Copied' : 'Copy'}
                 </button>
                 <button
                   onClick={shareLink}
-                  className="shrink-0 px-3 py-1.5 rounded-lg text-xs font-semibold bg-white/10 border border-white/10 text-white hover:bg-white/20 transition-all duration-200"
+                  className="shrink-0 px-3 py-1.5 rounded-lg text-xs font-semibold btn-secondary text-sm hover:bg-white/20 transition-all duration-200"
                 >
                   Share
                 </button>
@@ -618,7 +618,7 @@ const SessionPage: React.FC = () => {
               {/* Countdown timer */}
               {linkTimeRemaining > 0 ? (
                 <div className="flex items-center justify-between">
-                  <span className="text-xs text-gray-400">Time remaining</span>
+                  <span className="text-xs text-ink-muted">Time remaining</span>
                   <span className={`text-sm font-mono font-semibold ${
                     linkTimeRemaining <= 60 ? 'text-yellow-300' : 'text-emerald-300'
                   }`}>
@@ -631,7 +631,7 @@ const SessionPage: React.FC = () => {
                   <button
                     onClick={generateLink}
                     disabled={linkLoading}
-                    className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-gradient-to-r from-blue-600 to-purple-600 text-white hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50 transition-all duration-200"
+                    className="px-3 py-1.5 rounded-lg text-xs font-semibold btn-primary hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50 transition-all duration-200"
                   >
                     Regenerate
                   </button>
@@ -644,7 +644,7 @@ const SessionPage: React.FC = () => {
                   <button
                     onClick={generateLink}
                     disabled={linkLoading}
-                    className="text-xs text-gray-400 hover:text-white transition-colors duration-200"
+                    className="text-xs text-ink-muted hover:text-ink transition-colors duration-200"
                   >
                     ↻ Regenerate link (invalidates current)
                   </button>
@@ -655,9 +655,9 @@ const SessionPage: React.FC = () => {
         </div>
 
         {/* Real-time attendance list */}
-        <div className="backdrop-blur-xl bg-white/5 border border-white/10 rounded-2xl p-6">
+        <div className="surface-card rounded-2xl p-6">
           <div className="flex items-center justify-between mb-4">
-            <h2 className="text-lg font-semibold text-white">Live Attendance</h2>
+            <h2 className="text-lg font-semibold text-ink">Live Attendance</h2>
             <span className="px-3 py-1 bg-purple-500/20 border border-purple-500/30 rounded-full text-xs font-semibold text-purple-300">
               {activeSession.records.length} scanned
             </span>
@@ -666,26 +666,26 @@ const SessionPage: React.FC = () => {
           {activeSession.records.length === 0 ? (
             <div className="text-center py-8">
               <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-white/5 mb-3">
-                <svg className="w-6 h-6 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <svg className="w-6 h-6 text-ink-subtle" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
                 </svg>
               </div>
-              <p className="text-gray-500 text-sm">Waiting for students to scan...</p>
+              <p className="text-ink-subtle text-sm">Waiting for students to scan...</p>
             </div>
           ) : (
             <div className="space-y-2">
               {activeSession.records.map((record) => (
                 <div
                   key={record.id}
-                  className="flex items-center justify-between p-3 bg-white/5 border border-white/5 rounded-xl"
+                  className="flex items-center justify-between p-3 surface-muted-row"
                 >
                   <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-xs font-bold text-white">
+                    <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-xs font-bold text-ink">
                       {record.studentName.charAt(0)}
                     </div>
                     <div>
-                      <p className="font-medium text-white text-sm">{record.studentName}</p>
-                      <p className="text-xs text-gray-500">
+                      <p className="font-medium text-ink text-sm">{record.studentName}</p>
+                      <p className="text-xs text-ink-subtle">
                         {record.method} • {new Date(record.scannedAt).toLocaleTimeString()}
                       </p>
                     </div>
@@ -700,7 +700,7 @@ const SessionPage: React.FC = () => {
         </div>
 
         {/* Footer */}
-        <p className="text-center text-xs text-gray-500 mt-8">
+        <p className="text-center text-xs text-ink-subtle mt-8">
           © 2025 SAMS · Developed by Denis Macharia
         </p>
       </div>

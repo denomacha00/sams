@@ -198,8 +198,8 @@ const QRScanPage: React.FC = () => {
       <div className="max-w-lg mx-auto">
         <div className="mb-4 flex items-center justify-between gap-3">
           <div>
-            <h1 className="text-2xl font-bold text-slate-50">Scan QR Code</h1>
-            <p className="text-slate-400 text-sm mt-1">Point your camera at the teacher&apos;s QR code</p>
+            <h1 className="page-title">Scan QR Code</h1>
+            <p className="text-ink-muted text-sm mt-1">Point your camera at the teacher&apos;s QR code</p>
           </div>
           <Link to="/dashboard" className="btn-secondary text-sm px-3 py-2 shrink-0">
             Back
@@ -208,10 +208,10 @@ const QRScanPage: React.FC = () => {
 
         <div className="mb-4 flex items-center gap-2">
           <div className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-medium ${
-            gpsStatus === 'success' ? 'bg-emerald-950 text-emerald-300 border border-emerald-800' :
-            gpsStatus === 'failed' ? 'bg-red-950 text-red-300 border border-red-800' :
-            gpsStatus === 'acquiring' ? 'bg-amber-950 text-amber-300 border border-amber-800' :
-            'bg-slate-800 text-slate-400 border border-slate-700'
+            gpsStatus === 'success' ? 'bg-emerald-50 text-emerald-800 border border-emerald-200' :
+            gpsStatus === 'failed' ? 'bg-red-50 text-red-800 border border-red-200' :
+            gpsStatus === 'acquiring' ? 'bg-amber-50 text-amber-800 border border-amber-200' :
+            'bg-slate-800 text-ink-muted border border-line'
           }`}>
             {gpsStatus === 'idle' && 'GPS Ready'}
             {gpsStatus === 'acquiring' && 'Acquiring GPS...'}
@@ -221,14 +221,14 @@ const QRScanPage: React.FC = () => {
         </div>
 
         {success && (
-          <div className="mb-4 p-4 bg-emerald-950 border border-emerald-800 rounded-xl text-center">
-            <p className="text-emerald-200 font-medium">Attendance recorded</p>
+          <div className="mb-4 p-4 alert-success rounded-xl text-center">
+            <p className="text-emerald-800 font-medium">Attendance recorded</p>
           </div>
         )}
 
         {error && (
-          <div className="mb-4 p-3 bg-red-950 border border-red-800 rounded-xl">
-            <p className="text-sm text-red-200 text-center">{error}</p>
+          <div className="mb-4 p-3 alert-error rounded-xl">
+            <p className="text-sm text-red-800 text-center">{error}</p>
           </div>
         )}
 
@@ -236,13 +236,13 @@ const QRScanPage: React.FC = () => {
           {initializing && !scanning && !success && (
             <div className="text-center py-10">
               <div className="inline-block w-8 h-8 border-2 border-indigo-400 border-t-transparent rounded-full animate-spin mb-3" />
-              <p className="text-slate-400 text-sm">Opening camera...</p>
+              <p className="text-ink-muted text-sm">Opening camera...</p>
             </div>
           )}
 
           {!initializing && !scanning && !success && (
             <div className="text-center py-8">
-              <p className="text-slate-300 mb-6">Camera is ready. Tap below if it did not start automatically.</p>
+              <p className="text-ink mb-6">Camera is ready. Tap below if it did not start automatically.</p>
               <button type="button" onClick={() => void startCamera()} className="btn-primary py-3 px-8">
                 Start Scanner
               </button>
@@ -251,7 +251,7 @@ const QRScanPage: React.FC = () => {
 
           {scanning && (
             <div className="relative">
-              <div className="relative rounded-xl overflow-hidden border border-slate-700">
+              <div className="relative rounded-xl overflow-hidden border border-line">
                 <video
                   ref={videoRef}
                   className="w-full h-64 sm:h-80 object-cover bg-black"
@@ -270,7 +270,7 @@ const QRScanPage: React.FC = () => {
               </div>
               <div className="flex items-center justify-center gap-2 mt-4">
                 <div className="w-2 h-2 bg-indigo-400 rounded-full animate-pulse" />
-                <p className="text-sm text-slate-400">Scanning — hold steady</p>
+                <p className="text-sm text-ink-muted">Scanning — hold steady</p>
               </div>
               <button type="button" onClick={stopCamera} className="mt-4 w-full btn-secondary py-2.5">
                 Cancel
@@ -279,7 +279,7 @@ const QRScanPage: React.FC = () => {
           )}
 
           {loading && (
-            <p className="text-center text-sm text-slate-400 mt-4">Submitting attendance...</p>
+            <p className="text-center text-sm text-ink-muted mt-4">Submitting attendance...</p>
           )}
 
           {success && (
@@ -302,7 +302,7 @@ const QRScanPage: React.FC = () => {
         </div>
 
         {result && !success && (
-          <p className="text-center text-xs text-slate-500 mt-4 truncate">Token: {result}</p>
+          <p className="text-center text-xs text-ink-subtle mt-4 truncate">Token: {result}</p>
         )}
       </div>
     </div>

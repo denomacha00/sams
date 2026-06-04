@@ -979,7 +979,7 @@ const HodDepartmentPanel: React.FC<{ stats: StatCard[]; departmentName?: string 
         <div>
           <h3 className="text-lg font-semibold text-ink">Department Overview</h3>
           {departmentName && (
-            <p className="text-xs text-indigo-300/90">{departmentName}</p>
+            <p className="text-xs text-brand/90">{departmentName}</p>
           )}
         </div>
       </div>
@@ -1142,7 +1142,7 @@ const DashboardPage: React.FC = () => {
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={ICONS.bell} />
               </svg>
               {unreadCount > 0 && (
-                <span className="absolute -top-1.5 -right-1.5 min-w-[1.1rem] h-[1.1rem] px-0.5 bg-red-500 rounded-full border-2 border-white shadow-md flex items-center justify-center text-[9px] font-bold text-white">
+                <span className="absolute -top-1.5 -right-1.5 min-w-[1.1rem] h-[1.1rem] px-0.5 bg-red-500 rounded-full border-2 border-white shadow-md flex items-center justify-center text-[9px] font-bold text-ink">
                   {unreadCount > 99 ? '99+' : unreadCount}
                 </span>
               )}

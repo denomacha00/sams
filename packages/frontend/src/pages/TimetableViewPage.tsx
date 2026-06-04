@@ -97,13 +97,13 @@ const TimetableViewPage: React.FC = () => {
 
   return (
     <div className="page-shell">
-      <header className="border-b border-slate-800 bg-slate-950/95">
+      <header className="inner-page-header">
         <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <Link to="/dashboard" className="text-gray-400 hover:text-indigo-300 transition-colors">
+            <Link to="/dashboard" className="text-ink-muted hover:text-brand transition-colors">
               ← Dashboard
             </Link>
-            <h1 className="text-lg font-bold text-white">{pageTitle}</h1>
+            <h1 className="text-lg font-bold text-ink">{pageTitle}</h1>
           </div>
           <div className="flex items-center gap-3">
             {isSchoolAdmin && (
@@ -116,7 +116,7 @@ const TimetableViewPage: React.FC = () => {
             )}
             <button
               onClick={() => setViewMode(viewMode === 'table' ? 'grid' : 'table')}
-              className="px-3 py-2 rounded-lg bg-slate-900 border border-slate-700 text-gray-300 text-sm hover:bg-slate-800 transition-colors"
+              className="px-3 py-2 rounded-lg input-field text-ink-muted text-sm hover:bg-slate-100 transition-colors"
             >
               {viewMode === 'table' ? '📅 Grid View' : '📋 Table View'}
             </button>
@@ -130,7 +130,7 @@ const TimetableViewPage: React.FC = () => {
             <select
               value={filterDepartmentId}
               onChange={(e) => { setFilterDepartmentId(e.target.value); setFilterClassId(''); setLoading(true); }}
-              className="px-4 py-2 rounded-xl bg-slate-900 border border-slate-700 text-white text-sm min-w-[14rem]"
+              className="px-4 py-2 rounded-xl input-field text-sm min-w-[14rem]"
             >
               <option value="">All departments</option>
               {departments.map((d) => (
@@ -141,7 +141,7 @@ const TimetableViewPage: React.FC = () => {
               value={filterClassId}
               onChange={(e) => { setFilterClassId(e.target.value); setLoading(true); }}
               disabled={!filterDepartmentId}
-              className="px-4 py-2 rounded-xl bg-slate-900 border border-slate-700 text-white text-sm min-w-[14rem] disabled:opacity-50"
+              className="px-4 py-2 rounded-xl input-field text-sm min-w-[14rem] disabled:opacity-50"
             >
               <option value="">All classes in department</option>
               {classOptions.map((c) => (
@@ -152,7 +152,7 @@ const TimetableViewPage: React.FC = () => {
         )}
 
         {loading ? (
-          <div className="text-center text-gray-400 py-12">
+          <div className="text-center text-ink-muted py-12">
             <div className="flex items-center justify-center gap-3">
               <svg className="animate-spin h-5 w-5 text-indigo-400" viewBox="0 0 24 24">
                 <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
@@ -163,13 +163,13 @@ const TimetableViewPage: React.FC = () => {
           </div>
         ) : filteredEntries.length === 0 ? (
           <div className="text-center py-16">
-            <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-slate-900 border border-slate-700 mb-4">
-              <svg className="w-8 h-8 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl input-field mb-4">
+              <svg className="w-8 h-8 text-ink-subtle" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
               </svg>
             </div>
-            <p className="text-gray-400">No timetable entries found</p>
-            <p className="text-gray-500 text-sm mt-1">
+            <p className="text-ink-muted">No timetable entries found</p>
+            <p className="text-ink-subtle text-sm mt-1">
               {isSchoolAdmin ? 'Try another department or class, or ask your HOD to set up timetables.' : 'Your HOD has not set up the timetable yet.'}
             </p>
           </div>
@@ -178,29 +178,29 @@ const TimetableViewPage: React.FC = () => {
             {DAYS.slice(0, 5).map((day, idx) => (
               <div
                 key={day}
-                className={`bg-slate-900/80 border rounded-2xl p-4 transition-all ${
-                  idx === todayIndex ? 'border-indigo-500/40 ring-1 ring-indigo-500/20' : 'border-slate-700'
+                className={`surface-card p-4 transition-all ${
+                  idx === todayIndex ? 'border-indigo-300 ring-1 ring-indigo-100' : ''
                 }`}
               >
-                <h4 className={`font-semibold text-sm mb-3 pb-2 border-b border-white/10 flex items-center gap-2 ${
-                  idx === todayIndex ? 'text-indigo-300' : 'text-white'
+                <h4 className={`font-semibold text-sm mb-3 pb-2 border-b border-line flex items-center gap-2 ${
+                  idx === todayIndex ? 'text-brand' : 'text-ink'
                 }`}>
                   {day}
                   {idx === todayIndex && (
-                    <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-indigo-500/20 text-indigo-300">Today</span>
+                    <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-indigo-500/20 text-brand">Today</span>
                   )}
                 </h4>
                 <div className="space-y-2">
                   {getEntriesForDay(idx).length === 0 ? (
-                    <p className="text-gray-500 text-xs py-2">No classes</p>
+                    <p className="text-ink-subtle text-xs py-2">No classes</p>
                   ) : (
                     getEntriesForDay(idx).map((entry) => (
-                      <div key={entry.id} className="p-3 rounded-xl bg-slate-900 border border-slate-700 hover:border-indigo-500/30 transition-colors">
-                        <p className="text-white text-sm font-medium">{entry.subject}</p>
-                        <p className="text-indigo-300 text-xs mt-1 font-mono">{entry.startTime} - {entry.endTime}</p>
-                        {entry.class?.name && <p className="text-gray-400 text-xs mt-0.5">{entry.class.name}</p>}
-                        {entry.teacher?.fullName && <p className="text-gray-500 text-xs">{entry.teacher.fullName}</p>}
-                        {entry.room && <p className="text-gray-500 text-xs">📍 {entry.room}</p>}
+                      <div key={entry.id} className="p-3 rounded-xl input-field hover:border-indigo-500/30 transition-colors">
+                        <p className="text-ink text-sm font-medium">{entry.subject}</p>
+                        <p className="text-brand text-xs mt-1 font-mono">{entry.startTime} - {entry.endTime}</p>
+                        {entry.class?.name && <p className="text-ink-muted text-xs mt-0.5">{entry.class.name}</p>}
+                        {entry.teacher?.fullName && <p className="text-ink-subtle text-xs">{entry.teacher.fullName}</p>}
+                        {entry.room && <p className="text-ink-subtle text-xs">📍 {entry.room}</p>}
                       </div>
                     ))
                   )}
@@ -209,17 +209,17 @@ const TimetableViewPage: React.FC = () => {
             ))}
           </div>
         ) : (
-          <div className="bg-slate-900/80 border border-slate-700 rounded-2xl overflow-hidden">
+          <div className="surface-card border-line rounded-2xl overflow-hidden">
             <div className="overflow-x-auto">
               <table className="w-full">
                 <thead>
-                  <tr className="border-b border-white/10">
-                    <th className="text-left px-6 py-4 text-sm font-semibold text-white">Day</th>
-                    <th className="text-left px-6 py-4 text-sm font-semibold text-white">Subject</th>
-                    <th className="text-left px-6 py-4 text-sm font-semibold text-white">Class</th>
-                    <th className="text-left px-6 py-4 text-sm font-semibold text-white">Teacher</th>
-                    <th className="text-left px-6 py-4 text-sm font-semibold text-white">Time</th>
-                    <th className="text-left px-6 py-4 text-sm font-semibold text-white">Room</th>
+                  <tr className="border-b border-line bg-slate-50">
+                    <th className="text-left px-6 py-4 text-sm font-semibold text-ink">Day</th>
+                    <th className="text-left px-6 py-4 text-sm font-semibold text-ink">Subject</th>
+                    <th className="text-left px-6 py-4 text-sm font-semibold text-ink">Class</th>
+                    <th className="text-left px-6 py-4 text-sm font-semibold text-ink">Teacher</th>
+                    <th className="text-left px-6 py-4 text-sm font-semibold text-ink">Time</th>
+                    <th className="text-left px-6 py-4 text-sm font-semibold text-ink">Room</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -228,21 +228,21 @@ const TimetableViewPage: React.FC = () => {
                     .map((entry) => (
                       <tr
                         key={entry.id}
-                        className={`border-b border-white/5 hover:bg-white/5 transition-colors ${
-                          entry.dayOfWeek === todayIndex ? 'bg-indigo-500/5' : ''
+                        className={`border-b border-line hover:bg-slate-50 transition-colors ${
+                          entry.dayOfWeek === todayIndex ? 'bg-indigo-50/50' : ''
                         }`}
                       >
-                        <td className="px-6 py-4 text-sm text-white">
+                        <td className="px-6 py-4 text-sm text-ink">
                           {DAYS[entry.dayOfWeek]}
                           {entry.dayOfWeek === todayIndex && (
-                            <span className="ml-2 text-[10px] px-1.5 py-0.5 rounded-full bg-indigo-500/20 text-indigo-300">Today</span>
+                            <span className="ml-2 text-[10px] px-1.5 py-0.5 rounded-full bg-indigo-500/20 text-brand">Today</span>
                           )}
                         </td>
-                        <td className="px-6 py-4 text-sm text-white font-medium">{entry.subject}</td>
-                        <td className="px-6 py-4 text-sm text-gray-300">{entry.class?.name || '—'}</td>
-                        <td className="px-6 py-4 text-sm text-gray-300">{entry.teacher?.fullName || '—'}</td>
-                        <td className="px-6 py-4 text-sm text-gray-400 font-mono">{entry.startTime} - {entry.endTime}</td>
-                        <td className="px-6 py-4 text-sm text-gray-400">{entry.room || '—'}</td>
+                        <td className="px-6 py-4 text-sm text-ink font-medium">{entry.subject}</td>
+                        <td className="px-6 py-4 text-sm text-ink-muted">{entry.class?.name || '—'}</td>
+                        <td className="px-6 py-4 text-sm text-ink-muted">{entry.teacher?.fullName || '—'}</td>
+                        <td className="px-6 py-4 text-sm text-ink-muted font-mono">{entry.startTime} - {entry.endTime}</td>
+                        <td className="px-6 py-4 text-sm text-ink-muted">{entry.room || '—'}</td>
                       </tr>
                     ))}
                 </tbody>
@@ -254,7 +254,7 @@ const TimetableViewPage: React.FC = () => {
 
       <footer className="border-t border-white/5 mt-20 py-6">
         <div className="max-w-7xl mx-auto px-6 text-center">
-          <p className="text-xs text-gray-500">© 2025 SAMS · Developed by Denis Macharia</p>
+          <p className="text-xs text-ink-subtle">© 2025 SAMS · Developed by Denis Macharia</p>
         </div>
       </footer>
     </div>

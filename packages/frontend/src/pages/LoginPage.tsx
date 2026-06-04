@@ -415,7 +415,7 @@ const LoginPage: React.FC = () => {
                   {webauthnError && (
                     <p className="text-xs text-red-400 mt-2">{webauthnError}</p>
                   )}
-                  <p className="text-xs text-gray-500 mt-1">For users with a registered fingerprint or passkey</p>
+                  <p className="text-xs text-ink-subtle mt-1">For users with a registered fingerprint or passkey</p>
                 </div>
               )}
 

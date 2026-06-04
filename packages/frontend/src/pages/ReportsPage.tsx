@@ -271,25 +271,25 @@ const ReportsPage: React.FC = () => {
   const displayAbsent = report?._displayAbsent ?? report?.totalAbsent ?? 0;
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 p-6">
+    <div className="page-shell p-6">
       <div className="max-w-5xl mx-auto">
         {/* Header */}
         <div className="mb-8">
-          <h1 className="text-2xl font-bold text-white">Attendance Reports</h1>
-          <p className="text-gray-400 text-sm mt-1">{getRoleLabel()}</p>
+          <h1 className="text-2xl font-bold text-ink">Attendance Reports</h1>
+          <p className="text-ink-muted text-sm mt-1">{getRoleLabel()}</p>
         </div>
 
         {error && (
-          <div className="mb-4 p-3 bg-red-500/20 border border-red-400/30 rounded-xl backdrop-blur-sm">
-            <p className="text-sm text-red-200 text-center">{error}</p>
+          <div className="mb-4 p-3 alert-error">
+            <p className="text-sm text-red-800 text-center">{error}</p>
           </div>
         )}
 
         {/* Date range picker */}
-        <div className="backdrop-blur-xl bg-white/5 border border-white/10 rounded-2xl p-6 mb-6">
+        <div className="surface-card rounded-2xl p-6 mb-6">
           <div className="flex flex-col sm:flex-row gap-4 items-end">
             <div className="flex-1">
-              <label htmlFor="dateFrom" className="block text-xs font-semibold text-gray-300 uppercase tracking-wider mb-2">
+              <label htmlFor="dateFrom" className="form-label">
                 From
               </label>
               <input
@@ -297,11 +297,11 @@ const ReportsPage: React.FC = () => {
                 type="date"
                 value={dateFrom}
                 onChange={(e) => setDateFrom(e.target.value)}
-                className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:ring-2 focus:ring-purple-500/50 transition-all duration-200 [color-scheme:dark]"
+                className="w-full input-field focus:outline-none focus:ring-2 focus:ring-purple-500/50 transition-all duration-200 "
               />
             </div>
             <div className="flex-1">
-              <label htmlFor="dateTo" className="block text-xs font-semibold text-gray-300 uppercase tracking-wider mb-2">
+              <label htmlFor="dateTo" className="form-label">
                 To
               </label>
               <input
@@ -309,7 +309,7 @@ const ReportsPage: React.FC = () => {
                 type="date"
                 value={dateTo}
                 onChange={(e) => setDateTo(e.target.value)}
-                className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:ring-2 focus:ring-purple-500/50 transition-all duration-200 [color-scheme:dark]"
+                className="w-full input-field focus:outline-none focus:ring-2 focus:ring-purple-500/50 transition-all duration-200 "
               />
             </div>
             <button
@@ -330,49 +330,49 @@ const ReportsPage: React.FC = () => {
         )}
 
         {!loading && !report && !error && (
-          <div className="backdrop-blur-xl bg-white/5 border border-white/10 rounded-2xl p-12 text-center">
+          <div className="surface-card rounded-2xl p-12 text-center">
             <svg className="w-16 h-16 text-gray-600 mx-auto mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
             </svg>
-            <h3 className="text-lg font-semibold text-white mb-2">No Report Data</h3>
-            <p className="text-gray-400 text-sm">No attendance records found for the selected date range. Try adjusting the dates or take attendance first.</p>
+            <h3 className="text-lg font-semibold text-ink mb-2">No Report Data</h3>
+            <p className="text-ink-muted text-sm">No attendance records found for the selected date range. Try adjusting the dates or take attendance first.</p>
           </div>
         )}
 
         {report && (
           <>
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-6">
-              <div className="backdrop-blur-xl bg-white/5 border border-white/10 rounded-2xl p-5 text-center">
+              <div className="surface-card rounded-2xl p-5 text-center">
                 <p className="text-3xl font-bold text-emerald-400">
                   {displayPercentage.toFixed(1)}%
                 </p>
-                <p className="text-xs text-gray-400 mt-1 uppercase tracking-wider">Avg Attendance</p>
+                <p className="text-xs text-ink-muted mt-1 uppercase tracking-wider">Avg Attendance</p>
               </div>
-              <div className="backdrop-blur-xl bg-white/5 border border-white/10 rounded-2xl p-5 text-center">
+              <div className="surface-card rounded-2xl p-5 text-center">
                 <p className="text-3xl font-bold text-blue-400">{displaySessions}</p>
-                <p className="text-xs text-gray-400 mt-1 uppercase tracking-wider">Total Sessions</p>
+                <p className="text-xs text-ink-muted mt-1 uppercase tracking-wider">Total Sessions</p>
               </div>
-              <div className="backdrop-blur-xl bg-white/5 border border-white/10 rounded-2xl p-5 text-center">
+              <div className="surface-card rounded-2xl p-5 text-center">
                 <p className="text-3xl font-bold text-purple-400">{displayPresent}</p>
-                <p className="text-xs text-gray-400 mt-1 uppercase tracking-wider">Present</p>
+                <p className="text-xs text-ink-muted mt-1 uppercase tracking-wider">Present</p>
               </div>
-              <div className="backdrop-blur-xl bg-white/5 border border-white/10 rounded-2xl p-5 text-center">
+              <div className="surface-card rounded-2xl p-5 text-center">
                 <p className="text-3xl font-bold text-red-400">{atRiskCount > 0 ? atRiskCount : displayAbsent}</p>
-                <p className="text-xs text-gray-400 mt-1 uppercase tracking-wider">{atRiskCount > 0 ? 'At-Risk' : 'Absent'}</p>
+                <p className="text-xs text-ink-muted mt-1 uppercase tracking-wider">{atRiskCount > 0 ? 'At-Risk' : 'Absent'}</p>
               </div>
             </div>
 
             {/* Student breakdown table */}
             {report.students && report.students.length > 0 && (
-              <div className="backdrop-blur-xl bg-white/5 border border-white/10 rounded-2xl p-6 mb-6">
-                <h2 className="text-lg font-semibold text-white mb-4">Student Breakdown</h2>
+              <div className="surface-card rounded-2xl p-6 mb-6">
+                <h2 className="text-lg font-semibold text-ink mb-4">Student Breakdown</h2>
                 <div className="overflow-x-auto">
                   <table className="w-full">
                     <thead>
                       <tr className="border-b border-white/10">
-                        <th className="text-left text-xs font-semibold text-gray-400 uppercase tracking-wider py-3 px-2">Student</th>
-                        <th className="text-right text-xs font-semibold text-gray-400 uppercase tracking-wider py-3 px-2">Attendance</th>
-                        <th className="text-right text-xs font-semibold text-gray-400 uppercase tracking-wider py-3 px-2">Status</th>
+                        <th className="text-left text-xs font-semibold text-ink-muted uppercase tracking-wider py-3 px-2">Student</th>
+                        <th className="text-right text-xs font-semibold text-ink-muted uppercase tracking-wider py-3 px-2">Attendance</th>
+                        <th className="text-right text-xs font-semibold text-ink-muted uppercase tracking-wider py-3 px-2">Status</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-white/5">
@@ -380,10 +380,10 @@ const ReportsPage: React.FC = () => {
                         <tr key={s.studentId} className="hover:bg-white/5 transition-colors">
                           <td className="py-3 px-2">
                             <div className="flex items-center gap-3">
-                              <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-xs font-bold text-white">
+                              <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-xs font-bold text-ink">
                                 {(s.studentName || s.fullName || '?').charAt(0)}
                               </div>
-                              <span className="font-medium text-white text-sm">{s.studentName || s.fullName}</span>
+                              <span className="font-medium text-ink text-sm">{s.studentName || s.fullName}</span>
                             </div>
                           </td>
                           <td className="py-3 px-2 text-right">
@@ -439,7 +439,7 @@ const ReportsPage: React.FC = () => {
         )}
 
         {/* Footer */}
-        <p className="text-center text-xs text-gray-500 mt-8">
+        <p className="text-center text-xs text-ink-subtle mt-8">
           © 2025 SAMS · Developed by Denis Macharia
         </p>
       </div>

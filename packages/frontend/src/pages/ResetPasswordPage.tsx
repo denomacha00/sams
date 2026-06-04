@@ -59,8 +59,8 @@ const ResetPasswordPage: React.FC = () => {
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
               </svg>
             </div>
-            <h2 className="text-2xl font-bold text-white mb-1">Set New Password</h2>
-            <p className="text-gray-400 text-sm">Enter your new password below</p>
+            <h2 className="text-2xl font-bold text-ink mb-1">Set New Password</h2>
+            <p className="text-ink-muted text-sm">Enter your new password below</p>
           </div>
 
           {success ? (
@@ -68,7 +68,7 @@ const ResetPasswordPage: React.FC = () => {
               <svg className="w-8 h-8 text-emerald-400 mx-auto mb-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
               </svg>
-              <p className="text-emerald-200 font-medium">Password reset successfully!</p>
+              <p className="text-emerald-800 font-medium">Password reset successfully!</p>
               <p className="text-emerald-300/70 text-sm mt-1">Redirecting you to login...</p>
               <Link to="/login" className="inline-block mt-4 text-sm text-teal-400 hover:text-teal-300 font-semibold transition-colors">
                 ← Go to Login
@@ -91,7 +91,7 @@ const ResetPasswordPage: React.FC = () => {
               ) : (
                 <form onSubmit={handleSubmit} className="space-y-5">
                   <div>
-                    <label htmlFor="newPassword" className="block text-sm font-semibold text-gray-300 mb-1.5">
+                    <label htmlFor="newPassword" className="block text-sm font-semibold text-ink-muted mb-1.5">
                       New Password
                     </label>
                     <div className="relative">
@@ -102,13 +102,13 @@ const ResetPasswordPage: React.FC = () => {
                         onChange={(e) => setNewPassword(e.target.value)}
                         required
                         minLength={8}
-                        className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-teal-500/40 focus:border-teal-400 transition-all duration-200 pr-12"
+                        className="w-full input-field placeholder-ink-subtle focus:outline-none focus:ring-2 focus:ring-teal-500/40 focus:border-teal-400 transition-all duration-200 pr-12"
                         placeholder="At least 8 characters"
                       />
                       <button
                         type="button"
                         onClick={() => setShowPassword(!showPassword)}
-                        className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-200 transition-colors"
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-ink-muted hover:text-gray-200 transition-colors"
                       >
                         {showPassword ? (
                           <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -125,7 +125,7 @@ const ResetPasswordPage: React.FC = () => {
                   </div>
 
                   <div>
-                    <label htmlFor="confirmPassword" className="block text-sm font-semibold text-gray-300 mb-1.5">
+                    <label htmlFor="confirmPassword" className="block text-sm font-semibold text-ink-muted mb-1.5">
                       Confirm New Password
                     </label>
                     <input
@@ -134,7 +134,7 @@ const ResetPasswordPage: React.FC = () => {
                       value={confirmPassword}
                       onChange={(e) => setConfirmPassword(e.target.value)}
                       required
-                      className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-teal-500/40 focus:border-teal-400 transition-all duration-200"
+                      className="w-full input-field placeholder-ink-subtle focus:outline-none focus:ring-2 focus:ring-teal-500/40 focus:border-teal-400 transition-all duration-200"
                       placeholder="Repeat your new password"
                     />
                   </div>
@@ -167,7 +167,7 @@ const ResetPasswordPage: React.FC = () => {
         </div>
 
         <div className="text-center mt-6">
-          <p className="text-xs text-gray-500">© 2025 SAMS · Smart Attendance Management System</p>
+          <p className="text-xs text-ink-subtle">© 2025 SAMS · Smart Attendance Management System</p>
         </div>
       </div>
     </div>

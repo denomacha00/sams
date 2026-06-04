@@ -267,9 +267,9 @@ const AIAssistantPage: React.FC = () => {
   }, [messages]);
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 flex flex-col">
+    <div className="page-shell flex flex-col">
       {/* Header */}
-      <div className="border-b border-white/10 backdrop-blur-sm bg-white/5 px-6 py-4">
+      <div className="inner-page-header px-6 py-4">
         <div className="max-w-3xl mx-auto flex items-center gap-3">
           <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-purple-500 to-pink-600 flex items-center justify-center shadow-lg shadow-purple-500/20">
             <svg className="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -277,8 +277,8 @@ const AIAssistantPage: React.FC = () => {
             </svg>
           </div>
           <div>
-            <h1 className="text-lg font-bold text-white">AI Assistant</h1>
-            <p className="text-xs text-gray-400">Ask questions about attendance, reports, or get insights</p>
+            <h1 className="text-lg font-bold text-ink">AI Assistant</h1>
+            <p className="text-xs text-ink-muted">Ask questions about attendance, reports, or get insights</p>
           </div>
         </div>
       </div>
@@ -288,13 +288,13 @@ const AIAssistantPage: React.FC = () => {
         <div className="max-w-3xl mx-auto space-y-4">
           {messages.length === 0 && (
             <div className="text-center py-16">
-              <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-gradient-to-br from-purple-500/20 to-pink-500/20 border border-white/10 mb-4">
-                <svg className="w-8 h-8 text-purple-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-brand-light border border-line mb-4">
+                <svg className="w-8 h-8 text-brand" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
                 </svg>
               </div>
-              <p className="text-white text-lg font-medium mb-1">How can I help you today?</p>
-              <p className="text-gray-500 text-sm mb-8">
+              <p className="text-ink text-lg font-medium mb-1">How can I help you today?</p>
+              <p className="text-ink-subtle text-sm mb-8">
                 Ask about attendance trends, student performance, or any school data.
               </p>
 
@@ -304,7 +304,7 @@ const AIAssistantPage: React.FC = () => {
                   <button
                     key={q}
                     onClick={() => submitQuery(q)}
-                    className="px-4 py-2 bg-white/5 border border-white/10 rounded-xl text-sm text-gray-300 hover:bg-white/10 hover:border-white/20 transition-all duration-200"
+                    className="px-4 py-2 bg-white border border-line rounded-xl text-sm text-ink-muted hover:bg-slate-50 hover:border-line-strong transition-all duration-200"
                   >
                     {q}
                   </button>
@@ -323,10 +323,10 @@ const AIAssistantPage: React.FC = () => {
                   msg.role === 'user'
                     ? 'bg-gradient-to-r from-purple-600 to-blue-600 text-white shadow-lg shadow-purple-500/20'
                     : msg.isError
-                      ? 'bg-red-950/70 border border-red-500/50 text-red-100'
+                      ? 'bg-red-50 border border-red-200 text-red-800'
                       : msg.isSystemNotice
-                        ? 'bg-amber-950/70 border border-amber-500/50 text-amber-100'
-                        : 'bg-white/10 border border-white/10 text-gray-200'
+                        ? 'bg-amber-50 border border-amber-200 text-amber-900'
+                        : 'bg-slate-50 border border-line text-ink'
                 }`}
               >
                 {msg.role === 'assistant' ? (
@@ -353,7 +353,7 @@ const AIAssistantPage: React.FC = () => {
                 )}
                 <p
                   className={`text-xs mt-2 ${
-                    msg.role === 'user' ? 'text-purple-200/70' : 'text-gray-500'
+                    msg.role === 'user' ? 'text-purple-200/70' : 'text-ink-subtle'
                   }`}
                 >
                   {msg.timestamp.toLocaleTimeString()}
@@ -364,7 +364,7 @@ const AIAssistantPage: React.FC = () => {
 
           {loading && (
             <div className="flex justify-start">
-              <div className="bg-white/10 border border-white/10 rounded-2xl px-5 py-4">
+              <div className="bg-slate-50 border border-line rounded-2xl px-5 py-4">
                 <div className="flex space-x-1.5">
                   <div className="w-2 h-2 bg-purple-400 rounded-full animate-bounce" />
                   <div className="w-2 h-2 bg-purple-400 rounded-full animate-bounce" style={{ animationDelay: '0.1s' }} />
@@ -379,7 +379,7 @@ const AIAssistantPage: React.FC = () => {
       </div>
 
       {/* Input */}
-      <div className="border-t border-white/10 backdrop-blur-sm bg-white/5 px-6 py-4">
+      <div className="border-t border-line bg-white px-6 py-4">
         <div className="max-w-3xl mx-auto">
           {imagePreviews.length > 0 && (
             <div className="flex flex-wrap gap-2 mb-3">
@@ -404,7 +404,7 @@ const AIAssistantPage: React.FC = () => {
               type="button"
               onClick={() => fileInputRef.current?.click()}
               disabled={loading || selectedImages.length >= 4}
-              className="p-3 rounded-xl bg-white/10 text-gray-400 border border-white/10 hover:bg-white/20 hover:text-white disabled:opacity-50"
+              className="p-3 rounded-xl bg-white text-ink-muted border border-line hover:bg-slate-50 hover:text-ink disabled:opacity-50"
               title="Upload images (max 4)"
               aria-label="Upload images"
             >
@@ -418,7 +418,7 @@ const AIAssistantPage: React.FC = () => {
               onChange={(e) => setInput(e.target.value)}
               placeholder={selectedImages.length > 0 ? 'Ask about these images...' : 'Type your question...'}
               disabled={loading}
-              className="flex-1 bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-purple-500/50 disabled:opacity-50 transition-all duration-200"
+              className="flex-1 input-field placeholder-ink-subtle focus:outline-none focus:ring-2 focus:ring-purple-500/50 disabled:opacity-50 transition-all duration-200"
             />
 
             {/* Voice input button */}
@@ -428,7 +428,7 @@ const AIAssistantPage: React.FC = () => {
               className={`relative p-3 rounded-xl transition-all duration-200 ${
                 isListening
                   ? 'bg-red-500/20 text-red-300 border border-red-500/30'
-                  : 'bg-white/10 text-gray-400 border border-white/10 hover:bg-white/20 hover:text-white'
+                  : 'bg-white text-ink-muted border border-line hover:bg-slate-50 hover:text-ink'
               }`}
               title={isListening ? 'Stop listening' : 'Voice input'}
             >
@@ -443,7 +443,7 @@ const AIAssistantPage: React.FC = () => {
             <button
               type="submit"
               disabled={loading || (!input.trim() && selectedImages.length === 0)}
-              className="bg-gradient-to-r from-blue-600 to-purple-600 text-white py-3 px-5 rounded-xl shadow-lg shadow-purple-500/25 hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200"
+              className="btn-primary py-3 px-5 hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200"
             >
               <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />

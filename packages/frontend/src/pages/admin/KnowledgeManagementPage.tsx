@@ -73,7 +73,7 @@ const ScopeBadge: React.FC<{ scope: 'school' | 'department' | 'class' }> = ({ sc
 // ─── Category Badge ──────────────────────────────────────────────────────────
 
 const CategoryBadge: React.FC<{ category: string }> = ({ category }) => (
-  <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-white/10 text-gray-300 border border-white/10">
+  <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-white/10 text-ink-muted border border-white/10">
     {category}
   </span>
 );
@@ -143,47 +143,47 @@ const KnowledgeFormModal: React.FC<KnowledgeFormModalProps> = ({ isOpen, onClose
       {/* Modal */}
       <div className="relative w-full max-w-lg rounded-2xl border border-white/10 bg-slate-800 shadow-2xl">
         <div className="p-6">
-          <h3 className="text-xl font-bold text-white mb-6">
+          <h3 className="text-xl font-bold text-ink mb-6">
             {mode === 'create' ? 'Add Knowledge Entry' : 'Edit Knowledge Entry'}
           </h3>
 
           <form onSubmit={handleSubmit} className="space-y-4">
             {/* Title */}
             <div>
-              <label className="block text-sm font-medium text-gray-300 mb-1">Title</label>
+              <label className="block text-sm font-medium text-ink-muted mb-1">Title</label>
               <input
                 type="text"
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
                 maxLength={200}
-                className="w-full px-4 py-2.5 rounded-xl bg-white/5 border border-white/10 text-white placeholder-gray-500 focus:outline-none focus:border-teal-500/50 focus:ring-1 focus:ring-teal-500/50 transition-colors"
+                className="w-full px-4 py-2.5 rounded-xl bg-slate-50 border border-line text-white placeholder-ink-subtle focus:outline-none focus:border-teal-500/50 focus:ring-1 focus:ring-teal-500/50 transition-colors"
                 placeholder="Enter title..."
                 autoFocus
               />
-              <p className="text-xs text-gray-500 mt-1">{title.length}/200</p>
+              <p className="text-xs text-ink-subtle mt-1">{title.length}/200</p>
             </div>
 
             {/* Content */}
             <div>
-              <label className="block text-sm font-medium text-gray-300 mb-1">Content</label>
+              <label className="block text-sm font-medium text-ink-muted mb-1">Content</label>
               <textarea
                 value={content}
                 onChange={(e) => setContent(e.target.value)}
                 rows={5}
-                className="w-full px-4 py-2.5 rounded-xl bg-white/5 border border-white/10 text-white placeholder-gray-500 focus:outline-none focus:border-teal-500/50 focus:ring-1 focus:ring-teal-500/50 transition-colors resize-none"
+                className="w-full px-4 py-2.5 rounded-xl bg-slate-50 border border-line text-white placeholder-ink-subtle focus:outline-none focus:border-teal-500/50 focus:ring-1 focus:ring-teal-500/50 transition-colors resize-none"
                 placeholder="Enter knowledge content..."
               />
             </div>
 
             {/* Category */}
             <div>
-              <label className="block text-sm font-medium text-gray-300 mb-1">Category</label>
+              <label className="block text-sm font-medium text-ink-muted mb-1">Category</label>
               <input
                 type="text"
                 value={category}
                 onChange={(e) => setCategory(e.target.value)}
                 maxLength={50}
-                className="w-full px-4 py-2.5 rounded-xl bg-white/5 border border-white/10 text-white placeholder-gray-500 focus:outline-none focus:border-teal-500/50 focus:ring-1 focus:ring-teal-500/50 transition-colors"
+                className="w-full px-4 py-2.5 rounded-xl bg-slate-50 border border-line text-white placeholder-ink-subtle focus:outline-none focus:border-teal-500/50 focus:ring-1 focus:ring-teal-500/50 transition-colors"
                 placeholder="e.g. general, policy, curriculum..."
               />
             </div>
@@ -200,14 +200,14 @@ const KnowledgeFormModal: React.FC<KnowledgeFormModalProps> = ({ isOpen, onClose
               <button
                 type="button"
                 onClick={onClose}
-                className="px-4 py-2 rounded-xl text-sm text-gray-400 hover:text-white hover:bg-white/10 transition-colors"
+                className="px-4 py-2 rounded-xl text-sm text-ink-muted hover:text-ink hover:bg-white/10 transition-colors"
               >
                 Cancel
               </button>
               <button
                 type="submit"
                 disabled={submitting}
-                className="px-5 py-2 rounded-xl text-sm font-medium text-white bg-gradient-to-r from-teal-500 to-cyan-500 hover:from-teal-600 hover:to-cyan-600 shadow-lg shadow-teal-500/20 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+                className="px-5 py-2 rounded-xl text-sm font-medium text-ink bg-gradient-to-r from-teal-500 to-cyan-500 hover:from-teal-600 hover:to-cyan-600 shadow-lg shadow-teal-500/20 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
               >
                 {submitting ? 'Saving...' : mode === 'create' ? 'Create Entry' : 'Save Changes'}
               </button>
@@ -242,22 +242,22 @@ const DeleteConfirmDialog: React.FC<DeleteDialogProps> = ({ isOpen, entryTitle, 
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
             </svg>
           </div>
-          <h3 className="text-lg font-bold text-white">Delete Entry</h3>
+          <h3 className="text-lg font-bold text-ink">Delete Entry</h3>
         </div>
-        <p className="text-sm text-gray-300 mb-6">
-          Are you sure you want to delete <span className="font-semibold text-white">"{entryTitle}"</span>? This action cannot be undone.
+        <p className="text-sm text-ink-muted mb-6">
+          Are you sure you want to delete <span className="font-semibold text-ink">"{entryTitle}"</span>? This action cannot be undone.
         </p>
         <div className="flex items-center justify-end gap-3">
           <button
             onClick={onCancel}
-            className="px-4 py-2 rounded-xl text-sm text-gray-400 hover:text-white hover:bg-white/10 transition-colors"
+            className="px-4 py-2 rounded-xl text-sm text-ink-muted hover:text-ink hover:bg-white/10 transition-colors"
           >
             Cancel
           </button>
           <button
             onClick={onConfirm}
             disabled={deleting}
-            className="px-5 py-2 rounded-xl text-sm font-medium text-white bg-red-500 hover:bg-red-600 shadow-lg shadow-red-500/20 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+            className="px-5 py-2 rounded-xl text-sm font-medium text-ink bg-red-500 hover:bg-red-600 shadow-lg shadow-red-500/20 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
           >
             {deleting ? 'Deleting...' : 'Delete'}
           </button>
@@ -375,9 +375,9 @@ const KnowledgeManagementPage: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900">
+    <div className="page-shell">
       {/* Header */}
-      <header className="border-b border-white/10 backdrop-blur-sm bg-white/5">
+      <header className="inner-page-header">
         <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-teal-500 to-cyan-500 flex items-center justify-center shadow-lg shadow-teal-500/20">
@@ -386,13 +386,13 @@ const KnowledgeManagementPage: React.FC = () => {
               </svg>
             </div>
             <div>
-              <h1 className="text-lg font-bold text-white">Knowledge Base</h1>
-              <p className="text-xs text-gray-400">{scopeSubtitle}</p>
+              <h1 className="text-lg font-bold text-ink">Knowledge Base</h1>
+              <p className="text-xs text-ink-muted">{scopeSubtitle}</p>
             </div>
           </div>
           <div className="flex items-center gap-4">
-            <span className="text-sm text-gray-400">{user?.fullName}</span>
-            <Link to="/dashboard" className="text-sm text-gray-400 hover:text-cyan-400 transition-colors">
+            <span className="text-sm text-ink-muted">{user?.fullName}</span>
+            <Link to="/dashboard" className="text-sm text-ink-muted hover:text-cyan-400 transition-colors">
               ← Back to Dashboard
             </Link>
           </div>
@@ -403,12 +403,12 @@ const KnowledgeManagementPage: React.FC = () => {
         {/* Title + Add Button */}
         <div className="flex items-center justify-between mb-8">
           <div>
-            <h2 className="text-3xl font-bold text-white mb-1">Knowledge Base</h2>
-            <p className="text-gray-400">{total} {total === 1 ? 'entry' : 'entries'} available</p>
+            <h2 className="text-3xl font-bold text-ink mb-1">Knowledge Base</h2>
+            <p className="text-ink-muted">{total} {total === 1 ? 'entry' : 'entries'} available</p>
           </div>
           <button
             onClick={handleCreate}
-            className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-medium text-white bg-gradient-to-r from-teal-500 to-cyan-500 hover:from-teal-600 hover:to-cyan-600 shadow-lg shadow-teal-500/20 transition-all hover:scale-[1.02]"
+            className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-medium text-ink bg-gradient-to-r from-teal-500 to-cyan-500 hover:from-teal-600 hover:to-cyan-600 shadow-lg shadow-teal-500/20 transition-all hover:scale-[1.02]"
           >
             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
@@ -453,16 +453,16 @@ const KnowledgeManagementPage: React.FC = () => {
           </div>
         ) : entries.length === 0 ? (
           <div className="text-center py-20">
-            <div className="w-16 h-16 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-center mx-auto mb-4">
-              <svg className="w-8 h-8 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <div className="w-16 h-16 rounded-2xl bg-slate-50 border border-line flex items-center justify-center mx-auto mb-4">
+              <svg className="w-8 h-8 text-ink-subtle" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
               </svg>
             </div>
-            <h3 className="text-lg font-semibold text-white mb-2">No knowledge entries yet</h3>
-            <p className="text-gray-400 text-sm mb-6">Create your first knowledge entry to get started.</p>
+            <h3 className="text-lg font-semibold text-ink mb-2">No knowledge entries yet</h3>
+            <p className="text-ink-muted text-sm mb-6">Create your first knowledge entry to get started.</p>
             <button
               onClick={handleCreate}
-              className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-medium text-white bg-gradient-to-r from-teal-500 to-cyan-500 hover:from-teal-600 hover:to-cyan-600 shadow-lg shadow-teal-500/20 transition-all"
+              className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-medium text-ink bg-gradient-to-r from-teal-500 to-cyan-500 hover:from-teal-600 hover:to-cyan-600 shadow-lg shadow-teal-500/20 transition-all"
             >
               <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
@@ -483,18 +483,18 @@ const KnowledgeManagementPage: React.FC = () => {
                     <div className="flex-1 min-w-0">
                       {/* Title row */}
                       <div className="flex items-center gap-3 mb-2 flex-wrap">
-                        <h3 className="text-lg font-semibold text-white truncate">{entry.title}</h3>
+                        <h3 className="text-lg font-semibold text-ink truncate">{entry.title}</h3>
                         <ScopeBadge scope={entry.scopeLevel} />
                         <CategoryBadge category={entry.category} />
                       </div>
 
                       {/* Content preview */}
-                      <p className="text-sm text-gray-400 line-clamp-2 mb-3">
+                      <p className="text-sm text-ink-muted line-clamp-2 mb-3">
                         {entry.content}
                       </p>
 
                       {/* Meta */}
-                      <div className="flex items-center gap-4 text-xs text-gray-500">
+                      <div className="flex items-center gap-4 text-xs text-ink-subtle">
                         <span>By {entry.creatorName}</span>
                         <span>•</span>
                         <span>{formatDate(entry.createdAt)}</span>
@@ -506,7 +506,7 @@ const KnowledgeManagementPage: React.FC = () => {
                       <div className="flex items-center gap-2 shrink-0">
                         <button
                           onClick={() => handleEdit(entry)}
-                          className="p-2 rounded-lg hover:bg-white/10 text-gray-400 hover:text-teal-400 transition-colors"
+                          className="p-2 rounded-lg hover:bg-white/10 text-ink-muted hover:text-teal-400 transition-colors"
                           title="Edit"
                         >
                           <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -515,7 +515,7 @@ const KnowledgeManagementPage: React.FC = () => {
                         </button>
                         <button
                           onClick={() => handleDeleteClick(entry)}
-                          className="p-2 rounded-lg hover:bg-red-500/10 text-gray-400 hover:text-red-400 transition-colors"
+                          className="p-2 rounded-lg hover:bg-red-500/10 text-ink-muted hover:text-red-400 transition-colors"
                           title="Delete"
                         >
                           <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -535,7 +535,7 @@ const KnowledgeManagementPage: React.FC = () => {
                 <button
                   onClick={() => setPage((p) => Math.max(1, p - 1))}
                   disabled={page === 1}
-                  className="px-4 py-2 rounded-xl text-sm text-gray-400 hover:text-white hover:bg-white/10 border border-white/10 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                  className="px-4 py-2 rounded-xl text-sm text-ink-muted hover:text-ink hover:bg-white/10 border border-white/10 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
                 >
                   Previous
                 </button>
@@ -558,7 +558,7 @@ const KnowledgeManagementPage: React.FC = () => {
                         className={`w-9 h-9 rounded-lg text-sm font-medium transition-colors ${
                           page === pageNum
                             ? 'bg-teal-500/20 text-teal-300 border border-teal-500/30'
-                            : 'text-gray-400 hover:text-white hover:bg-white/10'
+                            : 'text-ink-muted hover:text-ink hover:bg-white/10'
                         }`}
                       >
                         {pageNum}
@@ -569,7 +569,7 @@ const KnowledgeManagementPage: React.FC = () => {
                 <button
                   onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
                   disabled={page === totalPages}
-                  className="px-4 py-2 rounded-xl text-sm text-gray-400 hover:text-white hover:bg-white/10 border border-white/10 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                  className="px-4 py-2 rounded-xl text-sm text-ink-muted hover:text-ink hover:bg-white/10 border border-white/10 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
                 >
                   Next
                 </button>
@@ -582,7 +582,7 @@ const KnowledgeManagementPage: React.FC = () => {
       {/* Footer */}
       <footer className="border-t border-white/5 mt-20 py-6">
         <div className="max-w-7xl mx-auto px-6 text-center">
-          <p className="text-xs text-gray-500">© 2025 SAMS · Developed by Denis Macharia</p>
+          <p className="text-xs text-ink-subtle">© 2025 SAMS · Developed by Denis Macharia</p>
         </div>
       </footer>
 

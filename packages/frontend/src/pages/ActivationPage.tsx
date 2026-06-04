@@ -52,7 +52,7 @@ const ActivationPage: React.FC = () => {
 
       <div className="relative z-10 w-full max-w-md">
         {/* Glass card */}
-        <div className="backdrop-blur-xl bg-white/5 border border-white/10 rounded-2xl shadow-2xl p-8">
+        <div className="surface-card rounded-2xl shadow-2xl p-8">
           {/* Header */}
           <div className="text-center mb-8">
             <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-gradient-to-br from-emerald-500 to-blue-600 shadow-lg shadow-emerald-500/25 mb-4">
@@ -60,8 +60,8 @@ const ActivationPage: React.FC = () => {
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" />
               </svg>
             </div>
-            <h1 className="text-2xl font-bold text-white">Activate School</h1>
-            <p className="text-sm text-gray-400 mt-1">Enter your license key to get started</p>
+            <h1 className="text-2xl font-bold text-ink">Activate School</h1>
+            <p className="text-sm text-ink-muted mt-1">Enter your license key to get started</p>
           </div>
 
           {/* Success state */}
@@ -72,7 +72,7 @@ const ActivationPage: React.FC = () => {
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                 </svg>
               </div>
-              <p className="text-sm text-emerald-200 font-medium mb-2">
+              <p className="text-sm text-emerald-800 font-medium mb-2">
                 School activated successfully!
               </p>
               <div className="bg-emerald-500/10 border border-emerald-400/20 rounded-lg px-3 py-2 inline-block">
@@ -87,8 +87,8 @@ const ActivationPage: React.FC = () => {
 
           {/* Error */}
           {error && (
-            <div className="mb-6 p-3 bg-red-500/20 border border-red-400/30 rounded-xl backdrop-blur-sm">
-              <p className="text-sm text-red-200 text-center">{error}</p>
+            <div className="mb-6 p-3 alert-error">
+              <p className="text-sm text-red-800 text-center">{error}</p>
             </div>
           )}
 
@@ -96,7 +96,7 @@ const ActivationPage: React.FC = () => {
           {!success && (
             <form onSubmit={handleSubmit} className="space-y-4">
               <div>
-                <label htmlFor="licenseKey" className="block text-xs font-semibold text-gray-300 uppercase tracking-wider mb-2">
+                <label htmlFor="licenseKey" className="form-label">
                   License Key
                 </label>
                 <input
@@ -105,13 +105,13 @@ const ActivationPage: React.FC = () => {
                   value={licenseKey}
                   onChange={(e) => setLicenseKey(e.target.value)}
                   required
-                  className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-purple-500/50 focus:border-purple-400/50 transition-all duration-200"
+                  className="w-full input-field placeholder-ink-subtle focus:outline-none focus:ring-2 focus:ring-purple-500/50 focus:border-purple-400/50 transition-all duration-200"
                   placeholder="XXXX-XXXX-XXXX-XXXX"
                 />
               </div>
 
               <div>
-                <label htmlFor="schoolName" className="block text-xs font-semibold text-gray-300 uppercase tracking-wider mb-2">
+                <label htmlFor="schoolName" className="form-label">
                   School Name
                 </label>
                 <input
@@ -120,13 +120,13 @@ const ActivationPage: React.FC = () => {
                   value={schoolName}
                   onChange={(e) => setSchoolName(e.target.value)}
                   required
-                  className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-purple-500/50 focus:border-purple-400/50 transition-all duration-200"
+                  className="w-full input-field placeholder-ink-subtle focus:outline-none focus:ring-2 focus:ring-purple-500/50 focus:border-purple-400/50 transition-all duration-200"
                   placeholder="e.g. Kenyatta High School"
                 />
               </div>
 
               <div>
-                <label htmlFor="schoolCode" className="block text-xs font-semibold text-gray-300 uppercase tracking-wider mb-2">
+                <label htmlFor="schoolCode" className="form-label">
                   School Code
                 </label>
                 <input
@@ -135,13 +135,13 @@ const ActivationPage: React.FC = () => {
                   value={schoolCode}
                   onChange={(e) => setSchoolCode(e.target.value.toUpperCase())}
                   required
-                  className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-purple-500/50 focus:border-purple-400/50 transition-all duration-200"
+                  className="w-full input-field placeholder-ink-subtle focus:outline-none focus:ring-2 focus:ring-purple-500/50 focus:border-purple-400/50 transition-all duration-200"
                   placeholder="e.g. KHS2024"
                 />
               </div>
 
               <div>
-                <label htmlFor="adminFullName" className="block text-xs font-semibold text-gray-300 uppercase tracking-wider mb-2">
+                <label htmlFor="adminFullName" className="form-label">
                   Admin Full Name
                 </label>
                 <input
@@ -150,13 +150,13 @@ const ActivationPage: React.FC = () => {
                   value={adminFullName}
                   onChange={(e) => setAdminFullName(e.target.value)}
                   required
-                  className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-purple-500/50 focus:border-purple-400/50 transition-all duration-200"
+                  className="w-full input-field placeholder-ink-subtle focus:outline-none focus:ring-2 focus:ring-purple-500/50 focus:border-purple-400/50 transition-all duration-200"
                   placeholder="John Doe"
                 />
               </div>
 
               <div>
-                <label htmlFor="adminEmail" className="block text-xs font-semibold text-gray-300 uppercase tracking-wider mb-2">
+                <label htmlFor="adminEmail" className="form-label">
                   Admin Email
                 </label>
                 <input
@@ -165,13 +165,13 @@ const ActivationPage: React.FC = () => {
                   value={adminEmail}
                   onChange={(e) => setAdminEmail(e.target.value)}
                   required
-                  className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-purple-500/50 focus:border-purple-400/50 transition-all duration-200"
+                  className="w-full input-field placeholder-ink-subtle focus:outline-none focus:ring-2 focus:ring-purple-500/50 focus:border-purple-400/50 transition-all duration-200"
                   placeholder="admin@school.ac.ke"
                 />
               </div>
 
               <div>
-                <label htmlFor="adminPassword" className="block text-xs font-semibold text-gray-300 uppercase tracking-wider mb-2">
+                <label htmlFor="adminPassword" className="form-label">
                   Admin Password
                 </label>
                 <input
@@ -181,7 +181,7 @@ const ActivationPage: React.FC = () => {
                   onChange={(e) => setAdminPassword(e.target.value)}
                   required
                   minLength={8}
-                  className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-purple-500/50 focus:border-purple-400/50 transition-all duration-200"
+                  className="w-full input-field placeholder-ink-subtle focus:outline-none focus:ring-2 focus:ring-purple-500/50 focus:border-purple-400/50 transition-all duration-200"
                   placeholder="Minimum 8 characters"
                 />
               </div>
@@ -189,7 +189,7 @@ const ActivationPage: React.FC = () => {
               <button
                 type="submit"
                 disabled={loading || success}
-                className="w-full bg-gradient-to-r from-blue-600 to-purple-600 text-white font-semibold py-3.5 px-4 rounded-xl hover:from-blue-500 hover:to-purple-500 focus:outline-none focus:ring-2 focus:ring-purple-500/50 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 shadow-lg shadow-purple-500/25 hover:shadow-purple-500/40 hover:scale-[1.02] active:scale-[0.98]"
+                className="w-full btn-primary font-semibold py-3.5 px-4 rounded-xl hover:from-blue-500 hover:to-purple-500 focus:outline-none focus:ring-2 focus:ring-purple-500/50 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 shadow-lg shadow-purple-500/25 hover:shadow-purple-500/40 hover:scale-[1.02] active:scale-[0.98]"
               >
                 {loading ? (
                   <span className="flex items-center justify-center gap-2">
@@ -218,7 +218,7 @@ const ActivationPage: React.FC = () => {
         </div>
 
         {/* Bottom text */}
-        <p className="text-center text-xs text-gray-500 mt-6">
+        <p className="text-center text-xs text-ink-subtle mt-6">
           © 2025 SAMS · Developed by Denis Macharia
         </p>
       </div>

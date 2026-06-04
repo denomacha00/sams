@@ -209,18 +209,18 @@ const TimetablePage: React.FC = () => {
   return (
     <div className="page-shell">
       {/* Header */}
-      <header className="border-b border-slate-800 bg-slate-950/95">
+      <header className="inner-page-header">
         <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <Link to="/dashboard" className="text-slate-400 hover:text-indigo-300 transition-colors">
+            <Link to="/dashboard" className="text-ink-muted hover:text-brand transition-colors">
               ← Admin
             </Link>
-            <h1 className="text-lg font-bold text-white">Timetable Management</h1>
+            <h1 className="text-lg font-bold text-ink">Timetable Management</h1>
           </div>
           <div className="flex items-center gap-3">
             <button
               onClick={() => setViewMode(viewMode === 'table' ? 'grid' : 'table')}
-              className="px-3 py-2 rounded-lg bg-slate-900 border border-slate-700 text-slate-300 text-sm hover:bg-slate-800 transition-colors"
+              className="px-3 py-2 rounded-lg input-field text-ink text-sm hover:bg-slate-100 transition-colors"
             >
               {viewMode === 'table' ? '📅 Grid View' : '📋 Table View'}
             </button>
@@ -242,7 +242,7 @@ const TimetablePage: React.FC = () => {
           <select
             value={filterClass}
             onChange={(e) => setFilterClass(e.target.value)}
-            className="px-4 py-2 rounded-xl bg-slate-900 border border-slate-700 text-white focus:outline-none focus:border-indigo-500/50 transition-colors text-sm min-w-[14rem]"
+            className="px-4 py-2 rounded-xl input-field focus:outline-none focus:border-indigo-500/50 transition-colors text-sm min-w-[14rem]"
           >
             <option value="" className="bg-slate-900">All classes</option>
             {classes.map((cls) => (
@@ -252,7 +252,7 @@ const TimetablePage: React.FC = () => {
           <select
             value={filterTeacher}
             onChange={(e) => setFilterTeacher(e.target.value)}
-            className="px-4 py-2 rounded-xl bg-slate-900 border border-slate-700 text-white focus:outline-none focus:border-indigo-500/50 transition-colors text-sm min-w-[14rem]"
+            className="px-4 py-2 rounded-xl input-field focus:outline-none focus:border-indigo-500/50 transition-colors text-sm min-w-[14rem]"
           >
             <option value="" className="bg-slate-900">All teachers</option>
             {teachers.map((teacher) => (
@@ -262,7 +262,7 @@ const TimetablePage: React.FC = () => {
         </div>
 
         {loading ? (
-          <div className="text-center text-gray-400 py-12">Loading timetable...</div>
+          <div className="text-center text-ink-muted py-12">Loading timetable...</div>
         ) : viewMode === 'table' ? (
           /* Table View */
           <div className="surface-card overflow-hidden">
@@ -270,19 +270,19 @@ const TimetablePage: React.FC = () => {
               <table className="w-full">
                 <thead>
                   <tr className="border-b border-white/10">
-                    <th className="text-left px-6 py-4 text-sm font-semibold text-white">Day</th>
-                    <th className="text-left px-6 py-4 text-sm font-semibold text-white">Subject</th>
-                    <th className="text-left px-6 py-4 text-sm font-semibold text-white">Class</th>
-                    <th className="text-left px-6 py-4 text-sm font-semibold text-white">Teacher</th>
-                    <th className="text-left px-6 py-4 text-sm font-semibold text-white">Time</th>
-                    <th className="text-left px-6 py-4 text-sm font-semibold text-white">Room</th>
-                    <th className="text-right px-6 py-4 text-sm font-semibold text-white">Actions</th>
+                    <th className="text-left px-6 py-4 text-sm font-semibold text-ink">Day</th>
+                    <th className="text-left px-6 py-4 text-sm font-semibold text-ink">Subject</th>
+                    <th className="text-left px-6 py-4 text-sm font-semibold text-ink">Class</th>
+                    <th className="text-left px-6 py-4 text-sm font-semibold text-ink">Teacher</th>
+                    <th className="text-left px-6 py-4 text-sm font-semibold text-ink">Time</th>
+                    <th className="text-left px-6 py-4 text-sm font-semibold text-ink">Room</th>
+                    <th className="text-right px-6 py-4 text-sm font-semibold text-ink">Actions</th>
                   </tr>
                 </thead>
                 <tbody>
                   {filteredEntries.length === 0 ? (
                     <tr>
-                      <td colSpan={7} className="px-6 py-12 text-center text-gray-400">No timetable entries</td>
+                      <td colSpan={7} className="px-6 py-12 text-center text-ink-muted">No timetable entries</td>
                     </tr>
                   ) : (
                     filteredEntries
@@ -290,11 +290,11 @@ const TimetablePage: React.FC = () => {
                       .map((entry) => (
                         <tr key={entry.id} className="border-b border-white/5 hover:bg-white/5 transition-colors">
                           <td className="px-6 py-4 text-sm text-white">{DAYS[entry.dayOfWeek]}</td>
-                          <td className="px-6 py-4 text-sm text-white font-medium">{entry.subject}</td>
-                          <td className="px-6 py-4 text-sm text-gray-300">{entry.class?.name || classes.find((c) => c.id === entry.classId)?.name || 'Unknown class'}</td>
-                          <td className="px-6 py-4 text-sm text-gray-300">{entry.teacher?.fullName || entry.teacherId}</td>
-                          <td className="px-6 py-4 text-sm text-gray-400">{entry.startTime} - {entry.endTime}</td>
-                          <td className="px-6 py-4 text-sm text-gray-400">{entry.room || '—'}</td>
+                          <td className="px-6 py-4 text-sm text-ink font-medium">{entry.subject}</td>
+                          <td className="px-6 py-4 text-sm text-ink-muted">{entry.class?.name || classes.find((c) => c.id === entry.classId)?.name || 'Unknown class'}</td>
+                          <td className="px-6 py-4 text-sm text-ink-muted">{entry.teacher?.fullName || entry.teacherId}</td>
+                          <td className="px-6 py-4 text-sm text-ink-muted">{entry.startTime} - {entry.endTime}</td>
+                          <td className="px-6 py-4 text-sm text-ink-muted">{entry.room || '—'}</td>
                           <td className="px-6 py-4 text-right">
                             {canManage && (
                               <>
@@ -328,16 +328,16 @@ const TimetablePage: React.FC = () => {
                 <h4 className="text-white font-semibold text-sm mb-3 pb-2 border-b border-white/10">{day}</h4>
                 <div className="space-y-2">
                   {getEntriesForDay(idx).length === 0 ? (
-                    <p className="text-gray-500 text-xs">No classes</p>
+                    <p className="text-ink-subtle text-xs">No classes</p>
                   ) : (
                     getEntriesForDay(idx)
                       .sort((a, b) => a.startTime.localeCompare(b.startTime))
                       .map((entry) => (
                         <div key={entry.id} className="p-3 rounded-xl bg-white/5 border border-white/5 hover:border-cyan-500/30 transition-colors">
                           <p className="text-white text-sm font-medium">{entry.subject}</p>
-                          <p className="text-gray-400 text-xs mt-1">{entry.startTime} - {entry.endTime}</p>
-                          <p className="text-gray-500 text-xs">{entry.class?.name || classes.find((c) => c.id === entry.classId)?.name || 'Unknown class'}</p>
-                          {entry.room && <p className="text-gray-500 text-xs">Room: {entry.room}</p>}
+                          <p className="text-ink-muted text-xs mt-1">{entry.startTime} - {entry.endTime}</p>
+                          <p className="text-ink-subtle text-xs">{entry.class?.name || classes.find((c) => c.id === entry.classId)?.name || 'Unknown class'}</p>
+                          {entry.room && <p className="text-ink-subtle text-xs">Room: {entry.room}</p>}
                         </div>
                       ))
                   )}
@@ -351,8 +351,8 @@ const TimetablePage: React.FC = () => {
       {/* Modal */}
       {showModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
-          <div className="bg-slate-900 border border-slate-700 rounded-2xl p-8 w-full max-w-lg mx-4 shadow-2xl">
-            <h3 className="text-xl font-bold text-white mb-6">
+          <div className="input-field rounded-2xl p-8 w-full max-w-lg mx-4 shadow-2xl">
+            <h3 className="text-xl font-bold text-ink mb-6">
               {editingEntry ? 'Edit Timetable Entry' : 'Add Timetable Entry'}
             </h3>
 
@@ -364,38 +364,38 @@ const TimetablePage: React.FC = () => {
 
             <form onSubmit={handleSubmit} className="space-y-4">
               <div>
-                <label className="block text-sm text-gray-300 mb-1">Subject *</label>
+                <label className="block text-sm text-ink-muted mb-1">Subject *</label>
                 <input
                   type="text"
                   required
                   value={formData.subject}
                   onChange={(e) => setFormData({ ...formData, subject: e.target.value })}
-                  className="w-full px-4 py-2.5 rounded-xl bg-slate-900 border border-slate-700 text-white placeholder-gray-500 focus:outline-none focus:border-indigo-500/50 transition-colors"
+                  className="w-full px-4 py-2.5 rounded-xl input-field placeholder-ink-subtle focus:outline-none focus:border-indigo-500/50 transition-colors"
                   placeholder="Mathematics"
                 />
               </div>
 
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm text-gray-300 mb-1">Department *</label>
+                  <label className="block text-sm text-ink-muted mb-1">Department *</label>
                   <select
                     required
                     value={formData.departmentId}
                     onChange={(e) => setFormData({ ...formData, departmentId: e.target.value, classId: '' })}
-                    className="w-full px-4 py-2.5 rounded-xl bg-slate-900 border border-slate-700 text-white focus:outline-none focus:border-indigo-500/50 transition-colors mb-3"
+                    className="w-full px-4 py-2.5 rounded-xl input-field focus:outline-none focus:border-indigo-500/50 transition-colors mb-3"
                   >
                     <option value="" className="bg-slate-800">-- Select Department --</option>
                     {departments.map((dept) => (
                       <option key={dept.id} value={dept.id} className="bg-slate-800">{dept.name}</option>
                     ))}
                   </select>
-                  <label className="block text-sm text-gray-300 mb-1">Class *</label>
+                  <label className="block text-sm text-ink-muted mb-1">Class *</label>
                   <select
                     required
                     value={formData.classId}
                     onChange={(e) => setFormData({ ...formData, classId: e.target.value })}
                     disabled={!formData.departmentId}
-                    className="w-full px-4 py-2.5 rounded-xl bg-slate-900 border border-slate-700 text-white focus:outline-none focus:border-indigo-500/50 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+                    className="w-full px-4 py-2.5 rounded-xl input-field focus:outline-none focus:border-indigo-500/50 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
                   >
                     <option value="" className="bg-slate-800">-- Select Class --</option>
                     {modalClassOptions.map((cls) => (
@@ -404,12 +404,12 @@ const TimetablePage: React.FC = () => {
                   </select>
                 </div>
                 <div>
-                  <label className="block text-sm text-gray-300 mb-1">Teacher *</label>
+                  <label className="block text-sm text-ink-muted mb-1">Teacher *</label>
                   <select
                     required
                     value={formData.teacherId}
                     onChange={(e) => setFormData({ ...formData, teacherId: e.target.value })}
-                    className="w-full px-4 py-2.5 rounded-xl bg-slate-900 border border-slate-700 text-white focus:outline-none focus:border-indigo-500/50 transition-colors"
+                    className="w-full px-4 py-2.5 rounded-xl input-field focus:outline-none focus:border-indigo-500/50 transition-colors"
                   >
                     <option value="" className="bg-slate-800">-- Select Teacher --</option>
                     {teachers.map(t => (
@@ -420,11 +420,11 @@ const TimetablePage: React.FC = () => {
               </div>
 
               <div>
-                <label className="block text-sm text-gray-300 mb-1">Day of Week *</label>
+                <label className="block text-sm text-ink-muted mb-1">Day of Week *</label>
                 <select
                   value={formData.dayOfWeek}
                   onChange={(e) => setFormData({ ...formData, dayOfWeek: parseInt(e.target.value) })}
-                  className="w-full px-4 py-2.5 rounded-xl bg-slate-900 border border-slate-700 text-white focus:outline-none focus:border-indigo-500/50 transition-colors"
+                  className="w-full px-4 py-2.5 rounded-xl input-field focus:outline-none focus:border-indigo-500/50 transition-colors"
                 >
                   {DAYS.map((day, idx) => (
                     <option key={day} value={idx} className="bg-slate-800">{day}</option>
@@ -434,34 +434,34 @@ const TimetablePage: React.FC = () => {
 
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm text-gray-300 mb-1">Start Time *</label>
+                  <label className="block text-sm text-ink-muted mb-1">Start Time *</label>
                   <input
                     type="time"
                     required
                     value={formData.startTime}
                     onChange={(e) => setFormData({ ...formData, startTime: e.target.value })}
-                    className="w-full px-4 py-2.5 rounded-xl bg-slate-900 border border-slate-700 text-white focus:outline-none focus:border-indigo-500/50 transition-colors"
+                    className="w-full px-4 py-2.5 rounded-xl input-field focus:outline-none focus:border-indigo-500/50 transition-colors"
                   />
                 </div>
                 <div>
-                  <label className="block text-sm text-gray-300 mb-1">End Time *</label>
+                  <label className="block text-sm text-ink-muted mb-1">End Time *</label>
                   <input
                     type="time"
                     required
                     value={formData.endTime}
                     onChange={(e) => setFormData({ ...formData, endTime: e.target.value })}
-                    className="w-full px-4 py-2.5 rounded-xl bg-slate-900 border border-slate-700 text-white focus:outline-none focus:border-indigo-500/50 transition-colors"
+                    className="w-full px-4 py-2.5 rounded-xl input-field focus:outline-none focus:border-indigo-500/50 transition-colors"
                   />
                 </div>
               </div>
 
               <div>
-                <label className="block text-sm text-gray-300 mb-1">Room</label>
+                <label className="block text-sm text-ink-muted mb-1">Room</label>
                 <input
                   type="text"
                   value={formData.room}
                   onChange={(e) => setFormData({ ...formData, room: e.target.value })}
-                  className="w-full px-4 py-2.5 rounded-xl bg-slate-900 border border-slate-700 text-white placeholder-gray-500 focus:outline-none focus:border-indigo-500/50 transition-colors"
+                  className="w-full px-4 py-2.5 rounded-xl input-field placeholder-ink-subtle focus:outline-none focus:border-indigo-500/50 transition-colors"
                   placeholder="Room 101"
                 />
               </div>
@@ -470,7 +470,7 @@ const TimetablePage: React.FC = () => {
                 <button
                   type="button"
                   onClick={() => setShowModal(false)}
-                  className="flex-1 px-4 py-2.5 rounded-xl bg-slate-900 border border-slate-700 text-gray-300 hover:bg-slate-800 transition-colors"
+                  className="flex-1 px-4 py-2.5 rounded-xl input-field text-ink-muted hover:bg-slate-100 transition-colors"
                 >
                   Cancel
                 </button>
@@ -490,7 +490,7 @@ const TimetablePage: React.FC = () => {
       {/* Footer */}
       <footer className="border-t border-white/5 mt-20 py-6">
         <div className="max-w-7xl mx-auto px-6 text-center">
-          <p className="text-xs text-gray-500">© 2025 SAMS · Developed by Denis Macharia</p>
+          <p className="text-xs text-ink-subtle">© 2025 SAMS · Developed by Denis Macharia</p>
         </div>
       </footer>
     </div>

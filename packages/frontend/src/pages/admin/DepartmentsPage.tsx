@@ -249,15 +249,15 @@ const DepartmentsPage: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900">
+    <div className="page-shell">
       {/* Header */}
-      <header className="border-b border-white/10 backdrop-blur-sm bg-white/5">
+      <header className="inner-page-header">
         <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <Link to="/dashboard" className="text-gray-400 hover:text-indigo-300 transition-colors">
+            <Link to="/dashboard" className="text-ink-muted hover:text-brand transition-colors">
               ← Admin
             </Link>
-            <h1 className="text-lg font-bold text-white">Departments & Classes</h1>
+            <h1 className="text-lg font-bold text-ink">Departments & Classes</h1>
           </div>
           <button
             onClick={openAddDeptModal}
@@ -270,9 +270,9 @@ const DepartmentsPage: React.FC = () => {
 
       <main className="max-w-7xl mx-auto px-6 py-8">
         {loading ? (
-          <div className="text-center text-gray-400 py-12">Loading departments...</div>
+          <div className="text-center text-ink-muted py-12">Loading departments...</div>
         ) : departments.length === 0 ? (
-          <div className="text-center text-gray-400 py-12">
+          <div className="text-center text-ink-muted py-12">
             <p className="mb-4">No departments found</p>
             <button
               onClick={openAddDeptModal}
@@ -284,7 +284,7 @@ const DepartmentsPage: React.FC = () => {
         ) : (
           <div className="space-y-4">
             {departments.map((dept) => (
-              <div key={dept.id} className="backdrop-blur-xl bg-white/5 border border-white/10 rounded-2xl overflow-hidden">
+              <div key={dept.id} className="surface-card rounded-2xl overflow-hidden">
                 {/* Department Header */}
                 <div className="flex items-center justify-between px-6 py-4 border-b border-white/5">
                   <button
@@ -292,7 +292,7 @@ const DepartmentsPage: React.FC = () => {
                     className="flex items-center gap-3 text-left"
                   >
                     <svg
-                      className={`w-4 h-4 text-gray-400 transition-transform ${expandedDepts.has(dept.id) ? 'rotate-90' : ''}`}
+                      className={`w-4 h-4 text-ink-muted transition-transform ${expandedDepts.has(dept.id) ? 'rotate-90' : ''}`}
                       fill="none"
                       viewBox="0 0 24 24"
                       stroke="currentColor"
@@ -302,13 +302,13 @@ const DepartmentsPage: React.FC = () => {
                     <div>
                       <h3 className="text-white font-semibold">{dept.name}</h3>
                       <div className="flex items-center gap-3 mt-0.5">
-                        <p className="text-xs text-gray-400">{dept.classes?.length || 0} classes · {dept.teachers?.length || 0} teachers</p>
+                        <p className="text-xs text-ink-muted">{dept.classes?.length || 0} classes · {dept.teachers?.length || 0} teachers</p>
                         {dept.hodName ? (
                           <span className="text-xs text-orange-300 bg-orange-500/10 border border-orange-500/20 px-2 py-0.5 rounded-full">
                             HOD: {dept.hodName}
                           </span>
                         ) : (
-                          <span className="text-xs text-gray-500 italic">No HOD assigned</span>
+                          <span className="text-xs text-ink-subtle italic">No HOD assigned</span>
                         )}
                       </div>
                     </div>
@@ -322,7 +322,7 @@ const DepartmentsPage: React.FC = () => {
                     </button>
                     <button
                       onClick={() => openAddClassModal(dept.id)}
-                      className="px-3 py-1.5 rounded-lg bg-white/5 border border-white/10 text-cyan-400 text-xs hover:bg-white/10 transition-colors"
+                      className="px-3 py-1.5 rounded-lg bg-slate-50 border border-line text-cyan-400 text-xs hover:bg-white/10 transition-colors"
                     >
                       + Add Class
                     </button>
@@ -347,12 +347,12 @@ const DepartmentsPage: React.FC = () => {
                     {/* Teachers in this department */}
                     {dept.teachers && dept.teachers.length > 0 && (
                       <div className="mb-4">
-                        <h4 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Teachers ({dept.teachers.length})</h4>
+                        <h4 className="text-xs font-semibold text-ink-muted uppercase tracking-wider mb-2">Teachers ({dept.teachers.length})</h4>
                         <div className="flex flex-wrap gap-2">
                           {dept.teachers.map((teacher) => (
                             <div key={teacher.id} className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-indigo-500/10 border border-indigo-500/20">
                               <div className="w-5 h-5 rounded-full bg-indigo-500/30 flex items-center justify-center">
-                                <span className="text-xs font-semibold text-indigo-300">{teacher.fullName.charAt(0)}</span>
+                                <span className="text-xs font-semibold text-brand">{teacher.fullName.charAt(0)}</span>
                               </div>
                               <span className="text-xs text-indigo-200">{teacher.fullName}</span>
                             </div>
@@ -362,16 +362,16 @@ const DepartmentsPage: React.FC = () => {
                     )}
 
                     {/* Classes */}
-                    <h4 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Classes ({dept.classes?.length || 0})</h4>
+                    <h4 className="text-xs font-semibold text-ink-muted uppercase tracking-wider mb-2">Classes ({dept.classes?.length || 0})</h4>
                     {(!dept.classes || dept.classes.length === 0) ? (
-                      <p className="text-gray-500 text-sm py-3">No classes in this department</p>
+                      <p className="text-ink-subtle text-sm py-3">No classes in this department</p>
                     ) : (
                       <div className="space-y-2">
                         {dept.classes.map((cls) => (
                           <div key={cls.id} className="flex items-center justify-between py-3 px-4 rounded-xl bg-white/5 border border-white/5">
                             <div>
                               <p className="text-white text-sm font-medium">{cls.name}</p>
-                              <p className="text-gray-500 text-xs">Capacity: {cls.capacity}</p>
+                              <p className="text-ink-subtle text-xs">Capacity: {cls.capacity}</p>
                               <p className="text-xs mt-0.5">
                                 {cls.classTeacherName ? (
                                   <span className="text-teal-400">Class Teacher: {cls.classTeacherName}</span>
@@ -409,8 +409,8 @@ const DepartmentsPage: React.FC = () => {
       {/* Department Modal */}
       {showDeptModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
-          <div className="backdrop-blur-xl bg-slate-800/90 border border-white/10 rounded-2xl p-8 w-full max-w-md mx-4 shadow-2xl">
-            <h3 className="text-xl font-bold text-white mb-6">
+          <div className="backdrop-blur-xl surface-card border-line rounded-2xl p-8 w-full max-w-md mx-4 shadow-2xl">
+            <h3 className="text-xl font-bold text-ink mb-6">
               {editingDept ? 'Edit Department' : 'Add Department'}
             </h3>
 
@@ -422,13 +422,13 @@ const DepartmentsPage: React.FC = () => {
 
             <form onSubmit={handleDeptSubmit} className="space-y-4">
               <div>
-                <label className="block text-sm text-gray-300 mb-1">Department Name *</label>
+                <label className="block text-sm text-ink-muted mb-1">Department Name *</label>
                 <input
                   type="text"
                   required
                   value={deptName}
                   onChange={(e) => setDeptName(e.target.value)}
-                  className="w-full px-4 py-2.5 rounded-xl bg-white/5 border border-white/10 text-white placeholder-gray-500 focus:outline-none focus:border-cyan-500/50 transition-colors"
+                  className="w-full px-4 py-2.5 rounded-xl bg-slate-50 border border-line text-white placeholder-ink-subtle focus:outline-none focus:border-cyan-500/50 transition-colors"
                   placeholder="e.g. Science Department"
                 />
               </div>
@@ -437,7 +437,7 @@ const DepartmentsPage: React.FC = () => {
                 <button
                   type="button"
                   onClick={() => setShowDeptModal(false)}
-                  className="flex-1 px-4 py-2.5 rounded-xl bg-white/5 border border-white/10 text-gray-300 hover:bg-white/10 transition-colors"
+                  className="flex-1 px-4 py-2.5 rounded-xl bg-slate-50 border border-line text-ink-muted hover:bg-white/10 transition-colors"
                 >
                   Cancel
                 </button>
@@ -457,8 +457,8 @@ const DepartmentsPage: React.FC = () => {
       {/* Class Modal */}
       {showClassModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
-          <div className="backdrop-blur-xl bg-slate-800/90 border border-white/10 rounded-2xl p-8 w-full max-w-md mx-4 shadow-2xl">
-            <h3 className="text-xl font-bold text-white mb-6">
+          <div className="backdrop-blur-xl surface-card border-line rounded-2xl p-8 w-full max-w-md mx-4 shadow-2xl">
+            <h3 className="text-xl font-bold text-ink mb-6">
               {editingClass ? 'Edit Class' : 'Add Class'}
             </h3>
 
@@ -470,25 +470,25 @@ const DepartmentsPage: React.FC = () => {
 
             <form onSubmit={handleClassSubmit} className="space-y-4">
               <div>
-                <label className="block text-sm text-gray-300 mb-1">Class Name *</label>
+                <label className="block text-sm text-ink-muted mb-1">Class Name *</label>
                 <input
                   type="text"
                   required
                   value={className}
                   onChange={(e) => setClassName(e.target.value)}
-                  className="w-full px-4 py-2.5 rounded-xl bg-white/5 border border-white/10 text-white placeholder-gray-500 focus:outline-none focus:border-cyan-500/50 transition-colors"
+                  className="w-full px-4 py-2.5 rounded-xl bg-slate-50 border border-line text-white placeholder-ink-subtle focus:outline-none focus:border-cyan-500/50 transition-colors"
                   placeholder="e.g. Form 1A"
                 />
               </div>
 
               <div>
-                <label className="block text-sm text-gray-300 mb-1">Capacity</label>
+                <label className="block text-sm text-ink-muted mb-1">Capacity</label>
                 <input
                   type="number"
                   min={1}
                   value={classCapacity}
                   onChange={(e) => setClassCapacity(parseInt(e.target.value) || 50)}
-                  className="w-full px-4 py-2.5 rounded-xl bg-white/5 border border-white/10 text-white focus:outline-none focus:border-cyan-500/50 transition-colors"
+                  className="w-full px-4 py-2.5 rounded-xl bg-slate-50 border border-line text-white focus:outline-none focus:border-cyan-500/50 transition-colors"
                 />
               </div>
 
@@ -496,7 +496,7 @@ const DepartmentsPage: React.FC = () => {
                 <button
                   type="button"
                   onClick={() => setShowClassModal(false)}
-                  className="flex-1 px-4 py-2.5 rounded-xl bg-white/5 border border-white/10 text-gray-300 hover:bg-white/10 transition-colors"
+                  className="flex-1 px-4 py-2.5 rounded-xl bg-slate-50 border border-line text-ink-muted hover:bg-white/10 transition-colors"
                 >
                   Cancel
                 </button>
@@ -516,11 +516,11 @@ const DepartmentsPage: React.FC = () => {
       {/* HOD Assignment Modal */}
       {showHodModal && hodDept && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
-          <div className="backdrop-blur-xl bg-slate-800/90 border border-white/10 rounded-2xl p-8 w-full max-w-md mx-4 shadow-2xl">
-            <h3 className="text-xl font-bold text-white mb-2">
+          <div className="backdrop-blur-xl surface-card border-line rounded-2xl p-8 w-full max-w-md mx-4 shadow-2xl">
+            <h3 className="text-xl font-bold text-ink mb-2">
               {hodDept.hodName ? 'Change HOD' : 'Assign HOD'}
             </h3>
-            <p className="text-sm text-gray-400 mb-6">
+            <p className="text-sm text-ink-muted mb-6">
               Department: <span className="text-white font-medium">{hodDept.name}</span>
               {hodDept.hodName && <span className="text-orange-300 ml-2">(Current: {hodDept.hodName})</span>}
             </p>
@@ -533,25 +533,25 @@ const DepartmentsPage: React.FC = () => {
 
             <div className="space-y-4">
               <div>
-                <label className="block text-sm text-gray-300 mb-1">Select HOD *</label>
+                <label className="block text-sm text-ink-muted mb-1">Select HOD *</label>
                 <select
                   value={selectedHodId}
                   onChange={(e) => setSelectedHodId(e.target.value)}
-                  className="w-full px-4 py-2.5 rounded-xl bg-white/5 border border-white/10 text-white focus:outline-none focus:border-cyan-500/50 transition-colors"
+                  className="w-full px-4 py-2.5 rounded-xl bg-slate-50 border border-line text-white focus:outline-none focus:border-cyan-500/50 transition-colors"
                 >
                   <option value="" className="bg-slate-800">-- Select a user --</option>
                   {hodUsers.map(u => (
                     <option key={u.id} value={u.id} className="bg-slate-800">{u.fullName}</option>
                   ))}
                 </select>
-                <p className="text-xs text-gray-500 mt-1">Shows existing HODs and teachers in this department</p>
+                <p className="text-xs text-ink-subtle mt-1">Shows existing HODs and teachers in this department</p>
               </div>
 
               <div className="flex gap-3 pt-2">
                 <button
                   type="button"
                   onClick={() => setShowHodModal(false)}
-                  className="flex-1 px-4 py-2.5 rounded-xl bg-white/5 border border-white/10 text-gray-300 hover:bg-white/10 transition-colors"
+                  className="flex-1 px-4 py-2.5 rounded-xl bg-slate-50 border border-line text-ink-muted hover:bg-white/10 transition-colors"
                 >
                   Cancel
                 </button>
@@ -571,7 +571,7 @@ const DepartmentsPage: React.FC = () => {
       {/* Footer */}
       <footer className="border-t border-white/5 mt-20 py-6">
         <div className="max-w-7xl mx-auto px-6 text-center">
-          <p className="text-xs text-gray-500">© 2025 SAMS · Developed by Denis Macharia</p>
+          <p className="text-xs text-ink-subtle">© 2025 SAMS · Developed by Denis Macharia</p>
         </div>
       </footer>
     </div>

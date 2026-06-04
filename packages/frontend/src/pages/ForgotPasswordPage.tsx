@@ -114,28 +114,28 @@ const ForgotPasswordPage: React.FC = () => {
       <div className="w-full max-w-md">
         <div className="bg-white/5 backdrop-blur-xl rounded-2xl shadow-2xl shadow-black/20 p-8 border border-white/10">
           <div className="text-center mb-6">
-            <h2 className="text-2xl font-bold text-white mb-1">Forgot Password</h2>
-            <p className="text-gray-400 text-sm">
+            <h2 className="text-2xl font-bold text-ink mb-1">Forgot Password</h2>
+            <p className="text-ink-muted text-sm">
               {mode === 'otp' ? 'Reset with a 6-digit code via email or SMS' : 'We will email or SMS you a reset link'}
             </p>
-            <p className="text-gray-500 text-xs mt-2">
+            <p className="text-ink-subtle text-xs mt-2">
               Email reset requires the school server to have SMTP configured. If email is unavailable, use OTP with the phone on your account.
             </p>
           </div>
 
           {!success && (
-            <div className="flex gap-2 mb-6 p-1 rounded-xl bg-white/5 border border-white/10">
+            <div className="flex gap-2 mb-6 p-1 rounded-xl bg-slate-50 border border-line">
               <button
                 type="button"
                 onClick={() => { setMode('otp'); setError(null); setOtpSent(false); }}
-                className={`flex-1 py-2 text-sm font-medium rounded-lg transition-colors ${mode === 'otp' ? 'bg-indigo-600 text-white' : 'text-gray-400 hover:text-white'}`}
+                className={`flex-1 py-2 text-sm font-medium rounded-lg transition-colors ${mode === 'otp' ? 'bg-indigo-600 text-white' : 'text-ink-muted hover:text-ink'}`}
               >
                 OTP code
               </button>
               <button
                 type="button"
                 onClick={() => { setMode('link'); setError(null); setOtpSent(false); }}
-                className={`flex-1 py-2 text-sm font-medium rounded-lg transition-colors ${mode === 'link' ? 'bg-indigo-600 text-white' : 'text-gray-400 hover:text-white'}`}
+                className={`flex-1 py-2 text-sm font-medium rounded-lg transition-colors ${mode === 'link' ? 'bg-indigo-600 text-white' : 'text-ink-muted hover:text-ink'}`}
               >
                 Reset link
               </button>
@@ -144,7 +144,7 @@ const ForgotPasswordPage: React.FC = () => {
 
           {success ? (
             <div className="p-4 bg-emerald-500/20 border border-emerald-400/30 rounded-xl text-center">
-              <p className="text-emerald-200 font-medium">Password reset complete!</p>
+              <p className="text-emerald-800 font-medium">Password reset complete!</p>
               <p className="text-emerald-300/70 text-sm mt-1">You can now sign in with your new password.</p>
               <Link to="/login" className="inline-block mt-4 text-sm text-teal-400 hover:text-teal-300 font-semibold">
                 ← Back to Login
@@ -186,12 +186,12 @@ const ForgotPasswordPage: React.FC = () => {
                   <p className="text-sm text-red-300 text-center">{error}</p>
                 </div>
               )}
-              <p className="text-sm text-gray-400 mb-4 text-center">
+              <p className="text-sm text-ink-muted mb-4 text-center">
                 {otpDeliveryHint ?? 'Enter the 6-digit code sent to your email or phone.'}
               </p>
               <form onSubmit={handleResetWithOtp} className="space-y-5">
                 <div>
-                  <label htmlFor="otpCode" className="block text-sm font-semibold text-gray-300 mb-1.5">Verification code</label>
+                  <label htmlFor="otpCode" className="block text-sm font-semibold text-ink-muted mb-1.5">Verification code</label>
                   <input
                     id="otpCode"
                     type="text"
@@ -200,7 +200,7 @@ const ForgotPasswordPage: React.FC = () => {
                     value={otpCode}
                     onChange={(e) => setOtpCode(e.target.value.replace(/\D/g, ''))}
                     required
-                    className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white text-center text-2xl tracking-[0.4em] font-mono focus:outline-none focus:ring-2 focus:ring-teal-500/40"
+                    className="w-full input-field text-center text-2xl tracking-[0.4em] font-mono focus:outline-none focus:ring-2 focus:ring-teal-500/40"
                     placeholder="000000"
                   />
                 </div>
@@ -212,7 +212,7 @@ const ForgotPasswordPage: React.FC = () => {
                 type="button"
                 onClick={handleResendOtp}
                 disabled={loading || resendCooldown > 0}
-                className="w-full mt-3 text-sm text-indigo-400 hover:text-indigo-300 disabled:opacity-50 disabled:cursor-not-allowed"
+                className="w-full mt-3 text-sm text-indigo-400 hover:text-brand disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {loading
                   ? 'Sending...'
@@ -253,7 +253,7 @@ function Field({
 }) {
   return (
     <div>
-      <label htmlFor={id} className="block text-sm font-semibold text-gray-300 mb-1.5">{label}</label>
+      <label htmlFor={id} className="block text-sm font-semibold text-ink-muted mb-1.5">{label}</label>
       <input
         id={id}
         type={type}
@@ -261,7 +261,7 @@ function Field({
         onChange={(e) => onChange(type === 'text' && id === 'schoolCode' ? e.target.value.toUpperCase() : e.target.value)}
         required
         minLength={type === 'password' ? 8 : undefined}
-        className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-teal-500/40"
+        className="w-full input-field placeholder-ink-subtle focus:outline-none focus:ring-2 focus:ring-teal-500/40"
         placeholder={placeholder}
       />
     </div>

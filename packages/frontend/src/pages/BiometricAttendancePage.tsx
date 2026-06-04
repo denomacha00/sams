@@ -220,8 +220,8 @@ const BiometricAttendancePage: React.FC = () => {
     return (
       <div className="page-shell p-6">
         <div className="max-w-lg mx-auto surface-card p-6 text-center">
-          <h1 className="text-xl font-bold text-white mb-2">Biometric attendance unavailable</h1>
-          <p className="text-gray-400 text-sm">
+          <h1 className="text-xl font-bold text-ink mb-2">Biometric attendance unavailable</h1>
+          <p className="text-ink-muted text-sm">
             Biometric scanning requires a Professional or Enterprise plan. Upgrade the school license
             in the Super Admin portal, then reload this page.
           </p>
@@ -235,16 +235,16 @@ const BiometricAttendancePage: React.FC = () => {
       <div className="max-w-lg mx-auto">
         {/* Header */}
         <div className="mb-8">
-          <h1 className="text-2xl font-bold text-white">Scan student face</h1>
-          <p className="text-gray-400 text-sm mt-1">
+          <h1 className="text-2xl font-bold text-ink">Scan student face</h1>
+          <p className="text-ink-muted text-sm mt-1">
             Scan student face on this device. Students do not use their phones for face check-in (they
             scan QR on their own phone). Login fingerprint stays on each user&apos;s own device.
           </p>
         </div>
 
         {error && (
-          <div className="mb-4 p-3 bg-red-500/20 border border-red-400/30 rounded-xl backdrop-blur-sm">
-            <p className="text-sm text-red-200 text-center">{error}</p>
+          <div className="mb-4 p-3 alert-error">
+            <p className="text-sm text-red-800 text-center">{error}</p>
           </div>
         )}
 
@@ -256,7 +256,7 @@ const BiometricAttendancePage: React.FC = () => {
                   <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
                   <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
                 </svg>
-                <p className="text-gray-400">Loading face detection models...</p>
+                <p className="text-ink-muted">Loading face detection models...</p>
               </div>
             </div>
           )}
@@ -269,13 +269,13 @@ const BiometricAttendancePage: React.FC = () => {
 
           {modelsLoaded && !cameraActive && !submitted && (
             <div className="text-center py-8">
-              <div className="inline-flex items-center justify-center w-20 h-20 rounded-2xl bg-slate-900 border border-slate-700 mb-4">
-                <svg className="w-10 h-10 text-indigo-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <div className="inline-flex items-center justify-center w-20 h-20 rounded-2xl input-field mb-4">
+                <svg className="w-10 h-10 text-brand" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
                 </svg>
               </div>
-              <p className="text-gray-300 mb-6">
+              <p className="text-ink-muted mb-6">
                 Point the camera at the student&apos;s face. You hold the device; attendance is recorded
                 for the matched student.
               </p>
@@ -339,8 +339,8 @@ const BiometricAttendancePage: React.FC = () => {
                 </svg>
               </div>
               <p className="text-lg font-medium text-white">Student marked present</p>
-              <p className="text-gray-400 mt-1">{matchResult.studentName}</p>
-              <p className="text-xs text-gray-500 mt-1">
+              <p className="text-ink-muted mt-1">{matchResult.studentName}</p>
+              <p className="text-xs text-ink-subtle mt-1">
                 Confidence: {(matchResult.confidence * 100).toFixed(1)}%
               </p>
               <button
@@ -358,7 +358,7 @@ const BiometricAttendancePage: React.FC = () => {
         </div>
 
         {/* Footer */}
-        <p className="text-center text-xs text-gray-500 mt-8">
+        <p className="text-center text-xs text-ink-subtle mt-8">
           © 2025 SAMS · Developed by Denis Macharia
         </p>
       </div>

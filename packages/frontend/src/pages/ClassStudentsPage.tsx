@@ -54,8 +54,8 @@ const ClassStudentsPage: React.FC = () => {
   });
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900">
-      <header className="border-b border-white/10 backdrop-blur-sm bg-white/5">
+    <div className="page-shell">
+      <header className="inner-page-header">
         <div className="max-w-5xl mx-auto px-6 py-4 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-teal-500 to-cyan-600 flex items-center justify-center shadow-lg shadow-teal-500/20">
@@ -64,11 +64,11 @@ const ClassStudentsPage: React.FC = () => {
               </svg>
             </div>
             <div>
-              <h1 className="text-lg font-bold text-white">My Class Students</h1>
-              <p className="text-xs text-gray-400">{user?.fullName}</p>
+              <h1 className="text-lg font-bold text-ink">My Class Students</h1>
+              <p className="text-xs text-ink-muted">{user?.fullName}</p>
             </div>
           </div>
-          <Link to="/dashboard" className="text-sm text-gray-400 hover:text-cyan-400 transition-colors">
+          <Link to="/dashboard" className="text-sm text-ink-muted hover:text-cyan-400 transition-colors">
             ← Dashboard
           </Link>
         </div>
@@ -77,14 +77,14 @@ const ClassStudentsPage: React.FC = () => {
       <main className="max-w-5xl mx-auto px-6 py-8">
         <div className="mb-6 flex items-center justify-between">
           <div>
-            <h2 className="text-2xl font-bold text-white">Students</h2>
-            <p className="text-gray-400 text-sm mt-1">{students.length} student{students.length !== 1 ? 's' : ''} in your class</p>
+            <h2 className="text-2xl font-bold text-ink">Students</h2>
+            <p className="text-ink-muted text-sm mt-1">{students.length} student{students.length !== 1 ? 's' : ''} in your class</p>
           </div>
         </div>
 
         {/* Search */}
         <div className="mb-6 relative">
-          <svg className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <svg className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-ink-muted" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
           </svg>
           <input
@@ -92,13 +92,13 @@ const ClassStudentsPage: React.FC = () => {
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             placeholder="Search by name, admission number, email or phone..."
-            className="w-full pl-11 pr-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-teal-500/40 focus:border-teal-400 transition-all"
+            className="w-full pl-11 pr-4 py-3 bg-slate-50 border border-line rounded-xl text-white placeholder-ink-subtle focus:outline-none focus:ring-2 focus:ring-teal-500/40 focus:border-teal-400 transition-all"
           />
           {searchQuery && (
-            <button onClick={() => setSearchQuery('')} className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-white text-sm">✕</button>
+            <button onClick={() => setSearchQuery('')} className="absolute right-4 top-1/2 -translate-y-1/2 text-ink-muted hover:text-ink text-sm">✕</button>
           )}
         </div>
-        {searchQuery && <p className="text-xs text-gray-400 mb-4">{filtered.length} result{filtered.length !== 1 ? 's' : ''} found</p>}
+        {searchQuery && <p className="text-xs text-ink-muted mb-4">{filtered.length} result{filtered.length !== 1 ? 's' : ''} found</p>}
 
         {error && (
           <div className="p-4 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-300 text-sm mb-6">
@@ -107,26 +107,26 @@ const ClassStudentsPage: React.FC = () => {
         )}
 
         {loading ? (
-          <div className="text-center text-gray-400 py-12">Loading students...</div>
+          <div className="text-center text-ink-muted py-12">Loading students...</div>
         ) : filtered.length === 0 ? (
           <div className="text-center py-12">
             <svg className="w-16 h-16 text-gray-600 mx-auto mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />
             </svg>
-            <p className="text-gray-400">
+            <p className="text-ink-muted">
               {searchQuery ? `No students found matching "${searchQuery}"` : 'No students in your class yet.'}
             </p>
           </div>
         ) : (
-          <div className="backdrop-blur-xl bg-white/5 border border-white/10 rounded-2xl overflow-hidden">
+          <div className="surface-card rounded-2xl overflow-hidden">
             <table className="w-full">
               <thead>
                 <tr className="border-b border-white/10">
-                  <th className="text-left px-6 py-4 text-sm font-semibold text-white">Name</th>
-                  <th className="text-left px-6 py-4 text-sm font-semibold text-white">ADM No.</th>
-                  <th className="text-left px-6 py-4 text-sm font-semibold text-white">Email</th>
-                  <th className="text-left px-6 py-4 text-sm font-semibold text-white">Phone</th>
-                  <th className="text-left px-6 py-4 text-sm font-semibold text-white">Status</th>
+                  <th className="text-left px-6 py-4 text-sm font-semibold text-ink">Name</th>
+                  <th className="text-left px-6 py-4 text-sm font-semibold text-ink">ADM No.</th>
+                  <th className="text-left px-6 py-4 text-sm font-semibold text-ink">Email</th>
+                  <th className="text-left px-6 py-4 text-sm font-semibold text-ink">Phone</th>
+                  <th className="text-left px-6 py-4 text-sm font-semibold text-ink">Status</th>
                 </tr>
               </thead>
               <tbody>
@@ -137,12 +137,12 @@ const ClassStudentsPage: React.FC = () => {
                         <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500/30 to-purple-500/30 flex items-center justify-center shrink-0">
                           <span className="text-xs font-semibold text-blue-300">{s.fullName.charAt(0)}</span>
                         </div>
-                        <span className="text-sm font-medium text-white">{s.fullName}</span>
+                        <span className="text-sm font-medium text-ink">{s.fullName}</span>
                       </div>
                     </td>
-                    <td className="px-6 py-4 text-sm text-gray-300">{s.admissionNumber || '—'}</td>
-                    <td className="px-6 py-4 text-sm text-gray-400">{s.email || '—'}</td>
-                    <td className="px-6 py-4 text-sm text-gray-400">{s.phone || '—'}</td>
+                    <td className="px-6 py-4 text-sm text-ink-muted">{s.admissionNumber || '—'}</td>
+                    <td className="px-6 py-4 text-sm text-ink-muted">{s.email || '—'}</td>
+                    <td className="px-6 py-4 text-sm text-ink-muted">{s.phone || '—'}</td>
                     <td className="px-6 py-4">
                       <span className={`inline-flex px-2 py-1 rounded-full text-xs font-medium ${s.isLocked ? 'bg-red-500/20 text-red-300' : 'bg-green-500/20 text-green-300'}`}>
                         {s.isLocked ? 'Locked' : 'Active'}
@@ -158,7 +158,7 @@ const ClassStudentsPage: React.FC = () => {
 
       <footer className="border-t border-white/5 mt-20 py-6">
         <div className="max-w-5xl mx-auto px-6 text-center">
-          <p className="text-xs text-gray-500">© 2025 SAMS · Developed by Denis Macharia</p>
+          <p className="text-xs text-ink-subtle">© 2025 SAMS · Developed by Denis Macharia</p>
         </div>
       </footer>
     </div>

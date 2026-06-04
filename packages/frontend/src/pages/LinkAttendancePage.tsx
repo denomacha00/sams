@@ -231,15 +231,15 @@ const LinkAttendancePage: React.FC = () => {
   // Loading state
   if (pageState === 'loading') {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 flex items-center justify-center p-6">
+      <div className="page-shell flex items-center justify-center p-6">
         <div className="text-center">
-          <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-white/5 border border-white/10 mb-4">
+          <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-slate-50 border border-line mb-4">
             <svg className="animate-spin h-8 w-8 text-purple-400" viewBox="0 0 24 24">
               <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
               <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
             </svg>
           </div>
-          <p className="text-gray-400 text-sm">Loading session info...</p>
+          <p className="text-ink-muted text-sm">Loading session info...</p>
         </div>
       </div>
     );
@@ -248,9 +248,9 @@ const LinkAttendancePage: React.FC = () => {
   // Success state
   if (pageState === 'success' && result) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 flex items-center justify-center p-6">
+      <div className="page-shell flex items-center justify-center p-6">
         <div className="max-w-sm w-full">
-          <div className="backdrop-blur-xl bg-white/5 border border-white/10 rounded-2xl p-8 text-center">
+          <div className="surface-card rounded-2xl p-8 text-center">
             {/* Green checkmark */}
             <div className="inline-flex items-center justify-center w-20 h-20 rounded-full bg-emerald-500/20 border-2 border-emerald-500/50 mb-6">
               <svg className="w-10 h-10 text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
@@ -258,7 +258,7 @@ const LinkAttendancePage: React.FC = () => {
               </svg>
             </div>
 
-            <h1 className="text-2xl font-bold text-white mb-2">Attendance Recorded!</h1>
+            <h1 className="text-2xl font-bold text-ink mb-2">Attendance Recorded!</h1>
 
             <div className={`inline-flex items-center gap-2 px-4 py-2 rounded-full text-sm font-semibold mb-4 ${
               result.status === 'PRESENT'
@@ -271,19 +271,19 @@ const LinkAttendancePage: React.FC = () => {
               {result.status}
             </div>
 
-            <p className="text-gray-400 text-sm mb-6">
+            <p className="text-ink-muted text-sm mb-6">
               Marked at {new Date(result.scannedAt).toLocaleTimeString()}
             </p>
 
             <button
               onClick={() => navigate('/dashboard')}
-              className="w-full bg-white/10 border border-white/20 text-white font-semibold py-3 px-4 rounded-xl hover:bg-white/15 transition-all duration-200"
+              className="w-full btn-secondary font-semibold py-3 px-4 rounded-xl hover:bg-white/15 transition-all duration-200"
             >
               Go to Dashboard
             </button>
           </div>
 
-          <p className="text-center text-xs text-gray-500 mt-6">
+          <p className="text-center text-xs text-ink-subtle mt-6">
             © 2025 SAMS · Developed by Denis Macharia
           </p>
         </div>
@@ -294,9 +294,9 @@ const LinkAttendancePage: React.FC = () => {
   // Error state
   if (pageState === 'error') {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 flex items-center justify-center p-6">
+      <div className="page-shell flex items-center justify-center p-6">
         <div className="max-w-sm w-full">
-          <div className="backdrop-blur-xl bg-white/5 border border-white/10 rounded-2xl p-8 text-center">
+          <div className="surface-card rounded-2xl p-8 text-center">
             {/* Red X icon */}
             <div className="inline-flex items-center justify-center w-20 h-20 rounded-full bg-red-500/20 border-2 border-red-500/50 mb-6">
               <svg className="w-10 h-10 text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
@@ -304,18 +304,18 @@ const LinkAttendancePage: React.FC = () => {
               </svg>
             </div>
 
-            <h1 className="text-2xl font-bold text-white mb-2">{errorMessage}</h1>
-            <p className="text-gray-400 text-sm mb-6">{errorDetail}</p>
+            <h1 className="text-2xl font-bold text-ink mb-2">{errorMessage}</h1>
+            <p className="text-ink-muted text-sm mb-6">{errorDetail}</p>
 
             <button
               onClick={() => navigate('/dashboard')}
-              className="w-full bg-white/10 border border-white/20 text-white font-semibold py-3 px-4 rounded-xl hover:bg-white/15 transition-all duration-200"
+              className="w-full btn-secondary font-semibold py-3 px-4 rounded-xl hover:bg-white/15 transition-all duration-200"
             >
               Go to Dashboard
             </button>
           </div>
 
-          <p className="text-center text-xs text-gray-500 mt-6">
+          <p className="text-center text-xs text-ink-subtle mt-6">
             © 2025 SAMS · Developed by Denis Macharia
           </p>
         </div>
@@ -325,9 +325,9 @@ const LinkAttendancePage: React.FC = () => {
 
   // Info state (session details + mark attendance button)
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 flex items-center justify-center p-6">
+    <div className="page-shell flex items-center justify-center p-6">
       <div className="max-w-sm w-full">
-        <div className="backdrop-blur-xl bg-white/5 border border-white/10 rounded-2xl p-8">
+        <div className="surface-card rounded-2xl p-8">
           {/* Header */}
           <div className="text-center mb-6">
             <div className="inline-flex items-center justify-center w-14 h-14 rounded-full bg-purple-500/20 border border-purple-500/30 mb-4">
@@ -335,30 +335,30 @@ const LinkAttendancePage: React.FC = () => {
                 <path strokeLinecap="round" strokeLinejoin="round" d="M13.19 8.688a4.5 4.5 0 011.242 7.244l-4.5 4.5a4.5 4.5 0 01-6.364-6.364l1.757-1.757m9.86-2.04a4.5 4.5 0 00-6.364-6.364L5.25 8.25" />
               </svg>
             </div>
-            <h1 className="text-xl font-bold text-white">Link Attendance</h1>
-            <p className="text-gray-400 text-sm mt-1">Confirm your presence</p>
+            <h1 className="text-xl font-bold text-ink">Link Attendance</h1>
+            <p className="text-ink-muted text-sm mt-1">Confirm your presence</p>
           </div>
 
           {/* Session details */}
           <div className="space-y-3 mb-6">
             <div className="flex items-center justify-between p-3 bg-white/5 border border-white/5 rounded-xl">
-              <span className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Subject</span>
-              <span className="text-sm font-medium text-white">{sessionInfo?.subject || '—'}</span>
+              <span className="text-xs font-semibold text-ink-muted uppercase tracking-wider">Subject</span>
+              <span className="text-sm font-medium text-ink">{sessionInfo?.subject || '—'}</span>
             </div>
 
             <div className="flex items-center justify-between p-3 bg-white/5 border border-white/5 rounded-xl">
-              <span className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Teacher</span>
-              <span className="text-sm font-medium text-white">{sessionInfo?.teacherName || '—'}</span>
+              <span className="text-xs font-semibold text-ink-muted uppercase tracking-wider">Teacher</span>
+              <span className="text-sm font-medium text-ink">{sessionInfo?.teacherName || '—'}</span>
             </div>
 
             <div className="flex items-center justify-between p-3 bg-white/5 border border-white/5 rounded-xl">
-              <span className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Class</span>
-              <span className="text-sm font-medium text-white">{sessionInfo?.className || '—'}</span>
+              <span className="text-xs font-semibold text-ink-muted uppercase tracking-wider">Class</span>
+              <span className="text-sm font-medium text-ink">{sessionInfo?.className || '—'}</span>
             </div>
 
             {/* Expiry countdown */}
             <div className="flex items-center justify-between p-3 bg-white/5 border border-white/5 rounded-xl">
-              <span className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Expires in</span>
+              <span className="text-xs font-semibold text-ink-muted uppercase tracking-wider">Expires in</span>
               <span className={`text-sm font-bold ${
                 countdown === 'Expired' ? 'text-red-400' : 'text-emerald-400'
               }`}>
@@ -403,7 +403,7 @@ const LinkAttendancePage: React.FC = () => {
           <button
             onClick={handleMarkAttendance}
             disabled={pageState === 'submitting' || pageState === 'gps-pending'}
-            className="w-full bg-gradient-to-r from-blue-600 to-purple-600 text-white font-semibold py-3.5 px-4 rounded-xl shadow-lg shadow-purple-500/25 hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200"
+            className="w-full btn-primary font-semibold py-3.5 px-4 rounded-xl shadow-lg shadow-purple-500/25 hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200"
           >
             {pageState === 'submitting' || pageState === 'gps-pending' ? (
               <span className="flex items-center justify-center gap-2">
@@ -420,7 +420,7 @@ const LinkAttendancePage: React.FC = () => {
         </div>
 
         {/* Footer */}
-        <p className="text-center text-xs text-gray-500 mt-6">
+        <p className="text-center text-xs text-ink-subtle mt-6">
           © 2025 SAMS · Developed by Denis Macharia
         </p>
       </div>

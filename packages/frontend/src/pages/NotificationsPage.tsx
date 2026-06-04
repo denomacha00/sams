@@ -496,41 +496,41 @@ const NotificationsPage: React.FC = () => {
     return (
       <div key={notif.id} onClick={() => !isSentFolder && !notif.read && markAsRead(notif.id)}
         className={`p-4 rounded-xl border transition-all ${isSentFolder ? '' : 'cursor-pointer'} backdrop-blur-sm ${
-          !isSentFolder && !notif.read ? 'bg-slate-900 border-indigo-500/30 hover:border-indigo-500/50' : 'bg-slate-900/60 border-slate-700/60'
+          !isSentFolder && !notif.read ? 'surface-card border-indigo-200 bg-indigo-50/40 hover:border-indigo-500/50' : 'surface-card border-line'
         }`}>
         <div className="flex items-start justify-between gap-3">
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2 flex-wrap">
               {!isSentFolder && !notif.read && <div className="w-2 h-2 rounded-full bg-indigo-400 flex-shrink-0" />}
-              <h3 className={`text-sm font-semibold ${!isSentFolder && !notif.read ? 'text-white' : 'text-gray-400'}`}>{notif.title}</h3>
+              <h3 className={`text-sm font-semibold ${!isSentFolder && !notif.read ? 'text-ink' : 'text-ink-muted'}`}>{notif.title}</h3>
               {notif.updatedAt && <span className="text-xs text-amber-400/70 italic">edited</span>}
               {notif.targetScopeLabel && (isSentFolder || isTeacher || isHOD) && (
-                <span className="text-xs px-2 py-0.5 rounded-full bg-indigo-500/15 text-indigo-300 border border-indigo-500/20">
+                <span className="text-xs px-2 py-0.5 rounded-full bg-indigo-500/15 text-brand border border-indigo-500/20">
                   {isSentFolder ? `To: ${notif.targetScopeLabel}` : notif.targetScopeLabel}
                 </span>
               )}
               {recipientCount != null && (
-                <span className="text-xs px-2 py-0.5 rounded-full bg-slate-800 text-gray-400 border border-slate-700">
+                <span className="text-xs px-2 py-0.5 rounded-full bg-slate-100 text-ink-muted border border-line">
                   {recipientCount} recipient{recipientCount !== 1 ? 's' : ''}
                 </span>
               )}
             </div>
-            <p className={`text-sm mt-1.5 ${!isSentFolder && !notif.read ? 'text-gray-300' : 'text-gray-500'}`}>{notif.message}</p>
+            <p className={`text-sm mt-1.5 ${!isSentFolder && !notif.read ? 'text-ink-muted' : 'text-ink-subtle'}`}>{notif.message}</p>
 
             <div className="flex items-center gap-2 mt-2 flex-wrap">
               <div className="flex items-center gap-1.5">
-                <div className="w-5 h-5 rounded-full bg-indigo-600 flex items-center justify-center text-[10px] font-bold text-white flex-shrink-0">
+                <div className="w-5 h-5 rounded-full bg-indigo-600 flex items-center justify-center text-[10px] font-bold text-ink flex-shrink-0">
                   {senderDisplay.charAt(0).toUpperCase()}
                 </div>
-                <span className="text-xs text-gray-400 font-medium">
+                <span className="text-xs text-ink-muted font-medium">
                   {isSentFolder ? 'You' : `From ${senderDisplay}`}
                 </span>
                 {roleDisplay && !isSentFolder && (
-                  <span className="text-xs px-1.5 py-0.5 rounded-full bg-white/10 text-gray-500 border border-white/5">{roleDisplay}</span>
+                  <span className="text-xs px-1.5 py-0.5 rounded-full bg-white/10 text-ink-subtle border border-white/5">{roleDisplay}</span>
                 )}
               </div>
               <span className="text-gray-600 text-xs">·</span>
-              <span className="text-xs text-gray-500">{formatDateTime(notif.createdAt)}</span>
+              <span className="text-xs text-ink-subtle">{formatDateTime(notif.createdAt)}</span>
               {notif.updatedAt && (
                 <><span className="text-gray-600 text-xs">·</span>
                 <span className="text-xs text-amber-400/60">edited {formatDateTime(notif.updatedAt)}</span></>
@@ -541,7 +541,7 @@ const NotificationsPage: React.FC = () => {
           <div className="flex items-center gap-1 flex-shrink-0">
             {canReply && (
               <button onClick={(e) => { e.stopPropagation(); setReplyingTo(notif); setReplyMessage(''); setReplyError(null); }}
-                className="px-2 py-1 text-xs rounded-lg bg-indigo-600/20 text-indigo-300 hover:bg-indigo-600/30 border border-indigo-500/30 transition-all">
+                className="px-2 py-1 text-xs rounded-lg bg-indigo-600/20 text-brand hover:bg-indigo-600/30 border border-indigo-500/30 transition-all">
                 Reply
               </button>
             )}
@@ -550,7 +550,7 @@ const NotificationsPage: React.FC = () => {
                 <div className="relative group">
                   <button onClick={(e) => { e.stopPropagation(); if (canModify) { setEditingNotification(notif); setEditMessage(notif.message); setEditError(null); } }}
                     disabled={!canModify}
-                    className={`p-1.5 rounded-lg transition-all ${canModify ? 'hover:bg-white/10 text-gray-400 hover:text-teal-400' : 'text-gray-600 cursor-not-allowed'}`}>
+                    className={`p-1.5 rounded-lg transition-all ${canModify ? 'hover:bg-white/10 text-ink-muted hover:text-teal-400' : 'text-gray-600 cursor-not-allowed'}`}>
                     <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
                     </svg>
@@ -564,7 +564,7 @@ const NotificationsPage: React.FC = () => {
                 <div className="relative group">
                   <button onClick={(e) => { e.stopPropagation(); if (canModify) { setDeletingNotification(notif); setDeleteError(null); } }}
                     disabled={!canModify}
-                    className={`p-1.5 rounded-lg transition-all ${canModify ? 'hover:bg-white/10 text-gray-400 hover:text-red-400' : 'text-gray-600 cursor-not-allowed'}`}>
+                    className={`p-1.5 rounded-lg transition-all ${canModify ? 'hover:bg-white/10 text-ink-muted hover:text-red-400' : 'text-gray-600 cursor-not-allowed'}`}>
                     <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
                     </svg>
@@ -589,7 +589,7 @@ const NotificationsPage: React.FC = () => {
         {/* Header */}
         <div className="flex items-center justify-between mb-8">
           <div>
-            <h1 className="text-2xl font-bold text-white flex items-center gap-3">
+            <h1 className="text-2xl font-bold text-ink flex items-center gap-3">
               Messages
               {unreadCount > 0 && folder === 'inbox' && (
                 <span className="inline-flex items-center justify-center px-2 py-0.5 rounded-full text-xs font-bold bg-indigo-600 text-white min-w-[1.5rem]">
@@ -597,7 +597,7 @@ const NotificationsPage: React.FC = () => {
                 </span>
               )}
             </h1>
-            <p className="text-gray-400 text-sm mt-1">
+            <p className="text-ink-muted text-sm mt-1">
               {isStudent
                 ? 'Read-only — replies are only available to class representatives'
                 : folder === 'inbox'
@@ -607,16 +607,16 @@ const NotificationsPage: React.FC = () => {
           </div>
           <div className="flex items-center gap-3">
             {canSend && (
-              <div className="flex rounded-xl border border-slate-700 overflow-hidden">
+              <div className="flex rounded-xl border border-line overflow-hidden">
                 <button
                   onClick={() => setFolder('inbox')}
-                  className={`px-3 py-2 text-sm transition-all ${folder === 'inbox' ? 'bg-indigo-600 text-white' : 'text-gray-400 hover:text-white hover:bg-slate-800'}`}
+                  className={`px-3 py-2 text-sm transition-all ${folder === 'inbox' ? 'bg-indigo-600 text-white' : 'text-ink-muted hover:text-ink hover:bg-slate-100'}`}
                 >
                   Inbox
                 </button>
                 <button
                   onClick={() => setFolder('sent')}
-                  className={`px-3 py-2 text-sm transition-all ${folder === 'sent' ? 'bg-indigo-600 text-white' : 'text-gray-400 hover:text-white hover:bg-slate-800'}`}
+                  className={`px-3 py-2 text-sm transition-all ${folder === 'sent' ? 'bg-indigo-600 text-white' : 'text-ink-muted hover:text-ink hover:bg-slate-100'}`}
                 >
                   Sent
                 </button>
@@ -625,7 +625,7 @@ const NotificationsPage: React.FC = () => {
             {folder === 'inbox' && unreadCount > 0 && (
               <button
                 onClick={markAllAsRead}
-                className="px-3 py-2 text-sm text-gray-400 hover:text-white border border-slate-700 rounded-xl hover:bg-slate-800 transition-all"
+                className="px-3 py-2 text-sm text-ink-muted hover:text-ink border border-line rounded-xl hover:bg-slate-100 transition-all"
               >
                 Mark all read
               </button>
@@ -642,7 +642,7 @@ const NotificationsPage: React.FC = () => {
         </div>
 
         {isStudent && (
-          <div className="mb-6 p-4 rounded-xl bg-slate-900/80 border border-slate-700 text-sm text-gray-400">
+          <div className="mb-6 p-4 rounded-xl surface-card border-line text-sm text-ink-muted">
             You can read messages from your teachers, HOD, and school admin here. Only class representatives can reply to their teachers.
           </div>
         )}
@@ -650,7 +650,7 @@ const NotificationsPage: React.FC = () => {
         {/* Send Form */}
         {showSendForm && canSend && (
           <div className="mb-8 surface-card p-6">
-            <h2 className="text-lg font-semibold text-white mb-4">Send Notification</h2>
+            <h2 className="text-lg font-semibold text-ink mb-4">Send Notification</h2>
             {sendSuccess && (
               <div className="mb-4 p-3 bg-emerald-500/20 border border-emerald-400/30 rounded-xl">
                 <p className="text-sm text-emerald-300 text-center">
@@ -671,7 +671,7 @@ const NotificationsPage: React.FC = () => {
             <form onSubmit={handleSend} className="space-y-4">
               {/* Scope */}
               <div>
-                <label className="block text-sm font-semibold text-gray-300 mb-1.5">Send to</label>
+                <label className="block text-sm font-semibold text-ink-muted mb-1.5">Send to</label>
                 <select value={scope} onChange={(e) => {
                   const next = e.target.value as Scope;
                   setScope(next);
@@ -683,7 +683,7 @@ const NotificationsPage: React.FC = () => {
                     setTargetId('');
                   }
                 }}
-                  className="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-3 text-white focus:outline-none focus:ring-2 focus:ring-indigo-500/40 transition-all">
+                  className="w-full input-field focus:outline-none focus:ring-2 focus:ring-indigo-500/40 transition-all">
                   {getScopeOptions().map((s) => (
                     <option key={s} value={s} className="bg-slate-800">
                       {s === 'school' ? 'Whole School' : s === 'department' ? 'Department' : 'Class'}
@@ -694,9 +694,9 @@ const NotificationsPage: React.FC = () => {
 
               {/* Target role filter */}
               <div>
-                <label className="block text-sm font-semibold text-gray-300 mb-1.5">Who receives it</label>
+                <label className="block text-sm font-semibold text-ink-muted mb-1.5">Who receives it</label>
                 <select value={targetRole} onChange={(e) => setTargetRole(e.target.value as TargetRole)}
-                  className="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-3 text-white focus:outline-none focus:ring-2 focus:ring-indigo-500/40 transition-all">
+                  className="w-full input-field focus:outline-none focus:ring-2 focus:ring-indigo-500/40 transition-all">
                   {getTargetRoleOptions().map((o) => (
                     <option key={o.value} value={o.value} className="bg-slate-800">{o.label}</option>
                   ))}
@@ -706,11 +706,11 @@ const NotificationsPage: React.FC = () => {
               {/* Department / Class picker */}
               {scope !== 'school' && (
                 <div>
-                  <label className="block text-sm font-semibold text-gray-300 mb-1.5">
+                  <label className="block text-sm font-semibold text-ink-muted mb-1.5">
                     {scope === 'department' ? 'Department' : 'Class *'}
                   </label>
                   {scope === 'department' && isHOD && (
-                    <p className="w-full bg-slate-900/80 border border-slate-700 rounded-xl px-4 py-3 text-gray-300">
+                    <p className="w-full surface-card border-line rounded-xl px-4 py-3 text-ink-muted">
                       {hodDepartmentName
                         ? `Your department: ${hodDepartmentName}`
                         : user?.departmentId
@@ -720,7 +720,7 @@ const NotificationsPage: React.FC = () => {
                   )}
                   {scope === 'department' && !isHOD && (
                     <select value={targetId} onChange={(e) => setTargetId(e.target.value)}
-                      className="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-3 text-white focus:outline-none focus:ring-2 focus:ring-indigo-500/40 transition-all">
+                      className="w-full input-field focus:outline-none focus:ring-2 focus:ring-indigo-500/40 transition-all">
                       <option value="" className="bg-slate-800">-- Select Department --</option>
                       {departments.map((d) => <option key={d.id} value={d.id} className="bg-slate-800">{d.name}</option>)}
                     </select>
@@ -729,14 +729,14 @@ const NotificationsPage: React.FC = () => {
                     <div className="space-y-3">
                       {user?.role === 'SCHOOL_ADMIN' && (
                         <div>
-                          <label className="block text-sm font-semibold text-gray-300 mb-1.5">Department *</label>
+                          <label className="block text-sm font-semibold text-ink-muted mb-1.5">Department *</label>
                           <select
                             value={selectedDepartmentId}
                             onChange={(e) => {
                               setSelectedDepartmentId(e.target.value);
                               setTargetId('');
                             }}
-                            className="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-3 text-white focus:outline-none focus:ring-2 focus:ring-indigo-500/40 transition-all"
+                            className="w-full input-field focus:outline-none focus:ring-2 focus:ring-indigo-500/40 transition-all"
                           >
                             <option value="" className="bg-slate-800">-- Select Department --</option>
                             {departments.map((d) => <option key={d.id} value={d.id} className="bg-slate-800">{d.name}</option>)}
@@ -745,7 +745,7 @@ const NotificationsPage: React.FC = () => {
                       )}
                       <select value={targetId} onChange={(e) => setTargetId(e.target.value)}
                         disabled={user?.role === 'SCHOOL_ADMIN' && !selectedDepartmentId}
-                        className="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-3 text-white focus:outline-none focus:ring-2 focus:ring-indigo-500/40 transition-all disabled:opacity-60 disabled:cursor-not-allowed">
+                        className="w-full input-field focus:outline-none focus:ring-2 focus:ring-indigo-500/40 transition-all disabled:opacity-60 disabled:cursor-not-allowed">
                         <option value="" className="bg-slate-800">-- Select Class --</option>
                         {classOptionsForScope().map((c) => <option key={c.id} value={c.id} className="bg-slate-800">{c.name}</option>)}
                       </select>
@@ -756,29 +756,29 @@ const NotificationsPage: React.FC = () => {
 
               {/* Title */}
               <div>
-                <label className="block text-sm font-semibold text-gray-300 mb-1.5">Title <span className="text-gray-500 font-normal">(optional)</span></label>
+                <label className="block text-sm font-semibold text-ink-muted mb-1.5">Title <span className="text-ink-subtle font-normal">(optional)</span></label>
                 <input type="text" value={title} onChange={(e) => setTitle(e.target.value)} maxLength={200}
                   placeholder="e.g. Exam Reminder"
-                  className="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/40 transition-all" />
+                  className="w-full input-field placeholder-ink-subtle focus:outline-none focus:ring-2 focus:ring-indigo-500/40 transition-all" />
               </div>
 
               {/* Message */}
               <div>
-                <label className="block text-sm font-semibold text-gray-300 mb-1.5">Message *</label>
+                <label className="block text-sm font-semibold text-ink-muted mb-1.5">Message *</label>
                 <textarea value={message} onChange={(e) => setMessage(e.target.value)} required rows={4}
-                  className="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/40 transition-all resize-none"
+                  className="w-full input-field placeholder-ink-subtle focus:outline-none focus:ring-2 focus:ring-indigo-500/40 transition-all resize-none"
                   placeholder="Type your message..." />
               </div>
 
               {/* Channels */}
               <div>
-                <label className="block text-sm font-semibold text-gray-300 mb-1.5">Send via</label>
+                <label className="block text-sm font-semibold text-ink-muted mb-1.5">Send via</label>
                 <div className="flex gap-4">
                   {(['inapp', 'sms'] as Channel[]).map((ch) => (
                     <label key={ch} className="flex items-center gap-2 cursor-pointer">
                       <input type="checkbox" checked={channels.includes(ch)} onChange={() => toggleChannel(ch)}
                         className="w-4 h-4 rounded border-slate-600 bg-slate-900 text-indigo-500 focus:ring-indigo-500/40" />
-                      <span className="text-sm text-gray-300">{ch === 'inapp' ? 'In-App' : 'SMS'}</span>
+                      <span className="text-sm text-ink-muted">{ch === 'inapp' ? 'In-App' : 'SMS'}</span>
                     </label>
                   ))}
                 </div>
@@ -811,7 +811,7 @@ const NotificationsPage: React.FC = () => {
             <svg className="w-16 h-16 text-gray-600 mx-auto mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
             </svg>
-            <p className="text-gray-400">{folder === 'inbox' ? 'No messages in your inbox' : 'No sent messages yet'}</p>
+            <p className="text-ink-muted">{folder === 'inbox' ? 'No messages in your inbox' : 'No sent messages yet'}</p>
           </div>
         ) : (
           <div className="space-y-3">
@@ -824,17 +824,17 @@ const NotificationsPage: React.FC = () => {
       {replyingTo && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setReplyingTo(null)} />
-          <div className="relative w-full max-w-lg bg-slate-800/95 backdrop-blur-xl border border-white/10 rounded-2xl p-6 shadow-2xl">
-            <h2 className="text-lg font-semibold text-white mb-1">Reply to {replyingTo.senderName}</h2>
-            <p className="text-xs text-gray-500 mb-4">Your reply goes only to this teacher.</p>
+          <div className="relative w-full max-w-lg bg-white border border-line rounded-2xl p-6 shadow-card-hover">
+            <h2 className="text-lg font-semibold text-ink mb-1">Reply to {replyingTo.senderName}</h2>
+            <p className="text-xs text-ink-subtle mb-4">Your reply goes only to this teacher.</p>
             {replyError && <div className="mb-4 p-3 bg-red-500/20 border border-red-400/30 rounded-xl"><p className="text-sm text-red-300">{replyError}</p></div>}
             <textarea value={replyMessage} onChange={(e) => setReplyMessage(e.target.value)} rows={4} maxLength={1000}
-              className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/40 transition-all resize-none"
+              className="w-full input-field placeholder-ink-subtle focus:outline-none focus:ring-2 focus:ring-indigo-500/40 transition-all resize-none"
               placeholder="Type your reply..." />
             <div className="flex gap-3 justify-end mt-4">
-              <button onClick={() => setReplyingTo(null)} className="px-4 py-2 text-sm font-medium text-gray-300 bg-white/5 border border-white/10 rounded-xl hover:bg-white/10 transition-all">Cancel</button>
+              <button onClick={() => setReplyingTo(null)} className="px-4 py-2 text-sm font-medium text-ink-muted bg-slate-50 border border-line rounded-xl hover:bg-white/10 transition-all">Cancel</button>
               <button onClick={handleReply} disabled={replyLoading || !replyMessage.trim()}
-                className="px-4 py-2 text-sm font-semibold text-white bg-indigo-600 rounded-xl hover:bg-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed transition-all">
+                className="px-4 py-2 text-sm font-semibold text-ink bg-indigo-600 rounded-xl hover:bg-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed transition-all">
                 {replyLoading ? 'Sending...' : 'Send Reply'}
               </button>
             </div>
@@ -846,19 +846,19 @@ const NotificationsPage: React.FC = () => {
       {editingNotification && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setEditingNotification(null)} />
-          <div className="relative w-full max-w-lg bg-slate-800/95 backdrop-blur-xl border border-white/10 rounded-2xl p-6 shadow-2xl">
-            <h2 className="text-lg font-semibold text-white mb-4">Edit Notification</h2>
+          <div className="relative w-full max-w-lg bg-white border border-line rounded-2xl p-6 shadow-card-hover">
+            <h2 className="text-lg font-semibold text-ink mb-4">Edit Notification</h2>
             {editError && <div className="mb-4 p-3 bg-red-500/20 border border-red-400/30 rounded-xl"><p className="text-sm text-red-300">{editError}</p></div>}
             <div className="mb-4">
-              <label className="block text-sm font-semibold text-gray-300 mb-1.5">Message</label>
+              <label className="block text-sm font-semibold text-ink-muted mb-1.5">Message</label>
               <textarea value={editMessage} onChange={(e) => setEditMessage(e.target.value)} rows={5} maxLength={1000}
-                className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-teal-500/40 transition-all resize-none" />
-              <p className="text-xs text-gray-500 mt-1 text-right">{editMessage.length}/1000</p>
+                className="w-full input-field placeholder-ink-subtle focus:outline-none focus:ring-2 focus:ring-teal-500/40 transition-all resize-none" />
+              <p className="text-xs text-ink-subtle mt-1 text-right">{editMessage.length}/1000</p>
             </div>
             <div className="flex gap-3 justify-end">
-              <button onClick={() => setEditingNotification(null)} className="px-4 py-2 text-sm font-medium text-gray-300 bg-white/5 border border-white/10 rounded-xl hover:bg-white/10 transition-all">Cancel</button>
+              <button onClick={() => setEditingNotification(null)} className="px-4 py-2 text-sm font-medium text-ink-muted bg-slate-50 border border-line rounded-xl hover:bg-white/10 transition-all">Cancel</button>
               <button onClick={handleEdit} disabled={editLoading || editMessage.trim().length < 1}
-                className="px-4 py-2 text-sm font-semibold text-white bg-gradient-to-r from-teal-500 to-cyan-600 rounded-xl hover:from-teal-400 hover:to-cyan-500 disabled:opacity-50 disabled:cursor-not-allowed transition-all">
+                className="px-4 py-2 text-sm font-semibold text-ink bg-gradient-to-r from-teal-500 to-cyan-600 rounded-xl hover:from-teal-400 hover:to-cyan-500 disabled:opacity-50 disabled:cursor-not-allowed transition-all">
                 {editLoading ? 'Saving...' : 'Save Changes'}
               </button>
             </div>
@@ -870,18 +870,18 @@ const NotificationsPage: React.FC = () => {
       {deletingNotification && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setDeletingNotification(null)} />
-          <div className="relative w-full max-w-md bg-slate-800/95 backdrop-blur-xl border border-white/10 rounded-2xl p-6 shadow-2xl">
-            <h2 className="text-lg font-semibold text-white mb-2">Delete Notification</h2>
-            <p className="text-sm text-gray-400 mb-6">
+          <div className="relative w-full max-w-md bg-white border border-line rounded-2xl p-6 shadow-card-hover">
+            <h2 className="text-lg font-semibold text-ink mb-2">Delete Notification</h2>
+            <p className="text-sm text-ink-muted mb-6">
               {deletingNotification.batchId
                 ? 'This will remove the message for all recipients. Cannot be undone.'
                 : 'This will remove this notification. Cannot be undone.'}
             </p>
             {deleteError && <div className="mb-4 p-3 bg-red-500/20 border border-red-400/30 rounded-xl"><p className="text-sm text-red-300">{deleteError}</p></div>}
             <div className="flex gap-3 justify-end">
-              <button onClick={() => setDeletingNotification(null)} className="px-4 py-2 text-sm font-medium text-gray-300 bg-white/5 border border-white/10 rounded-xl hover:bg-white/10 transition-all">Cancel</button>
+              <button onClick={() => setDeletingNotification(null)} className="px-4 py-2 text-sm font-medium text-ink-muted bg-slate-50 border border-line rounded-xl hover:bg-white/10 transition-all">Cancel</button>
               <button onClick={handleDelete} disabled={deleteLoading}
-                className="px-4 py-2 text-sm font-semibold text-white bg-gradient-to-r from-red-500 to-rose-600 rounded-xl hover:from-red-400 hover:to-rose-500 disabled:opacity-50 disabled:cursor-not-allowed transition-all">
+                className="px-4 py-2 text-sm font-semibold text-ink bg-gradient-to-r from-red-500 to-rose-600 rounded-xl hover:from-red-400 hover:to-rose-500 disabled:opacity-50 disabled:cursor-not-allowed transition-all">
                 {deleteLoading ? 'Deleting...' : 'Delete'}
               </button>
             </div>

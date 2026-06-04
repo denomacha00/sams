@@ -59,25 +59,25 @@ const ClassRosterPage: React.FC = () => {
 
   if (!canAccess) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 p-8 text-center text-gray-400">
+      <div className="page-shell p-8 text-center text-ink-muted">
         You do not have access to this page.
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900">
-      <header className="border-b border-white/10 backdrop-blur-sm bg-white/5">
+    <div className="page-shell">
+      <header className="inner-page-header">
         <div className="max-w-3xl mx-auto px-6 py-4 flex items-center gap-3">
-          <Link to="/dashboard" className="text-gray-400 hover:text-cyan-400 transition-colors">← Dashboard</Link>
-          <h1 className="text-lg font-bold text-white">
+          <Link to="/dashboard" className="text-ink-muted hover:text-cyan-400 transition-colors">← Dashboard</Link>
+          <h1 className="text-lg font-bold text-ink">
             {canAssign ? 'Class Representatives' : 'View Class Representatives'}
           </h1>
         </div>
       </header>
 
       <main className="max-w-3xl mx-auto px-6 py-8">
-        <p className="text-sm text-gray-400 mb-6">
+        <p className="text-sm text-ink-muted mb-6">
           {canAssign
             ? 'As class teacher, assign one student as class rep. They can reply to your messages in the Messages inbox.'
             : 'View-only list of class representatives. Only the class teacher can assign or remove a rep.'}
@@ -93,21 +93,21 @@ const ClassRosterPage: React.FC = () => {
           <div className="mb-4 p-3 rounded-xl bg-red-500/10 border border-red-500/20 text-red-300 text-sm">{error}</div>
         )}
 
-        <div className="backdrop-blur-xl bg-white/5 border border-white/10 rounded-2xl overflow-hidden">
+        <div className="surface-card rounded-2xl overflow-hidden">
           {loading ? (
-            <p className="p-8 text-center text-gray-400">Loading students...</p>
+            <p className="p-8 text-center text-ink-muted">Loading students...</p>
           ) : students.length === 0 ? (
-            <p className="p-8 text-center text-gray-400">No students found for your class scope.</p>
+            <p className="p-8 text-center text-ink-muted">No students found for your class scope.</p>
           ) : (
             <ul className="divide-y divide-white/5">
               {students.map((s) => (
                 <li key={s.id} className="flex items-center justify-between gap-4 px-6 py-4 hover:bg-white/5">
                   <div>
                     <p className="text-white font-medium">{s.fullName}</p>
-                    <p className="text-xs text-gray-400">
+                    <p className="text-xs text-ink-muted">
                       {s.admissionNumber || s.username || s.id.slice(0, 8)}
                       {s.isClassRep && (
-                        <span className="ml-2 inline-flex px-2 py-0.5 rounded-full bg-indigo-500/20 text-indigo-300 text-xs font-medium">
+                        <span className="ml-2 inline-flex px-2 py-0.5 rounded-full bg-indigo-500/20 text-brand text-xs font-medium">
                           Class Rep
                         </span>
                       )}
@@ -120,14 +120,14 @@ const ClassRosterPage: React.FC = () => {
                       onClick={() => toggleClassRep(s)}
                       className={`px-4 py-2 rounded-xl text-sm font-semibold transition-all disabled:opacity-50 ${
                         s.isClassRep
-                          ? 'bg-white/10 text-gray-300 hover:bg-white/15'
+                          ? 'bg-white/10 text-ink-muted hover:bg-white/15'
                           : 'bg-indigo-600 text-white hover:bg-indigo-500'
                       }`}
                     >
                       {updatingId === s.id ? 'Saving...' : s.isClassRep ? 'Remove rep' : 'Make class rep'}
                     </button>
                   ) : (
-                    <span className="text-xs text-gray-500">
+                    <span className="text-xs text-ink-subtle">
                       {s.isClassRep ? 'Class rep' : '—'}
                     </span>
                   )}

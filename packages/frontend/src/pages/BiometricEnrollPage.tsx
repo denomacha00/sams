@@ -129,16 +129,16 @@ const BiometricEnrollPage: React.FC = () => {
 
   if (featureGated) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 p-6">
+      <div className="page-shell p-6">
         <div className="max-w-lg mx-auto">
-          <div className="backdrop-blur-xl bg-white/5 border border-white/10 rounded-2xl p-8 text-center">
+          <div className="surface-card rounded-2xl p-8 text-center">
             <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-yellow-500/20 border border-yellow-500/30 mb-4">
               <svg className="w-8 h-8 text-yellow-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
               </svg>
             </div>
-            <h2 className="text-xl font-bold text-white mb-2">Feature Unavailable</h2>
-            <p className="text-gray-400">
+            <h2 className="text-xl font-bold text-ink mb-2">Feature Unavailable</h2>
+            <p className="text-ink-muted">
               Biometric enrollment requires a Professional or Enterprise plan. Please upgrade your subscription to access this feature.
             </p>
           </div>
@@ -152,8 +152,8 @@ const BiometricEnrollPage: React.FC = () => {
       <div className="max-w-lg mx-auto">
         {/* Header */}
         <div className="mb-8">
-          <h1 className="text-2xl font-bold text-white">Biometric Enrollment</h1>
-          <p className="text-gray-400 text-sm mt-1">Register your face for biometric attendance</p>
+          <h1 className="text-2xl font-bold text-ink">Biometric Enrollment</h1>
+          <p className="text-ink-muted text-sm mt-1">Register your face for biometric attendance</p>
         </div>
 
         {success && (
@@ -163,14 +163,14 @@ const BiometricEnrollPage: React.FC = () => {
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
               </svg>
             </div>
-            <p className="text-emerald-200 font-medium text-lg">Enrollment Complete</p>
-            <p className="text-gray-400 text-sm mt-1">Your face has been registered for biometric attendance.</p>
+            <p className="text-emerald-800 font-medium text-lg">Enrollment Complete</p>
+            <p className="text-ink-muted text-sm mt-1">Your face has been registered for biometric attendance.</p>
           </div>
         )}
 
         {error && (
-          <div className="mb-4 p-3 bg-red-500/20 border border-red-400/30 rounded-xl backdrop-blur-sm">
-            <p className="text-sm text-red-200 text-center">{error}</p>
+          <div className="mb-4 p-3 alert-error">
+            <p className="text-sm text-red-800 text-center">{error}</p>
           </div>
         )}
 
@@ -182,20 +182,20 @@ const BiometricEnrollPage: React.FC = () => {
                   <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
                   <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
                 </svg>
-                <p className="text-gray-400">Loading face detection models...</p>
+                <p className="text-ink-muted">Loading face detection models...</p>
               </div>
             </div>
           )}
 
           {modelsLoaded && !cameraActive && !success && (
             <div className="text-center py-8">
-              <div className="inline-flex items-center justify-center w-20 h-20 rounded-2xl bg-slate-900 border border-slate-700 mb-4">
-                <svg className="w-10 h-10 text-indigo-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <div className="inline-flex items-center justify-center w-20 h-20 rounded-2xl input-field mb-4">
+                <svg className="w-10 h-10 text-brand" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
                 </svg>
               </div>
-              <p className="text-gray-300 mb-6">
+              <p className="text-ink-muted mb-6">
                 We'll capture your face for biometric attendance. Make sure you're in a well-lit area.
               </p>
               <button
@@ -226,7 +226,7 @@ const BiometricEnrollPage: React.FC = () => {
               {step === 'blink' && !blinkDetected && (
                 <div className="text-center">
                   <p className="text-white font-medium mb-2">Liveness Check</p>
-                  <p className="text-gray-400 text-sm mb-4">Please blink your eyes, then press the button below.</p>
+                  <p className="text-ink-muted text-sm mb-4">Please blink your eyes, then press the button below.</p>
                   <button
                     onClick={handleBlinkCheck}
                     className="bg-yellow-500/20 border border-yellow-500/30 text-yellow-300 font-semibold py-2.5 px-6 rounded-xl hover:bg-yellow-500/30 transition-all duration-200"
@@ -239,7 +239,7 @@ const BiometricEnrollPage: React.FC = () => {
               {step === 'capture' && (
                 <div className="text-center">
                   <p className="text-emerald-300 font-medium mb-2">✓ Liveness confirmed</p>
-                  <p className="text-gray-400 text-sm mb-4">Look directly at the camera and press capture.</p>
+                  <p className="text-ink-muted text-sm mb-4">Look directly at the camera and press capture.</p>
                   <button
                     onClick={captureAndEnroll}
                     disabled={loading}
@@ -286,7 +286,7 @@ const BiometricEnrollPage: React.FC = () => {
         </div>
 
         {/* Footer */}
-        <p className="text-center text-xs text-gray-500 mt-8">
+        <p className="text-center text-xs text-ink-subtle mt-8">
           © 2025 SAMS · Developed by Denis Macharia
         </p>
       </div>
