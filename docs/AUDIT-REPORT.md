@@ -12,7 +12,7 @@
 |----------|--------|
 | **Ready for real-world school testing?** | **Yes, with caveats** |
 | **Ready for mobile app (API-only client)?** | **Yes** — REST `/api/v1/*` + Socket.IO notifications/attendance are stable contracts |
-| **Automated gate (this run)** | Backend **303/303** tests pass · Backend `tsc --noEmit` pass · Builds: shared, backend, frontend, super-admin **pass** · Frontend **12** tests pass |
+| **Automated gate (this run)** | Backend **304** tests pass · Backend `tsc --noEmit` pass · Builds: shared, backend, frontend, super-admin **pass** · Frontend **14** tests pass |
 
 **Caveats before calling production “done”:**
 
@@ -376,18 +376,37 @@ Then on VPS: `bash scripts/deploy-production.sh`
 9. **Attendance session** (teacher) — start session + QR unchanged.
 10. **Profile avatar** — upload error messaging from `e4a158e1` still shows 413 hint.
 
-### Denis — push when ready (two local commits)
+### Release ready (final pass — 2026-06-04)
+
+| Item | Value |
+|------|--------|
+| **Pushed to `origin/main`** | `e4a158e1` HOD timetable scope + profile errors · `974465e5` UI palette + dashboard dedup · release chore commit (smoke script, docs, blue-purple token stitch) |
+| **Prior remote HEAD** | `7e96be84` |
+| **Backend tests** | 40 files, **304** passed |
+| **Frontend tests** | 4 files, **14** passed |
+| **Lint** | `@sams/backend`, `@sams/frontend`, `@sams/super-admin` — pass |
+| **Builds** | shared, backend, frontend, super-admin — pass |
+
+**VPS deploy one-liner:**
 
 ```bash
-cd /var/www/sams   # or local clone
-git log -2 --oneline
-# expect: UI polish commit, then e4a158e1 HOD timetable + profile
-
-git push origin main
-bash scripts/deploy-production.sh
+cd /var/www/sams && bash scripts/deploy-production.sh
 ```
 
-**Not pushed from agent session** — Denis pushes after review.
+**15-minute smoke checklist (Denis):**
+
+1. `bash scripts/post-deploy-verify.sh` — all critical OK.
+2. **SCHOOL_ADMIN** — login → `/dashboard`; open `/admin` → lands on dashboard; Users/Timetable back links → dashboard.
+3. **HOD** — timetable list shows department only; send dept notification; profile avatar upload error still readable on 413.
+4. **TEACHER** — start session → QR refresh; manual attendance; class-scoped notify.
+5. **STUDENT** — scan QR; timetable; AI self-scope question; notifications inbox.
+6. **SUPER_ADMIN** — `super.smart-managment.com`; schools list; no duplicate quick links on dashboard.
+7. **Floating AI** — open on dashboard; thread restore; indigo accents (no neon cyan buttons).
+8. **Health** — `curl -sS https://api.smart-managment.com/health` or local `:3001/health` — DB + redis OK.
+9. Optional: `VERIFY_AI_QUERY=1 bash scripts/post-deploy-verify.sh` if quota allows.
+10. Optional: `VERIFY_LOGIN_*` + `bash scripts/smoke-production.sh` on VPS.
+
+**Files in final release chore commit:** `scripts/smoke-test-local.sh`, `packages/frontend/src/index.css`, `DOCUMENTATION.md`, `docs/SAMS-OPS-RUNBOOK.md`, `docs/SAMS-DEVELOPER-OPS-BOOK-DENIS.md`, `docs/AUDIT-REPORT.md`.
 
 ---
 

@@ -348,6 +348,14 @@ VERIFY_AI_QUERY=1 bash scripts/post-deploy-verify.sh
 bash scripts/smoke-production.sh
 ```
 
+**Local dev (API on `PORT=3001`):**
+
+```bash
+npm run dev -w @sams/backend   # separate terminal
+bash scripts/smoke-test-local.sh
+VERIFY_LOGIN_IDENTIFIER=teacher@school.com VERIFY_LOGIN_PASSWORD='***' bash scripts/smoke-test-local.sh
+```
+
 ### 3.4 Partial deploy (UI only)
 
 ```bash

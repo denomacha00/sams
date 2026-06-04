@@ -151,6 +151,12 @@ sams/
 - Cannot send school-wide or department broadcasts; cannot edit others' messages
 - Assigned by **School Admin** (User Management) or **Teacher/HOD** (Class Roster page)
 
+### School app navigation (HOD / School Admin)
+
+- **`/dashboard`** is the single command center with role-grouped quick actions.
+- **`/admin`** redirects to `/dashboard` (no duplicate admin home).
+- Admin tools stay on **`/admin/users`**, **`/admin/timetable`**, **`/admin/departments`**, **`/admin/links`**, **`/admin/knowledge`**; back links return to `/dashboard`.
+
 ---
 
 ## 5. Features
@@ -564,6 +570,7 @@ Ensure the same shell user that runs `pm2` uses Node 20 (`which node` → `/usr/
 |--------|---------|
 | `scripts/deploy-production.sh` | Pull main, `npm ci`, build all packages, migrate, PM2 reload |
 | `scripts/post-deploy-verify.sh` | Dist artifacts, PM2, `/health` (incl. AI/SMS block), optional AI/login smoke |
+| `scripts/smoke-test-local.sh` | Local dev curl smoke (`/health`, auth + timetable when creds set) |
 | `scripts/smoke-production.sh` | Lightweight curl smoke on VPS |
 | `scripts/smoke-role-checks.md` | Curl examples + manual checks by role |
 | `scripts/go-live.sh` | Backup secrets, pull main, build, migrate, readiness gate, restart, verify |

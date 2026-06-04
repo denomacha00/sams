@@ -78,13 +78,21 @@
     background-color: rgb(79 70 229 / 0.18) !important;
   }
 
-  .from-teal-500, .from-cyan-500, .from-purple-500, .from-pink-500, .from-orange-500, .from-amber-500 {
+  .from-teal-500, .from-cyan-500, .from-purple-500, .from-pink-500, .from-orange-500, .from-amber-500,
+  .from-blue-500, .from-blue-600, .from-purple-600, .from-indigo-500, .from-indigo-600, .from-emerald-600 {
     --tw-gradient-from: rgb(79 70 229 / var(--tw-gradient-from-opacity, 1)) !important;
     --tw-gradient-to: rgb(79 70 229 / 0) !important;
     --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-to) !important;
   }
 
-  .to-teal-500, .to-cyan-500, .to-purple-500, .to-pink-500, .to-orange-500, .to-amber-500 {
+  .to-teal-500, .to-cyan-500, .to-purple-500, .to-pink-500, .to-orange-500, .to-amber-500,
+  .to-blue-500, .to-blue-600, .to-purple-600, .to-indigo-500, .to-indigo-600, .to-teal-600, .to-emerald-500 {
+    --tw-gradient-to: rgb(71 85 105 / var(--tw-gradient-to-opacity, 1)) !important;
+  }
+
+  .hover\:from-teal-400:hover, .hover\:to-cyan-400:hover, .hover\:to-cyan-500:hover,
+  .hover\:from-blue-600:hover, .hover\:to-purple-600:hover {
+    --tw-gradient-from: rgb(99 102 241 / var(--tw-gradient-from-opacity, 1)) !important;
     --tw-gradient-to: rgb(71 85 105 / var(--tw-gradient-to-opacity, 1)) !important;
   }
 

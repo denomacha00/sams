@@ -418,6 +418,8 @@ bash scripts/deploy-production.sh
 
 Deploy: backs up env → `git reset --hard origin/main` → rebuilds all packages → prisma migrate → PM2 start → nginx reload → post-deploy verify.
 
+**Local dev smoke (before push):** with backend running, `bash scripts/smoke-test-local.sh` (optional `VERIFY_LOGIN_*` for `/users/me` + timetable). Full VPS gate: `bash scripts/post-deploy-verify.sh`.
+
 **If deploy fails at restart:**
 
 ```bash
