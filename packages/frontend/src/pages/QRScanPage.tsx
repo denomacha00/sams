@@ -41,18 +41,47 @@ function isSecureCameraContext(): boolean {
   return hostname === 'localhost' || hostname === '127.0.0.1';
 }
 
-function waitForVideoReady(video: HTMLVideoElement, timeoutMs = 8000): Promise<void> {
-  if (video.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA) {
-    return video.play();
+function waitForVideoElement(
+  ref: React.RefObject<HTMLVideoElement>,
+  timeoutMs = 3000,
+): Promise<HTMLVideoElement> {
+  return new Promise((resolve, reject) => {
+    const started = Date.now();
+    const tick = () => {
+      if (ref.current) {
+        resolve(ref.current);
+        return;
+      }
+      if (Date.now() - started >= timeoutMs) {
+        reject(new Error('Camera preview not mounted'));
+        return;
+      }
+      requestAnimationFrame(tick);
+    };
+    tick();
+  });
+}
+
+function waitForVideoReady(video: HTMLVideoElement, timeoutMs = 10000): Promise<void> {
+  const play = async () => {
+    video.muted = true;
+    video.setAttribute('playsinline', 'true');
+    await video.play();
+  };
+
+  if (video.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA && video.videoWidth > 0) {
+    return play();
   }
+
   return new Promise((resolve, reject) => {
     const timer = window.setTimeout(() => {
       cleanup();
       reject(new Error('Camera preview timed out'));
     }, timeoutMs);
     const onReady = () => {
+      if (video.videoWidth <= 0) return;
       cleanup();
-      void video.play().then(resolve).catch(reject);
+      void play().then(resolve).catch(reject);
     };
     const onError = () => {
       cleanup();
@@ -61,10 +90,12 @@ function waitForVideoReady(video: HTMLVideoElement, timeoutMs = 8000): Promise<v
     const cleanup = () => {
       window.clearTimeout(timer);
       video.removeEventListener('loadedmetadata', onReady);
+      video.removeEventListener('loadeddata', onReady);
       video.removeEventListener('canplay', onReady);
       video.removeEventListener('error', onError);
     };
     video.addEventListener('loadedmetadata', onReady);
+    video.addEventListener('loadeddata', onReady);
     video.addEventListener('canplay', onReady);
     video.addEventListener('error', onError);
   });
@@ -84,6 +115,7 @@ const QRScanPage: React.FC = () => {
   const [initializing, setInitializing] = useState(true);
   const [gpsStatus, setGpsStatus] = useState<'idle' | 'acquiring' | 'success' | 'failed'>('idle');
   const streamRef = useRef<MediaStream | null>(null);
+  const startingRef = useRef(false);
 
   const stopCamera = useCallback(() => {
     scanningRef.current = false;
@@ -176,18 +208,22 @@ const QRScanPage: React.FC = () => {
   }, []);
 
   const startCamera = useCallback(async () => {
+    if (startingRef.current) return;
+    startingRef.current = true;
     setError(null);
     setInitializing(true);
 
     if (!isSecureCameraContext()) {
       setError('Camera requires HTTPS. Open SAMS using https:// on your school URL (not http://).');
       setInitializing(false);
+      startingRef.current = false;
       return;
     }
 
     if (!navigator.mediaDevices?.getUserMedia) {
       setError('Camera is not supported in this browser. Try Chrome on Android or Safari on iPhone.');
       setInitializing(false);
+      startingRef.current = false;
       return;
     }
 
@@ -195,26 +231,26 @@ const QRScanPage: React.FC = () => {
     if (!hasJsQR) {
       setError('QR scanner failed to load. Check internet connection and refresh the page.');
       setInitializing(false);
-      return;
-    }
-
-    const video = videoRef.current;
-    if (!video) {
-      setError('Camera preview not ready. Tap Start Scanner to try again.');
-      setInitializing(false);
+      startingRef.current = false;
       return;
     }
 
     try {
+      const video = await waitForVideoElement(videoRef);
+      stopCamera();
       const stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: { ideal: 'environment' } },
+        video: {
+          facingMode: { ideal: 'environment' },
+          width: { ideal: 1280 },
+          height: { ideal: 720 },
+        },
         audio: false,
       });
       streamRef.current = stream;
       video.srcObject = stream;
+      setScanning(true);
       await waitForVideoReady(video);
       scanningRef.current = true;
-      setScanning(true);
       scanFrame();
     } catch (err: unknown) {
       const name = err instanceof DOMException ? err.name : '';
@@ -227,10 +263,12 @@ const QRScanPage: React.FC = () => {
       }
       streamRef.current?.getTracks().forEach((t) => t.stop());
       streamRef.current = null;
+      setScanning(false);
     } finally {
       setInitializing(false);
+      startingRef.current = false;
     }
-  }, [scanFrame]);
+  }, [scanFrame, stopCamera]);
 
   useEffect(() => {
     let active = true;
@@ -311,7 +349,7 @@ const QRScanPage: React.FC = () => {
             </button>
           </div>
 
-          {initializing && !scanning && !success && (
+          {initializing && !success && (
             <div className="text-center py-10">
               <div className="inline-block w-8 h-8 border-2 border-indigo-400 border-t-transparent rounded-full animate-spin mb-3" />
               <p className="text-ink-muted text-sm">Opening camera...</p>

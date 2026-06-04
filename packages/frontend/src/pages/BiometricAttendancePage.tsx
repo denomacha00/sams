@@ -1,10 +1,11 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useCallback, useState, useRef, useEffect } from 'react';
 import apiClient from '../services/apiClient';
 import { FACE_API_MODELS_URI } from '../constants/faceApi';
 import { getTemplatesForClass } from '../services/offlineStore';
 import { saveAttendanceRecord } from '../services/offlineStore';
 import { useAuthStore } from '../store/authStore';
 import { AttendanceStatus } from '@sams/shared';
+import { getApiErrorMessage } from '../lib/apiError';
 
 interface MatchResult {
   studentId: string;
@@ -12,16 +13,70 @@ interface MatchResult {
   confidence: number;
 }
 
+interface FaceApiLike {
+  nets: {
+    tinyFaceDetector: { loadFromUri: (uri: string) => Promise<void> };
+    faceLandmark68Net: { loadFromUri: (uri: string) => Promise<void> };
+    faceRecognitionNet: { loadFromUri: (uri: string) => Promise<void> };
+  };
+  TinyFaceDetectorOptions: new () => unknown;
+  detectSingleFace: (
+    input: HTMLVideoElement,
+    options: unknown,
+  ) => {
+    withFaceLandmarks: () => {
+      withFaceDescriptor: () => Promise<{ descriptor: Float32Array } | null>;
+    };
+  };
+}
+
+function getFaceApi(): FaceApiLike | null {
+  return (window as Window & { faceapi?: FaceApiLike }).faceapi ?? null;
+}
+
+function isSecureCameraContext(): boolean {
+  const { protocol, hostname } = window.location;
+  return protocol === 'https:' || hostname === 'localhost' || hostname === '127.0.0.1';
+}
+
+function waitForVideoElement(
+  ref: React.RefObject<HTMLVideoElement>,
+  timeoutMs = 3000,
+): Promise<HTMLVideoElement> {
+  return new Promise((resolve, reject) => {
+    const started = Date.now();
+    const tick = () => {
+      if (ref.current) {
+        resolve(ref.current);
+        return;
+      }
+      if (Date.now() - started >= timeoutMs) {
+        reject(new Error('Camera preview not mounted'));
+        return;
+      }
+      requestAnimationFrame(tick);
+    };
+    tick();
+  });
+}
+
+async function waitForVideoReady(video: HTMLVideoElement): Promise<void> {
+  video.muted = true;
+  video.setAttribute('playsinline', 'true');
+  await video.play();
+}
+
 const BiometricAttendancePage: React.FC = () => {
   const user = useAuthStore((s) => s.user);
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const [cameraActive, setCameraActive] = useState(false);
+  const [cameraStarting, setCameraStarting] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [matchResult, setMatchResult] = useState<MatchResult | null>(null);
   const [submitted, setSubmitted] = useState(false);
-  const [templates, setTemplates] = useState<any[]>([]);
+  const [templates, setTemplates] = useState<unknown[]>([]);
   const [modelsLoaded, setModelsLoaded] = useState(false);
   const [sessionId, setSessionId] = useState('');
   const [classId, setClassId] = useState<string | null>(null);
@@ -43,8 +98,7 @@ const BiometricAttendancePage: React.FC = () => {
   useEffect(() => {
     const loadModels = async () => {
       try {
-        // @ts-ignore - face-api loaded via script tag or dynamic import
-        const faceapi = (window as any).faceapi;
+        const faceapi = getFaceApi();
         if (!faceapi) {
           setError('Face detection library not loaded. Please refresh the page.');
           return;
@@ -104,32 +158,62 @@ const BiometricAttendancePage: React.FC = () => {
     void loadTemplates();
   }, [classId, user?.classId]);
 
-  const startCamera = async () => {
+  const startCamera = useCallback(async () => {
+    if (cameraStarting) return;
     setError(null);
     setMatchResult(null);
     setSubmitted(false);
+
+    if (!isSecureCameraContext()) {
+      setError('Camera requires HTTPS. Open SAMS using https:// on your school URL (not http://).');
+      return;
+    }
+
+    if (!navigator.mediaDevices?.getUserMedia) {
+      setError('Camera is not supported in this browser. Try Chrome on Android or Safari on iPhone.');
+      return;
+    }
+
+    setCameraStarting(true);
+    setCameraActive(true);
     try {
+      const video = await waitForVideoElement(videoRef);
       const stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: 'environment', width: 640, height: 480 },
+        video: {
+          facingMode: { ideal: 'environment' },
+          width: { ideal: 1280 },
+          height: { ideal: 720 },
+        },
+        audio: false,
       });
       streamRef.current = stream;
-      if (videoRef.current) {
-        videoRef.current.srcObject = stream;
-        await videoRef.current.play();
-        setCameraActive(true);
+      video.srcObject = stream;
+      await waitForVideoReady(video);
+    } catch (err: unknown) {
+      const name = err instanceof DOMException ? err.name : '';
+      if (name === 'NotAllowedError' || name === 'PermissionDeniedError') {
+        setError('Camera access denied. Allow camera permission in browser settings, then refresh.');
+      } else if (name === 'NotFoundError' || name === 'DevicesNotFoundError') {
+        setError('No camera found on this device.');
+      } else {
+        setError('Could not start camera. Tap Open camera to try again.');
       }
-    } catch {
-      setError('Camera access denied. Please allow camera permissions.');
+      streamRef.current?.getTracks().forEach((t) => t.stop());
+      streamRef.current = null;
+      setCameraActive(false);
+    } finally {
+      setCameraStarting(false);
     }
-  };
+  }, [cameraStarting]);
 
-  const stopCamera = () => {
+  const stopCamera = useCallback(() => {
     if (streamRef.current) {
       streamRef.current.getTracks().forEach((t) => t.stop());
       streamRef.current = null;
     }
     setCameraActive(false);
-  };
+    setCameraStarting(false);
+  }, []);
 
   const detectAndMatch = async () => {
     if (!videoRef.current) return;
@@ -137,8 +221,7 @@ const BiometricAttendancePage: React.FC = () => {
     setError(null);
 
     try {
-      // @ts-ignore
-      const faceapi = (window as any).faceapi;
+      const faceapi = getFaceApi();
       if (!faceapi) throw new Error('Face API not available');
 
       const detection = await faceapi
@@ -201,12 +284,8 @@ const BiometricAttendancePage: React.FC = () => {
         setError('Saved offline. Will sync when connected.');
         stopCamera();
       }
-    } catch (err: any) {
-      const apiMsg =
-        err.response?.data?.message ||
-        err.response?.data?.error ||
-        err.response?.data?.code;
-      setError(apiMsg || 'Biometric verification failed.');
+    } catch (err: unknown) {
+      setError(getApiErrorMessage(err, 'Biometric verification failed.'));
     } finally {
       setLoading(false);
     }
@@ -214,7 +293,7 @@ const BiometricAttendancePage: React.FC = () => {
 
   useEffect(() => {
     return () => stopCamera();
-  }, []);
+  }, [stopCamera]);
 
   if (featureGated) {
     return (
@@ -281,10 +360,10 @@ const BiometricAttendancePage: React.FC = () => {
               </p>
               <button
                 onClick={startCamera}
-                disabled={!sessionId}
+                disabled={!sessionId || cameraStarting}
                 className="btn-primary py-3 px-8 hover:scale-[1.02] active:scale-[0.98] transition-all duration-200 disabled:opacity-50"
               >
-                Open camera
+                {cameraStarting ? 'Opening camera...' : 'Open camera'}
               </button>
             </div>
           )}
@@ -347,7 +426,7 @@ const BiometricAttendancePage: React.FC = () => {
                 onClick={() => {
                   setSubmitted(false);
                   setMatchResult(null);
-                  startCamera();
+                  void startCamera();
                 }}
                 className="mt-6 btn-primary py-3 px-8 hover:scale-[1.02] active:scale-[0.98] transition-all duration-200"
               >

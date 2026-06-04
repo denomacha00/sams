@@ -13,6 +13,21 @@ export default defineConfig({
       '@sams/shared': path.resolve(__dirname, '../shared/src/types/index.ts'),
     },
   },
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks(id) {
+          if (!id.includes('node_modules')) return undefined;
+          if (id.includes('react') || id.includes('react-router-dom')) return 'react-vendor';
+          if (id.includes('axios') || id.includes('socket.io-client') || id.includes('zustand')) {
+            return 'app-vendor';
+          }
+          if (id.includes('qrcode') || id.includes('idb')) return 'attendance-vendor';
+          return 'vendor';
+        },
+      },
+    },
+  },
   server: {
     port: 3000,
     proxy: {
