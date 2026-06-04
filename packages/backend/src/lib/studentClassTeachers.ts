@@ -113,7 +113,7 @@ export function formatStudentHodAnswer(ctx: StudentClassContext): string {
   if (ctx.hod) {
     return `👤 **Your Head of Department** (${dept})\n\n**${ctx.hod.fullName}** is the HOD for your class department.${formatHodContact(ctx.hod)}\n\nYou may see messages from them on your **Notifications** page when they send department announcements.`;
   }
-  return `Your class **${ctx.className}** is in the **${dept}** department, but no Head of Department is assigned in SAMS yet. Ask your class teacher or school office.`;
+  return `No HOD is assigned to your department (**${dept}**) in SAMS yet. Ask your school admin to assign one.`;
 }
 
 export function formatStudentTeachersAnswer(ctx: StudentClassContext): string {

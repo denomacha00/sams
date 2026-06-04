@@ -35,10 +35,27 @@ describe('studentContextQuery', () => {
       'who is my head of department',
       'head of my department',
       'my head of department',
+      'who is the hod',
+      'who is HOD of this dep',
+      'who is hod of this department',
+      'this dept hod',
     ];
     for (const message of cases) {
       expect(isStudentContextQuery(message), message).toBe(true);
       expect(detectStudentContextAction(message), message).toBe('list_my_hod');
+    }
+  });
+
+  it('detects school admin phrasing including adim typo', () => {
+    const cases = [
+      'who is admin of this school',
+      'who is adim of this school',
+      'school admin',
+      'my school admin',
+      'who is the school administrator',
+    ];
+    for (const message of cases) {
+      expect(detectStudentContextAction(message), message).toBe('list_school_admin');
     }
   });
 
@@ -53,9 +70,30 @@ describe('studentContextQuery', () => {
     expect(detectStudentContextAction('my class rep')).toBe('who_is_class_rep');
   });
 
-  it('returns null for non-students', async () => {
+  it('returns null for non-students on student-only actions', async () => {
     const teacher = { ...studentUser, role: UserRole.TEACHER };
     await expect(queryStudentContext(teacher as never, 'my hod')).resolves.toBeNull();
+  });
+
+  it('allows teachers to query school admin', async () => {
+    const handler = vi.fn().mockResolvedValue({
+      answer: '🏫 **School administrator**\n\n• **Admin One**',
+      data: { admins: [{ fullName: 'Admin One' }] },
+    });
+    vi.mocked(findAction).mockReturnValue({
+      action: 'list_school_admin',
+      handler,
+      patterns: [],
+      description: '',
+      destructive: false,
+      extractParams: () => ({}),
+      descriptionTemplate: () => '',
+    });
+
+    const teacher = { ...studentUser, role: UserRole.TEACHER, classId: undefined };
+    const result = await queryStudentContext(teacher as never, 'who is admin of this school');
+    expect(result?.intent).toBe('list_school_admin');
+    expect(handler).toHaveBeenCalled();
   });
 
   it('queryStudentContext invokes list_my_hod handler', async () => {

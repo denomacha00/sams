@@ -121,6 +121,17 @@ describe('AIService anti-hallucination routing', () => {
     expect(r.engine).toBe('local');
   });
 
+  it('blocks LLM for who-is school admin phrasing when context returns null', async () => {
+    localQuery.mockResolvedValue({ answer: 'help', intent: 'unknown' });
+    queryStudentContext.mockResolvedValue(null);
+
+    const service = new AIService();
+    const r = await service.query(studentUser as never, 'who is adim of this school');
+
+    expect(openaiQueryWithHistory).not.toHaveBeenCalled();
+    expect(r.intent).toBe('data_not_found');
+  });
+
   it('uses student context handler for my hod without LLM', async () => {
     localQuery.mockResolvedValue({ answer: 'help', intent: 'unknown' });
     queryStudentContext.mockResolvedValue({

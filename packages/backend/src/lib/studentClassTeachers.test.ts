@@ -49,8 +49,9 @@ describe('studentClassTeachers formatting', () => {
   it('formatStudentHodAnswer when no HOD assigned', () => {
     const noHod: StudentClassContext = { ...sampleCtx, hod: null };
     const answer = formatStudentHodAnswer(noHod);
-    expect(answer).toContain('Form 2B');
-    expect(answer).toContain('no Head of Department');
+    expect(answer).toContain('Sciences');
+    expect(answer).toMatch(/No HOD is assigned to your department/i);
+    expect(answer).toMatch(/school admin to assign one/i);
   });
 
   it('handles empty teacher list', () => {

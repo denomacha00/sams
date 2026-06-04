@@ -1,4 +1,6 @@
 import type { ActionDefinition, ActionHandler } from '../roleActionRegistry';
+import { listSchoolAdminHandler } from '../../../lib/schoolAdminLookup';
+import { SCHOOL_ADMIN_QUERY_PATTERNS } from '../studentContextQuery';
 import { createRegistrationLinkActionDef } from './registrationLinkAction';
 
 // ─── Handlers ─────────────────────────────────────────────────────────────────
@@ -272,5 +274,14 @@ export const teacherActions: ActionDefinition[] = [
     descriptionTemplate: (params) =>
       `Send in-app message to your class: "${String(params.message).slice(0, 80)}${String(params.message).length > 80 ? '…' : ''}"`,
     handler: sendClassMessageHandler,
+  },
+  {
+    action: 'list_school_admin',
+    description: 'Name the school administrator(s) for your school',
+    destructive: false,
+    patterns: SCHOOL_ADMIN_QUERY_PATTERNS,
+    extractParams: () => ({}),
+    descriptionTemplate: () => 'Tell the user who the school administrator is for their school.',
+    handler: listSchoolAdminHandler,
   },
 ];

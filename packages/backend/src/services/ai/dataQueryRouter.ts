@@ -6,7 +6,11 @@ import {
   type DetectedIntent,
 } from './localEngine';
 import { isTimetableManageQuery, isTimetableViewQuery } from './timetableQuery';
-import { isStudentContextQuery, queryStudentContext } from './studentContextQuery';
+import {
+  isSchoolPersonnelQuery,
+  isStudentContextQuery,
+  queryStudentContext,
+} from './studentContextQuery';
 
 /** Broad SAMS data keywords — used only when intent is still unknown. */
 const SAMS_DATA_KEYWORD_RE =
@@ -37,11 +41,15 @@ export function isSamsDataQuery(question: string): boolean {
 
   if (isTimetableViewQuery(q) || isTimetableManageQuery(q)) return true;
   if (isStudentContextQuery(q)) return true;
+  if (isSchoolPersonnelQuery(q)) return true;
 
   const intent = detectDataIntent(q);
   if (intent !== 'unknown' && !INFORMATIONAL_INTENTS.includes(intent)) return true;
 
-  if (NON_DATA_QUESTION_RE.test(q)) return false;
+  if (NON_DATA_QUESTION_RE.test(q)) {
+    if (isSchoolPersonnelQuery(q)) return true;
+    return false;
+  }
 
   return SAMS_DATA_KEYWORD_RE.test(q);
 }

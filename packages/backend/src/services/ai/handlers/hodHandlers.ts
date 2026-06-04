@@ -1,6 +1,8 @@
 import type { ActionDefinition, ActionHandler } from '../roleActionRegistry';
+import { listSchoolAdminHandler } from '../../../lib/schoolAdminLookup';
 import { fetchDepartmentStats, formatDepartmentStatsAnswer } from '../departmentStatsQuery';
 import { extractMessageBody, parseNotificationTargetRole } from '../notificationActionParams';
+import { SCHOOL_ADMIN_QUERY_PATTERNS } from '../studentContextQuery';
 import { createRegistrationLinkActionDef } from './registrationLinkAction';
 
 // ─── Handlers ─────────────────────────────────────────────────────────────────
@@ -267,5 +269,14 @@ export const hodActions: ActionDefinition[] = [
     descriptionTemplate: (params) =>
       `Send in-app notification to your department${params.targetRole ? ` (${params.targetRole}s only)` : ''}: "${String(params.message).slice(0, 80)}${String(params.message).length > 80 ? '…' : ''}"`,
     handler: sendDepartmentNotificationHandler,
+  },
+  {
+    action: 'list_school_admin',
+    description: 'Name the school administrator(s) for your school',
+    destructive: false,
+    patterns: SCHOOL_ADMIN_QUERY_PATTERNS,
+    extractParams: () => ({}),
+    descriptionTemplate: () => 'Tell the user who the school administrator is for their school.',
+    handler: listSchoolAdminHandler,
   },
 ];

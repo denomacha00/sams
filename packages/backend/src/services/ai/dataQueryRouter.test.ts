@@ -5,7 +5,7 @@ import {
   isSamsDataQuery,
   SAMS_DATA_NOT_FOUND_MESSAGE,
 } from './dataQueryRouter';
-import { isStudentContextQuery } from './studentContextQuery';
+import { isSchoolPersonnelQuery, isStudentContextQuery } from './studentContextQuery';
 
 describe('dataQueryRouter', () => {
   describe('extended attendance / absent phrasing', () => {
@@ -32,6 +32,9 @@ describe('dataQueryRouter', () => {
       expect(isStudentContextQuery('my hod')).toBe(true);
       expect(isSamsDataQuery('my hod')).toBe(true);
       expect(isSamsDataQuery('my teachers')).toBe(true);
+      expect(isSamsDataQuery('who is HOD of this dep')).toBe(true);
+      expect(isSamsDataQuery('who is admin of this school')).toBe(true);
+      expect(isSamsDataQuery('who is adim of this school')).toBe(true);
       expect(isSamsDataQuery('who is absent today')).toBe(true);
       expect(isSamsDataQuery('risk score for my class')).toBe(true);
     });
@@ -39,6 +42,13 @@ describe('dataQueryRouter', () => {
     it('does not flag general knowledge', () => {
       expect(isSamsDataQuery('what is photosynthesis')).toBe(false);
       expect(isSamsDataQuery('explain gravity')).toBe(false);
+    });
+
+    it('flags who-is HOD and school admin as SAMS data (not general knowledge)', () => {
+      expect(isSchoolPersonnelQuery('who is HOD of this dep')).toBe(true);
+      expect(isSamsDataQuery('who is HOD of this dep')).toBe(true);
+      expect(isSamsDataQuery('who is adim of this school')).toBe(true);
+      expect(isSamsDataQuery('who is photosynthesis')).toBe(false);
     });
 
     it('does not flag SAMS product overview', () => {

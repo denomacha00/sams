@@ -1,6 +1,8 @@
 import type { ActionDefinition, ActionHandler } from '../roleActionRegistry';
 import { TIMETABLE_VIEW_PATTERNS } from '../timetableQuery';
+import { listSchoolAdminHandler } from '../../../lib/schoolAdminLookup';
 import {
+  SCHOOL_ADMIN_QUERY_PATTERNS,
   STUDENT_CLASS_QUERY_PATTERNS,
   STUDENT_CLASS_REP_QUERY_PATTERNS,
   STUDENT_DEPARTMENT_QUERY_PATTERNS,
@@ -319,6 +321,15 @@ export const studentActions: ActionDefinition[] = [
     descriptionTemplate: () =>
       'Tell the student who their Head of Department is for their class department.',
     handler: listMyHodHandler,
+  },
+  {
+    action: 'list_school_admin',
+    description: 'Name the school administrator(s) for your school',
+    destructive: false,
+    patterns: SCHOOL_ADMIN_QUERY_PATTERNS,
+    extractParams: () => ({}),
+    descriptionTemplate: () => 'Tell the user who the school administrator is for their school.',
+    handler: listSchoolAdminHandler,
   },
   {
     action: 'list_my_teachers',
