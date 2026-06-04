@@ -33,7 +33,7 @@ const AuthGuard: React.FC<AuthGuardProps> = ({ allowedRoles }) => {
   if (user?.role === UserRole.SUPER_ADMIN) {
     redirectToSuperAdminPortal();
     return (
-      <div className="min-h-screen flex items-center justify-center bg-slate-900 text-ink-muted p-6 text-center">
+      <div className="min-h-screen flex items-center justify-center bg-canvas text-ink-muted p-6 text-center">
         <p>Redirecting to the Super Admin portal…</p>
       </div>
     );

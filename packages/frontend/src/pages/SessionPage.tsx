@@ -348,7 +348,7 @@ const SessionPage: React.FC = () => {
               )}
             </div>
 
-            <div className="flex items-center justify-between p-3 bg-slate-50 border border-line rounded-xl">
+            <div className="flex items-center justify-between p-3 bg-surface-muted border border-line rounded-xl">
               <div>
                 <p className="text-sm font-medium text-ink">Require GPS (QR scan)</p>
                 <p className="text-xs text-ink-muted mt-0.5">
@@ -435,7 +435,7 @@ const SessionPage: React.FC = () => {
           <button
             onClick={endSession}
             disabled={loading}
-            className="btn-secondary text-red-700 border-red-200 hover:bg-red-50 py-2 px-4 disabled:opacity-50 transition-all duration-200"
+            className="btn-secondary text-red-300 border-red-500/40 hover:bg-red-500/15 py-2 px-4 disabled:opacity-50 transition-all duration-200"
           >
             End Session
           </button>
@@ -505,7 +505,7 @@ const SessionPage: React.FC = () => {
               </div>
 
               {/* GPS toggle */}
-              <div className="flex items-center justify-between p-3 bg-slate-50 border border-line rounded-xl">
+              <div className="flex items-center justify-between p-3 bg-surface-muted border border-line rounded-xl">
                 <div>
                   <p className="text-sm font-medium text-ink">Require GPS</p>
                   <p className="text-xs text-ink-muted mt-0.5">
@@ -593,7 +593,7 @@ const SessionPage: React.FC = () => {
               </div>
 
               {/* Link URL display */}
-              <div className="flex items-center gap-2 bg-slate-50 border border-line rounded-xl p-3">
+              <div className="flex items-center gap-2 bg-surface-muted border border-line rounded-xl p-3">
                 <div className="flex-1 truncate text-sm text-ink-muted font-mono">
                   {linkUrl}
                 </div>

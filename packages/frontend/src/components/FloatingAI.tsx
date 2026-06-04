@@ -312,10 +312,10 @@ const FloatingAI: React.FC = () => {
           isOpen
             ? 'opacity-100 translate-y-0 pointer-events-auto'
             : 'opacity-0 translate-y-4 pointer-events-none'
-        } w-[calc(100vw-2rem)] sm:w-[400px] h-[520px] max-h-[70vh] flex flex-col rounded-2xl border border-line bg-white shadow-card-hover`}
+        } w-[calc(100vw-2rem)] sm:w-[400px] h-[520px] max-h-[70vh] flex flex-col rounded-2xl border border-line bg-surface shadow-card-hover`}
       >
         {/* Header */}
-        <div className="flex items-center justify-between px-4 py-3 border-b border-line bg-slate-50 rounded-t-2xl">
+        <div className="flex items-center justify-between px-4 py-3 border-b border-line bg-surface-muted rounded-t-2xl">
           <div className="flex items-center gap-2">
             <div className="w-8 h-8 rounded-lg bg-brand flex items-center justify-center">
               <AISparkleIcon className="w-4 h-4 text-white" />
@@ -327,7 +327,7 @@ const FloatingAI: React.FC = () => {
           </div>
           <button
             onClick={() => setIsOpen(false)}
-            className="p-1.5 rounded-lg hover:bg-slate-100 text-ink-muted hover:text-ink transition-colors"
+            className="p-1.5 rounded-lg hover:bg-surface-elevated text-ink-muted hover:text-ink transition-colors"
             aria-label="Close chat"
           >
             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
@@ -353,10 +353,10 @@ const FloatingAI: React.FC = () => {
                   msg.role === 'user'
                     ? 'bg-brand text-white'
                     : msg.isError
-                      ? 'bg-red-50 border border-red-200 text-red-800'
+                      ? 'bg-red-950/50 border border-red-500/40 text-red-200'
                       : msg.isSystemNotice
-                        ? 'bg-amber-50 border border-amber-200 text-amber-900'
-                        : 'bg-slate-50 border border-line text-ink'
+                        ? 'bg-amber-950/50 border border-amber-500/40 text-amber-200'
+                        : 'bg-surface-muted border border-line text-ink'
                 }`}
               >
                 {/* User uploaded images */}
@@ -396,7 +396,7 @@ const FloatingAI: React.FC = () => {
               <div className="w-6 h-6 rounded-full bg-brand flex items-center justify-center mr-2 mt-1 flex-shrink-0">
                 <AISparkleIcon className="w-3 h-3 text-white" />
               </div>
-              <div className="bg-slate-50 border border-line rounded-xl px-3 py-2">
+              <div className="bg-surface-muted border border-line rounded-xl px-3 py-2">
                 <div className="flex space-x-1">
                   <div className="w-1.5 h-1.5 bg-indigo-400 rounded-full animate-bounce" />
                   <div className="w-1.5 h-1.5 bg-indigo-400 rounded-full animate-bounce" style={{ animationDelay: '0.1s' }} />
@@ -410,7 +410,7 @@ const FloatingAI: React.FC = () => {
         </div>
 
         {/* Input */}
-        <div className="border-t border-line p-3 bg-white rounded-b-2xl">
+        <div className="border-t border-line p-3 bg-surface rounded-b-2xl">
           {/* Image previews */}
           {imagePreviews.length > 0 && (
             <div className="flex gap-2 mb-2 flex-wrap">
@@ -435,7 +435,7 @@ const FloatingAI: React.FC = () => {
 
             {/* Image upload button */}
             <button type="button" onClick={() => fileInputRef.current?.click()}
-              className="p-2 bg-white text-ink-muted border border-line rounded-lg hover:bg-slate-50 hover:text-ink transition-all"
+              className="p-2 bg-surface-muted text-ink-muted border border-line rounded-lg hover:bg-surface-elevated hover:text-ink transition-all"
               title="Upload images (max 4)" aria-label="Upload images">
               <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
                 <path strokeLinecap="round" strokeLinejoin="round" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
@@ -450,7 +450,7 @@ const FloatingAI: React.FC = () => {
               onChange={(e) => setInput(e.target.value)}
               placeholder={selectedImages.length > 0 ? 'Ask about these images...' : 'Ask SAMS AI...'}
               disabled={loading}
-              className="flex-1 bg-white border border-line rounded-lg px-3 py-2 text-sm text-ink placeholder-ink-subtle focus:outline-none focus:ring-1 focus:ring-brand/30 disabled:opacity-50 transition-all"
+              className="flex-1 bg-surface-muted border border-line rounded-lg px-3 py-2 text-sm text-ink placeholder-ink-subtle focus:outline-none focus:ring-1 focus:ring-brand/30 disabled:opacity-50 transition-all"
             />
 
             {/* Voice button */}
@@ -460,7 +460,7 @@ const FloatingAI: React.FC = () => {
               className={`relative p-2 rounded-lg transition-all duration-200 ${
                 isListening
                   ? 'bg-red-500/20 text-red-300 border border-red-500/30'
-                  : 'bg-white text-ink-muted border border-line hover:bg-slate-50 hover:text-ink'
+                  : 'bg-surface-muted text-ink-muted border border-line hover:bg-surface-elevated hover:text-ink'
               }`}
               title={isListening ? 'Stop listening' : 'Voice input'}
               aria-label={isListening ? 'Stop listening' : 'Voice input'}
@@ -493,7 +493,7 @@ const FloatingAI: React.FC = () => {
         onClick={() => setIsOpen((prev) => !prev)}
         className={`fixed bottom-6 right-6 z-[9999] w-14 h-14 rounded-full shadow-lg shadow-black/40 flex items-center justify-center transition-all duration-300 hover:scale-110 active:scale-95 ${
           isOpen
-            ? 'bg-white border border-line text-ink'
+            ? 'bg-surface border border-line text-ink'
             : 'bg-brand'
         }`}
         aria-label={isOpen ? 'Close SAMS AI Assistant' : 'Open SAMS AI Assistant'}

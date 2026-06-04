@@ -294,7 +294,7 @@ const RegistrationLinksPage: React.FC = () => {
                               <span className="text-xs text-teal-400">{link.className}</span>
                             )}
                             {!link.departmentName && !link.className && (
-                              <span className="text-xs text-gray-600">—</span>
+                              <span className="text-xs text-ink-muted">—</span>
                             )}
                           </div>
                         </td>
@@ -339,7 +339,7 @@ const RegistrationLinksPage: React.FC = () => {
                   <select
                     value={targetRole}
                     onChange={(e) => { setTargetRole(e.target.value); setSelectedDept(''); setSelectedClass(''); }}
-                    className="w-full px-4 py-2.5 rounded-xl bg-slate-50 border border-line text-white focus:outline-none focus:border-cyan-500/50 transition-colors"
+                    className="w-full px-4 py-2.5 rounded-xl bg-surface-muted border border-line text-white focus:outline-none focus:border-cyan-500/50 transition-colors"
                   >
                     {isHOD ? (
                       <>
@@ -370,7 +370,7 @@ const RegistrationLinksPage: React.FC = () => {
                       <p className="text-xs text-teal-400 mb-3">Generating a student registration link for your department</p>
                       <label className="block text-sm text-ink-muted mb-1">Class *</label>
                       {loadingClasses ? (
-                        <div className="w-full px-4 py-2.5 rounded-xl bg-slate-50 border border-line text-ink-muted text-sm">
+                        <div className="w-full px-4 py-2.5 rounded-xl bg-surface-muted border border-line text-ink-muted text-sm">
                           Loading classes...
                         </div>
                       ) : teacherClasses.length === 0 ? (
@@ -381,7 +381,7 @@ const RegistrationLinksPage: React.FC = () => {
                         <select
                           value={selectedClass}
                           onChange={(e) => setSelectedClass(e.target.value)}
-                          className="w-full px-4 py-2.5 rounded-xl bg-slate-50 border border-line text-white focus:outline-none focus:border-cyan-500/50 transition-colors"
+                          className="w-full px-4 py-2.5 rounded-xl bg-surface-muted border border-line text-white focus:outline-none focus:border-cyan-500/50 transition-colors"
                         >
                           <option value="" className="bg-slate-800">-- Select Class --</option>
                           {teacherClasses.map(c => (
@@ -399,18 +399,18 @@ const RegistrationLinksPage: React.FC = () => {
                 <div>
                   <label className="block text-sm text-ink-muted mb-1">Class *</label>
                   {loadingClasses ? (
-                    <div className="w-full px-4 py-2.5 rounded-xl bg-slate-50 border border-line text-ink-muted text-sm">
+                    <div className="w-full px-4 py-2.5 rounded-xl bg-surface-muted border border-line text-ink-muted text-sm">
                       Loading classes...
                     </div>
                   ) : hodClasses.length === 0 ? (
-                    <div className="w-full px-4 py-2.5 rounded-xl bg-slate-50 border border-line text-ink-subtle text-sm cursor-not-allowed">
+                    <div className="w-full px-4 py-2.5 rounded-xl bg-surface-muted border border-line text-ink-subtle text-sm cursor-not-allowed">
                       No classes available in your department
                     </div>
                   ) : (
                     <select
                       value={selectedClass}
                       onChange={(e) => setSelectedClass(e.target.value)}
-                      className="w-full px-4 py-2.5 rounded-xl bg-slate-50 border border-line text-white focus:outline-none focus:border-cyan-500/50 transition-colors"
+                      className="w-full px-4 py-2.5 rounded-xl bg-surface-muted border border-line text-white focus:outline-none focus:border-cyan-500/50 transition-colors"
                     >
                       <option value="" className="bg-slate-800">-- Select Class --</option>
                       {hodClasses.map(c => (
@@ -436,7 +436,7 @@ const RegistrationLinksPage: React.FC = () => {
                       <select
                         value={selectedDept}
                         onChange={(e) => { setSelectedDept(e.target.value); setSelectedClass(''); }}
-                        className="w-full px-4 py-2.5 rounded-xl bg-slate-50 border border-line text-white focus:outline-none focus:border-cyan-500/50 transition-colors"
+                        className="w-full px-4 py-2.5 rounded-xl bg-surface-muted border border-line text-white focus:outline-none focus:border-cyan-500/50 transition-colors"
                       >
                         <option value="" className="bg-slate-800">-- Select Department --</option>
                         {departments.map(d => (
@@ -464,7 +464,7 @@ const RegistrationLinksPage: React.FC = () => {
                   <select
                     value={selectedClass}
                     onChange={(e) => setSelectedClass(e.target.value)}
-                    className="w-full px-4 py-2.5 rounded-xl bg-slate-50 border border-line text-white focus:outline-none focus:border-cyan-500/50 transition-colors"
+                    className="w-full px-4 py-2.5 rounded-xl bg-surface-muted border border-line text-white focus:outline-none focus:border-cyan-500/50 transition-colors"
                   >
                     <option value="" className="bg-slate-800">-- Select Class --</option>
                     {classesForSelectedDept.map(c => (
@@ -487,7 +487,7 @@ const RegistrationLinksPage: React.FC = () => {
                     max={365}
                     value={expiryDays}
                     onChange={(e) => setExpiryDays(parseInt(e.target.value) || 30)}
-                    className="w-full px-4 py-2.5 rounded-xl bg-slate-50 border border-line text-white focus:outline-none focus:border-cyan-500/50 transition-colors"
+                    className="w-full px-4 py-2.5 rounded-xl bg-surface-muted border border-line text-white focus:outline-none focus:border-cyan-500/50 transition-colors"
                   />
                 </div>
                 <div>
@@ -497,7 +497,7 @@ const RegistrationLinksPage: React.FC = () => {
                     min={1}
                     value={maxUses}
                     onChange={(e) => setMaxUses(parseInt(e.target.value) || 50)}
-                    className="w-full px-4 py-2.5 rounded-xl bg-slate-50 border border-line text-white focus:outline-none focus:border-cyan-500/50 transition-colors"
+                    className="w-full px-4 py-2.5 rounded-xl bg-surface-muted border border-line text-white focus:outline-none focus:border-cyan-500/50 transition-colors"
                   />
                 </div>
               </div>
@@ -515,7 +515,7 @@ const RegistrationLinksPage: React.FC = () => {
                 <button
                   type="button"
                   onClick={() => setShowModal(false)}
-                  className="flex-1 px-4 py-2.5 rounded-xl bg-slate-50 border border-line text-ink-muted hover:bg-white/10 transition-colors"
+                  className="flex-1 px-4 py-2.5 rounded-xl bg-surface-muted border border-line text-ink-muted hover:bg-white/10 transition-colors"
                 >
                   Cancel
                 </button>

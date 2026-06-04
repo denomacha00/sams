@@ -427,17 +427,17 @@ const SettingsPage: React.FC = () => {
                                 <span className="text-xs text-amber-400/70 italic">edited</span>
                               )}
                               {expired && (
-                                <span className="text-xs text-gray-600 italic">window expired</span>
+                                <span className="text-xs text-ink-muted italic">window expired</span>
                               )}
                             </div>
                             <p className="text-sm text-ink-muted line-clamp-2">{notif.message}</p>
-                            <p className="text-xs text-gray-600 mt-1">{new Date(notif.createdAt).toLocaleString()}</p>
+                            <p className="text-xs text-ink-muted mt-1">{new Date(notif.createdAt).toLocaleString()}</p>
                           </div>
                           <div className="flex items-center gap-1 flex-shrink-0">
                             <button
                               onClick={() => { if (canModify) { setEditingNotif(notif); setEditMsg(notif.message); setEditErr(null); } }}
                               disabled={!canModify}
-                              className={`p-1.5 rounded-lg transition-all ${canModify ? 'hover:bg-white/10 text-ink-muted hover:text-teal-400' : 'text-gray-700 cursor-not-allowed'}`}
+                              className={`p-1.5 rounded-lg transition-all ${canModify ? 'hover:bg-white/10 text-ink-muted hover:text-brand' : 'text-ink-muted cursor-not-allowed'}`}
                               aria-label="Edit notification"
                             >
                               <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -447,7 +447,7 @@ const SettingsPage: React.FC = () => {
                             <button
                               onClick={() => { if (canModify) { setDeletingNotif(notif); setDeleteErr(null); } }}
                               disabled={!canModify}
-                              className={`p-1.5 rounded-lg transition-all ${canModify ? 'hover:bg-white/10 text-ink-muted hover:text-red-400' : 'text-gray-700 cursor-not-allowed'}`}
+                              className={`p-1.5 rounded-lg transition-all ${canModify ? 'hover:bg-white/10 text-ink-muted hover:text-red-400' : 'text-ink-muted cursor-not-allowed'}`}
                               aria-label="Delete notification"
                             >
                               <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -483,12 +483,12 @@ const SettingsPage: React.FC = () => {
                   onChange={(e) => setEditMsg(e.target.value)}
                   rows={5}
                   maxLength={1000}
-                  className="w-full input-field placeholder-ink-subtle focus:outline-none focus:ring-2 focus:ring-teal-500/40 focus:border-teal-400 transition-all resize-none"
+                  className="w-full input-field placeholder-ink-subtle focus:outline-none focus:ring-2 focus:ring-brand/40/40 focus:border-brand transition-all resize-none"
                 />
                 <p className="text-xs text-ink-subtle mt-1 text-right">{editMsg.length}/1000</p>
               </div>
               <div className="flex gap-3 justify-end">
-                <button onClick={() => setEditingNotif(null)} className="px-4 py-2 text-sm font-medium text-ink-muted bg-slate-50 border border-line rounded-xl hover:bg-white/10 transition-all">
+                <button onClick={() => setEditingNotif(null)} className="px-4 py-2 text-sm font-medium text-ink-muted bg-surface-muted border border-line rounded-xl hover:bg-white/10 transition-all">
                   Cancel
                 </button>
                 <button
@@ -518,7 +518,7 @@ const SettingsPage: React.FC = () => {
                 </div>
               )}
               <div className="flex gap-3 justify-end">
-                <button onClick={() => setDeletingNotif(null)} className="px-4 py-2 text-sm font-medium text-ink-muted bg-slate-50 border border-line rounded-xl hover:bg-white/10 transition-all">
+                <button onClick={() => setDeletingNotif(null)} className="px-4 py-2 text-sm font-medium text-ink-muted bg-surface-muted border border-line rounded-xl hover:bg-white/10 transition-all">
                   Cancel
                 </button>
                 <button

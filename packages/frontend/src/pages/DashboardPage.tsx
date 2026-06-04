@@ -116,8 +116,8 @@ const SectionHeader: React.FC<{ title: string; icon: string; gradient: string }>
 // ─── Skeleton Loader ─────────────────────────────────────────────────────────
 
 const SkeletonCard: React.FC = () => (
-  <div className="animate-pulse rounded-2xl border border-line bg-slate-100 p-6 min-h-[140px]">
-    <div className="w-12 h-12 rounded-xl bg-slate-200 mb-4" />
+  <div className="animate-pulse rounded-2xl border border-line bg-surface-muted p-6 min-h-[140px]">
+    <div className="w-12 h-12 rounded-xl bg-surface-elevated mb-4" />
     <div className="h-4 w-20 bg-slate-200 rounded mb-2" />
     <div className="h-8 w-16 bg-slate-200 rounded" />
   </div>
@@ -150,23 +150,25 @@ const AnimatedStatCard: React.FC<{ stat: StatCard; index: number }> = ({ stat, i
 // ─── Quick Action Button ─────────────────────────────────────────────────────
 
 const QuickActionButton: React.FC<{ action: QuickAction; index: number }> = ({ action, index }) => {
+  const isPrimary = action.variant === 'attendance' || action.variant === 'alert';
   const topBarClass =
     action.variant === 'attendance'
-      ? 'from-emerald-500 to-teal-500'
+      ? 'from-orange-500 to-orange-600'
       : action.variant === 'alert'
         ? 'from-amber-500 to-orange-500'
-        : action.gradient;
+        : 'from-indigo-500 to-blue-600';
   const iconBgClass =
     action.variant === 'attendance'
-      ? 'from-emerald-600 to-teal-600'
+      ? 'from-orange-500 to-orange-600'
       : action.variant === 'alert'
-        ? 'from-amber-500 to-orange-500'
-        : action.gradient;
+        ? 'from-amber-500 to-orange-600'
+        : 'from-indigo-600 to-blue-600';
+  const cardClass = isPrimary ? 'quick-action-card--primary' : 'quick-action-card--secondary';
 
   return (
   <Link
     to={action.to}
-    className="group quick-action-card"
+    className={`group quick-action-card ${cardClass}`}
     style={{ animationDelay: `${(index + 4) * 80}ms`, animation: 'fadeInUp 0.5s ease-out forwards', opacity: 0 }}
   >
     <div className={`absolute top-0 left-0 right-0 h-px bg-gradient-to-r ${topBarClass} opacity-40 group-hover:opacity-70 transition-opacity duration-300`} />
@@ -176,7 +178,7 @@ const QuickActionButton: React.FC<{ action: QuickAction; index: number }> = ({ a
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d={action.icon} />
         </svg>
       </div>
-      <h3 className="text-sm font-medium text-ink group-hover:text-brand transition-colors">{action.label}</h3>
+      <h3 className={`text-sm font-medium text-ink transition-colors ${isPrimary ? 'group-hover:text-orange-400' : 'group-hover:text-brand'}`}>{action.label}</h3>
     </div>
     <div className="absolute bottom-4 right-4 opacity-0 group-hover:opacity-100 transition-all duration-300 translate-x-2 group-hover:translate-x-0">
       <svg className="w-4 h-4 text-ink-subtle" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -282,7 +284,7 @@ const AtAGlancePanel: React.FC<{ role?: UserRole; userId?: string }> = ({ role, 
       {loading ? (
         <div className="space-y-3">
           {[1, 2, 3].map((i) => (
-            <div key={i} className="animate-pulse h-12 rounded-xl bg-slate-100" />
+            <div key={i} className="animate-pulse h-12 rounded-xl bg-surface-elevated" />
           ))}
         </div>
       ) : role === UserRole.STUDENT ? (
@@ -446,7 +448,7 @@ const ActivityFeed: React.FC = () => {
       {loading ? (
         <div className="space-y-3">
           {[1, 2, 3].map((i) => (
-            <div key={i} className="animate-pulse flex items-center gap-3 p-3 rounded-xl bg-slate-100">
+            <div key={i} className="animate-pulse flex items-center gap-3 p-3 rounded-xl bg-surface-elevated">
               <div className="w-2.5 h-2.5 rounded-full bg-slate-200 shrink-0" />
               <div className="flex-1 h-3 bg-slate-200 rounded" />
               <div className="w-16 h-3 bg-slate-200 rounded" />
@@ -455,7 +457,7 @@ const ActivityFeed: React.FC = () => {
         </div>
       ) : items.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-8">
-          <div className="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center mb-3">
+          <div className="w-10 h-10 rounded-full bg-surface-elevated flex items-center justify-center mb-3">
             <svg className="w-5 h-5 text-ink-subtle" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d={ICONS.bell} />
             </svg>
@@ -465,7 +467,7 @@ const ActivityFeed: React.FC = () => {
       ) : (
         <div className="space-y-3">
           {items.map((item) => (
-            <div key={item.id} className="flex items-center gap-3 p-3 rounded-xl bg-slate-50 hover:bg-slate-100 border border-line transition-all duration-300">
+            <div key={item.id} className="flex items-center gap-3 p-3 rounded-xl bg-surface-muted hover:bg-surface-elevated border border-line transition-all duration-300">
               <div className={`w-2.5 h-2.5 rounded-full ${typeColor[item.type] ?? 'bg-gray-500'} shadow-sm shrink-0`} />
               <p className="text-sm text-ink-muted flex-1 truncate">{item.message}</p>
               <span className="text-xs text-ink-subtle font-medium shrink-0">{formatRelative(item.createdAt)}</span>
@@ -909,7 +911,7 @@ const TeacherClassPanel: React.FC<{ classId?: string; attendanceRate?: string }>
         </Link>
         <Link
           to="/class-roster"
-          className="text-xs py-2 px-4 rounded-xl border border-line text-ink-muted hover:bg-slate-50 transition-colors"
+          className="text-xs py-2 px-4 rounded-xl border border-line text-ink-muted hover:bg-surface-muted transition-colors"
         >
           Class Roster
         </Link>
@@ -923,7 +925,7 @@ const TeacherClassPanel: React.FC<{ classId?: string; attendanceRate?: string }>
       {loading ? (
         <div className="space-y-2">
           {[1, 2, 3].map((i) => (
-            <div key={i} className="animate-pulse h-10 rounded-xl bg-slate-100" />
+            <div key={i} className="animate-pulse h-10 rounded-xl bg-surface-elevated" />
           ))}
         </div>
       ) : preview.length === 0 ? (
@@ -1185,7 +1187,7 @@ const DashboardPage: React.FC = () => {
               </Link>
               <button
                 onClick={handleLogout}
-                className="text-sm text-ink-muted hover:text-red-600 px-3 py-1.5 rounded-lg hover:bg-red-50 border border-transparent hover:border-red-200 transition-all duration-300"
+                className="text-sm text-ink-muted hover:text-red-600 px-3 py-1.5 rounded-lg hover:bg-red-500/15 border border-transparent hover:border-red-200 transition-all duration-300"
               >
                 Sign Out
               </button>

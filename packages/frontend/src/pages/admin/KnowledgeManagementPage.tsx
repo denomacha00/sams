@@ -156,7 +156,7 @@ const KnowledgeFormModal: React.FC<KnowledgeFormModalProps> = ({ isOpen, onClose
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
                 maxLength={200}
-                className="w-full px-4 py-2.5 rounded-xl bg-slate-50 border border-line text-white placeholder-ink-subtle focus:outline-none focus:border-teal-500/50 focus:ring-1 focus:ring-teal-500/50 transition-colors"
+                className="w-full px-4 py-2.5 rounded-xl bg-surface-muted border border-line text-ink placeholder-ink-subtle focus:outline-none focus:border-brand/50 focus:ring-1 focus:ring-brand/40/50 transition-colors"
                 placeholder="Enter title..."
                 autoFocus
               />
@@ -170,7 +170,7 @@ const KnowledgeFormModal: React.FC<KnowledgeFormModalProps> = ({ isOpen, onClose
                 value={content}
                 onChange={(e) => setContent(e.target.value)}
                 rows={5}
-                className="w-full px-4 py-2.5 rounded-xl bg-slate-50 border border-line text-white placeholder-ink-subtle focus:outline-none focus:border-teal-500/50 focus:ring-1 focus:ring-teal-500/50 transition-colors resize-none"
+                className="w-full px-4 py-2.5 rounded-xl bg-surface-muted border border-line text-ink placeholder-ink-subtle focus:outline-none focus:border-brand/50 focus:ring-1 focus:ring-brand/40/50 transition-colors resize-none"
                 placeholder="Enter knowledge content..."
               />
             </div>
@@ -183,7 +183,7 @@ const KnowledgeFormModal: React.FC<KnowledgeFormModalProps> = ({ isOpen, onClose
                 value={category}
                 onChange={(e) => setCategory(e.target.value)}
                 maxLength={50}
-                className="w-full px-4 py-2.5 rounded-xl bg-slate-50 border border-line text-white placeholder-ink-subtle focus:outline-none focus:border-teal-500/50 focus:ring-1 focus:ring-teal-500/50 transition-colors"
+                className="w-full px-4 py-2.5 rounded-xl bg-surface-muted border border-line text-ink placeholder-ink-subtle focus:outline-none focus:border-brand/50 focus:ring-1 focus:ring-brand/40/50 transition-colors"
                 placeholder="e.g. general, policy, curriculum..."
               />
             </div>
@@ -453,7 +453,7 @@ const KnowledgeManagementPage: React.FC = () => {
           </div>
         ) : entries.length === 0 ? (
           <div className="text-center py-20">
-            <div className="w-16 h-16 rounded-2xl bg-slate-50 border border-line flex items-center justify-center mx-auto mb-4">
+            <div className="w-16 h-16 rounded-2xl bg-surface-muted border border-line flex items-center justify-center mx-auto mb-4">
               <svg className="w-8 h-8 text-ink-subtle" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
               </svg>
@@ -506,7 +506,7 @@ const KnowledgeManagementPage: React.FC = () => {
                       <div className="flex items-center gap-2 shrink-0">
                         <button
                           onClick={() => handleEdit(entry)}
-                          className="p-2 rounded-lg hover:bg-white/10 text-ink-muted hover:text-teal-400 transition-colors"
+                          className="p-2 rounded-lg hover:bg-white/10 text-ink-muted hover:text-brand transition-colors"
                           title="Edit"
                         >
                           <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">

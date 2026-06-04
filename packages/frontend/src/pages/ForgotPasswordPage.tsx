@@ -124,7 +124,7 @@ const ForgotPasswordPage: React.FC = () => {
           </div>
 
           {!success && (
-            <div className="flex gap-2 mb-6 p-1 rounded-xl bg-slate-50 border border-line">
+            <div className="flex gap-2 mb-6 p-1 rounded-xl bg-surface-muted border border-line">
               <button
                 type="button"
                 onClick={() => { setMode('otp'); setError(null); setOtpSent(false); }}
@@ -200,7 +200,7 @@ const ForgotPasswordPage: React.FC = () => {
                     value={otpCode}
                     onChange={(e) => setOtpCode(e.target.value.replace(/\D/g, ''))}
                     required
-                    className="w-full input-field text-center text-2xl tracking-[0.4em] font-mono focus:outline-none focus:ring-2 focus:ring-teal-500/40"
+                    className="w-full input-field text-center text-2xl tracking-[0.4em] font-mono focus:outline-none focus:ring-2 focus:ring-brand/40/40"
                     placeholder="000000"
                   />
                 </div>
@@ -261,7 +261,7 @@ function Field({
         onChange={(e) => onChange(type === 'text' && id === 'schoolCode' ? e.target.value.toUpperCase() : e.target.value)}
         required
         minLength={type === 'password' ? 8 : undefined}
-        className="w-full input-field placeholder-ink-subtle focus:outline-none focus:ring-2 focus:ring-teal-500/40"
+        className="w-full input-field placeholder-ink-subtle focus:outline-none focus:ring-2 focus:ring-brand/40/40"
         placeholder={placeholder}
       />
     </div>

@@ -168,10 +168,10 @@ const AISAMSWidget: React.FC = () => {
           isOpen
             ? 'opacity-100 translate-y-0 pointer-events-auto'
             : 'opacity-0 translate-y-4 pointer-events-none'
-        } w-[calc(100vw-2rem)] sm:w-[400px] h-[500px] max-h-[70vh] flex flex-col rounded-2xl border border-line bg-white shadow-card-hover`}
+        } w-[calc(100vw-2rem)] sm:w-[400px] h-[500px] max-h-[70vh] flex flex-col rounded-2xl border border-line bg-surface shadow-card-hover`}
       >
         {/* Header */}
-        <div className="flex items-center justify-between px-4 py-3 border-b border-line bg-slate-50 rounded-t-2xl">
+        <div className="flex items-center justify-between px-4 py-3 border-b border-line bg-surface-muted rounded-t-2xl">
           <div className="flex items-center gap-2">
             <div className="w-8 h-8 rounded-lg bg-indigo-600 flex items-center justify-center">
               <svg className="w-4 h-4 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -208,7 +208,7 @@ const AISAMSWidget: React.FC = () => {
                 className={`max-w-[85%] rounded-xl px-3 py-2 text-sm ${
                   msg.role === 'user'
                     ? 'bg-indigo-600 text-white'
-                    : 'bg-slate-50 border border-line text-ink'
+                    : 'bg-surface-muted border border-line text-ink'
                 }`}
               >
                 {msg.role === 'assistant' ? (
@@ -248,7 +248,7 @@ const AISAMSWidget: React.FC = () => {
           {/* Loading indicator */}
           {loading && (
             <div className="flex justify-start">
-              <div className="bg-slate-50 border border-line rounded-xl px-3 py-2">
+              <div className="bg-surface-muted border border-line rounded-xl px-3 py-2">
                 <div className="flex space-x-1">
                   <div className="w-1.5 h-1.5 bg-indigo-400 rounded-full animate-bounce" />
                   <div className="w-1.5 h-1.5 bg-indigo-400 rounded-full animate-bounce" style={{ animationDelay: '0.1s' }} />
@@ -262,7 +262,7 @@ const AISAMSWidget: React.FC = () => {
         </div>
 
         {/* Input */}
-        <div className="border-t border-line p-3 bg-white rounded-b-2xl">
+        <div className="border-t border-line p-3 bg-surface rounded-b-2xl">
           <form onSubmit={handleSubmit} className="flex gap-2">
             <input
               ref={inputRef}
@@ -281,7 +281,7 @@ const AISAMSWidget: React.FC = () => {
               className={`p-2 rounded-lg transition-all duration-200 ${
                 isListening
                   ? 'bg-red-500/20 text-red-300 border border-red-500/30'
-                  : 'bg-slate-900 text-ink-muted border border-line hover:bg-slate-100 hover:text-ink'
+                  : 'bg-slate-900 text-ink-muted border border-line hover:bg-surface-elevated hover:text-ink'
               }`}
               title={isListening ? 'Stop listening' : 'Voice input'}
               aria-label={isListening ? 'Stop listening' : 'Voice input'}

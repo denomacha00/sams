@@ -7,27 +7,39 @@ export default {
   theme: {
     extend: {
       colors: {
+        canvas: {
+          DEFAULT: 'var(--color-bg, #0d2818)',
+        },
         surface: {
-          DEFAULT: 'var(--color-surface, #ffffff)',
-          muted: 'var(--color-surface-muted, #f6f6f6)',
-          elevated: 'var(--color-surface-elevated, #ffffff)',
+          DEFAULT: 'var(--color-surface, #1a2e1f)',
+          muted: 'var(--color-surface-muted, #122a1c)',
+          elevated: 'var(--color-surface-elevated, #243d2a)',
         },
         ink: {
-          DEFAULT: 'var(--color-text, #1d1d1d)',
-          muted: 'var(--color-text-muted, #64748b)',
-          subtle: 'var(--color-text-subtle, #94a3b8)',
+          DEFAULT: 'var(--color-text, #f5f5f5)',
+          muted: 'var(--color-text-muted, #94a3b8)',
+          subtle: 'var(--color-text-subtle, #9ca3af)',
         },
         line: {
-          DEFAULT: 'var(--color-border, #e2e8f0)',
-          strong: 'var(--color-border-strong, #cbd5e1)',
+          DEFAULT: 'var(--color-border, #2d4a35)',
+          strong: 'var(--color-border-strong, #3d5c47)',
         },
         brand: {
           DEFAULT: 'var(--color-brand, #4f46e5)',
           hover: 'var(--color-brand-hover, #4338ca)',
-          light: 'var(--color-brand-light, #eef2ff)',
+          light: 'var(--color-brand-light, #1e1b4b)',
           foreground: '#ffffff',
         },
-        // School branding support — override via CSS variables
+        'accent-orange': {
+          DEFAULT: 'var(--color-accent-orange, #f97316)',
+          hover: 'var(--color-accent-orange-hover, #ea580c)',
+          light: 'var(--color-accent-orange-light, #431407)',
+        },
+        'accent-blue': {
+          DEFAULT: 'var(--color-accent-blue, #2563eb)',
+          hover: 'var(--color-accent-blue-hover, #1d4ed8)',
+          light: 'var(--color-accent-blue-light, #1e3a5f)',
+        },
         primary: {
           50: 'var(--color-primary-50, #eef2ff)',
           100: 'var(--color-primary-100, #e0e7ff)',
@@ -59,8 +71,8 @@ export default {
         sans: ['Inter', 'system-ui', '-apple-system', 'sans-serif'],
       },
       boxShadow: {
-        card: '0 1px 3px 0 rgb(0 0 0 / 0.06), 0 1px 2px -1px rgb(0 0 0 / 0.06)',
-        'card-hover': '0 4px 12px 0 rgb(0 0 0 / 0.08)',
+        card: '0 1px 3px 0 rgb(0 0 0 / 0.35), 0 1px 2px -1px rgb(0 0 0 / 0.25)',
+        'card-hover': '0 8px 24px 0 rgb(0 0 0 / 0.45)',
       },
     },
   },

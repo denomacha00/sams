@@ -215,7 +215,7 @@ const ManualAttendancePage: React.FC = () => {
                   <select
                     value={marks[student.id]?.status || AttendanceStatus.PRESENT}
                     onChange={(e) => updateMark(student.id, 'status', e.target.value)}
-                    className={`bg-slate-50 border border-line rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500/50 appearance-none ${getStatusColor(marks[student.id]?.status)}`}
+                    className={`bg-surface-muted border border-line rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500/50 appearance-none ${getStatusColor(marks[student.id]?.status)}`}
                   >
                     <option value={AttendanceStatus.PRESENT} className="bg-slate-800 text-emerald-400">Present</option>
                     <option value={AttendanceStatus.LATE} className="bg-slate-800 text-yellow-400">Late</option>
@@ -230,7 +230,7 @@ const ManualAttendancePage: React.FC = () => {
                     maxLength={500}
                     value={marks[student.id]?.note || ''}
                     onChange={(e) => updateMark(student.id, 'note', e.target.value)}
-                    className="bg-slate-50 border border-line rounded-lg px-3 py-2 text-sm text-white placeholder-ink-subtle w-full sm:w-40 focus:outline-none focus:ring-2 focus:ring-purple-500/50"
+                    className="bg-surface-muted border border-line rounded-lg px-3 py-2 text-sm text-ink placeholder-ink-subtle w-full sm:w-40 focus:outline-none focus:ring-2 focus:ring-purple-500/50"
                   />
                 </div>
               ))}

@@ -222,7 +222,7 @@ const RegisterPage: React.FC = () => {
 
         {/* Pre-filled context info */}
         {linkMeta && (
-          <div className="mb-6 p-3 bg-slate-50 border border-line rounded-xl space-y-1.5" role="region" aria-label="Registration context">
+          <div className="mb-6 p-3 bg-surface-muted border border-line rounded-xl space-y-1.5" role="region" aria-label="Registration context">
             {linkMeta.schoolName && (
               <div className="flex items-center gap-2">
                 <svg className="w-4 h-4 text-teal-400 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" /></svg>
@@ -364,7 +364,7 @@ const RegisterPage: React.FC = () => {
                 value={fullName}
                 onChange={(e) => setFullName(e.target.value)}
                 required
-                className="w-full input-field placeholder-ink-subtle focus:outline-none focus:ring-2 focus:ring-teal-500/40 focus:border-teal-400 transition-all"
+                className="w-full input-field placeholder-ink-subtle focus:outline-none focus:ring-2 focus:ring-brand/40/40 focus:border-brand transition-all"
                 placeholder="Your full name"
               />
             </div>
@@ -377,7 +377,7 @@ const RegisterPage: React.FC = () => {
                 onChange={(e) => setUsername(e.target.value.toLowerCase().replace(/\s/g, ''))}
                 required
                 minLength={3}
-                className="w-full input-field placeholder-ink-subtle focus:outline-none focus:ring-2 focus:ring-teal-500/40 focus:border-teal-400 transition-all"
+                className="w-full input-field placeholder-ink-subtle focus:outline-none focus:ring-2 focus:ring-brand/40/40 focus:border-brand transition-all"
                 placeholder="Choose a username"
               />
             </div>
@@ -390,7 +390,7 @@ const RegisterPage: React.FC = () => {
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                className="w-full input-field placeholder-ink-subtle focus:outline-none focus:ring-2 focus:ring-teal-500/40 focus:border-teal-400 transition-all"
+                className="w-full input-field placeholder-ink-subtle focus:outline-none focus:ring-2 focus:ring-brand/40/40 focus:border-brand transition-all"
                 placeholder="your@email.com"
               />
               <p className="text-xs text-ink-subtle mt-1">Used for password reset and notifications</p>
@@ -403,7 +403,7 @@ const RegisterPage: React.FC = () => {
                 value={phone}
                 onChange={(e) => setPhone(e.target.value)}
                 required
-                className="w-full input-field placeholder-ink-subtle focus:outline-none focus:ring-2 focus:ring-teal-500/40 focus:border-teal-400 transition-all"
+                className="w-full input-field placeholder-ink-subtle focus:outline-none focus:ring-2 focus:ring-brand/40/40 focus:border-brand transition-all"
                 placeholder="+254 7XX XXX XXX"
               />
             </div>
@@ -417,7 +417,7 @@ const RegisterPage: React.FC = () => {
                   value={admissionNumber}
                   onChange={(e) => setAdmissionNumber(e.target.value)}
                   required
-                  className="w-full input-field placeholder-ink-subtle focus:outline-none focus:ring-2 focus:ring-teal-500/40 focus:border-teal-400 transition-all"
+                  className="w-full input-field placeholder-ink-subtle focus:outline-none focus:ring-2 focus:ring-brand/40/40 focus:border-brand transition-all"
                   placeholder="e.g. ADM/2024/001"
                 />
               </div>
@@ -432,7 +432,7 @@ const RegisterPage: React.FC = () => {
                   onChange={(e) => setPassword(e.target.value)}
                   required
                   minLength={8}
-                  className="w-full bg-slate-50 border border-line rounded-xl px-4 py-3 pr-12 text-white placeholder-ink-subtle focus:outline-none focus:ring-2 focus:ring-teal-500/40 focus:border-teal-400 transition-all"
+                  className="w-full bg-surface-muted border border-line rounded-xl px-4 py-3 pr-12 text-ink placeholder-ink-subtle focus:outline-none focus:ring-2 focus:ring-brand/40/40 focus:border-brand transition-all"
                   placeholder="Minimum 8 characters"
                 />
                 <button
@@ -453,7 +453,7 @@ const RegisterPage: React.FC = () => {
             <button
               type="submit"
               disabled={loading}
-              className="w-full bg-gradient-to-r from-teal-500 to-cyan-600 text-white font-bold py-3.5 px-4 rounded-xl hover:from-teal-400 hover:to-cyan-500 focus:outline-none focus:ring-2 focus:ring-teal-500/50 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-lg shadow-teal-500/30 hover:scale-[1.01] active:scale-[0.99]"
+              className="w-full bg-gradient-to-r from-teal-500 to-cyan-600 text-white font-bold py-3.5 px-4 rounded-xl hover:from-teal-400 hover:to-cyan-500 focus:outline-none focus:ring-2 focus:ring-brand/40/50 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-lg shadow-teal-500/30 hover:scale-[1.01] active:scale-[0.99]"
             >
               {loading ? 'Registering...' : 'Register'}
             </button>
@@ -461,7 +461,7 @@ const RegisterPage: React.FC = () => {
         )}
 
         {/* Footer */}
-        <p className="text-center text-xs text-gray-600 mt-6">© 2025 SAMS · Developed by Denis Macharia</p>
+        <p className="text-center text-xs text-ink-muted mt-6">© 2025 SAMS · Developed by Denis Macharia</p>
       </div>
     </div>
   );

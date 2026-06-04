@@ -116,7 +116,7 @@ const TimetableViewPage: React.FC = () => {
             )}
             <button
               onClick={() => setViewMode(viewMode === 'table' ? 'grid' : 'table')}
-              className="px-3 py-2 rounded-lg input-field text-ink-muted text-sm hover:bg-slate-100 transition-colors"
+              className="px-3 py-2 rounded-lg input-field text-ink-muted text-sm hover:bg-surface-elevated transition-colors"
             >
               {viewMode === 'table' ? '📅 Grid View' : '📋 Table View'}
             </button>
@@ -213,7 +213,7 @@ const TimetableViewPage: React.FC = () => {
             <div className="overflow-x-auto">
               <table className="w-full">
                 <thead>
-                  <tr className="border-b border-line bg-slate-50">
+                  <tr className="border-b border-line bg-surface-muted">
                     <th className="text-left px-6 py-4 text-sm font-semibold text-ink">Day</th>
                     <th className="text-left px-6 py-4 text-sm font-semibold text-ink">Subject</th>
                     <th className="text-left px-6 py-4 text-sm font-semibold text-ink">Class</th>
@@ -228,7 +228,7 @@ const TimetableViewPage: React.FC = () => {
                     .map((entry) => (
                       <tr
                         key={entry.id}
-                        className={`border-b border-line hover:bg-slate-50 transition-colors ${
+                        className={`border-b border-line hover:bg-surface-muted transition-colors ${
                           entry.dayOfWeek === todayIndex ? 'bg-indigo-50/50' : ''
                         }`}
                       >

@@ -178,7 +178,7 @@ const DepartmentManagementPage: React.FC = () => {
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="Search by name or admission number..."
-              className="w-full pl-11 pr-4 py-3 bg-slate-50 border border-line rounded-xl text-white placeholder-ink-subtle focus:outline-none focus:ring-2 focus:ring-teal-500/40 focus:border-teal-400 transition-all"
+              className="w-full pl-11 pr-4 py-3 bg-surface-muted border border-line rounded-xl text-ink placeholder-ink-subtle focus:outline-none focus:ring-2 focus:ring-brand/40/40 focus:border-brand transition-all"
             />
             {searchQuery && <p className="text-xs text-ink-muted mt-1">{filteredStudents.length} result{filteredStudents.length !== 1 ? 's' : ''}</p>}
           </div>
@@ -243,7 +243,7 @@ const DepartmentManagementPage: React.FC = () => {
                     <select
                       value={selectedTeacherId}
                       onChange={(e) => setSelectedTeacherId(e.target.value)}
-                      className="flex-1 px-3 py-2 rounded-xl bg-slate-50 border border-line text-white text-sm focus:outline-none focus:border-teal-500/50 transition-colors"
+                      className="flex-1 px-3 py-2 rounded-xl bg-surface-muted border border-line text-white text-sm focus:outline-none focus:border-brand/50 transition-colors"
                       disabled={assigning}
                     >
                       <option value="" className="bg-slate-800">— Choose a teacher —</option>

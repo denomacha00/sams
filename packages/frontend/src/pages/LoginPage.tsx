@@ -208,9 +208,9 @@ const LoginPage: React.FC = () => {
   return (
     <div className="min-h-screen flex">
       {/* Left panel — branding */}
-      <div className="hidden lg:flex lg:w-1/2 relative overflow-hidden bg-white border-r border-line items-center justify-center">
+      <div className="hidden lg:flex lg:w-1/2 relative overflow-hidden bg-canvas border-r border-line items-center justify-center">
         <div className="relative z-10 text-center px-12">
-          <div className="inline-flex w-28 h-28 rounded-2xl bg-brand items-center justify-center shadow-card mb-8">
+          <div className="inline-flex w-28 h-28 rounded-2xl bg-orange-500 items-center justify-center shadow-card mb-8">
             <svg className="w-14 h-14 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
             </svg>
@@ -251,8 +251,8 @@ const LoginPage: React.FC = () => {
             </p>
 
             {authNotice && (
-              <div className="mb-6 p-3 rounded-xl bg-amber-50 border border-amber-200">
-                <p className="text-sm text-center font-medium text-amber-800">{authNotice}</p>
+              <div className="mb-6 p-3 rounded-xl bg-amber-500/15 border border-amber-500/40">
+                <p className="text-sm text-center font-medium text-amber-200">{authNotice}</p>
               </div>
             )}
 

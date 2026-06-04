@@ -510,7 +510,7 @@ const NotificationsPage: React.FC = () => {
                 </span>
               )}
               {recipientCount != null && (
-                <span className="text-xs px-2 py-0.5 rounded-full bg-slate-100 text-ink-muted border border-line">
+                <span className="text-xs px-2 py-0.5 rounded-full bg-surface-elevated text-ink-muted border border-line">
                   {recipientCount} recipient{recipientCount !== 1 ? 's' : ''}
                 </span>
               )}
@@ -529,10 +529,10 @@ const NotificationsPage: React.FC = () => {
                   <span className="text-xs px-1.5 py-0.5 rounded-full bg-white/10 text-ink-subtle border border-white/5">{roleDisplay}</span>
                 )}
               </div>
-              <span className="text-gray-600 text-xs">·</span>
+              <span className="text-ink-muted text-xs">·</span>
               <span className="text-xs text-ink-subtle">{formatDateTime(notif.createdAt)}</span>
               {notif.updatedAt && (
-                <><span className="text-gray-600 text-xs">·</span>
+                <><span className="text-ink-muted text-xs">·</span>
                 <span className="text-xs text-amber-400/60">edited {formatDateTime(notif.updatedAt)}</span></>
               )}
             </div>
@@ -550,7 +550,7 @@ const NotificationsPage: React.FC = () => {
                 <div className="relative group">
                   <button onClick={(e) => { e.stopPropagation(); if (canModify) { setEditingNotification(notif); setEditMessage(notif.message); setEditError(null); } }}
                     disabled={!canModify}
-                    className={`p-1.5 rounded-lg transition-all ${canModify ? 'hover:bg-white/10 text-ink-muted hover:text-teal-400' : 'text-gray-600 cursor-not-allowed'}`}>
+                    className={`p-1.5 rounded-lg transition-all ${canModify ? 'hover:bg-white/10 text-ink-muted hover:text-brand' : 'text-ink-muted cursor-not-allowed'}`}>
                     <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
                     </svg>
@@ -564,7 +564,7 @@ const NotificationsPage: React.FC = () => {
                 <div className="relative group">
                   <button onClick={(e) => { e.stopPropagation(); if (canModify) { setDeletingNotification(notif); setDeleteError(null); } }}
                     disabled={!canModify}
-                    className={`p-1.5 rounded-lg transition-all ${canModify ? 'hover:bg-white/10 text-ink-muted hover:text-red-400' : 'text-gray-600 cursor-not-allowed'}`}>
+                    className={`p-1.5 rounded-lg transition-all ${canModify ? 'hover:bg-white/10 text-ink-muted hover:text-red-400' : 'text-ink-muted cursor-not-allowed'}`}>
                     <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
                     </svg>
@@ -610,13 +610,13 @@ const NotificationsPage: React.FC = () => {
               <div className="flex rounded-xl border border-line overflow-hidden">
                 <button
                   onClick={() => setFolder('inbox')}
-                  className={`px-3 py-2 text-sm transition-all ${folder === 'inbox' ? 'bg-indigo-600 text-white' : 'text-ink-muted hover:text-ink hover:bg-slate-100'}`}
+                  className={`px-3 py-2 text-sm transition-all ${folder === 'inbox' ? 'bg-indigo-600 text-white' : 'text-ink-muted hover:text-ink hover:bg-surface-elevated'}`}
                 >
                   Inbox
                 </button>
                 <button
                   onClick={() => setFolder('sent')}
-                  className={`px-3 py-2 text-sm transition-all ${folder === 'sent' ? 'bg-indigo-600 text-white' : 'text-ink-muted hover:text-ink hover:bg-slate-100'}`}
+                  className={`px-3 py-2 text-sm transition-all ${folder === 'sent' ? 'bg-indigo-600 text-white' : 'text-ink-muted hover:text-ink hover:bg-surface-elevated'}`}
                 >
                   Sent
                 </button>
@@ -625,7 +625,7 @@ const NotificationsPage: React.FC = () => {
             {folder === 'inbox' && unreadCount > 0 && (
               <button
                 onClick={markAllAsRead}
-                className="px-3 py-2 text-sm text-ink-muted hover:text-ink border border-line rounded-xl hover:bg-slate-100 transition-all"
+                className="px-3 py-2 text-sm text-ink-muted hover:text-ink border border-line rounded-xl hover:bg-surface-elevated transition-all"
               >
                 Mark all read
               </button>
@@ -808,7 +808,7 @@ const NotificationsPage: React.FC = () => {
           </div>
         ) : displayList.length === 0 ? (
           <div className="text-center py-12">
-            <svg className="w-16 h-16 text-gray-600 mx-auto mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <svg className="w-16 h-16 text-ink-muted mx-auto mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
             </svg>
             <p className="text-ink-muted">{folder === 'inbox' ? 'No messages in your inbox' : 'No sent messages yet'}</p>
@@ -824,7 +824,7 @@ const NotificationsPage: React.FC = () => {
       {replyingTo && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setReplyingTo(null)} />
-          <div className="relative w-full max-w-lg bg-white border border-line rounded-2xl p-6 shadow-card-hover">
+          <div className="relative w-full max-w-lg bg-surface border border-line rounded-2xl p-6 shadow-card-hover">
             <h2 className="text-lg font-semibold text-ink mb-1">Reply to {replyingTo.senderName}</h2>
             <p className="text-xs text-ink-subtle mb-4">Your reply goes only to this teacher.</p>
             {replyError && <div className="mb-4 p-3 bg-red-500/20 border border-red-400/30 rounded-xl"><p className="text-sm text-red-300">{replyError}</p></div>}
@@ -832,7 +832,7 @@ const NotificationsPage: React.FC = () => {
               className="w-full input-field placeholder-ink-subtle focus:outline-none focus:ring-2 focus:ring-indigo-500/40 transition-all resize-none"
               placeholder="Type your reply..." />
             <div className="flex gap-3 justify-end mt-4">
-              <button onClick={() => setReplyingTo(null)} className="px-4 py-2 text-sm font-medium text-ink-muted bg-slate-50 border border-line rounded-xl hover:bg-white/10 transition-all">Cancel</button>
+              <button onClick={() => setReplyingTo(null)} className="px-4 py-2 text-sm font-medium text-ink-muted bg-surface-muted border border-line rounded-xl hover:bg-white/10 transition-all">Cancel</button>
               <button onClick={handleReply} disabled={replyLoading || !replyMessage.trim()}
                 className="px-4 py-2 text-sm font-semibold text-ink bg-indigo-600 rounded-xl hover:bg-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed transition-all">
                 {replyLoading ? 'Sending...' : 'Send Reply'}
@@ -846,17 +846,17 @@ const NotificationsPage: React.FC = () => {
       {editingNotification && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setEditingNotification(null)} />
-          <div className="relative w-full max-w-lg bg-white border border-line rounded-2xl p-6 shadow-card-hover">
+          <div className="relative w-full max-w-lg bg-surface border border-line rounded-2xl p-6 shadow-card-hover">
             <h2 className="text-lg font-semibold text-ink mb-4">Edit Notification</h2>
             {editError && <div className="mb-4 p-3 bg-red-500/20 border border-red-400/30 rounded-xl"><p className="text-sm text-red-300">{editError}</p></div>}
             <div className="mb-4">
               <label className="block text-sm font-semibold text-ink-muted mb-1.5">Message</label>
               <textarea value={editMessage} onChange={(e) => setEditMessage(e.target.value)} rows={5} maxLength={1000}
-                className="w-full input-field placeholder-ink-subtle focus:outline-none focus:ring-2 focus:ring-teal-500/40 transition-all resize-none" />
+                className="w-full input-field placeholder-ink-subtle focus:outline-none focus:ring-2 focus:ring-brand/40/40 transition-all resize-none" />
               <p className="text-xs text-ink-subtle mt-1 text-right">{editMessage.length}/1000</p>
             </div>
             <div className="flex gap-3 justify-end">
-              <button onClick={() => setEditingNotification(null)} className="px-4 py-2 text-sm font-medium text-ink-muted bg-slate-50 border border-line rounded-xl hover:bg-white/10 transition-all">Cancel</button>
+              <button onClick={() => setEditingNotification(null)} className="px-4 py-2 text-sm font-medium text-ink-muted bg-surface-muted border border-line rounded-xl hover:bg-white/10 transition-all">Cancel</button>
               <button onClick={handleEdit} disabled={editLoading || editMessage.trim().length < 1}
                 className="px-4 py-2 text-sm font-semibold text-ink bg-gradient-to-r from-teal-500 to-cyan-600 rounded-xl hover:from-teal-400 hover:to-cyan-500 disabled:opacity-50 disabled:cursor-not-allowed transition-all">
                 {editLoading ? 'Saving...' : 'Save Changes'}
@@ -870,7 +870,7 @@ const NotificationsPage: React.FC = () => {
       {deletingNotification && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setDeletingNotification(null)} />
-          <div className="relative w-full max-w-md bg-white border border-line rounded-2xl p-6 shadow-card-hover">
+          <div className="relative w-full max-w-md bg-surface border border-line rounded-2xl p-6 shadow-card-hover">
             <h2 className="text-lg font-semibold text-ink mb-2">Delete Notification</h2>
             <p className="text-sm text-ink-muted mb-6">
               {deletingNotification.batchId
@@ -879,7 +879,7 @@ const NotificationsPage: React.FC = () => {
             </p>
             {deleteError && <div className="mb-4 p-3 bg-red-500/20 border border-red-400/30 rounded-xl"><p className="text-sm text-red-300">{deleteError}</p></div>}
             <div className="flex gap-3 justify-end">
-              <button onClick={() => setDeletingNotification(null)} className="px-4 py-2 text-sm font-medium text-ink-muted bg-slate-50 border border-line rounded-xl hover:bg-white/10 transition-all">Cancel</button>
+              <button onClick={() => setDeletingNotification(null)} className="px-4 py-2 text-sm font-medium text-ink-muted bg-surface-muted border border-line rounded-xl hover:bg-white/10 transition-all">Cancel</button>
               <button onClick={handleDelete} disabled={deleteLoading}
                 className="px-4 py-2 text-sm font-semibold text-ink bg-gradient-to-r from-red-500 to-rose-600 rounded-xl hover:from-red-400 hover:to-rose-500 disabled:opacity-50 disabled:cursor-not-allowed transition-all">
                 {deleteLoading ? 'Deleting...' : 'Delete'}

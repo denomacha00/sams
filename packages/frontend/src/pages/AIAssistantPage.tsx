@@ -304,7 +304,7 @@ const AIAssistantPage: React.FC = () => {
                   <button
                     key={q}
                     onClick={() => submitQuery(q)}
-                    className="px-4 py-2 bg-white border border-line rounded-xl text-sm text-ink-muted hover:bg-slate-50 hover:border-line-strong transition-all duration-200"
+                    className="px-4 py-2 bg-surface-muted border border-line rounded-xl text-sm text-ink-muted hover:bg-surface-elevated hover:border-line-strong transition-all duration-200"
                   >
                     {q}
                   </button>
@@ -323,10 +323,10 @@ const AIAssistantPage: React.FC = () => {
                   msg.role === 'user'
                     ? 'bg-gradient-to-r from-purple-600 to-blue-600 text-white shadow-lg shadow-purple-500/20'
                     : msg.isError
-                      ? 'bg-red-50 border border-red-200 text-red-800'
+                      ? 'bg-red-950/50 border border-red-500/40 text-red-200'
                       : msg.isSystemNotice
-                        ? 'bg-amber-50 border border-amber-200 text-amber-900'
-                        : 'bg-slate-50 border border-line text-ink'
+                        ? 'bg-amber-950/50 border border-amber-500/40 text-amber-200'
+                        : 'bg-surface-muted border border-line text-ink'
                 }`}
               >
                 {msg.role === 'assistant' ? (
@@ -364,7 +364,7 @@ const AIAssistantPage: React.FC = () => {
 
           {loading && (
             <div className="flex justify-start">
-              <div className="bg-slate-50 border border-line rounded-2xl px-5 py-4">
+              <div className="bg-surface-muted border border-line rounded-2xl px-5 py-4">
                 <div className="flex space-x-1.5">
                   <div className="w-2 h-2 bg-purple-400 rounded-full animate-bounce" />
                   <div className="w-2 h-2 bg-purple-400 rounded-full animate-bounce" style={{ animationDelay: '0.1s' }} />
@@ -379,7 +379,7 @@ const AIAssistantPage: React.FC = () => {
       </div>
 
       {/* Input */}
-      <div className="border-t border-line bg-white px-6 py-4">
+      <div className="border-t border-line bg-surface px-6 py-4">
         <div className="max-w-3xl mx-auto">
           {imagePreviews.length > 0 && (
             <div className="flex flex-wrap gap-2 mb-3">
@@ -404,7 +404,7 @@ const AIAssistantPage: React.FC = () => {
               type="button"
               onClick={() => fileInputRef.current?.click()}
               disabled={loading || selectedImages.length >= 4}
-              className="p-3 rounded-xl bg-white text-ink-muted border border-line hover:bg-slate-50 hover:text-ink disabled:opacity-50"
+              className="p-3 rounded-xl bg-surface-muted text-ink-muted border border-line hover:bg-surface-elevated hover:text-ink disabled:opacity-50"
               title="Upload images (max 4)"
               aria-label="Upload images"
             >
@@ -428,7 +428,7 @@ const AIAssistantPage: React.FC = () => {
               className={`relative p-3 rounded-xl transition-all duration-200 ${
                 isListening
                   ? 'bg-red-500/20 text-red-300 border border-red-500/30'
-                  : 'bg-white text-ink-muted border border-line hover:bg-slate-50 hover:text-ink'
+                  : 'bg-surface-muted text-ink-muted border border-line hover:bg-surface-elevated hover:text-ink'
               }`}
               title={isListening ? 'Stop listening' : 'Voice input'}
             >
@@ -451,7 +451,7 @@ const AIAssistantPage: React.FC = () => {
             </button>
           </form>
 
-          <p className="text-center text-xs text-gray-600 mt-3">
+          <p className="text-center text-xs text-ink-muted mt-3">
             © 2025 SAMS · Developed by Denis Macharia
           </p>
         </div>

@@ -322,7 +322,7 @@ const DepartmentsPage: React.FC = () => {
                     </button>
                     <button
                       onClick={() => openAddClassModal(dept.id)}
-                      className="px-3 py-1.5 rounded-lg bg-slate-50 border border-line text-cyan-400 text-xs hover:bg-white/10 transition-colors"
+                      className="px-3 py-1.5 rounded-lg bg-surface-muted border border-line text-cyan-400 text-xs hover:bg-white/10 transition-colors"
                     >
                       + Add Class
                     </button>
@@ -376,7 +376,7 @@ const DepartmentsPage: React.FC = () => {
                                 {cls.classTeacherName ? (
                                   <span className="text-teal-400">Class Teacher: {cls.classTeacherName}</span>
                                 ) : (
-                                  <span className="text-gray-600 italic">No class teacher assigned</span>
+                                  <span className="text-ink-muted italic">No class teacher assigned</span>
                                 )}
                               </p>
                             </div>
@@ -428,7 +428,7 @@ const DepartmentsPage: React.FC = () => {
                   required
                   value={deptName}
                   onChange={(e) => setDeptName(e.target.value)}
-                  className="w-full px-4 py-2.5 rounded-xl bg-slate-50 border border-line text-white placeholder-ink-subtle focus:outline-none focus:border-cyan-500/50 transition-colors"
+                  className="w-full px-4 py-2.5 rounded-xl bg-surface-muted border border-line text-ink placeholder-ink-subtle focus:outline-none focus:border-cyan-500/50 transition-colors"
                   placeholder="e.g. Science Department"
                 />
               </div>
@@ -437,7 +437,7 @@ const DepartmentsPage: React.FC = () => {
                 <button
                   type="button"
                   onClick={() => setShowDeptModal(false)}
-                  className="flex-1 px-4 py-2.5 rounded-xl bg-slate-50 border border-line text-ink-muted hover:bg-white/10 transition-colors"
+                  className="flex-1 px-4 py-2.5 rounded-xl bg-surface-muted border border-line text-ink-muted hover:bg-white/10 transition-colors"
                 >
                   Cancel
                 </button>
@@ -476,7 +476,7 @@ const DepartmentsPage: React.FC = () => {
                   required
                   value={className}
                   onChange={(e) => setClassName(e.target.value)}
-                  className="w-full px-4 py-2.5 rounded-xl bg-slate-50 border border-line text-white placeholder-ink-subtle focus:outline-none focus:border-cyan-500/50 transition-colors"
+                  className="w-full px-4 py-2.5 rounded-xl bg-surface-muted border border-line text-ink placeholder-ink-subtle focus:outline-none focus:border-cyan-500/50 transition-colors"
                   placeholder="e.g. Form 1A"
                 />
               </div>
@@ -488,7 +488,7 @@ const DepartmentsPage: React.FC = () => {
                   min={1}
                   value={classCapacity}
                   onChange={(e) => setClassCapacity(parseInt(e.target.value) || 50)}
-                  className="w-full px-4 py-2.5 rounded-xl bg-slate-50 border border-line text-white focus:outline-none focus:border-cyan-500/50 transition-colors"
+                  className="w-full px-4 py-2.5 rounded-xl bg-surface-muted border border-line text-white focus:outline-none focus:border-cyan-500/50 transition-colors"
                 />
               </div>
 
@@ -496,7 +496,7 @@ const DepartmentsPage: React.FC = () => {
                 <button
                   type="button"
                   onClick={() => setShowClassModal(false)}
-                  className="flex-1 px-4 py-2.5 rounded-xl bg-slate-50 border border-line text-ink-muted hover:bg-white/10 transition-colors"
+                  className="flex-1 px-4 py-2.5 rounded-xl bg-surface-muted border border-line text-ink-muted hover:bg-white/10 transition-colors"
                 >
                   Cancel
                 </button>
@@ -537,7 +537,7 @@ const DepartmentsPage: React.FC = () => {
                 <select
                   value={selectedHodId}
                   onChange={(e) => setSelectedHodId(e.target.value)}
-                  className="w-full px-4 py-2.5 rounded-xl bg-slate-50 border border-line text-white focus:outline-none focus:border-cyan-500/50 transition-colors"
+                  className="w-full px-4 py-2.5 rounded-xl bg-surface-muted border border-line text-white focus:outline-none focus:border-cyan-500/50 transition-colors"
                 >
                   <option value="" className="bg-slate-800">-- Select a user --</option>
                   {hodUsers.map(u => (
@@ -551,7 +551,7 @@ const DepartmentsPage: React.FC = () => {
                 <button
                   type="button"
                   onClick={() => setShowHodModal(false)}
-                  className="flex-1 px-4 py-2.5 rounded-xl bg-slate-50 border border-line text-ink-muted hover:bg-white/10 transition-colors"
+                  className="flex-1 px-4 py-2.5 rounded-xl bg-surface-muted border border-line text-ink-muted hover:bg-white/10 transition-colors"
                 >
                   Cancel
                 </button>

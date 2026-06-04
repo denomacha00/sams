@@ -102,7 +102,7 @@ const ResetPasswordPage: React.FC = () => {
                         onChange={(e) => setNewPassword(e.target.value)}
                         required
                         minLength={8}
-                        className="w-full input-field placeholder-ink-subtle focus:outline-none focus:ring-2 focus:ring-teal-500/40 focus:border-teal-400 transition-all duration-200 pr-12"
+                        className="w-full input-field placeholder-ink-subtle focus:outline-none focus:ring-2 focus:ring-brand/40/40 focus:border-brand transition-all duration-200 pr-12"
                         placeholder="At least 8 characters"
                       />
                       <button
@@ -134,7 +134,7 @@ const ResetPasswordPage: React.FC = () => {
                       value={confirmPassword}
                       onChange={(e) => setConfirmPassword(e.target.value)}
                       required
-                      className="w-full input-field placeholder-ink-subtle focus:outline-none focus:ring-2 focus:ring-teal-500/40 focus:border-teal-400 transition-all duration-200"
+                      className="w-full input-field placeholder-ink-subtle focus:outline-none focus:ring-2 focus:ring-brand/40/40 focus:border-brand transition-all duration-200"
                       placeholder="Repeat your new password"
                     />
                   </div>
@@ -142,7 +142,7 @@ const ResetPasswordPage: React.FC = () => {
                   <button
                     type="submit"
                     disabled={loading}
-                    className="w-full bg-gradient-to-r from-teal-500 to-cyan-600 text-white font-bold py-3.5 px-4 rounded-xl hover:from-teal-400 hover:to-cyan-500 focus:outline-none focus:ring-2 focus:ring-teal-500/50 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 shadow-lg shadow-teal-500/30 hover:shadow-teal-500/50 hover:scale-[1.01] active:scale-[0.99]"
+                    className="w-full bg-gradient-to-r from-teal-500 to-cyan-600 text-white font-bold py-3.5 px-4 rounded-xl hover:from-teal-400 hover:to-cyan-500 focus:outline-none focus:ring-2 focus:ring-brand/40/50 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 shadow-lg shadow-teal-500/30 hover:shadow-teal-500/50 hover:scale-[1.01] active:scale-[0.99]"
                   >
                     {loading ? (
                       <span className="flex items-center justify-center gap-2">

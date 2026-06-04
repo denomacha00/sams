@@ -292,7 +292,7 @@ const UserManagementPage: React.FC = () => {
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="Search by name, admission number, email or phone..."
-              className="w-full pl-11 pr-4 py-3 bg-slate-50 border border-line rounded-xl text-white placeholder-ink-subtle focus:outline-none focus:ring-2 focus:ring-teal-500/40 focus:border-teal-400 transition-all"
+              className="w-full pl-11 pr-4 py-3 bg-surface-muted border border-line rounded-xl text-ink placeholder-ink-subtle focus:outline-none focus:ring-2 focus:ring-brand/40/40 focus:border-brand transition-all"
             />
             {searchQuery && (
               <button onClick={() => setSearchQuery('')} className="absolute right-4 top-1/2 -translate-y-1/2 text-ink-muted hover:text-ink">
@@ -373,7 +373,7 @@ const UserManagementPage: React.FC = () => {
                               {departments.flatMap(d => d.classes || []).find(c => c.id === u.classId)?.name || u.classId}
                             </span>
                           )}
-                          {!u.departmentId && !u.classId && <span className="text-xs text-gray-600">—</span>}
+                          {!u.departmentId && !u.classId && <span className="text-xs text-ink-muted">—</span>}
                         </div>
                       </td>
                       <td className="px-6 py-4">
@@ -428,7 +428,7 @@ const UserManagementPage: React.FC = () => {
                   required
                   value={formData.fullName}
                   onChange={(e) => setFormData({ ...formData, fullName: e.target.value })}
-                  className="w-full px-4 py-2.5 rounded-xl bg-slate-50 border border-line text-white placeholder-ink-subtle focus:outline-none focus:border-cyan-500/50 transition-colors"
+                  className="w-full px-4 py-2.5 rounded-xl bg-surface-muted border border-line text-ink placeholder-ink-subtle focus:outline-none focus:border-cyan-500/50 transition-colors"
                   placeholder="John Doe"
                 />
               </div>
@@ -442,7 +442,7 @@ const UserManagementPage: React.FC = () => {
                   maxLength={50}
                   value={formData.username}
                   onChange={(e) => setFormData({ ...formData, username: e.target.value.replace(/\s/g, '') })}
-                  className="w-full px-4 py-2.5 rounded-xl bg-slate-50 border border-line text-white placeholder-ink-subtle focus:outline-none focus:border-cyan-500/50 transition-colors"
+                  className="w-full px-4 py-2.5 rounded-xl bg-surface-muted border border-line text-ink placeholder-ink-subtle focus:outline-none focus:border-cyan-500/50 transition-colors"
                   placeholder="e.g. hod_john"
                 />
                 <p className="text-xs text-ink-subtle mt-1">Used to sign in — letters, numbers, dots, underscores, hyphens.</p>
@@ -455,7 +455,7 @@ const UserManagementPage: React.FC = () => {
                     type="email"
                     value={formData.email}
                     onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                    className="w-full px-4 py-2.5 rounded-xl bg-slate-50 border border-line text-white placeholder-ink-subtle focus:outline-none focus:border-cyan-500/50 transition-colors"
+                    className="w-full px-4 py-2.5 rounded-xl bg-surface-muted border border-line text-ink placeholder-ink-subtle focus:outline-none focus:border-cyan-500/50 transition-colors"
                     placeholder="john@school.com"
                   />
                 </div>
@@ -465,14 +465,14 @@ const UserManagementPage: React.FC = () => {
                     type="text"
                     value={formData.phone}
                     onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                    className="w-full px-4 py-2.5 rounded-xl bg-slate-50 border border-line text-white placeholder-ink-subtle focus:outline-none focus:border-cyan-500/50 transition-colors"
+                    className="w-full px-4 py-2.5 rounded-xl bg-surface-muted border border-line text-ink placeholder-ink-subtle focus:outline-none focus:border-cyan-500/50 transition-colors"
                     placeholder="+254..."
                   />
                 </div>
               </div>
 
               {editingUser?.role === 'STUDENT' && (
-                <label className="flex items-start gap-3 p-3 rounded-xl bg-slate-50 border border-line cursor-pointer">
+                <label className="flex items-start gap-3 p-3 rounded-xl bg-surface-muted border border-line cursor-pointer">
                   <input
                     type="checkbox"
                     checked={formData.attendanceGpsExempt}
@@ -499,7 +499,7 @@ const UserManagementPage: React.FC = () => {
                       setFormData({ ...formData, role: e.target.value, departmentId: '', classId: '' });
                       setHodWarning(null);
                     }}
-                    className="w-full px-4 py-2.5 rounded-xl bg-slate-50 border border-line text-white focus:outline-none focus:border-cyan-500/50 transition-colors"
+                    className="w-full px-4 py-2.5 rounded-xl bg-surface-muted border border-line text-white focus:outline-none focus:border-cyan-500/50 transition-colors"
                   >
                     <option value="STUDENT" className="bg-slate-800">Student</option>
                     <option value="TEACHER" className="bg-slate-800">Teacher</option>
@@ -515,7 +515,7 @@ const UserManagementPage: React.FC = () => {
                     type="text"
                     value={formData.admissionNumber}
                     onChange={(e) => setFormData({ ...formData, admissionNumber: e.target.value })}
-                    className="w-full px-4 py-2.5 rounded-xl bg-slate-50 border border-line text-white placeholder-ink-subtle focus:outline-none focus:border-cyan-500/50 transition-colors"
+                    className="w-full px-4 py-2.5 rounded-xl bg-surface-muted border border-line text-ink placeholder-ink-subtle focus:outline-none focus:border-cyan-500/50 transition-colors"
                     placeholder={formData.role === 'STUDENT' ? 'ADM001' : 'Optional'}
                   />
                 </div>
@@ -534,7 +534,7 @@ const UserManagementPage: React.FC = () => {
                     <select
                       value={formData.departmentId}
                       onChange={(e) => handleDeptChange(e.target.value)}
-                      className="w-full px-4 py-2.5 rounded-xl bg-slate-50 border border-line text-white focus:outline-none focus:border-cyan-500/50 transition-colors"
+                      className="w-full px-4 py-2.5 rounded-xl bg-surface-muted border border-line text-white focus:outline-none focus:border-cyan-500/50 transition-colors"
                     >
                       <option value="" className="bg-slate-800">-- Select Department --</option>
                       {departments.map(d => (
@@ -561,7 +561,7 @@ const UserManagementPage: React.FC = () => {
                     value={formData.classId}
                     onChange={(e) => setFormData({ ...formData, classId: e.target.value })}
                     disabled={!formData.departmentId || formData.role === 'HOD'}
-                    className="w-full px-4 py-2.5 rounded-xl bg-slate-50 border border-line text-white focus:outline-none focus:border-cyan-500/50 transition-colors disabled:opacity-50"
+                    className="w-full px-4 py-2.5 rounded-xl bg-surface-muted border border-line text-white focus:outline-none focus:border-cyan-500/50 transition-colors disabled:opacity-50"
                   >
                     <option value="" className="bg-slate-800">
                       {formData.role === 'HOD' ? '-- N/A for HOD --' : '-- Select Class --'}
@@ -585,7 +585,7 @@ const UserManagementPage: React.FC = () => {
                   required={!editingUser}
                   value={formData.password}
                   onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                  className="w-full px-4 py-2.5 rounded-xl bg-slate-50 border border-line text-white placeholder-ink-subtle focus:outline-none focus:border-cyan-500/50 transition-colors"
+                  className="w-full px-4 py-2.5 rounded-xl bg-surface-muted border border-line text-ink placeholder-ink-subtle focus:outline-none focus:border-cyan-500/50 transition-colors"
                   placeholder="••••••••"
                 />
               </div>
@@ -594,7 +594,7 @@ const UserManagementPage: React.FC = () => {
                 <button
                   type="button"
                   onClick={() => setShowModal(false)}
-                  className="flex-1 px-4 py-2.5 rounded-xl bg-slate-50 border border-line text-ink-muted hover:bg-white/10 transition-colors"
+                  className="flex-1 px-4 py-2.5 rounded-xl bg-surface-muted border border-line text-ink-muted hover:bg-white/10 transition-colors"
                 >
                   Cancel
                 </button>
