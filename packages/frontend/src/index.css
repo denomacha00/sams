@@ -3,13 +3,28 @@
 @tailwind utilities;
 
 @layer base {
+  :root {
+    --color-bg: #f6f6f6;
+    --color-surface: #ffffff;
+    --color-surface-muted: #f6f6f6;
+    --color-surface-elevated: #ffffff;
+    --color-text: #1d1d1d;
+    --color-text-muted: #64748b;
+    --color-text-subtle: #94a3b8;
+    --color-border: #e2e8f0;
+    --color-border-strong: #cbd5e1;
+    --color-brand: #4f46e5;
+    --color-brand-hover: #4338ca;
+    --color-brand-light: #eef2ff;
+  }
+
   * {
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
   }
 
   body {
-    @apply bg-slate-950 text-slate-100 font-sans;
+    @apply bg-surface-muted text-ink font-sans;
   }
 
   ::-webkit-scrollbar {
@@ -20,24 +35,52 @@
     @apply bg-transparent;
   }
   ::-webkit-scrollbar-thumb {
-    @apply bg-slate-600 rounded-full;
+    @apply bg-line-strong rounded-full;
   }
   ::-webkit-scrollbar-thumb:hover {
-    @apply bg-slate-500;
+    @apply bg-slate-400;
   }
 }
 
 @layer components {
   .page-shell {
-    @apply min-h-screen bg-slate-950 text-slate-100;
+    @apply min-h-screen bg-surface-muted text-ink;
+  }
+
+  .app-header {
+    @apply relative border-b border-line bg-white/95 backdrop-blur-sm sticky top-0 z-50 shadow-sm;
   }
 
   .surface-card {
-    @apply rounded-2xl border border-slate-700/80 bg-slate-900/90 shadow-lg shadow-black/20;
+    @apply rounded-2xl border border-line bg-white shadow-card;
+  }
+
+  .surface-panel {
+    @apply rounded-2xl border border-line bg-white shadow-card p-6 min-h-[280px];
+  }
+
+  .surface-muted-row {
+    @apply flex items-center justify-between p-3 rounded-xl bg-slate-50 border border-line hover:bg-slate-100/80 transition-colors;
+  }
+
+  .stat-card {
+    @apply relative overflow-hidden rounded-2xl border border-line bg-white p-6 min-h-[140px] shadow-card hover:shadow-card-hover hover:border-line-strong transition-all duration-300 cursor-default;
+  }
+
+  .quick-action-card {
+    @apply relative overflow-hidden rounded-2xl border border-line bg-white p-5 min-h-[120px] shadow-card hover:shadow-card-hover hover:border-line-strong transition-all duration-300 flex flex-col justify-between;
+  }
+
+  .nav-icon-btn {
+    @apply relative w-9 h-9 rounded-lg bg-slate-50 border border-line flex items-center justify-center text-ink-muted hover:bg-slate-100 hover:border-line-strong transition-all duration-300;
+  }
+
+  .nav-icon-btn-active {
+    @apply bg-brand-light border-indigo-200 text-brand;
   }
 
   .btn-primary {
-    @apply bg-indigo-600 text-white font-semibold rounded-xl hover:bg-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/40 disabled:opacity-50 disabled:cursor-not-allowed transition-colors;
+    @apply bg-brand text-white font-semibold rounded-xl hover:bg-brand-hover focus:outline-none focus:ring-2 focus:ring-indigo-300 disabled:opacity-50 disabled:cursor-not-allowed transition-colors;
   }
 
   .btn-attendance {
@@ -45,25 +88,25 @@
   }
 
   .btn-secondary {
-    @apply bg-slate-800 text-slate-100 font-medium rounded-xl border border-slate-600 hover:bg-slate-700 transition-colors;
+    @apply bg-white text-ink font-medium rounded-xl border border-line-strong hover:bg-slate-50 transition-colors;
   }
 
   .input-field {
-    @apply w-full bg-slate-900/80 border border-slate-600 rounded-xl px-4 py-3 text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-500/50 transition-colors;
+    @apply w-full bg-white border border-line-strong rounded-xl px-4 py-3 text-ink placeholder-ink-subtle focus:outline-none focus:ring-2 focus:ring-indigo-200 focus:border-indigo-400 transition-colors;
   }
 }
 
 @layer utilities {
   .glass {
-    @apply backdrop-blur-xl bg-slate-900/60 border border-slate-700/60;
+    @apply backdrop-blur-xl bg-white/90 border border-line;
   }
   .glass-dark {
-    @apply backdrop-blur-xl bg-slate-950/80 border border-slate-800;
+    @apply backdrop-blur-xl bg-white/95 border border-line;
   }
 
   /* UI stitch: normalize legacy neon accents app-wide */
   .text-teal-300, .text-teal-400, .text-cyan-300, .text-cyan-400, .text-purple-300, .text-pink-300 {
-    color: rgb(165 180 252) !important;
+    color: rgb(79 70 229) !important;
   }
 
   .border-teal-500\/20, .border-teal-500\/30, .border-teal-500\/40,
@@ -75,7 +118,7 @@
 
   .bg-teal-500\/10, .bg-teal-500\/20, .bg-teal-500\/30, .bg-cyan-500\/10, .bg-cyan-500\/20,
   .bg-purple-500\/10, .bg-purple-500\/20, .bg-pink-500\/10, .bg-pink-500\/20 {
-    background-color: rgb(79 70 229 / 0.18) !important;
+    background-color: rgb(79 70 229 / 0.12) !important;
   }
 
   .from-teal-500, .from-cyan-500, .from-purple-500, .from-pink-500, .from-orange-500, .from-amber-500,
@@ -87,13 +130,13 @@
 
   .to-teal-500, .to-cyan-500, .to-purple-500, .to-pink-500, .to-orange-500, .to-amber-500,
   .to-blue-500, .to-blue-600, .to-purple-600, .to-indigo-500, .to-indigo-600, .to-teal-600, .to-emerald-500 {
-    --tw-gradient-to: rgb(71 85 105 / var(--tw-gradient-to-opacity, 1)) !important;
+    --tw-gradient-to: rgb(99 102 241 / var(--tw-gradient-to-opacity, 1)) !important;
   }
 
   .hover\:from-teal-400:hover, .hover\:to-cyan-400:hover, .hover\:to-cyan-500:hover,
   .hover\:from-blue-600:hover, .hover\:to-purple-600:hover {
     --tw-gradient-from: rgb(99 102 241 / var(--tw-gradient-from-opacity, 1)) !important;
-    --tw-gradient-to: rgb(71 85 105 / var(--tw-gradient-to-opacity, 1)) !important;
+    --tw-gradient-to: rgb(79 70 229 / var(--tw-gradient-to-opacity, 1)) !important;
   }
 
   .via-cyan-500, .via-purple-500, .via-pink-500, .via-violet-500 {
@@ -102,16 +145,16 @@
 
   .from-violet-500, .to-violet-500 {
     --tw-gradient-from: rgb(79 70 229 / var(--tw-gradient-from-opacity, 1)) !important;
-    --tw-gradient-to: rgb(71 85 105 / var(--tw-gradient-to-opacity, 1)) !important;
+    --tw-gradient-to: rgb(99 102 241 / var(--tw-gradient-to-opacity, 1)) !important;
     --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-to) !important;
   }
 
   .hover\:text-cyan-400:hover, .hover\:text-cyan-300:hover {
-    color: rgb(165 180 252) !important;
+    color: rgb(79 70 229) !important;
   }
 
   .shadow-teal-500\/20, .shadow-cyan-500\/20, .shadow-purple-500\/20, .shadow-pink-500\/20 {
-    --tw-shadow-color: rgb(99 102 241 / 0.2);
+    --tw-shadow-color: rgb(99 102 241 / 0.15);
     --tw-shadow: var(--tw-shadow-colored);
   }
 }

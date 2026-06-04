@@ -1,4 +1,10 @@
 import axios, { AxiosError, InternalAxiosRequestConfig } from 'axios';
+
+declare module 'axios' {
+  export interface AxiosRequestConfig {
+    skipAuthRedirect?: boolean;
+  }
+}
 import { readAccessToken, readRefreshToken, writeTokens } from '../lib/authTokens';
 import { clearAuthState, forceAuthRedirect, type AuthRedirectReason } from '../lib/clearAuthState';
 

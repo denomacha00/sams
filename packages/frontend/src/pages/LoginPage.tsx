@@ -208,51 +208,51 @@ const LoginPage: React.FC = () => {
   return (
     <div className="min-h-screen flex">
       {/* Left panel — branding */}
-      <div className="hidden lg:flex lg:w-1/2 relative overflow-hidden bg-slate-900 border-r border-slate-800 items-center justify-center">
+      <div className="hidden lg:flex lg:w-1/2 relative overflow-hidden bg-white border-r border-line items-center justify-center">
         <div className="relative z-10 text-center px-12">
-          <div className="inline-flex w-28 h-28 rounded-2xl bg-indigo-600 items-center justify-center border border-indigo-500/40 mb-8">
+          <div className="inline-flex w-28 h-28 rounded-2xl bg-brand items-center justify-center shadow-card mb-8">
             <svg className="w-14 h-14 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
             </svg>
           </div>
-          <h1 className="text-5xl font-bold text-slate-50 tracking-tight mb-3">SAMS</h1>
-          <p className="text-lg text-slate-300 font-medium tracking-wide">
+          <h1 className="text-5xl font-bold text-ink tracking-tight mb-3">SAMS</h1>
+          <p className="text-lg text-ink-muted font-medium tracking-wide">
             Smart Attendance Management System
           </p>
-          <p className="text-sm text-slate-500 mt-4 max-w-sm mx-auto leading-relaxed">
+          <p className="text-sm text-ink-subtle mt-4 max-w-sm mx-auto leading-relaxed">
             Multi-school platform with QR, GPS, and biometric attendance for Kenyan institutions.
           </p>
         </div>
       </div>
 
       {/* Right panel — login form */}
-      <div className="flex-1 flex items-center justify-center bg-slate-950 px-6 py-12 relative">
+      <div className="flex-1 flex items-center justify-center bg-surface-muted px-6 py-12 relative">
         <div className="w-full max-w-md">
           {/* Mobile logo (shown on small screens) */}
           <div className="lg:hidden text-center mb-8">
-            <div className="inline-flex items-center justify-center w-20 h-20 rounded-2xl bg-indigo-600 border border-indigo-500/40 mb-4">
+            <div className="inline-flex items-center justify-center w-20 h-20 rounded-2xl bg-brand shadow-card mb-4">
               <svg className="w-10 h-10 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
               </svg>
             </div>
-            <h1 className="text-3xl font-black text-white">SAMS</h1>
-            <p className="text-sm text-gray-400">Smart Attendance Management System</p>
+            <h1 className="text-3xl font-black text-ink">SAMS</h1>
+            <p className="text-sm text-ink-muted">Smart Attendance Management System</p>
           </div>
 
           {/* Form card */}
           <div className="surface-card p-8">
-            <h2 className="text-2xl font-bold text-white mb-1">
+            <h2 className="text-2xl font-bold text-ink mb-1">
               {otpStep ? 'Enter verification code' : 'Welcome back'}
             </h2>
-            <p className="text-gray-400 text-sm mb-8">
+            <p className="text-ink-muted text-sm mb-8">
               {otpStep
                 ? `Code sent${otpDelivery?.email ? ` to ${otpDelivery.email}` : ''}${otpDelivery?.phone ? ` to ${otpDelivery.phone}` : ''}`
                 : 'Sign in to your school account'}
             </p>
 
             {authNotice && (
-              <div className="mb-6 p-3 rounded-xl bg-amber-500/20 border border-amber-400/30">
-                <p className="text-sm text-center font-medium text-amber-200">{authNotice}</p>
+              <div className="mb-6 p-3 rounded-xl bg-amber-50 border border-amber-200">
+                <p className="text-sm text-center font-medium text-amber-800">{authNotice}</p>
               </div>
             )}
 
@@ -293,7 +293,7 @@ const LoginPage: React.FC = () => {
             {otpStep ? (
               <form onSubmit={handleVerifyOtp} className="space-y-5">
                 <div>
-                  <label htmlFor="otpCode" className="block text-sm font-semibold text-gray-300 mb-1.5">
+                  <label htmlFor="otpCode" className="block text-sm font-semibold text-ink mb-1.5">
                     6-digit code
                   </label>
                   <input
@@ -316,7 +316,7 @@ const LoginPage: React.FC = () => {
                   type="button"
                   onClick={handleResendOtp}
                   disabled={resendLoading || resendCooldown > 0}
-                  className="w-full text-sm text-indigo-400 hover:text-indigo-300 disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="w-full text-sm text-brand hover:text-brand-hover disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {resendLoading
                     ? 'Sending...'
@@ -327,7 +327,7 @@ const LoginPage: React.FC = () => {
                 <button
                   type="button"
                   onClick={() => { setOtpStep(false); setOtpCode(''); clearError(); }}
-                  className="w-full text-sm text-slate-400 hover:text-indigo-300"
+                  className="w-full text-sm text-ink-muted hover:text-brand"
                 >
                   ← Back to password login
                 </button>
@@ -335,7 +335,7 @@ const LoginPage: React.FC = () => {
             ) : (
             <form onSubmit={handleSubmit} className="space-y-5">
               <div>
-                <label htmlFor="identifier" className="block text-sm font-semibold text-gray-300 mb-1.5">
+                <label htmlFor="identifier" className="block text-sm font-semibold text-ink mb-1.5">
                   Username / Phone / Email / ADM
                 </label>
                 <input
@@ -350,7 +350,7 @@ const LoginPage: React.FC = () => {
               </div>
 
               <div>
-                <label htmlFor="password" className="block text-sm font-semibold text-gray-300 mb-1.5">
+                <label htmlFor="password" className="block text-sm font-semibold text-ink mb-1.5">
                   Password
                 </label>
                 <div className="relative">
@@ -366,7 +366,7 @@ const LoginPage: React.FC = () => {
                   <button
                     type="button"
                     onClick={() => setShowPassword(!showPassword)}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-white transition-colors"
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-ink-subtle hover:text-ink transition-colors"
                   >
                     {showPassword ? (
                       <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21" /></svg>
@@ -393,7 +393,7 @@ const LoginPage: React.FC = () => {
             )}
 
             {!otpStep && (
-            <div className="mt-6 pt-6 border-t border-white/10 text-center space-y-3">
+            <div className="mt-6 pt-6 border-t border-line text-center space-y-3">
               {/* WebAuthn Fingerprint Sign-In for Teachers */}
               {webauthnAvailable && (
                 <div className="mb-3">
@@ -419,10 +419,10 @@ const LoginPage: React.FC = () => {
                 </div>
               )}
 
-              <Link to="/forgot-password" className="block text-sm text-slate-400 hover:text-indigo-300 font-medium transition-colors">
+              <Link to="/forgot-password" className="block text-sm text-ink-muted hover:text-brand font-medium transition-colors">
                 Forgot your password?
               </Link>
-              <Link to="/activate" className="block text-sm text-indigo-400 hover:text-indigo-300 font-semibold transition-colors">
+              <Link to="/activate" className="block text-sm text-brand hover:text-brand-hover font-semibold transition-colors">
                 Activate a new school →
               </Link>
             </div>
@@ -431,9 +431,9 @@ const LoginPage: React.FC = () => {
 
           {/* Footer */}
           <div className="text-center mt-6">
-            <p className="text-xs text-gray-500">© 2025 SAMS · Smart Attendance Management System</p>
-            <p className="text-xs text-gray-500 mt-1">
-              Developed by <span className="text-indigo-400 font-medium">Denis Macharia</span> · <a href="tel:+254703285246" className="text-indigo-400 hover:text-indigo-300">+254 703 285 246</a>
+            <p className="text-xs text-ink-subtle">© 2025 SAMS · Smart Attendance Management System</p>
+            <p className="text-xs text-ink-subtle mt-1">
+              Developed by <span className="text-brand font-medium">Denis Macharia</span> · <a href="tel:+254703285246" className="text-brand hover:text-brand-hover">+254 703 285 246</a>
             </p>
           </div>
         </div>

@@ -107,19 +107,19 @@ const SectionHeader: React.FC<{ title: string; icon: string; gradient: string }>
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={icon} />
         </svg>
       </div>
-      <h3 className="text-lg font-semibold text-white tracking-tight">{title}</h3>
+      <h3 className="text-lg font-semibold text-ink tracking-tight">{title}</h3>
     </div>
-    <div className="h-px bg-slate-700/70" />
+    <div className="h-px bg-line" />
   </div>
 );
 
 // ─── Skeleton Loader ─────────────────────────────────────────────────────────
 
 const SkeletonCard: React.FC = () => (
-  <div className="animate-pulse rounded-2xl border border-white/10 bg-white/5 p-6 min-h-[140px]">
-    <div className="w-12 h-12 rounded-xl bg-white/10 mb-4" />
-    <div className="h-4 w-20 bg-white/10 rounded mb-2" />
-    <div className="h-8 w-16 bg-white/10 rounded" />
+  <div className="animate-pulse rounded-2xl border border-line bg-slate-100 p-6 min-h-[140px]">
+    <div className="w-12 h-12 rounded-xl bg-slate-200 mb-4" />
+    <div className="h-4 w-20 bg-slate-200 rounded mb-2" />
+    <div className="h-8 w-16 bg-slate-200 rounded" />
   </div>
 );
 
@@ -127,7 +127,7 @@ const SkeletonCard: React.FC = () => (
 
 const AnimatedStatCard: React.FC<{ stat: StatCard; index: number }> = ({ stat, index }) => (
   <div
-    className="relative overflow-hidden rounded-2xl border border-slate-700/80 bg-slate-900/80 p-6 min-h-[140px] hover:bg-slate-800/80 hover:border-slate-600 transition-all duration-300 group cursor-default"
+    className="group stat-card"
     style={{
       animationDelay: `${index * 100}ms`,
       animation: 'fadeInUp 0.5s ease-out forwards',
@@ -141,8 +141,8 @@ const AnimatedStatCard: React.FC<{ stat: StatCard; index: number }> = ({ stat, i
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d={stat.icon} />
         </svg>
       </div>
-      <p className="text-sm text-gray-400 mb-1 font-medium">{stat.label}</p>
-      <p className="text-2xl font-bold text-white tracking-tight">{stat.value}</p>
+      <p className="text-sm text-ink-muted mb-1 font-medium">{stat.label}</p>
+      <p className="text-2xl font-bold text-ink tracking-tight">{stat.value}</p>
     </div>
   </div>
 );
@@ -166,7 +166,7 @@ const QuickActionButton: React.FC<{ action: QuickAction; index: number }> = ({ a
   return (
   <Link
     to={action.to}
-    className="group relative overflow-hidden rounded-2xl border border-slate-700/80 bg-slate-900/80 p-5 min-h-[120px] hover:bg-slate-800/80 hover:border-slate-600 transition-all duration-300 flex flex-col justify-between"
+    className="group quick-action-card"
     style={{ animationDelay: `${(index + 4) * 80}ms`, animation: 'fadeInUp 0.5s ease-out forwards', opacity: 0 }}
   >
     <div className={`absolute top-0 left-0 right-0 h-px bg-gradient-to-r ${topBarClass} opacity-40 group-hover:opacity-70 transition-opacity duration-300`} />
@@ -176,10 +176,10 @@ const QuickActionButton: React.FC<{ action: QuickAction; index: number }> = ({ a
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d={action.icon} />
         </svg>
       </div>
-      <h3 className="text-sm font-medium text-white/90 group-hover:text-white transition-colors">{action.label}</h3>
+      <h3 className="text-sm font-medium text-ink group-hover:text-brand transition-colors">{action.label}</h3>
     </div>
     <div className="absolute bottom-4 right-4 opacity-0 group-hover:opacity-100 transition-all duration-300 translate-x-2 group-hover:translate-x-0">
-      <svg className="w-4 h-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+      <svg className="w-4 h-4 text-ink-subtle" fill="none" viewBox="0 0 24 24" stroke="currentColor">
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 8l4 4m0 0l-4 4m4-4H3" />
       </svg>
     </div>
@@ -205,8 +205,7 @@ function getAtAGlanceTitle(role?: UserRole): string {
   }
 }
 
-const panelShellClass =
-  'rounded-2xl border border-white/10 bg-white/[0.03] backdrop-blur-md p-6 min-h-[280px]';
+const panelShellClass = 'surface-panel';
 const panelAnimStyle = { animation: 'fadeInUp 0.5s ease-out 0.6s forwards', opacity: 0 };
 
 const AtAGlancePanel: React.FC<{ role?: UserRole; userId?: string }> = ({ role, userId }) => {
@@ -277,30 +276,30 @@ const AtAGlancePanel: React.FC<{ role?: UserRole; userId?: string }> = ({ role, 
             />
           </svg>
         </div>
-        <h3 className="text-lg font-semibold text-white">{title}</h3>
+        <h3 className="text-lg font-semibold text-ink">{title}</h3>
       </div>
 
       {loading ? (
         <div className="space-y-3">
           {[1, 2, 3].map((i) => (
-            <div key={i} className="animate-pulse h-12 rounded-xl bg-white/5" />
+            <div key={i} className="animate-pulse h-12 rounded-xl bg-slate-100" />
           ))}
         </div>
       ) : role === UserRole.STUDENT ? (
         <div className="space-y-4">
           <div className="text-center py-4">
-            <p className="text-4xl font-bold text-emerald-300">{studentPresent}</p>
-            <p className="text-sm text-gray-400 mt-1">classes marked present today</p>
+            <p className="text-4xl font-bold text-emerald-600">{studentPresent}</p>
+            <p className="text-sm text-ink-muted mt-1">classes marked present today</p>
           </div>
           <Link
             to="/reports"
-            className="block text-center text-sm text-indigo-300 hover:text-indigo-200 transition-colors py-2"
+            className="block text-center text-sm text-brand hover:text-brand-hover transition-colors py-2"
           >
             View my attendance reports →
           </Link>
           <Link
             to="/timetable"
-            className="block text-center text-sm text-gray-400 hover:text-gray-300 transition-colors"
+            className="block text-center text-sm text-ink-muted hover:text-ink-muted transition-colors"
           >
             Open full timetable →
           </Link>
@@ -309,26 +308,26 @@ const AtAGlancePanel: React.FC<{ role?: UserRole; userId?: string }> = ({ role, 
         <div className="space-y-3">
           {activeSessions.length === 0 ? (
             <div className="text-center py-6">
-              <p className="text-gray-400 text-sm mb-1">No active sessions</p>
-              <p className="text-xs text-gray-500">Use Sign In Students above to start a session and show the QR code.</p>
+              <p className="text-ink-muted text-sm mb-1">No active sessions</p>
+              <p className="text-xs text-ink-subtle">Use Sign In Students above to start a session and show the QR code.</p>
             </div>
           ) : (
             <>
-              <p className="text-xs font-medium text-emerald-400/90 uppercase tracking-wide">Active now</p>
+              <p className="text-xs font-medium text-emerald-600 uppercase tracking-wide">Active now</p>
               {activeSessions.map((s) => (
                 <Link
                   key={s.id}
                   to="/sessions"
-                  className="flex items-center justify-between p-3 rounded-xl bg-white/[0.03] hover:bg-white/[0.07] border border-white/5 hover:border-emerald-500/30 transition-all"
+                  className="surface-muted-row hover:border-emerald-300"
                 >
                   <div>
-                    <p className="text-sm text-white font-medium">{s.subject}</p>
-                    {s.className && <p className="text-xs text-gray-500">{s.className}</p>}
+                    <p className="text-sm text-ink font-medium">{s.subject}</p>
+                    {s.className && <p className="text-xs text-ink-subtle">{s.className}</p>}
                   </div>
-                  <span className="text-xs font-semibold text-emerald-400">Live</span>
+                  <span className="text-xs font-semibold text-emerald-600">Live</span>
                 </Link>
               ))}
-              <Link to="/sessions" className="block text-center text-sm text-indigo-300 hover:text-indigo-200 pt-1">
+              <Link to="/sessions" className="block text-center text-sm text-brand hover:text-brand-hover pt-1">
                 Manage session & QR →
               </Link>
             </>
@@ -336,13 +335,13 @@ const AtAGlancePanel: React.FC<{ role?: UserRole; userId?: string }> = ({ role, 
         </div>
       ) : role === UserRole.HOD ? (
         <div className="space-y-3">
-          <div className="flex items-center justify-between p-3 rounded-xl bg-white/[0.03] border border-white/5">
-            <span className="text-sm text-gray-300">Unread notifications</span>
-            <span className={`text-sm font-semibold ${unreadCount > 0 ? 'text-amber-300' : 'text-indigo-300'}`}>
+          <div className="surface-muted-row">
+            <span className="text-sm text-ink-muted">Unread notifications</span>
+            <span className={`text-sm font-semibold ${unreadCount > 0 ? 'text-amber-600' : 'text-brand'}`}>
               {unreadCount}
             </span>
           </div>
-          <p className="text-xs text-gray-500 px-1">
+          <p className="text-xs text-ink-subtle px-1">
             Use Quick Actions below for department tools, timetable, and reports.
           </p>
           {unreadCount > 0 && (
@@ -356,13 +355,13 @@ const AtAGlancePanel: React.FC<{ role?: UserRole; userId?: string }> = ({ role, 
         </div>
       ) : role === UserRole.SCHOOL_ADMIN ? (
         <div className="space-y-3">
-          <div className="flex items-center justify-between p-3 rounded-xl bg-white/[0.03] border border-white/5">
-            <span className="text-sm text-gray-300">Unread notifications</span>
-            <span className={`text-sm font-semibold ${unreadCount > 0 ? 'text-amber-300' : 'text-indigo-300'}`}>
+          <div className="surface-muted-row">
+            <span className="text-sm text-ink-muted">Unread notifications</span>
+            <span className={`text-sm font-semibold ${unreadCount > 0 ? 'text-amber-600' : 'text-brand'}`}>
               {unreadCount}
             </span>
           </div>
-          <p className="text-xs text-gray-500 px-1">
+          <p className="text-xs text-ink-subtle px-1">
             Manage users, departments, and registration links from Quick Actions.
           </p>
           {unreadCount > 0 && (
@@ -375,7 +374,7 @@ const AtAGlancePanel: React.FC<{ role?: UserRole; userId?: string }> = ({ role, 
           )}
         </div>
       ) : (
-        <p className="text-gray-500 text-sm text-center py-8">Welcome to SAMS</p>
+        <p className="text-ink-subtle text-sm text-center py-8">Welcome to SAMS</p>
       )}
     </div>
   );
@@ -435,41 +434,41 @@ const ActivityFeed: React.FC = () => {
   };
 
   return (
-    <div className="rounded-2xl border border-white/10 bg-white/[0.03] backdrop-blur-md p-6 min-h-[280px]" style={{ animation: 'fadeInUp 0.5s ease-out 0.7s forwards', opacity: 0 }}>
+    <div className="surface-panel" style={{ animation: 'fadeInUp 0.5s ease-out 0.7s forwards', opacity: 0 }}>
       <div className="flex items-center gap-3 mb-5">
       <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-indigo-600 to-slate-700 flex items-center justify-center shadow-lg shadow-indigo-500/20">
           <svg className="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={ICONS.trending} />
           </svg>
         </div>
-        <h3 className="text-lg font-semibold text-white">Recent Activity</h3>
+        <h3 className="text-lg font-semibold text-ink">Recent Activity</h3>
       </div>
       {loading ? (
         <div className="space-y-3">
           {[1, 2, 3].map((i) => (
-            <div key={i} className="animate-pulse flex items-center gap-3 p-3 rounded-xl bg-white/5">
-              <div className="w-2.5 h-2.5 rounded-full bg-white/10 shrink-0" />
-              <div className="flex-1 h-3 bg-white/10 rounded" />
-              <div className="w-16 h-3 bg-white/10 rounded" />
+            <div key={i} className="animate-pulse flex items-center gap-3 p-3 rounded-xl bg-slate-100">
+              <div className="w-2.5 h-2.5 rounded-full bg-slate-200 shrink-0" />
+              <div className="flex-1 h-3 bg-slate-200 rounded" />
+              <div className="w-16 h-3 bg-slate-200 rounded" />
             </div>
           ))}
         </div>
       ) : items.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-8">
-          <div className="w-10 h-10 rounded-full bg-white/5 flex items-center justify-center mb-3">
-            <svg className="w-5 h-5 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <div className="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center mb-3">
+            <svg className="w-5 h-5 text-ink-subtle" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d={ICONS.bell} />
             </svg>
           </div>
-          <p className="text-gray-500 text-sm">No recent activity</p>
+          <p className="text-ink-subtle text-sm">No recent activity</p>
         </div>
       ) : (
         <div className="space-y-3">
           {items.map((item) => (
-            <div key={item.id} className="flex items-center gap-3 p-3 rounded-xl bg-white/[0.02] hover:bg-white/[0.05] border border-white/5 hover:border-white/10 transition-all duration-300">
+            <div key={item.id} className="flex items-center gap-3 p-3 rounded-xl bg-slate-50 hover:bg-slate-100 border border-line transition-all duration-300">
               <div className={`w-2.5 h-2.5 rounded-full ${typeColor[item.type] ?? 'bg-gray-500'} shadow-sm shrink-0`} />
-              <p className="text-sm text-gray-300 flex-1 truncate">{item.message}</p>
-              <span className="text-xs text-gray-500 font-medium shrink-0">{formatRelative(item.createdAt)}</span>
+              <p className="text-sm text-ink-muted flex-1 truncate">{item.message}</p>
+              <span className="text-xs text-ink-subtle font-medium shrink-0">{formatRelative(item.createdAt)}</span>
             </div>
           ))}
         </div>
@@ -869,11 +868,11 @@ const TeacherClassPanel: React.FC<{ classId?: string; attendanceRate?: string }>
         className="rounded-2xl border border-amber-500/30 bg-amber-500/10 p-6 min-h-[280px]"
         style={{ animation: 'fadeInUp 0.5s ease-out 0.7s forwards', opacity: 0 }}
       >
-        <h3 className="text-lg font-semibold text-amber-100 mb-2">No class assigned</h3>
-        <p className="text-sm text-amber-200/90 mb-4">
+        <h3 className="text-lg font-semibold text-amber-800 mb-2">No class assigned</h3>
+        <p className="text-sm text-amber-700 mb-4">
           You must be assigned as class teacher before you can see students. Ask your HOD or school admin to assign your class in user management.
         </p>
-        <Link to="/profile" className="text-sm text-indigo-300 hover:text-indigo-200">
+        <Link to="/profile" className="text-sm text-brand hover:text-brand-hover">
           View profile →
         </Link>
       </div>
@@ -884,7 +883,7 @@ const TeacherClassPanel: React.FC<{ classId?: string; attendanceRate?: string }>
 
   return (
     <div
-      className="rounded-2xl border border-slate-700 bg-slate-900/80 p-6 min-h-[280px]"
+      className="surface-panel"
       style={{ animation: 'fadeInUp 0.5s ease-out 0.7s forwards', opacity: 0 }}
     >
       <div className="flex items-center justify-between gap-3 mb-5">
@@ -895,8 +894,8 @@ const TeacherClassPanel: React.FC<{ classId?: string; attendanceRate?: string }>
             </svg>
           </div>
           <div>
-            <h3 className="text-lg font-semibold text-white">My Class</h3>
-            {className && <p className="text-xs text-gray-400">{className}</p>}
+            <h3 className="text-lg font-semibold text-ink">My Class</h3>
+            {className && <p className="text-xs text-ink-muted">{className}</p>}
           </div>
         </div>
         <span className="text-sm font-semibold text-teal-400">
@@ -910,41 +909,41 @@ const TeacherClassPanel: React.FC<{ classId?: string; attendanceRate?: string }>
         </Link>
         <Link
           to="/class-roster"
-          className="text-xs py-2 px-4 rounded-xl border border-white/10 text-gray-200 hover:bg-white/5 transition-colors"
+          className="text-xs py-2 px-4 rounded-xl border border-line text-ink-muted hover:bg-slate-50 transition-colors"
         >
           Class Roster
         </Link>
       </div>
 
-      <div className="flex items-center justify-between p-3 rounded-xl bg-white/[0.03] border border-white/5 mb-4">
-        <span className="text-sm text-gray-300">Class attendance rate</span>
+      <div className="surface-muted-row mb-4">
+        <span className="text-sm text-ink-muted">Class attendance rate</span>
         <span className="text-sm font-semibold text-blue-400">{attendanceRate ?? '—'}</span>
       </div>
 
       {loading ? (
         <div className="space-y-2">
           {[1, 2, 3].map((i) => (
-            <div key={i} className="animate-pulse h-10 rounded-xl bg-white/5" />
+            <div key={i} className="animate-pulse h-10 rounded-xl bg-slate-100" />
           ))}
         </div>
       ) : preview.length === 0 ? (
-        <p className="text-sm text-gray-500 text-center py-4">No students in this class yet.</p>
+        <p className="text-sm text-ink-subtle text-center py-4">No students in this class yet.</p>
       ) : (
         <ul className="space-y-2">
           {preview.map((s) => (
             <li
               key={s.id}
-              className="flex items-center justify-between p-3 rounded-xl bg-white/[0.03] border border-white/5"
+              className="surface-muted-row"
             >
-              <span className="text-sm text-white">{s.fullName}</span>
+              <span className="text-sm text-ink">{s.fullName}</span>
               {s.isClassRep && (
-                <span className="text-xs text-indigo-300 font-medium">Class rep</span>
+                <span className="text-xs text-brand font-medium">Class rep</span>
               )}
             </li>
           ))}
           {students.length > preview.length && (
             <li className="text-center pt-1">
-              <Link to="/class/students" className="text-xs text-indigo-300 hover:text-indigo-200">
+              <Link to="/class/students" className="text-xs text-brand hover:text-brand-hover">
                 View all {students.length} students →
               </Link>
             </li>
@@ -968,7 +967,7 @@ const HodDepartmentPanel: React.FC<{ stats: StatCard[]; departmentName?: string 
 
   return (
     <div
-      className="rounded-2xl border border-white/10 bg-white/[0.03] backdrop-blur-md p-6 min-h-[280px]"
+      className="surface-panel"
       style={{ animation: 'fadeInUp 0.5s ease-out 0.7s forwards', opacity: 0 }}
     >
       <div className="flex items-center gap-3 mb-5">
@@ -978,33 +977,33 @@ const HodDepartmentPanel: React.FC<{ stats: StatCard[]; departmentName?: string 
           </svg>
         </div>
         <div>
-          <h3 className="text-lg font-semibold text-white">Department Overview</h3>
+          <h3 className="text-lg font-semibold text-ink">Department Overview</h3>
           {departmentName && (
             <p className="text-xs text-indigo-300/90">{departmentName}</p>
           )}
         </div>
       </div>
       <div className="space-y-3">
-        <div className="flex items-center justify-between p-3 rounded-xl bg-white/[0.03] border border-white/5">
-          <span className="text-sm text-gray-300">Students</span>
+        <div className="surface-muted-row">
+          <span className="text-sm text-ink-muted">Students</span>
           <span className="text-sm font-semibold text-teal-400">{deptStudents}</span>
         </div>
-        <div className="flex items-center justify-between p-3 rounded-xl bg-white/[0.03] border border-white/5">
-          <span className="text-sm text-gray-300">Teachers</span>
+        <div className="surface-muted-row">
+          <span className="text-sm text-ink-muted">Teachers</span>
           <span className="text-sm font-semibold text-blue-400">{deptTeachers}</span>
         </div>
-        <div className="flex items-center justify-between p-3 rounded-xl bg-white/[0.03] border border-white/5">
-          <span className="text-sm text-gray-300">Avg. Attendance</span>
+        <div className="surface-muted-row">
+          <span className="text-sm text-ink-muted">Avg. Attendance</span>
           <span className="text-sm font-semibold text-emerald-400">{attendanceRate}</span>
         </div>
-        <div className="flex items-center justify-between p-3 rounded-xl bg-white/[0.03] border border-white/5">
-          <span className="text-sm text-gray-300">High Risk Students</span>
+        <div className="surface-muted-row">
+          <span className="text-sm text-ink-muted">High Risk Students</span>
           <span className="text-sm font-semibold text-amber-400">{atRisk}</span>
         </div>
       </div>
       <Link
         to="/hod/department"
-        className="block text-center text-sm text-indigo-300 hover:text-indigo-200 mt-4"
+        className="block text-center text-sm text-brand hover:text-brand-hover mt-4"
       >
         Open department management →
       </Link>
@@ -1113,37 +1112,37 @@ const DashboardPage: React.FC = () => {
       `}</style>
 
       {/* Header */}
-      <header className="relative border-b border-slate-800 bg-slate-950/95 sticky top-0 z-50">
+      <header className="app-header">
         <div className="relative max-w-7xl mx-auto px-6 lg:px-8 py-4 flex items-center justify-between">
           <div className="flex items-center gap-4">
-            <div className="w-10 h-10 rounded-xl bg-indigo-600 flex items-center justify-center ring-1 ring-indigo-500/30">
+            <div className="w-10 h-10 rounded-xl bg-brand flex items-center justify-center shadow-sm">
               <svg className="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
               </svg>
             </div>
             <div>
-              <h1 className="text-lg font-bold text-white tracking-tight">SAMS</h1>
-              <p className="text-xs text-gray-400 font-medium">Smart Attendance Management</p>
+              <h1 className="text-lg font-bold text-ink tracking-tight">SAMS</h1>
+              <p className="text-xs text-ink-muted font-medium">Smart Attendance Management</p>
             </div>
           </div>
 
           <div className="flex items-center gap-3">
             {/* Date & Time */}
             <div className="hidden md:flex flex-col items-end mr-2">
-              <span className="text-sm text-gray-300 font-medium">{currentTime}</span>
-              <span className="text-xs text-gray-500">{formatDate()}</span>
+              <span className="text-sm text-ink font-medium">{currentTime}</span>
+              <span className="text-xs text-ink-muted">{formatDate()}</span>
             </div>
 
             {/* Notifications */}
             <Link
               to="/notifications"
-              className="relative w-9 h-9 rounded-lg bg-white/[0.04] border border-white/10 flex items-center justify-center hover:bg-white/[0.08] hover:border-white/20 transition-all duration-300"
+              className="nav-icon-btn"
             >
-              <svg className="w-4 h-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <svg className="w-4 h-4 text-ink-muted" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={ICONS.bell} />
               </svg>
               {unreadCount > 0 && (
-                <span className="absolute -top-1.5 -right-1.5 min-w-[1.1rem] h-[1.1rem] px-0.5 bg-red-500 rounded-full border-2 border-slate-900 shadow-lg shadow-red-500/30 flex items-center justify-center text-[9px] font-bold text-white">
+                <span className="absolute -top-1.5 -right-1.5 min-w-[1.1rem] h-[1.1rem] px-0.5 bg-red-500 rounded-full border-2 border-white shadow-md flex items-center justify-center text-[9px] font-bold text-white">
                   {unreadCount > 99 ? '99+' : unreadCount}
                 </span>
               )}
@@ -1152,10 +1151,8 @@ const DashboardPage: React.FC = () => {
             {/* Profile */}
             <Link
               to="/profile"
-              className={`relative w-9 h-9 rounded-lg border flex items-center justify-center hover:bg-white/[0.08] transition-all duration-300 ${
-                location.pathname === '/profile'
-                  ? 'bg-white/10 border-indigo-500/50 text-indigo-300'
-                  : 'bg-white/[0.04] border-white/10 text-gray-400'
+              className={`nav-icon-btn ${
+                location.pathname === '/profile' ? 'nav-icon-btn-active' : ''
               }`}
               title="Profile"
             >
@@ -1167,10 +1164,8 @@ const DashboardPage: React.FC = () => {
             {/* Settings */}
             <Link
               to="/settings"
-              className={`relative w-9 h-9 rounded-lg border flex items-center justify-center hover:bg-white/[0.08] transition-all duration-300 ${
-                location.pathname === '/settings'
-                  ? 'bg-white/10 border-indigo-500/50 text-indigo-300'
-                  : 'bg-white/[0.04] border-white/10 text-gray-400'
+              className={`nav-icon-btn ${
+                location.pathname === '/settings' ? 'nav-icon-btn-active' : ''
               }`}
               title="Settings"
             >
@@ -1190,7 +1185,7 @@ const DashboardPage: React.FC = () => {
               </Link>
               <button
                 onClick={handleLogout}
-                className="text-sm text-gray-400 hover:text-red-400 px-3 py-1.5 rounded-lg hover:bg-red-500/10 border border-transparent hover:border-red-500/20 transition-all duration-300"
+                className="text-sm text-ink-muted hover:text-red-600 px-3 py-1.5 rounded-lg hover:bg-red-50 border border-transparent hover:border-red-200 transition-all duration-300"
               >
                 Sign Out
               </button>
@@ -1208,23 +1203,23 @@ const DashboardPage: React.FC = () => {
           <div className="relative z-10 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
             <div>
               <div className="flex flex-col sm:flex-row sm:items-center gap-3 mb-2">
-                <h2 className="text-3xl lg:text-4xl font-bold text-white tracking-tight">
+                <h2 className="text-3xl lg:text-4xl font-bold text-ink tracking-tight">
                   Welcome back, {user?.fullName?.split(' ')[0] || 'User'}
                 </h2>
-                <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold text-indigo-100 bg-indigo-600/30 border border-indigo-500/40 w-fit">
+                <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold text-brand bg-brand-light border border-brand/20 w-fit">
                   {getRoleLabel(user?.role)}
                 </span>
                 {user?.role === UserRole.HOD && departmentName && (
-                  <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium text-indigo-100 bg-indigo-600/20 border border-indigo-500/30 w-fit">
+                  <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium text-brand bg-brand-light border border-brand/15 w-fit">
                     {departmentName}
                   </span>
                 )}
               </div>
-              <p className="text-slate-400 text-base max-w-lg">
+              <p className="text-ink-muted text-base max-w-lg">
                 {getRoleGreeting(user?.role)}
               </p>
               {user?.role === UserRole.TEACHER && !user?.classId && (
-                <p className="mt-3 text-sm text-amber-300/90 max-w-lg">
+                <p className="mt-3 text-sm text-amber-700 max-w-lg">
                   No class is assigned to your account yet — student lists and class stats stay empty until an admin assigns you as class teacher.
                 </p>
               )}
@@ -1252,8 +1247,8 @@ const DashboardPage: React.FC = () => {
               )}
             </div>
             <div className="hidden lg:flex flex-col items-end">
-              <div className="text-2xl font-bold text-white/90 tracking-tight">{currentTime}</div>
-              <div className="text-sm text-gray-400">{formatDate()}</div>
+              <div className="text-2xl font-bold text-ink tracking-tight">{currentTime}</div>
+              <div className="text-sm text-ink-muted">{formatDate()}</div>
             </div>
           </div>
         </div>
@@ -1275,7 +1270,7 @@ const DashboardPage: React.FC = () => {
           <div className="space-y-8">
             {quickActionGroups.map((group) => (
               <div key={group.title}>
-                <h4 className="text-sm font-medium text-slate-400 mb-3 uppercase tracking-wide">{group.title}</h4>
+                <h4 className="text-sm font-medium text-ink-muted mb-3 uppercase tracking-wide">{group.title}</h4>
                 <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
                   {group.actions.map((action) => {
                     const index = quickActionIndex++;
@@ -1308,24 +1303,24 @@ const DashboardPage: React.FC = () => {
             )}
 
             {user?.role === UserRole.STUDENT && (
-              <div className="rounded-2xl border border-white/10 bg-white/[0.03] backdrop-blur-md p-6 min-h-[280px]" style={{ animation: 'fadeInUp 0.5s ease-out 0.7s forwards', opacity: 0 }}>
+              <div className="surface-panel" style={{ animation: 'fadeInUp 0.5s ease-out 0.7s forwards', opacity: 0 }}>
                 <div className="flex items-center gap-3 mb-5">
                   <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-emerald-600 to-teal-600 flex items-center justify-center shadow-lg shadow-emerald-500/20">
                     <svg className="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={ICONS.fire} />
                     </svg>
                   </div>
-                  <h3 className="text-lg font-semibold text-white">Attendance Streak</h3>
+                  <h3 className="text-lg font-semibold text-ink">Attendance Streak</h3>
                 </div>
                 <div className="text-center py-6">
                   <div className="text-5xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-emerald-300 to-teal-300 mb-2">
                     {daysPresentStat ?? '—'}
                   </div>
-                  <p className="text-sm text-gray-400">days present (term total)</p>
+                  <p className="text-sm text-ink-muted">days present (term total)</p>
                 </div>
                 <Link
                   to="/reports"
-                  className="block text-center text-sm text-indigo-300 hover:text-indigo-200"
+                  className="block text-center text-sm text-brand hover:text-brand-hover"
                 >
                   View full attendance history →
                 </Link>
@@ -1340,9 +1335,9 @@ const DashboardPage: React.FC = () => {
       </main>
 
       {/* Footer */}
-      <footer className="relative border-t border-white/[0.05] mt-16 py-8">
+      <footer className="relative border-t border-line mt-16 py-8">
         <div className="max-w-7xl mx-auto px-6 lg:px-8 text-center">
-          <p className="text-xs text-gray-500">© 2025 SAMS · Developed by Denis Macharia</p>
+          <p className="text-xs text-ink-subtle">© 2025 SAMS · Developed by Denis Macharia</p>
         </div>
       </footer>
     </div>

@@ -7,19 +7,39 @@ export default {
   theme: {
     extend: {
       colors: {
+        surface: {
+          DEFAULT: 'var(--color-surface, #ffffff)',
+          muted: 'var(--color-surface-muted, #f6f6f6)',
+          elevated: 'var(--color-surface-elevated, #ffffff)',
+        },
+        ink: {
+          DEFAULT: 'var(--color-text, #1d1d1d)',
+          muted: 'var(--color-text-muted, #64748b)',
+          subtle: 'var(--color-text-subtle, #94a3b8)',
+        },
+        line: {
+          DEFAULT: 'var(--color-border, #e2e8f0)',
+          strong: 'var(--color-border-strong, #cbd5e1)',
+        },
+        brand: {
+          DEFAULT: 'var(--color-brand, #4f46e5)',
+          hover: 'var(--color-brand-hover, #4338ca)',
+          light: 'var(--color-brand-light, #eef2ff)',
+          foreground: '#ffffff',
+        },
         // School branding support — override via CSS variables
         primary: {
-          50: 'var(--color-primary-50, #eff6ff)',
-          100: 'var(--color-primary-100, #dbeafe)',
-          200: 'var(--color-primary-200, #bfdbfe)',
-          300: 'var(--color-primary-300, #93c5fd)',
-          400: 'var(--color-primary-400, #60a5fa)',
-          500: 'var(--color-primary-500, #3b82f6)',
-          600: 'var(--color-primary-600, #2563eb)',
-          700: 'var(--color-primary-700, #1d4ed8)',
-          800: 'var(--color-primary-800, #1e40af)',
-          900: 'var(--color-primary-900, #1e3a8a)',
-          950: 'var(--color-primary-950, #172554)',
+          50: 'var(--color-primary-50, #eef2ff)',
+          100: 'var(--color-primary-100, #e0e7ff)',
+          200: 'var(--color-primary-200, #c7d2fe)',
+          300: 'var(--color-primary-300, #a5b4fc)',
+          400: 'var(--color-primary-400, #818cf8)',
+          500: 'var(--color-primary-500, #6366f1)',
+          600: 'var(--color-primary-600, #4f46e5)',
+          700: 'var(--color-primary-700, #4338ca)',
+          800: 'var(--color-primary-800, #3730a3)',
+          900: 'var(--color-primary-900, #312e81)',
+          950: 'var(--color-primary-950, #1e1b4b)',
         },
         accent: {
           50: 'var(--color-accent-50, #f0fdf4)',
@@ -37,6 +57,10 @@ export default {
       },
       fontFamily: {
         sans: ['Inter', 'system-ui', '-apple-system', 'sans-serif'],
+      },
+      boxShadow: {
+        card: '0 1px 3px 0 rgb(0 0 0 / 0.06), 0 1px 2px -1px rgb(0 0 0 / 0.06)',
+        'card-hover': '0 4px 12px 0 rgb(0 0 0 / 0.08)',
       },
     },
   },
