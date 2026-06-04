@@ -128,8 +128,8 @@ const ManualAttendancePage: React.FC = () => {
   const getStatusColor = (status: AttendanceStatus) => {
     switch (status) {
       case AttendanceStatus.PRESENT: return 'text-orange-400';
-      case AttendanceStatus.LATE: return 'text-amber-700';
-      case AttendanceStatus.EXCUSED: return 'text-blue-700';
+      case AttendanceStatus.LATE: return 'text-orange-400';
+      case AttendanceStatus.EXCUSED: return 'text-indigo-300';
       case AttendanceStatus.ABSENT: return 'text-red-700';
       default: return 'text-ink-muted';
     }
@@ -152,7 +152,7 @@ const ManualAttendancePage: React.FC = () => {
 
         {error && (
           <div className="mb-4 p-3 alert-error">
-            <p className="text-sm text-red-800 text-center">{error}</p>
+            <p className="text-sm text-red-300 text-center">{error}</p>
           </div>
         )}
 
@@ -165,7 +165,7 @@ const ManualAttendancePage: React.FC = () => {
             id="session"
             value={sessionId}
             onChange={(e) => setSessionId(e.target.value)}
-            className="w-full input-field focus:outline-none focus:ring-2 focus:ring-purple-500/50 transition-all duration-200 appearance-none"
+            className="w-full input-field focus:outline-none focus:ring-2 focus:ring-indigo-500/50 transition-all duration-200 appearance-none"
           >
             <option value="" className="bg-slate-800">-- Select Session --</option>
             {sessions.map((s) => (
@@ -175,7 +175,7 @@ const ManualAttendancePage: React.FC = () => {
             ))}
           </select>
           {sessions.length === 0 && (
-            <p className="text-xs text-amber-800 mt-2">
+            <p className="text-xs text-orange-400 mt-2">
               No active session. Start one from{' '}
               <a href="/sessions" className="text-brand hover:text-brand-hover underline">
                 Sign In Students
@@ -215,11 +215,11 @@ const ManualAttendancePage: React.FC = () => {
                   <select
                     value={marks[student.id]?.status || AttendanceStatus.PRESENT}
                     onChange={(e) => updateMark(student.id, 'status', e.target.value)}
-                    className={`bg-surface-muted border border-line rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500/50 appearance-none ${getStatusColor(marks[student.id]?.status)}`}
+                    className={`bg-surface-muted border border-line rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/50 appearance-none ${getStatusColor(marks[student.id]?.status)}`}
                   >
                     <option value={AttendanceStatus.PRESENT} className="bg-slate-800 text-orange-400">Present</option>
-                    <option value={AttendanceStatus.LATE} className="bg-slate-800 text-yellow-400">Late</option>
-                    <option value={AttendanceStatus.EXCUSED} className="bg-slate-800 text-blue-400">Excused</option>
+                    <option value={AttendanceStatus.LATE} className="bg-slate-800 text-orange-400">Late</option>
+                    <option value={AttendanceStatus.EXCUSED} className="bg-slate-800 text-indigo-400">Excused</option>
                     <option value={AttendanceStatus.ABSENT} className="bg-slate-800 text-red-400">Absent</option>
                   </select>
 
@@ -230,7 +230,7 @@ const ManualAttendancePage: React.FC = () => {
                     maxLength={500}
                     value={marks[student.id]?.note || ''}
                     onChange={(e) => updateMark(student.id, 'note', e.target.value)}
-                    className="bg-surface-muted border border-line rounded-lg px-3 py-2 text-sm text-ink placeholder-ink-subtle w-full sm:w-40 focus:outline-none focus:ring-2 focus:ring-purple-500/50"
+                    className="bg-surface-muted border border-line rounded-lg px-3 py-2 text-sm text-ink placeholder-ink-subtle w-full sm:w-40 focus:outline-none focus:ring-2 focus:ring-indigo-500/50"
                   />
                 </div>
               ))}
@@ -256,7 +256,7 @@ const ManualAttendancePage: React.FC = () => {
               <button
                 onClick={handleSubmit}
                 disabled={loading || students.length === 0}
-                className="w-full sm:w-auto bg-gradient-to-r from-blue-600 to-purple-600 text-white font-semibold py-2.5 px-6 rounded-xl shadow-lg shadow-purple-500/25 hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200"
+                className="w-full sm:w-auto bg-gradient-to-r from-indigo-600 to-indigo-700 text-white font-semibold py-2.5 px-6 rounded-xl shadow-lg shadow-indigo-500/25 hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200"
               >
                 {loading ? 'Submitting...' : 'Submit Attendance'}
               </button>

@@ -503,7 +503,7 @@ const NotificationsPage: React.FC = () => {
             <div className="flex items-center gap-2 flex-wrap">
               {!isSentFolder && !notif.read && <div className="w-2 h-2 rounded-full bg-indigo-400 flex-shrink-0" />}
               <h3 className={`text-sm font-semibold ${!isSentFolder && !notif.read ? 'text-ink' : 'text-ink-muted'}`}>{notif.title}</h3>
-              {notif.updatedAt && <span className="text-xs text-amber-400/70 italic">edited</span>}
+              {notif.updatedAt && <span className="text-xs text-orange-400/70 italic">edited</span>}
               {notif.targetScopeLabel && (isSentFolder || isTeacher || isHOD) && (
                 <span className="text-xs px-2 py-0.5 rounded-full bg-indigo-500/15 text-brand border border-indigo-500/20">
                   {isSentFolder ? `To: ${notif.targetScopeLabel}` : notif.targetScopeLabel}
@@ -533,7 +533,7 @@ const NotificationsPage: React.FC = () => {
               <span className="text-xs text-ink-subtle">{formatDateTime(notif.createdAt)}</span>
               {notif.updatedAt && (
                 <><span className="text-ink-muted text-xs">·</span>
-                <span className="text-xs text-amber-400/60">edited {formatDateTime(notif.updatedAt)}</span></>
+                <span className="text-xs text-orange-400/60">edited {formatDateTime(notif.updatedAt)}</span></>
               )}
             </div>
           </div>
@@ -664,8 +664,8 @@ const NotificationsPage: React.FC = () => {
               </div>
             )}
             {isHOD && hodScopeError && (
-              <div className="mb-4 p-3 bg-amber-500/20 border border-amber-400/30 rounded-xl">
-                <p className="text-sm text-amber-200 text-center">{hodScopeError}</p>
+              <div className="mb-4 p-3 bg-orange-500/20 border border-orange-500/30 rounded-xl">
+                <p className="text-sm text-orange-400 text-center">{hodScopeError}</p>
               </div>
             )}
             <form onSubmit={handleSend} className="space-y-4">
@@ -858,7 +858,7 @@ const NotificationsPage: React.FC = () => {
             <div className="flex gap-3 justify-end">
               <button onClick={() => setEditingNotification(null)} className="px-4 py-2 text-sm font-medium text-ink-muted bg-surface-muted border border-line rounded-xl hover:bg-white/10 transition-all">Cancel</button>
               <button onClick={handleEdit} disabled={editLoading || editMessage.trim().length < 1}
-                className="px-4 py-2 text-sm font-semibold text-ink bg-gradient-to-r from-indigo-500 to-blue-600 rounded-xl hover:from-indigo-400 hover:to-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-all">
+                className="px-4 py-2 text-sm font-semibold text-ink bg-gradient-to-r from-indigo-500 to-indigo-700 rounded-xl hover:from-indigo-400 hover:to-indigo-600 disabled:opacity-50 disabled:cursor-not-allowed transition-all">
                 {editLoading ? 'Saving...' : 'Save Changes'}
               </button>
             </div>
@@ -881,7 +881,7 @@ const NotificationsPage: React.FC = () => {
             <div className="flex gap-3 justify-end">
               <button onClick={() => setDeletingNotification(null)} className="px-4 py-2 text-sm font-medium text-ink-muted bg-surface-muted border border-line rounded-xl hover:bg-white/10 transition-all">Cancel</button>
               <button onClick={handleDelete} disabled={deleteLoading}
-                className="px-4 py-2 text-sm font-semibold text-ink bg-gradient-to-r from-red-500 to-rose-600 rounded-xl hover:from-red-400 hover:to-rose-500 disabled:opacity-50 disabled:cursor-not-allowed transition-all">
+                className="px-4 py-2 text-sm font-semibold text-ink bg-gradient-to-r from-red-600 to-red-700 rounded-xl hover:from-red-500 hover:to-red-600 disabled:opacity-50 disabled:cursor-not-allowed transition-all">
                 {deleteLoading ? 'Deleting...' : 'Delete'}
               </button>
             </div>

@@ -118,7 +118,7 @@ const DepartmentManagementPage: React.FC = () => {
       <header className="inner-page-header">
         <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-500 to-blue-500 flex items-center justify-center shadow-lg shadow-indigo-500/20">
+            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-500 to-indigo-600 flex items-center justify-center shadow-lg shadow-indigo-500/20">
               <svg className="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
               </svg>
@@ -130,7 +130,7 @@ const DepartmentManagementPage: React.FC = () => {
           </div>
           <div className="flex items-center gap-4">
             <span className="text-sm text-ink-muted">{user?.fullName}</span>
-            <Link to="/dashboard" className="text-sm text-ink-muted hover:text-cyan-400 transition-colors">
+            <Link to="/dashboard" className="text-sm text-ink-muted hover:text-indigo-400 transition-colors">
               ← Back to Dashboard
             </Link>
           </div>
@@ -158,7 +158,7 @@ const DepartmentManagementPage: React.FC = () => {
               onClick={() => setActiveTab(tab)}
               className={`px-4 py-2 rounded-lg text-sm font-medium transition-all capitalize ${
                 activeTab === tab
-                  ? 'bg-gradient-to-r from-indigo-500 to-blue-600 text-white shadow-lg shadow-cyan-500/20'
+                  ? 'bg-gradient-to-r from-indigo-500 to-indigo-700 text-white shadow-lg shadow-indigo-500/20'
                   : 'bg-white/5 text-ink-muted hover:bg-white/10 hover:text-ink border border-white/10'
               }`}
             >
@@ -194,7 +194,7 @@ const DepartmentManagementPage: React.FC = () => {
               <div className="text-center text-ink-muted py-8">No teachers in this department yet.</div>
             ) : teachers.map((teacher) => (
               <div key={teacher.id} className="rounded-2xl border border-white/10 bg-white/5 p-4 flex items-center gap-3">
-                <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-indigo-500/30 to-blue-500/30 border border-indigo-500/20 flex items-center justify-center shrink-0">
+                <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-indigo-500/30 to-indigo-600/30 border border-indigo-500/20 flex items-center justify-center shrink-0">
                   <span className="text-sm font-semibold text-brand">{teacher.fullName.charAt(0)}</span>
                 </div>
                 <div>
@@ -233,7 +233,7 @@ const DepartmentManagementPage: React.FC = () => {
                     </p>
                   </div>
                   {selectedClassId !== cls.id && (
-                    <button onClick={() => openAssignForm(cls.id)} className="shrink-0 px-3 py-1.5 rounded-lg text-xs font-medium text-white bg-gradient-to-r from-indigo-500 to-blue-600 hover:from-indigo-600 hover:to-blue-600 transition-all">
+                    <button onClick={() => openAssignForm(cls.id)} className="shrink-0 px-3 py-1.5 rounded-lg text-xs font-medium text-white bg-gradient-to-r from-indigo-500 to-indigo-700 hover:from-indigo-600 hover:to-indigo-700 transition-all">
                       Assign Teacher
                     </button>
                   )}
@@ -251,7 +251,7 @@ const DepartmentManagementPage: React.FC = () => {
                         <option key={t.id} value={t.id} className="bg-slate-800">{t.fullName}</option>
                       ))}
                     </select>
-                    <button onClick={() => handleAssign(cls.id)} disabled={assigning || !selectedTeacherId} className="px-4 py-2 rounded-xl text-xs font-medium text-white bg-gradient-to-r from-indigo-500 to-blue-600 disabled:opacity-50 transition-all">
+                    <button onClick={() => handleAssign(cls.id)} disabled={assigning || !selectedTeacherId} className="px-4 py-2 rounded-xl text-xs font-medium text-white bg-gradient-to-r from-indigo-500 to-indigo-700 disabled:opacity-50 transition-all">
                       {assigning ? 'Assigning…' : 'Assign'}
                     </button>
                     <button onClick={cancelAssign} disabled={assigning} className="px-3 py-2 rounded-xl text-xs text-ink-muted hover:text-ink hover:bg-white/10 transition-colors">
@@ -277,8 +277,8 @@ const DepartmentManagementPage: React.FC = () => {
               <div className="space-y-2">
                 {filteredStudents.map((s) => (
                   <div key={s.id} className="rounded-xl border border-white/10 bg-white/5 px-4 py-3 flex items-center gap-3">
-                    <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500/30 to-purple-500/30 flex items-center justify-center shrink-0">
-                      <span className="text-xs font-semibold text-blue-300">{s.fullName.charAt(0)}</span>
+                    <div className="w-8 h-8 rounded-full bg-gradient-to-br from-indigo-500/30 to-indigo-600/30 flex items-center justify-center shrink-0">
+                      <span className="text-xs font-semibold text-indigo-300">{s.fullName.charAt(0)}</span>
                     </div>
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-medium text-ink">{s.fullName}</p>

@@ -65,7 +65,7 @@ export const AiMessageContent: React.FC<{ content: string; className?: string }>
             href={seg.href}
             target="_blank"
             rel="noopener noreferrer"
-            className="text-cyan-400 underline underline-offset-2 hover:text-cyan-300 break-all"
+            className="text-indigo-400 underline underline-offset-2 hover:text-indigo-300 break-all"
           >
             {seg.label}
           </a>

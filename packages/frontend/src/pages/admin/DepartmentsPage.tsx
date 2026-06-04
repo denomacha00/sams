@@ -261,7 +261,7 @@ const DepartmentsPage: React.FC = () => {
           </div>
           <button
             onClick={openAddDeptModal}
-            className="px-4 py-2 rounded-xl bg-gradient-to-r from-indigo-500 to-blue-600 text-white text-sm font-semibold hover:from-indigo-400 hover:to-blue-400 transition-all shadow-lg shadow-cyan-500/20"
+            className="px-4 py-2 rounded-xl bg-gradient-to-r from-indigo-500 to-indigo-700 text-white text-sm font-semibold hover:from-indigo-400 hover:to-indigo-500 transition-all shadow-lg shadow-indigo-500/20"
           >
             + Add Department
           </button>
@@ -276,7 +276,7 @@ const DepartmentsPage: React.FC = () => {
             <p className="mb-4">No departments found</p>
             <button
               onClick={openAddDeptModal}
-              className="px-4 py-2 rounded-xl bg-gradient-to-r from-indigo-500 to-blue-600 text-white text-sm font-semibold"
+              className="px-4 py-2 rounded-xl bg-gradient-to-r from-indigo-500 to-indigo-700 text-white text-sm font-semibold"
             >
               Create your first department
             </button>
@@ -322,13 +322,13 @@ const DepartmentsPage: React.FC = () => {
                     </button>
                     <button
                       onClick={() => openAddClassModal(dept.id)}
-                      className="px-3 py-1.5 rounded-lg bg-surface-muted border border-line text-cyan-400 text-xs hover:bg-white/10 transition-colors"
+                      className="px-3 py-1.5 rounded-lg bg-surface-muted border border-line text-indigo-400 text-xs hover:bg-white/10 transition-colors"
                     >
                       + Add Class
                     </button>
                     <button
                       onClick={() => openEditDeptModal(dept)}
-                      className="text-cyan-400 hover:text-cyan-300 text-sm transition-colors"
+                      className="text-indigo-400 hover:text-indigo-300 text-sm transition-colors"
                     >
                       Edit
                     </button>
@@ -383,7 +383,7 @@ const DepartmentsPage: React.FC = () => {
                             <div className="flex items-center gap-3">
                               <button
                                 onClick={() => openEditClassModal(cls)}
-                                className="text-cyan-400 hover:text-cyan-300 text-xs transition-colors"
+                                className="text-indigo-400 hover:text-indigo-300 text-xs transition-colors"
                               >
                                 Edit
                               </button>
@@ -428,7 +428,7 @@ const DepartmentsPage: React.FC = () => {
                   required
                   value={deptName}
                   onChange={(e) => setDeptName(e.target.value)}
-                  className="w-full px-4 py-2.5 rounded-xl bg-surface-muted border border-line text-ink placeholder-ink-subtle focus:outline-none focus:border-cyan-500/50 transition-colors"
+                  className="w-full px-4 py-2.5 rounded-xl bg-surface-muted border border-line text-ink placeholder-ink-subtle focus:outline-none focus:border-indigo-500/50 transition-colors"
                   placeholder="e.g. Science Department"
                 />
               </div>
@@ -444,7 +444,7 @@ const DepartmentsPage: React.FC = () => {
                 <button
                   type="submit"
                   disabled={submitting}
-                  className="flex-1 px-4 py-2.5 rounded-xl bg-gradient-to-r from-indigo-500 to-blue-600 text-white font-semibold hover:from-indigo-400 hover:to-blue-400 transition-all shadow-lg shadow-cyan-500/20 disabled:opacity-50"
+                  className="flex-1 px-4 py-2.5 rounded-xl bg-gradient-to-r from-indigo-500 to-indigo-700 text-white font-semibold hover:from-indigo-400 hover:to-indigo-500 transition-all shadow-lg shadow-indigo-500/20 disabled:opacity-50"
                 >
                   {submitting ? 'Saving...' : editingDept ? 'Update' : 'Create'}
                 </button>
@@ -476,7 +476,7 @@ const DepartmentsPage: React.FC = () => {
                   required
                   value={className}
                   onChange={(e) => setClassName(e.target.value)}
-                  className="w-full px-4 py-2.5 rounded-xl bg-surface-muted border border-line text-ink placeholder-ink-subtle focus:outline-none focus:border-cyan-500/50 transition-colors"
+                  className="w-full px-4 py-2.5 rounded-xl bg-surface-muted border border-line text-ink placeholder-ink-subtle focus:outline-none focus:border-indigo-500/50 transition-colors"
                   placeholder="e.g. Form 1A"
                 />
               </div>
@@ -488,7 +488,7 @@ const DepartmentsPage: React.FC = () => {
                   min={1}
                   value={classCapacity}
                   onChange={(e) => setClassCapacity(parseInt(e.target.value) || 50)}
-                  className="w-full px-4 py-2.5 rounded-xl bg-surface-muted border border-line text-white focus:outline-none focus:border-cyan-500/50 transition-colors"
+                  className="w-full px-4 py-2.5 rounded-xl bg-surface-muted border border-line text-white focus:outline-none focus:border-indigo-500/50 transition-colors"
                 />
               </div>
 
@@ -503,7 +503,7 @@ const DepartmentsPage: React.FC = () => {
                 <button
                   type="submit"
                   disabled={submitting}
-                  className="flex-1 px-4 py-2.5 rounded-xl bg-gradient-to-r from-indigo-500 to-blue-600 text-white font-semibold hover:from-indigo-400 hover:to-blue-400 transition-all shadow-lg shadow-cyan-500/20 disabled:opacity-50"
+                  className="flex-1 px-4 py-2.5 rounded-xl bg-gradient-to-r from-indigo-500 to-indigo-700 text-white font-semibold hover:from-indigo-400 hover:to-indigo-500 transition-all shadow-lg shadow-indigo-500/20 disabled:opacity-50"
                 >
                   {submitting ? 'Saving...' : editingClass ? 'Update' : 'Create'}
                 </button>
@@ -537,7 +537,7 @@ const DepartmentsPage: React.FC = () => {
                 <select
                   value={selectedHodId}
                   onChange={(e) => setSelectedHodId(e.target.value)}
-                  className="w-full px-4 py-2.5 rounded-xl bg-surface-muted border border-line text-white focus:outline-none focus:border-cyan-500/50 transition-colors"
+                  className="w-full px-4 py-2.5 rounded-xl bg-surface-muted border border-line text-white focus:outline-none focus:border-indigo-500/50 transition-colors"
                 >
                   <option value="" className="bg-slate-800">-- Select a user --</option>
                   {hodUsers.map(u => (
@@ -558,7 +558,7 @@ const DepartmentsPage: React.FC = () => {
                 <button
                   onClick={handleHodAssign}
                   disabled={hodSubmitting || !selectedHodId}
-                  className="flex-1 px-4 py-2.5 rounded-xl bg-gradient-to-r from-orange-500 to-amber-500 text-white font-semibold hover:from-orange-400 hover:to-amber-400 transition-all disabled:opacity-50"
+                  className="flex-1 px-4 py-2.5 rounded-xl bg-gradient-to-r from-orange-500 to-orange-600 text-white font-semibold hover:from-orange-400 hover:to-orange-500 transition-all disabled:opacity-50"
                 >
                   {hodSubmitting ? 'Assigning...' : 'Assign HOD'}
                 </button>

@@ -204,7 +204,7 @@ const RegistrationLinksPage: React.FC = () => {
 
   const getRoleBadge = (role: string) => {
     switch (role) {
-      case 'STUDENT': return 'bg-blue-500/20 text-blue-300';
+      case 'STUDENT': return 'bg-indigo-500/20 text-indigo-300';
       case 'TEACHER': return 'bg-indigo-500/20 text-indigo-300';
       case 'HOD': return 'bg-orange-500/20 text-orange-300';
       default: return 'bg-gray-500/20 text-ink-muted';
@@ -236,7 +236,7 @@ const RegistrationLinksPage: React.FC = () => {
           <div className="flex items-center gap-3">
             <Link
               to="/dashboard"
-              className="text-ink-muted hover:text-cyan-400 transition-colors"
+              className="text-ink-muted hover:text-indigo-400 transition-colors"
             >
               ← {isHOD || isTeacher ? 'Dashboard' : 'Admin'}
             </Link>
@@ -244,7 +244,7 @@ const RegistrationLinksPage: React.FC = () => {
           </div>
           <button
             onClick={() => { setError(''); setShowModal(true); }}
-            className="px-4 py-2 rounded-xl bg-gradient-to-r from-indigo-500 to-blue-600 text-white text-sm font-semibold hover:from-indigo-400 hover:to-blue-400 transition-all shadow-lg shadow-cyan-500/20"
+            className="px-4 py-2 rounded-xl bg-gradient-to-r from-indigo-500 to-indigo-700 text-white text-sm font-semibold hover:from-indigo-400 hover:to-indigo-500 transition-all shadow-lg shadow-indigo-500/20"
           >
             + Generate Link
           </button>
@@ -304,7 +304,7 @@ const RegistrationLinksPage: React.FC = () => {
                           <span className={`inline-flex px-2 py-1 rounded-full text-xs font-medium ${status.color}`}>{status.label}</span>
                         </td>
                         <td className="px-6 py-4 text-right">
-                          <button onClick={() => copyLink(link.token, link.id)} className="text-cyan-400 hover:text-cyan-300 text-sm transition-colors mr-3">
+                          <button onClick={() => copyLink(link.token, link.id)} className="text-indigo-400 hover:text-indigo-300 text-sm transition-colors mr-3">
                             {copiedId === link.id ? '✓ Copied' : 'Copy'}
                           </button>
                           <button onClick={() => handleDelete(link.id)} className="text-red-400 hover:text-red-300 text-sm transition-colors">
@@ -339,7 +339,7 @@ const RegistrationLinksPage: React.FC = () => {
                   <select
                     value={targetRole}
                     onChange={(e) => { setTargetRole(e.target.value); setSelectedDept(''); setSelectedClass(''); }}
-                    className="w-full px-4 py-2.5 rounded-xl bg-surface-muted border border-line text-white focus:outline-none focus:border-cyan-500/50 transition-colors"
+                    className="w-full px-4 py-2.5 rounded-xl bg-surface-muted border border-line text-white focus:outline-none focus:border-indigo-500/50 transition-colors"
                   >
                     {isHOD ? (
                       <>
@@ -361,9 +361,9 @@ const RegistrationLinksPage: React.FC = () => {
               {isTeacher && (
                 <div>
                   {!user?.departmentId ? (
-                    <div className="w-full px-4 py-3 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-300 text-sm">
+                    <div className="w-full px-4 py-3 rounded-xl bg-orange-500/10 border border-orange-500/20 text-orange-400 text-sm">
                       <p className="font-semibold mb-1">Department not assigned</p>
-                      <p className="text-xs text-amber-400/80">You need to be assigned to a department before generating student registration links. Please contact your School Admin.</p>
+                      <p className="text-xs text-orange-400/80">You need to be assigned to a department before generating student registration links. Please contact your School Admin.</p>
                     </div>
                   ) : (
                     <>
@@ -374,14 +374,14 @@ const RegistrationLinksPage: React.FC = () => {
                           Loading classes...
                         </div>
                       ) : teacherClasses.length === 0 ? (
-                        <div className="w-full px-4 py-2.5 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-300 text-sm">
+                        <div className="w-full px-4 py-2.5 rounded-xl bg-orange-500/10 border border-orange-500/20 text-orange-400 text-sm">
                           No classes in your department yet. Ask your HOD to create classes first.
                         </div>
                       ) : (
                         <select
                           value={selectedClass}
                           onChange={(e) => setSelectedClass(e.target.value)}
-                          className="w-full px-4 py-2.5 rounded-xl bg-surface-muted border border-line text-white focus:outline-none focus:border-cyan-500/50 transition-colors"
+                          className="w-full px-4 py-2.5 rounded-xl bg-surface-muted border border-line text-white focus:outline-none focus:border-indigo-500/50 transition-colors"
                         >
                           <option value="" className="bg-slate-800">-- Select Class --</option>
                           {teacherClasses.map(c => (
@@ -410,7 +410,7 @@ const RegistrationLinksPage: React.FC = () => {
                     <select
                       value={selectedClass}
                       onChange={(e) => setSelectedClass(e.target.value)}
-                      className="w-full px-4 py-2.5 rounded-xl bg-surface-muted border border-line text-white focus:outline-none focus:border-cyan-500/50 transition-colors"
+                      className="w-full px-4 py-2.5 rounded-xl bg-surface-muted border border-line text-white focus:outline-none focus:border-indigo-500/50 transition-colors"
                     >
                       <option value="" className="bg-slate-800">-- Select Class --</option>
                       {hodClasses.map(c => (
@@ -428,7 +428,7 @@ const RegistrationLinksPage: React.FC = () => {
                     Department *
                   </label>
                   {departments.length === 0 ? (
-                    <div className="w-full px-4 py-2.5 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-300 text-sm">
+                    <div className="w-full px-4 py-2.5 rounded-xl bg-orange-500/10 border border-orange-500/20 text-orange-400 text-sm">
                       No departments found. Create departments first in the Departments section.
                     </div>
                   ) : (
@@ -436,7 +436,7 @@ const RegistrationLinksPage: React.FC = () => {
                       <select
                         value={selectedDept}
                         onChange={(e) => { setSelectedDept(e.target.value); setSelectedClass(''); }}
-                        className="w-full px-4 py-2.5 rounded-xl bg-surface-muted border border-line text-white focus:outline-none focus:border-cyan-500/50 transition-colors"
+                        className="w-full px-4 py-2.5 rounded-xl bg-surface-muted border border-line text-white focus:outline-none focus:border-indigo-500/50 transition-colors"
                       >
                         <option value="" className="bg-slate-800">-- Select Department --</option>
                         {departments.map(d => (
@@ -446,7 +446,7 @@ const RegistrationLinksPage: React.FC = () => {
                         ))}
                       </select>
                       {targetRole === 'HOD' && selectedDept && departments.find(d => d.id === selectedDept)?.hodName && (
-                        <p className="text-xs text-amber-400 mt-1">
+                        <p className="text-xs text-orange-400 mt-1">
                           ⚠ This department already has a HOD ({departments.find(d => d.id === selectedDept)?.hodName}). The new HOD link will replace them when used.
                         </p>
                       )}
@@ -464,7 +464,7 @@ const RegistrationLinksPage: React.FC = () => {
                   <select
                     value={selectedClass}
                     onChange={(e) => setSelectedClass(e.target.value)}
-                    className="w-full px-4 py-2.5 rounded-xl bg-surface-muted border border-line text-white focus:outline-none focus:border-cyan-500/50 transition-colors"
+                    className="w-full px-4 py-2.5 rounded-xl bg-surface-muted border border-line text-white focus:outline-none focus:border-indigo-500/50 transition-colors"
                   >
                     <option value="" className="bg-slate-800">-- Select Class --</option>
                     {classesForSelectedDept.map(c => (
@@ -472,7 +472,7 @@ const RegistrationLinksPage: React.FC = () => {
                     ))}
                   </select>
                   {classesForSelectedDept.length === 0 && (
-                    <p className="text-xs text-yellow-400 mt-1">No classes in this department. Create one first.</p>
+                    <p className="text-xs text-orange-400 mt-1">No classes in this department. Create one first.</p>
                   )}
                 </div>
               )}
@@ -487,7 +487,7 @@ const RegistrationLinksPage: React.FC = () => {
                     max={365}
                     value={expiryDays}
                     onChange={(e) => setExpiryDays(parseInt(e.target.value) || 30)}
-                    className="w-full px-4 py-2.5 rounded-xl bg-surface-muted border border-line text-white focus:outline-none focus:border-cyan-500/50 transition-colors"
+                    className="w-full px-4 py-2.5 rounded-xl bg-surface-muted border border-line text-white focus:outline-none focus:border-indigo-500/50 transition-colors"
                   />
                 </div>
                 <div>
@@ -497,7 +497,7 @@ const RegistrationLinksPage: React.FC = () => {
                     min={1}
                     value={maxUses}
                     onChange={(e) => setMaxUses(parseInt(e.target.value) || 50)}
-                    className="w-full px-4 py-2.5 rounded-xl bg-surface-muted border border-line text-white focus:outline-none focus:border-cyan-500/50 transition-colors"
+                    className="w-full px-4 py-2.5 rounded-xl bg-surface-muted border border-line text-white focus:outline-none focus:border-indigo-500/50 transition-colors"
                   />
                 </div>
               </div>
@@ -522,7 +522,7 @@ const RegistrationLinksPage: React.FC = () => {
                 <button
                   type="submit"
                   disabled={isGenerateDisabled()}
-                  className="flex-1 px-4 py-2.5 rounded-xl bg-gradient-to-r from-indigo-500 to-blue-600 text-white font-semibold hover:from-indigo-400 hover:to-blue-400 transition-all shadow-lg shadow-cyan-500/20 disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="flex-1 px-4 py-2.5 rounded-xl bg-gradient-to-r from-indigo-500 to-indigo-700 text-white font-semibold hover:from-indigo-400 hover:to-indigo-500 transition-all shadow-lg shadow-indigo-500/20 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {submitting ? 'Generating...' : 'Generate Link'}
                 </button>

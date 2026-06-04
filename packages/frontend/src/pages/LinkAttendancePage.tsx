@@ -234,7 +234,7 @@ const LinkAttendancePage: React.FC = () => {
       <div className="page-shell flex items-center justify-center p-6">
         <div className="text-center">
           <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-surface-muted border border-line mb-4">
-            <svg className="animate-spin h-8 w-8 text-purple-400" viewBox="0 0 24 24">
+            <svg className="animate-spin h-8 w-8 text-indigo-400" viewBox="0 0 24 24">
               <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
               <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
             </svg>
@@ -263,10 +263,10 @@ const LinkAttendancePage: React.FC = () => {
             <div className={`inline-flex items-center gap-2 px-4 py-2 rounded-full text-sm font-semibold mb-4 ${
               result.status === 'PRESENT'
                 ? 'bg-orange-500/20 text-indigo-300 border border-orange-500/30'
-                : 'bg-yellow-500/20 text-yellow-300 border border-yellow-500/30'
+                : 'bg-orange-500/20 text-orange-400 border border-orange-500/30'
             }`}>
               <span className={`w-2 h-2 rounded-full ${
-                result.status === 'PRESENT' ? 'bg-orange-400' : 'bg-yellow-400'
+                result.status === 'PRESENT' ? 'bg-orange-400' : 'bg-orange-400'
               }`} />
               {result.status}
             </div>
@@ -330,8 +330,8 @@ const LinkAttendancePage: React.FC = () => {
         <div className="surface-card rounded-2xl p-8">
           {/* Header */}
           <div className="text-center mb-6">
-            <div className="inline-flex items-center justify-center w-14 h-14 rounded-full bg-purple-500/20 border border-purple-500/30 mb-4">
-              <svg className="w-7 h-7 text-purple-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+            <div className="inline-flex items-center justify-center w-14 h-14 rounded-full bg-indigo-500/20 border border-indigo-500/30 mb-4">
+              <svg className="w-7 h-7 text-indigo-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M13.19 8.688a4.5 4.5 0 011.242 7.244l-4.5 4.5a4.5 4.5 0 01-6.364-6.364l1.757-1.757m9.86-2.04a4.5 4.5 0 00-6.364-6.364L5.25 8.25" />
               </svg>
             </div>
@@ -369,17 +369,17 @@ const LinkAttendancePage: React.FC = () => {
 
           {/* GPS status */}
           {sessionInfo?.requireGps === false ? (
-            <div className="mb-4 p-3 bg-yellow-500/10 border border-yellow-500/20 rounded-xl flex items-center gap-2">
-              <svg className="w-4 h-4 text-yellow-400 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <div className="mb-4 p-3 bg-orange-500/10 border border-orange-500/20 rounded-xl flex items-center gap-2">
+              <svg className="w-4 h-4 text-orange-400 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21" />
               </svg>
-              <p className="text-xs text-yellow-300">No GPS check — teacher has disabled location verification for this link</p>
+              <p className="text-xs text-orange-400">No GPS check — teacher has disabled location verification for this link</p>
             </div>
           ) : (
             <>
               {gpsError && (
-                <div className="mb-4 p-3 bg-yellow-500/10 border border-yellow-500/20 rounded-xl">
-                  <p className="text-xs text-yellow-300">{gpsError}</p>
+                <div className="mb-4 p-3 bg-orange-500/10 border border-orange-500/20 rounded-xl">
+                  <p className="text-xs text-orange-400">{gpsError}</p>
                 </div>
               )}
 
@@ -403,7 +403,7 @@ const LinkAttendancePage: React.FC = () => {
           <button
             onClick={handleMarkAttendance}
             disabled={pageState === 'submitting' || pageState === 'gps-pending'}
-            className="w-full btn-primary font-semibold py-3.5 px-4 rounded-xl shadow-lg shadow-purple-500/25 hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200"
+            className="w-full btn-primary font-semibold py-3.5 px-4 rounded-xl shadow-lg shadow-indigo-500/25 hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200"
           >
             {pageState === 'submitting' || pageState === 'gps-pending' ? (
               <span className="flex items-center justify-center gap-2">

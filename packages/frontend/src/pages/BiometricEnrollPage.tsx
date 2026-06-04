@@ -132,8 +132,8 @@ const BiometricEnrollPage: React.FC = () => {
       <div className="page-shell p-6">
         <div className="max-w-lg mx-auto">
           <div className="surface-card rounded-2xl p-8 text-center">
-            <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-yellow-500/20 border border-yellow-500/30 mb-4">
-              <svg className="w-8 h-8 text-yellow-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-orange-500/20 border border-orange-500/30 mb-4">
+              <svg className="w-8 h-8 text-orange-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
               </svg>
             </div>
@@ -170,7 +170,7 @@ const BiometricEnrollPage: React.FC = () => {
 
         {error && (
           <div className="mb-4 p-3 alert-error">
-            <p className="text-sm text-red-800 text-center">{error}</p>
+            <p className="text-sm text-red-300 text-center">{error}</p>
           </div>
         )}
 
@@ -229,7 +229,7 @@ const BiometricEnrollPage: React.FC = () => {
                   <p className="text-ink-muted text-sm mb-4">Please blink your eyes, then press the button below.</p>
                   <button
                     onClick={handleBlinkCheck}
-                    className="bg-yellow-500/20 border border-yellow-500/30 text-yellow-300 font-semibold py-2.5 px-6 rounded-xl hover:bg-yellow-500/30 transition-all duration-200"
+                    className="bg-orange-500/20 border border-orange-500/30 text-orange-400 font-semibold py-2.5 px-6 rounded-xl hover:bg-orange-500/30 transition-all duration-200"
                   >
                     I Blinked
                   </button>

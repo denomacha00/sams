@@ -185,7 +185,7 @@ const ProfilePage: React.FC = () => {
 
             {/* Crop area */}
             <div
-              className="relative w-48 h-48 mx-auto rounded-full overflow-hidden border-2 border-purple-500/50 cursor-move select-none"
+              className="relative w-48 h-48 mx-auto rounded-full overflow-hidden border-2 border-indigo-500/50 cursor-move select-none"
               onMouseDown={handleCropMouseDown}
               onMouseMove={handleCropMouseMove}
               onMouseUp={handleCropMouseUp}
@@ -221,7 +221,7 @@ const ProfilePage: React.FC = () => {
                 step="0.1"
                 value={cropScale}
                 onChange={(e) => setCropScale(parseFloat(e.target.value))}
-                className="w-full accent-purple-500"
+                className="w-full accent-indigo-500"
               />
             </div>
 
@@ -238,7 +238,7 @@ const ProfilePage: React.FC = () => {
               <button
                 onClick={handleCropConfirm}
                 disabled={uploadingAvatar}
-                className="flex-1 bg-gradient-to-r from-blue-600 to-purple-600 text-white font-semibold py-2.5 rounded-xl shadow-lg shadow-purple-500/25 hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50 transition-all"
+                className="flex-1 bg-gradient-to-r from-indigo-600 to-indigo-700 text-white font-semibold py-2.5 rounded-xl shadow-lg shadow-indigo-500/25 hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50 transition-all"
               >
                 {uploadingAvatar ? 'Uploading...' : 'Save'}
               </button>
@@ -261,7 +261,7 @@ const ProfilePage: React.FC = () => {
         )}
         {error && (
           <div className="mb-4 p-3 alert-error">
-            <p className="text-sm text-red-800 text-center">{error}</p>
+            <p className="text-sm text-red-300 text-center">{error}</p>
           </div>
         )}
 
@@ -270,7 +270,7 @@ const ProfilePage: React.FC = () => {
           <div className="flex items-center gap-5 mb-6 pb-6 border-b border-white/10">
             {/* Avatar */}
             <div className="relative group">
-              <div className="shadow-lg shadow-purple-500/20 overflow-hidden">
+              <div className="shadow-lg shadow-indigo-500/20 overflow-hidden">
                 <UserAvatar
                   avatarUrl={user?.avatarUrl}
                   fullName={user?.fullName}
@@ -302,7 +302,7 @@ const ProfilePage: React.FC = () => {
             <div>
               <label htmlFor="username" className="form-label">Username</label>
               <input id="username" type="text" value={username} onChange={(e) => setUsername(e.target.value)}
-                className="w-full input-field placeholder-ink-subtle focus:outline-none focus:ring-2 focus:ring-purple-500/50 transition-all" placeholder="Your username" />
+                className="w-full input-field placeholder-ink-subtle focus:outline-none focus:ring-2 focus:ring-indigo-500/50 transition-all" placeholder="Your username" />
             </div>
             <div>
               <label htmlFor="fullName" className="form-label">
@@ -312,22 +312,22 @@ const ProfilePage: React.FC = () => {
                 readOnly={!canEditName}
                 className={`w-full border rounded-xl px-4 py-3 placeholder-ink-subtle focus:outline-none transition-all ${
                   canEditName
-                    ? 'bg-white/5 border-white/10 text-white focus:ring-2 focus:ring-purple-500/50'
+                    ? 'bg-white/5 border-white/10 text-white focus:ring-2 focus:ring-indigo-500/50'
                     : 'bg-white/[0.02] border-white/5 text-ink-muted cursor-not-allowed'
                 }`} placeholder="Your full name" />
             </div>
             <div>
               <label htmlFor="email" className="form-label">Email</label>
               <input id="email" type="email" value={email} onChange={(e) => setEmail(e.target.value)}
-                className="w-full input-field placeholder-ink-subtle focus:outline-none focus:ring-2 focus:ring-purple-500/50 transition-all" placeholder="your@email.com" />
+                className="w-full input-field placeholder-ink-subtle focus:outline-none focus:ring-2 focus:ring-indigo-500/50 transition-all" placeholder="your@email.com" />
             </div>
             <div>
               <label htmlFor="phone" className="form-label">Phone Number</label>
               <input id="phone" type="tel" value={phone} onChange={(e) => setPhone(e.target.value)}
-                className="w-full input-field placeholder-ink-subtle focus:outline-none focus:ring-2 focus:ring-purple-500/50 transition-all" placeholder="+254 7XX XXX XXX" />
+                className="w-full input-field placeholder-ink-subtle focus:outline-none focus:ring-2 focus:ring-indigo-500/50 transition-all" placeholder="+254 7XX XXX XXX" />
             </div>
             <button type="submit" disabled={saving}
-              className="w-full btn-primary font-semibold py-3 px-4 rounded-xl shadow-lg shadow-purple-500/25 hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50 transition-all">
+              className="w-full btn-primary font-semibold py-3 px-4 rounded-xl shadow-lg shadow-indigo-500/25 hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50 transition-all">
               {saving ? 'Saving...' : 'Update Profile'}
             </button>
           </form>
@@ -336,8 +336,8 @@ const ProfilePage: React.FC = () => {
         {/* Account Info */}
         <div className="surface-card rounded-2xl p-6 mb-6">
           <div className="flex items-center gap-3 mb-4">
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-500/20 to-indigo-500/20 border border-blue-500/30 flex items-center justify-center">
-              <svg className="w-5 h-5 text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-500/20 to-indigo-500/20 border border-indigo-500/30 flex items-center justify-center">
+              <svg className="w-5 h-5 text-indigo-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
               </svg>
             </div>

@@ -69,7 +69,7 @@ const ClassRosterPage: React.FC = () => {
     <div className="page-shell">
       <header className="inner-page-header">
         <div className="max-w-3xl mx-auto px-6 py-4 flex items-center gap-3">
-          <Link to="/dashboard" className="text-ink-muted hover:text-cyan-400 transition-colors">← Dashboard</Link>
+          <Link to="/dashboard" className="text-ink-muted hover:text-indigo-400 transition-colors">← Dashboard</Link>
           <h1 className="text-lg font-bold text-ink">
             {canAssign ? 'Class Representatives' : 'View Class Representatives'}
           </h1>
@@ -84,7 +84,7 @@ const ClassRosterPage: React.FC = () => {
         </p>
 
         {isTeacher && !user?.classId && (
-          <div className="mb-6 p-4 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-200 text-sm">
+          <div className="mb-6 p-4 rounded-xl bg-orange-500/10 border border-orange-500/20 text-orange-400 text-sm">
             You are not assigned to a class yet. Ask your HOD or school admin to assign you as class teacher.
           </div>
         )}

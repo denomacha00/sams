@@ -48,14 +48,14 @@ const ActivationPage: React.FC = () => {
       {/* Background */}
       <div className="absolute inset-0 bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900" />
       <div className="absolute top-20 right-20 w-72 h-72 bg-indigo-500/15 rounded-full blur-3xl animate-pulse" />
-      <div className="absolute bottom-20 left-20 w-96 h-96 bg-blue-500/15 rounded-full blur-3xl animate-pulse" style={{ animationDelay: '1s' }} />
+      <div className="absolute bottom-20 left-20 w-96 h-96 bg-indigo-500/15 rounded-full blur-3xl animate-pulse" style={{ animationDelay: '1s' }} />
 
       <div className="relative z-10 w-full max-w-md">
         {/* Glass card */}
         <div className="surface-card rounded-2xl shadow-2xl p-8">
           {/* Header */}
           <div className="text-center mb-8">
-            <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-gradient-to-br from-indigo-500 to-blue-600 shadow-lg shadow-indigo-500/25 mb-4">
+            <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-gradient-to-br from-indigo-500 to-indigo-700 shadow-lg shadow-indigo-500/25 mb-4">
               <svg className="w-8 h-8 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" />
               </svg>
@@ -88,7 +88,7 @@ const ActivationPage: React.FC = () => {
           {/* Error */}
           {error && (
             <div className="mb-6 p-3 alert-error">
-              <p className="text-sm text-red-800 text-center">{error}</p>
+              <p className="text-sm text-red-300 text-center">{error}</p>
             </div>
           )}
 
@@ -105,7 +105,7 @@ const ActivationPage: React.FC = () => {
                   value={licenseKey}
                   onChange={(e) => setLicenseKey(e.target.value)}
                   required
-                  className="w-full input-field placeholder-ink-subtle focus:outline-none focus:ring-2 focus:ring-purple-500/50 focus:border-purple-400/50 transition-all duration-200"
+                  className="w-full input-field placeholder-ink-subtle focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500/50 transition-all duration-200"
                   placeholder="XXXX-XXXX-XXXX-XXXX"
                 />
               </div>
@@ -120,7 +120,7 @@ const ActivationPage: React.FC = () => {
                   value={schoolName}
                   onChange={(e) => setSchoolName(e.target.value)}
                   required
-                  className="w-full input-field placeholder-ink-subtle focus:outline-none focus:ring-2 focus:ring-purple-500/50 focus:border-purple-400/50 transition-all duration-200"
+                  className="w-full input-field placeholder-ink-subtle focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500/50 transition-all duration-200"
                   placeholder="e.g. Kenyatta High School"
                 />
               </div>
@@ -135,7 +135,7 @@ const ActivationPage: React.FC = () => {
                   value={schoolCode}
                   onChange={(e) => setSchoolCode(e.target.value.toUpperCase())}
                   required
-                  className="w-full input-field placeholder-ink-subtle focus:outline-none focus:ring-2 focus:ring-purple-500/50 focus:border-purple-400/50 transition-all duration-200"
+                  className="w-full input-field placeholder-ink-subtle focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500/50 transition-all duration-200"
                   placeholder="e.g. KHS2024"
                 />
               </div>
@@ -150,7 +150,7 @@ const ActivationPage: React.FC = () => {
                   value={adminFullName}
                   onChange={(e) => setAdminFullName(e.target.value)}
                   required
-                  className="w-full input-field placeholder-ink-subtle focus:outline-none focus:ring-2 focus:ring-purple-500/50 focus:border-purple-400/50 transition-all duration-200"
+                  className="w-full input-field placeholder-ink-subtle focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500/50 transition-all duration-200"
                   placeholder="John Doe"
                 />
               </div>
@@ -165,7 +165,7 @@ const ActivationPage: React.FC = () => {
                   value={adminEmail}
                   onChange={(e) => setAdminEmail(e.target.value)}
                   required
-                  className="w-full input-field placeholder-ink-subtle focus:outline-none focus:ring-2 focus:ring-purple-500/50 focus:border-purple-400/50 transition-all duration-200"
+                  className="w-full input-field placeholder-ink-subtle focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500/50 transition-all duration-200"
                   placeholder="admin@school.ac.ke"
                 />
               </div>
@@ -181,7 +181,7 @@ const ActivationPage: React.FC = () => {
                   onChange={(e) => setAdminPassword(e.target.value)}
                   required
                   minLength={8}
-                  className="w-full input-field placeholder-ink-subtle focus:outline-none focus:ring-2 focus:ring-purple-500/50 focus:border-purple-400/50 transition-all duration-200"
+                  className="w-full input-field placeholder-ink-subtle focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500/50 transition-all duration-200"
                   placeholder="Minimum 8 characters"
                 />
               </div>
@@ -189,7 +189,7 @@ const ActivationPage: React.FC = () => {
               <button
                 type="submit"
                 disabled={loading || success}
-                className="w-full btn-primary font-semibold py-3.5 px-4 rounded-xl hover:from-blue-500 hover:to-purple-500 focus:outline-none focus:ring-2 focus:ring-purple-500/50 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 shadow-lg shadow-purple-500/25 hover:shadow-purple-500/40 hover:scale-[1.02] active:scale-[0.98]"
+                className="w-full btn-primary font-semibold py-3.5 px-4 rounded-xl hover:from-indigo-500 hover:to-indigo-600 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 shadow-lg shadow-indigo-500/25 hover:shadow-indigo-500/40 hover:scale-[1.02] active:scale-[0.98]"
               >
                 {loading ? (
                   <span className="flex items-center justify-center gap-2">
@@ -210,7 +210,7 @@ const ActivationPage: React.FC = () => {
           <div className="mt-6 pt-6 border-t border-white/10 text-center">
             <Link
               to="/login"
-              className="text-sm text-purple-300 hover:text-purple-200 transition-colors font-medium"
+              className="text-sm text-indigo-300 hover:text-indigo-200 transition-colors font-medium"
             >
               ← Already activated? Sign in
             </Link>

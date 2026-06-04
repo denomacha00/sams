@@ -54,7 +54,7 @@ const ResetPasswordPage: React.FC = () => {
       <div className="w-full max-w-md">
         <div className="bg-white/5 backdrop-blur-xl rounded-2xl shadow-2xl shadow-black/20 p-8 border border-white/10">
           <div className="text-center mb-8">
-            <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-gradient-to-br from-indigo-500 to-blue-600 shadow-lg shadow-indigo-500/20 mb-4">
+            <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-gradient-to-br from-indigo-500 to-indigo-700 shadow-lg shadow-indigo-500/20 mb-4">
               <svg className="w-8 h-8 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
               </svg>
@@ -142,7 +142,7 @@ const ResetPasswordPage: React.FC = () => {
                   <button
                     type="submit"
                     disabled={loading}
-                    className="w-full bg-gradient-to-r from-indigo-500 to-blue-600 text-white font-bold py-3.5 px-4 rounded-xl hover:from-indigo-400 hover:to-blue-500 focus:outline-none focus:ring-2 focus:ring-brand/40/50 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 shadow-lg shadow-indigo-500/30 hover:shadow-indigo-500/50 hover:scale-[1.01] active:scale-[0.99]"
+                    className="w-full bg-gradient-to-r from-indigo-500 to-indigo-700 text-white font-bold py-3.5 px-4 rounded-xl hover:from-indigo-400 hover:to-indigo-600 focus:outline-none focus:ring-2 focus:ring-brand/40/50 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 shadow-lg shadow-indigo-500/30 hover:shadow-indigo-500/50 hover:scale-[1.01] active:scale-[0.99]"
                   >
                     {loading ? (
                       <span className="flex items-center justify-center gap-2">

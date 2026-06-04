@@ -249,7 +249,7 @@ const SettingsPage: React.FC = () => {
         )}
         {error && (
           <div className="mb-4 p-3 alert-error">
-            <p className="text-sm text-red-800 text-center">{error}</p>
+            <p className="text-sm text-red-300 text-center">{error}</p>
           </div>
         )}
 
@@ -279,11 +279,11 @@ const SettingsPage: React.FC = () => {
           </div>
           <form onSubmit={handlePasswordChange} className="space-y-4">
             <input type="password" value={currentPassword} onChange={(e) => setCurrentPassword(e.target.value)} required
-              className="w-full input-field placeholder-ink-subtle focus:outline-none focus:ring-2 focus:ring-purple-500/50 transition-all" placeholder="Current password" />
+              className="w-full input-field placeholder-ink-subtle focus:outline-none focus:ring-2 focus:ring-indigo-500/50 transition-all" placeholder="Current password" />
             <input type="password" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} required minLength={8}
-              className="w-full input-field placeholder-ink-subtle focus:outline-none focus:ring-2 focus:ring-purple-500/50 transition-all" placeholder="New password (min 8 chars)" />
+              className="w-full input-field placeholder-ink-subtle focus:outline-none focus:ring-2 focus:ring-indigo-500/50 transition-all" placeholder="New password (min 8 chars)" />
             <input type="password" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} required minLength={8}
-              className="w-full input-field placeholder-ink-subtle focus:outline-none focus:ring-2 focus:ring-purple-500/50 transition-all" placeholder="Confirm new password" />
+              className="w-full input-field placeholder-ink-subtle focus:outline-none focus:ring-2 focus:ring-indigo-500/50 transition-all" placeholder="Confirm new password" />
             <button type="submit" disabled={saving}
               className="w-full btn-secondary font-semibold py-3 px-4 rounded-xl hover:bg-white/20 disabled:opacity-50 transition-all">
               {saving ? 'Changing...' : 'Change Password'}
@@ -308,8 +308,8 @@ const SettingsPage: React.FC = () => {
         {isStudent && (
           <div className="surface-card rounded-2xl p-6 mb-6">
             <div className="flex items-center gap-3 mb-4">
-              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-purple-500/20 to-blue-500/20 border border-purple-500/30 flex items-center justify-center">
-                <svg className="w-5 h-5 text-purple-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-500/20 to-indigo-600/20 border border-indigo-500/30 flex items-center justify-center">
+                <svg className="w-5 h-5 text-indigo-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
                 </svg>
@@ -328,7 +328,7 @@ const SettingsPage: React.FC = () => {
               <div>
                 <p className="text-sm text-ink-muted mb-4">Enroll your face so teachers can mark your attendance using biometric scanning.</p>
                 <button onClick={handleFaceEnroll} disabled={bioLoading}
-                  className="w-full flex items-center justify-center gap-2 bg-gradient-to-r from-purple-600 to-blue-600 text-white font-semibold py-3 px-4 rounded-xl shadow-lg shadow-purple-500/25 hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50 transition-all">
+                  className="w-full flex items-center justify-center gap-2 bg-gradient-to-r from-indigo-600 to-indigo-700 text-white font-semibold py-3 px-4 rounded-xl shadow-lg shadow-indigo-500/25 hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50 transition-all">
                   {bioLoading ? (
                     <><svg className="animate-spin h-5 w-5" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" /><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" /></svg> Scanning face...</>
                   ) : (
@@ -344,7 +344,7 @@ const SettingsPage: React.FC = () => {
         {webauthnAvailable && (
           <div className="surface-card rounded-2xl p-6 mb-6">
             <div className="flex items-center gap-3 mb-4">
-              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-500/20 to-blue-600/20 border border-indigo-500/30 flex items-center justify-center">
+              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-500/20 to-indigo-700/20 border border-indigo-500/30 flex items-center justify-center">
                 <svg className="w-5 h-5 text-indigo-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 11c0 3.517-1.009 6.799-2.753 9.571m-3.44-2.04l.054-.09A13.916 13.916 0 008 11a4 4 0 118 0c0 1.017-.07 2.019-.203 3m-2.118 6.844A21.88 21.88 0 0015.171 17m3.839 1.132c.645-2.266.99-4.659.99-7.132A8 8 0 008 4.07M3 15.364c.64-1.319 1-2.8 1-4.364 0-1.457.39-2.823 1.07-4" />
                 </svg>
@@ -359,8 +359,8 @@ const SettingsPage: React.FC = () => {
               </div>
             </div>
             {isStudent && (
-              <div className="mb-4 p-3 bg-blue-500/10 border border-blue-500/20 rounded-xl">
-                <p className="text-xs text-blue-300">
+              <div className="mb-4 p-3 bg-indigo-500/10 border border-indigo-500/20 rounded-xl">
+                <p className="text-xs text-indigo-300">
                   <span className="font-semibold">Note:</span> Your fingerprint is used for signing in to this app only. For attendance, use the Face Enrollment below — a teacher scans your face on their device to mark you present.
                 </p>
               </div>
@@ -374,7 +374,7 @@ const SettingsPage: React.FC = () => {
               <div>
                 <p className="text-sm text-ink-muted mb-4">Register your fingerprint for biometric verification and quick sign-in.</p>
                 <button onClick={handleFingerprintRegister} disabled={fingerprintLoading}
-                  className="w-full flex items-center justify-center gap-2 bg-gradient-to-r from-indigo-600 to-blue-600 text-white font-semibold py-3 px-4 rounded-xl shadow-lg shadow-indigo-500/25 hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50 transition-all">
+                  className="w-full flex items-center justify-center gap-2 bg-gradient-to-r from-indigo-600 to-indigo-700 text-white font-semibold py-3 px-4 rounded-xl shadow-lg shadow-indigo-500/25 hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50 transition-all">
                   {fingerprintLoading ? (
                     <><svg className="animate-spin h-5 w-5" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" /><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" /></svg> Touch your sensor...</>
                   ) : (
@@ -424,7 +424,7 @@ const SettingsPage: React.FC = () => {
                                 {notif.recipientCount} recipient{notif.recipientCount !== 1 ? 's' : ''}
                               </span>
                               {notif.updatedAt && (
-                                <span className="text-xs text-amber-400/70 italic">edited</span>
+                                <span className="text-xs text-orange-400/70 italic">edited</span>
                               )}
                               {expired && (
                                 <span className="text-xs text-ink-muted italic">window expired</span>
@@ -494,7 +494,7 @@ const SettingsPage: React.FC = () => {
                 <button
                   onClick={handleEditSave}
                   disabled={editSaving || editMsg.trim().length < 1}
-                  className="px-4 py-2 text-sm font-semibold text-ink bg-gradient-to-r from-indigo-500 to-blue-600 rounded-xl hover:from-indigo-400 hover:to-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+                  className="px-4 py-2 text-sm font-semibold text-ink bg-gradient-to-r from-indigo-500 to-indigo-700 rounded-xl hover:from-indigo-400 hover:to-indigo-600 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
                 >
                   {editSaving ? 'Saving...' : 'Save Changes'}
                 </button>
@@ -524,7 +524,7 @@ const SettingsPage: React.FC = () => {
                 <button
                   onClick={handleDeleteConfirm}
                   disabled={deleteConfirming}
-                  className="px-4 py-2 text-sm font-semibold text-ink bg-gradient-to-r from-red-500 to-rose-600 rounded-xl hover:from-red-400 hover:to-rose-500 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+                  className="px-4 py-2 text-sm font-semibold text-ink bg-gradient-to-r from-red-600 to-red-700 rounded-xl hover:from-red-500 hover:to-red-600 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
                 >
                   {deleteConfirming ? 'Deleting...' : 'Delete'}
                 </button>

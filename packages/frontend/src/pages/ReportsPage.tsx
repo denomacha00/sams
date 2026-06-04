@@ -281,7 +281,7 @@ const ReportsPage: React.FC = () => {
 
         {error && (
           <div className="mb-4 p-3 alert-error">
-            <p className="text-sm text-red-800 text-center">{error}</p>
+            <p className="text-sm text-red-300 text-center">{error}</p>
           </div>
         )}
 
@@ -297,7 +297,7 @@ const ReportsPage: React.FC = () => {
                 type="date"
                 value={dateFrom}
                 onChange={(e) => setDateFrom(e.target.value)}
-                className="w-full input-field focus:outline-none focus:ring-2 focus:ring-purple-500/50 transition-all duration-200 "
+                className="w-full input-field focus:outline-none focus:ring-2 focus:ring-indigo-500/50 transition-all duration-200 "
               />
             </div>
             <div className="flex-1">
@@ -309,13 +309,13 @@ const ReportsPage: React.FC = () => {
                 type="date"
                 value={dateTo}
                 onChange={(e) => setDateTo(e.target.value)}
-                className="w-full input-field focus:outline-none focus:ring-2 focus:ring-purple-500/50 transition-all duration-200 "
+                className="w-full input-field focus:outline-none focus:ring-2 focus:ring-indigo-500/50 transition-all duration-200 "
               />
             </div>
             <button
               onClick={fetchReport}
               disabled={loading}
-              className="bg-gradient-to-r from-blue-600 to-purple-600 text-white font-semibold py-3 px-6 rounded-xl shadow-lg shadow-purple-500/25 hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50 transition-all duration-200"
+              className="bg-gradient-to-r from-indigo-600 to-indigo-700 text-white font-semibold py-3 px-6 rounded-xl shadow-lg shadow-indigo-500/25 hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50 transition-all duration-200"
             >
               {loading ? 'Loading...' : 'Generate'}
             </button>
@@ -349,11 +349,11 @@ const ReportsPage: React.FC = () => {
                 <p className="text-xs text-ink-muted mt-1 uppercase tracking-wider">Avg Attendance</p>
               </div>
               <div className="surface-card rounded-2xl p-5 text-center">
-                <p className="text-3xl font-bold text-blue-400">{displaySessions}</p>
+                <p className="text-3xl font-bold text-indigo-400">{displaySessions}</p>
                 <p className="text-xs text-ink-muted mt-1 uppercase tracking-wider">Total Sessions</p>
               </div>
               <div className="surface-card rounded-2xl p-5 text-center">
-                <p className="text-3xl font-bold text-purple-400">{displayPresent}</p>
+                <p className="text-3xl font-bold text-indigo-400">{displayPresent}</p>
                 <p className="text-xs text-ink-muted mt-1 uppercase tracking-wider">Present</p>
               </div>
               <div className="surface-card rounded-2xl p-5 text-center">
@@ -380,7 +380,7 @@ const ReportsPage: React.FC = () => {
                         <tr key={s.studentId} className="hover:bg-white/5 transition-colors">
                           <td className="py-3 px-2">
                             <div className="flex items-center gap-3">
-                              <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-xs font-bold text-ink">
+                              <div className="w-8 h-8 rounded-full bg-gradient-to-br from-indigo-500 to-indigo-700 flex items-center justify-center text-xs font-bold text-ink">
                                 {(s.studentName || s.fullName || '?').charAt(0)}
                               </div>
                               <span className="font-medium text-ink text-sm">{s.studentName || s.fullName}</span>
@@ -389,7 +389,7 @@ const ReportsPage: React.FC = () => {
                           <td className="py-3 px-2 text-right">
                             <span className={`font-semibold text-sm ${
                               s.attendancePercentage >= 80 ? 'text-orange-400' :
-                              s.attendancePercentage >= 60 ? 'text-yellow-400' :
+                              s.attendancePercentage >= 60 ? 'text-orange-400' :
                               'text-red-400'
                             }`}>
                               {s.attendancePercentage.toFixed(1)}%
@@ -398,7 +398,7 @@ const ReportsPage: React.FC = () => {
                           <td className="py-3 px-2 text-right">
                             <span className={`px-2 py-1 text-xs font-medium rounded-full ${
                               s.attendancePercentage >= 80 ? 'bg-orange-500/20 text-indigo-300' :
-                              s.attendancePercentage >= 60 ? 'bg-yellow-500/20 text-yellow-300' :
+                              s.attendancePercentage >= 60 ? 'bg-orange-500/20 text-orange-400' :
                               'bg-red-500/20 text-red-300'
                             }`}>
                               {s.attendancePercentage >= 80 ? 'Good' : s.attendancePercentage >= 60 ? 'Warning' : 'At Risk'}

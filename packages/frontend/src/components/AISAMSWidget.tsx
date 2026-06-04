@@ -221,7 +221,7 @@ const AISAMSWidget: React.FC = () => {
                     type="button"
                     onClick={() => void confirmPendingAction(msg.pendingAction!)}
                     disabled={loading}
-                    className="mt-2 w-full bg-amber-600 hover:bg-amber-500 disabled:opacity-50 text-white text-xs font-medium py-1.5 px-3 rounded-lg transition-colors"
+                    className="mt-2 w-full bg-orange-500 hover:bg-orange-600 disabled:opacity-50 text-white text-xs font-medium py-1.5 px-3 rounded-lg transition-colors"
                   >
                     Confirm: {msg.pendingAction.description}
                   </button>

@@ -300,7 +300,7 @@ const TimetablePage: React.FC = () => {
                               <>
                             <button
                               onClick={() => openEditModal(entry)}
-                              className="text-cyan-400 hover:text-cyan-300 text-sm mr-3 transition-colors"
+                              className="text-indigo-400 hover:text-indigo-300 text-sm mr-3 transition-colors"
                             >
                               Edit
                             </button>
@@ -333,7 +333,7 @@ const TimetablePage: React.FC = () => {
                     getEntriesForDay(idx)
                       .sort((a, b) => a.startTime.localeCompare(b.startTime))
                       .map((entry) => (
-                        <div key={entry.id} className="p-3 rounded-xl bg-white/5 border border-white/5 hover:border-cyan-500/30 transition-colors">
+                        <div key={entry.id} className="p-3 rounded-xl bg-white/5 border border-white/5 hover:border-indigo-500/30 transition-colors">
                           <p className="text-white text-sm font-medium">{entry.subject}</p>
                           <p className="text-ink-muted text-xs mt-1">{entry.startTime} - {entry.endTime}</p>
                           <p className="text-ink-subtle text-xs">{entry.class?.name || classes.find((c) => c.id === entry.classId)?.name || 'Unknown class'}</p>

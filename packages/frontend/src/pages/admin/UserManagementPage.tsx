@@ -256,7 +256,7 @@ const UserManagementPage: React.FC = () => {
           </div>
           <button
             onClick={openAddModal}
-            className="px-4 py-2 rounded-xl bg-gradient-to-r from-indigo-500 to-blue-600 text-white text-sm font-semibold hover:from-indigo-400 hover:to-blue-400 transition-all shadow-lg shadow-cyan-500/20"
+            className="px-4 py-2 rounded-xl bg-gradient-to-r from-indigo-500 to-indigo-700 text-white text-sm font-semibold hover:from-indigo-400 hover:to-indigo-500 transition-all shadow-lg shadow-indigo-500/20"
           >
             + Add User
           </button>
@@ -272,7 +272,7 @@ const UserManagementPage: React.FC = () => {
               onClick={() => setActiveTab(tab)}
               className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
                 activeTab === tab
-                  ? 'bg-gradient-to-r from-indigo-500 to-blue-600 text-white shadow-lg shadow-cyan-500/20'
+                  ? 'bg-gradient-to-r from-indigo-500 to-indigo-700 text-white shadow-lg shadow-indigo-500/20'
                   : 'bg-white/5 text-ink-muted hover:bg-white/10 hover:text-ink border border-white/10'
               }`}
             >
@@ -336,15 +336,15 @@ const UserManagementPage: React.FC = () => {
                   filteredUsers.map((u) => (
                     <tr key={u.id} className="border-b border-white/5 hover:bg-white/5 transition-colors">
                       <td className="px-6 py-4 text-sm text-white">{u.fullName}</td>
-                      <td className="px-6 py-4 text-sm text-cyan-300">{u.username || '—'}</td>
+                      <td className="px-6 py-4 text-sm text-indigo-300">{u.username || '—'}</td>
                       <td className="px-6 py-4 text-sm text-ink-muted">{u.email || '—'}</td>
                       <td className="px-6 py-4">
                         <div className="flex items-center gap-1.5 flex-wrap">
                           <span className={`inline-flex px-2 py-1 rounded-full text-xs font-medium ${
                             u.role === 'HOD' ? 'bg-orange-500/20 text-orange-300' :
                             u.role === 'TEACHER' ? 'bg-indigo-500/20 text-indigo-300' :
-                            u.role === 'STUDENT' ? 'bg-blue-500/20 text-blue-300' :
-                            'bg-purple-500/20 text-purple-300'
+                            u.role === 'STUDENT' ? 'bg-indigo-500/20 text-indigo-300' :
+                            'bg-indigo-500/20 text-indigo-300'
                           }`}>
                             {u.role}
                           </span>
@@ -354,7 +354,7 @@ const UserManagementPage: React.FC = () => {
                             </span>
                           )}
                           {u.role === 'STUDENT' && u.isClassRep && (
-                            <span className="inline-flex px-2 py-1 rounded-full text-xs font-medium bg-amber-500/20 text-amber-300">
+                            <span className="inline-flex px-2 py-1 rounded-full text-xs font-medium bg-orange-500/20 text-orange-400">
                               Class Rep
                             </span>
                           )}
@@ -386,7 +386,7 @@ const UserManagementPage: React.FC = () => {
                       <td className="px-6 py-4 text-right">
                         <button
                           onClick={() => openEditModal(u)}
-                          className="text-cyan-400 hover:text-cyan-300 text-sm mr-3 transition-colors"
+                          className="text-indigo-400 hover:text-indigo-300 text-sm mr-3 transition-colors"
                         >
                           Edit
                         </button>
@@ -428,7 +428,7 @@ const UserManagementPage: React.FC = () => {
                   required
                   value={formData.fullName}
                   onChange={(e) => setFormData({ ...formData, fullName: e.target.value })}
-                  className="w-full px-4 py-2.5 rounded-xl bg-surface-muted border border-line text-ink placeholder-ink-subtle focus:outline-none focus:border-cyan-500/50 transition-colors"
+                  className="w-full px-4 py-2.5 rounded-xl bg-surface-muted border border-line text-ink placeholder-ink-subtle focus:outline-none focus:border-indigo-500/50 transition-colors"
                   placeholder="John Doe"
                 />
               </div>
@@ -442,7 +442,7 @@ const UserManagementPage: React.FC = () => {
                   maxLength={50}
                   value={formData.username}
                   onChange={(e) => setFormData({ ...formData, username: e.target.value.replace(/\s/g, '') })}
-                  className="w-full px-4 py-2.5 rounded-xl bg-surface-muted border border-line text-ink placeholder-ink-subtle focus:outline-none focus:border-cyan-500/50 transition-colors"
+                  className="w-full px-4 py-2.5 rounded-xl bg-surface-muted border border-line text-ink placeholder-ink-subtle focus:outline-none focus:border-indigo-500/50 transition-colors"
                   placeholder="e.g. hod_john"
                 />
                 <p className="text-xs text-ink-subtle mt-1">Used to sign in — letters, numbers, dots, underscores, hyphens.</p>
@@ -455,7 +455,7 @@ const UserManagementPage: React.FC = () => {
                     type="email"
                     value={formData.email}
                     onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                    className="w-full px-4 py-2.5 rounded-xl bg-surface-muted border border-line text-ink placeholder-ink-subtle focus:outline-none focus:border-cyan-500/50 transition-colors"
+                    className="w-full px-4 py-2.5 rounded-xl bg-surface-muted border border-line text-ink placeholder-ink-subtle focus:outline-none focus:border-indigo-500/50 transition-colors"
                     placeholder="john@school.com"
                   />
                 </div>
@@ -465,7 +465,7 @@ const UserManagementPage: React.FC = () => {
                     type="text"
                     value={formData.phone}
                     onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                    className="w-full px-4 py-2.5 rounded-xl bg-surface-muted border border-line text-ink placeholder-ink-subtle focus:outline-none focus:border-cyan-500/50 transition-colors"
+                    className="w-full px-4 py-2.5 rounded-xl bg-surface-muted border border-line text-ink placeholder-ink-subtle focus:outline-none focus:border-indigo-500/50 transition-colors"
                     placeholder="+254..."
                   />
                 </div>
@@ -499,7 +499,7 @@ const UserManagementPage: React.FC = () => {
                       setFormData({ ...formData, role: e.target.value, departmentId: '', classId: '' });
                       setHodWarning(null);
                     }}
-                    className="w-full px-4 py-2.5 rounded-xl bg-surface-muted border border-line text-white focus:outline-none focus:border-cyan-500/50 transition-colors"
+                    className="w-full px-4 py-2.5 rounded-xl bg-surface-muted border border-line text-white focus:outline-none focus:border-indigo-500/50 transition-colors"
                   >
                     <option value="STUDENT" className="bg-slate-800">Student</option>
                     <option value="TEACHER" className="bg-slate-800">Teacher</option>
@@ -515,7 +515,7 @@ const UserManagementPage: React.FC = () => {
                     type="text"
                     value={formData.admissionNumber}
                     onChange={(e) => setFormData({ ...formData, admissionNumber: e.target.value })}
-                    className="w-full px-4 py-2.5 rounded-xl bg-surface-muted border border-line text-ink placeholder-ink-subtle focus:outline-none focus:border-cyan-500/50 transition-colors"
+                    className="w-full px-4 py-2.5 rounded-xl bg-surface-muted border border-line text-ink placeholder-ink-subtle focus:outline-none focus:border-indigo-500/50 transition-colors"
                     placeholder={formData.role === 'STUDENT' ? 'ADM001' : 'Optional'}
                   />
                 </div>
@@ -534,7 +534,7 @@ const UserManagementPage: React.FC = () => {
                     <select
                       value={formData.departmentId}
                       onChange={(e) => handleDeptChange(e.target.value)}
-                      className="w-full px-4 py-2.5 rounded-xl bg-surface-muted border border-line text-white focus:outline-none focus:border-cyan-500/50 transition-colors"
+                      className="w-full px-4 py-2.5 rounded-xl bg-surface-muted border border-line text-white focus:outline-none focus:border-indigo-500/50 transition-colors"
                     >
                       <option value="" className="bg-slate-800">-- Select Department --</option>
                       {departments.map(d => (
@@ -545,7 +545,7 @@ const UserManagementPage: React.FC = () => {
                     </select>
                   )}
                   {hodWarning && (
-                    <p className="text-xs text-amber-400 mt-1">⚠ {hodWarning}</p>
+                    <p className="text-xs text-orange-400 mt-1">⚠ {hodWarning}</p>
                   )}
                 </div>
                 <div>
@@ -561,7 +561,7 @@ const UserManagementPage: React.FC = () => {
                     value={formData.classId}
                     onChange={(e) => setFormData({ ...formData, classId: e.target.value })}
                     disabled={!formData.departmentId || formData.role === 'HOD'}
-                    className="w-full px-4 py-2.5 rounded-xl bg-surface-muted border border-line text-white focus:outline-none focus:border-cyan-500/50 transition-colors disabled:opacity-50"
+                    className="w-full px-4 py-2.5 rounded-xl bg-surface-muted border border-line text-white focus:outline-none focus:border-indigo-500/50 transition-colors disabled:opacity-50"
                   >
                     <option value="" className="bg-slate-800">
                       {formData.role === 'HOD' ? '-- N/A for HOD --' : '-- Select Class --'}
@@ -571,7 +571,7 @@ const UserManagementPage: React.FC = () => {
                     ))}
                   </select>
                   {needsClass && formData.departmentId && classesForDept.length === 0 && (
-                    <p className="text-xs text-yellow-400 mt-1">No classes in this department yet</p>
+                    <p className="text-xs text-orange-400 mt-1">No classes in this department yet</p>
                   )}
                 </div>
               </div>
@@ -585,7 +585,7 @@ const UserManagementPage: React.FC = () => {
                   required={!editingUser}
                   value={formData.password}
                   onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                  className="w-full px-4 py-2.5 rounded-xl bg-surface-muted border border-line text-ink placeholder-ink-subtle focus:outline-none focus:border-cyan-500/50 transition-colors"
+                  className="w-full px-4 py-2.5 rounded-xl bg-surface-muted border border-line text-ink placeholder-ink-subtle focus:outline-none focus:border-indigo-500/50 transition-colors"
                   placeholder="••••••••"
                 />
               </div>
@@ -601,7 +601,7 @@ const UserManagementPage: React.FC = () => {
                 <button
                   type="submit"
                   disabled={submitting}
-                  className="flex-1 px-4 py-2.5 rounded-xl bg-gradient-to-r from-indigo-500 to-blue-600 text-white font-semibold hover:from-indigo-400 hover:to-blue-400 transition-all shadow-lg shadow-cyan-500/20 disabled:opacity-50"
+                  className="flex-1 px-4 py-2.5 rounded-xl bg-gradient-to-r from-indigo-500 to-indigo-700 text-white font-semibold hover:from-indigo-400 hover:to-indigo-500 transition-all shadow-lg shadow-indigo-500/20 disabled:opacity-50"
                 >
                   {submitting ? 'Saving...' : editingUser ? 'Update User' : 'Create User'}
                 </button>

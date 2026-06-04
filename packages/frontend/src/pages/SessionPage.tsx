@@ -300,7 +300,7 @@ const SessionPage: React.FC = () => {
       case AttendanceStatus.PRESENT:
         return 'bg-orange-500/20 text-indigo-300 border border-orange-500/30';
       case AttendanceStatus.LATE:
-        return 'bg-yellow-500/20 text-yellow-300 border border-yellow-500/30';
+        return 'bg-orange-500/20 text-orange-400 border border-orange-500/30';
       default:
         return 'bg-red-500/20 text-red-300 border border-red-500/30';
     }
@@ -319,7 +319,7 @@ const SessionPage: React.FC = () => {
 
           {error && (
             <div className="mb-4 p-3 alert-error">
-              <p className="text-sm text-red-800">{error}</p>
+              <p className="text-sm text-red-300">{error}</p>
             </div>
           )}
 
@@ -332,7 +332,7 @@ const SessionPage: React.FC = () => {
                 id="timetableEntry"
                 value={selectedEntry}
                 onChange={(e) => setSelectedEntry(e.target.value)}
-                className="w-full input-field focus:outline-none focus:ring-2 focus:ring-purple-500/50 transition-all duration-200 appearance-none"
+                className="w-full input-field focus:outline-none focus:ring-2 focus:ring-indigo-500/50 transition-all duration-200 appearance-none"
               >
                 <option value="" className="bg-slate-800">-- Select --</option>
                 {timetableEntries.map((entry) => (
@@ -342,7 +342,7 @@ const SessionPage: React.FC = () => {
                 ))}
               </select>
               {timetableEntries.length === 0 && (
-                <p className="text-xs text-amber-300/90 mt-2">
+                <p className="text-xs text-orange-400/90 mt-2">
                   No classes on your timetable for today. Ask your HOD or admin to add entries, or try again on the scheduled day.
                 </p>
               )}
@@ -361,7 +361,7 @@ const SessionPage: React.FC = () => {
                 type="button"
                 onClick={() => setSessionRequireGps((v) => !v)}
                 className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors duration-200 focus:outline-none ${
-                  sessionRequireGps ? 'bg-purple-600' : 'bg-white/20'
+                  sessionRequireGps ? 'bg-indigo-600' : 'bg-white/20'
                 }`}
               >
                 <span
@@ -387,7 +387,7 @@ const SessionPage: React.FC = () => {
                     onChange={(e) =>
                       setSessionRadiusM(Math.max(10, Math.min(10000, parseInt(e.target.value, 10) || 100)))
                     }
-                    className="flex-1 input-field focus:outline-none focus:ring-2 focus:ring-purple-500/50 transition-all duration-200"
+                    className="flex-1 input-field focus:outline-none focus:ring-2 focus:ring-indigo-500/50 transition-all duration-200"
                   />
                   <span className="text-sm text-ink-muted shrink-0">m</span>
                 </div>
@@ -397,7 +397,7 @@ const SessionPage: React.FC = () => {
             <button
               onClick={startSession}
               disabled={!selectedEntry || loading}
-              className="w-full btn-primary font-semibold py-3.5 px-4 rounded-xl shadow-lg shadow-purple-500/25 hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200"
+              className="w-full btn-primary font-semibold py-3.5 px-4 rounded-xl shadow-lg shadow-indigo-500/25 hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200"
             >
               {loading ? (
                 <span className="flex items-center justify-center gap-2">
@@ -443,7 +443,7 @@ const SessionPage: React.FC = () => {
 
         {error && (
           <div className="mb-4 p-3 alert-error">
-            <p className="text-sm text-red-800">{error}</p>
+            <p className="text-sm text-red-300">{error}</p>
           </div>
         )}
 
@@ -451,15 +451,15 @@ const SessionPage: React.FC = () => {
         <div className="surface-card rounded-2xl p-6 mb-6 text-center">
           <h2 className="text-lg font-semibold text-ink mb-4">Scan QR Code</h2>
           {qrDataUrl ? (
-            <div className="inline-block p-4 bg-white rounded-2xl shadow-2xl shadow-purple-500/20">
+            <div className="inline-block p-4 bg-white rounded-2xl shadow-2xl shadow-indigo-500/20">
               <img src={qrDataUrl} alt="Attendance QR Code" className="w-64 h-64" />
             </div>
           ) : (
             <div className="flex items-center justify-center h-64">
               <div className="flex space-x-2">
-                <div className="w-3 h-3 bg-purple-400 rounded-full animate-bounce" />
-                <div className="w-3 h-3 bg-purple-400 rounded-full animate-bounce" style={{ animationDelay: '0.1s' }} />
-                <div className="w-3 h-3 bg-purple-400 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }} />
+                <div className="w-3 h-3 bg-indigo-500 rounded-full animate-bounce" />
+                <div className="w-3 h-3 bg-indigo-500 rounded-full animate-bounce" style={{ animationDelay: '0.1s' }} />
+                <div className="w-3 h-3 bg-indigo-500 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }} />
               </div>
             </div>
           )}
@@ -494,7 +494,7 @@ const SessionPage: React.FC = () => {
                   id="expiryMinutes"
                   value={expiryMinutes}
                   onChange={(e) => setExpiryMinutes(Number(e.target.value))}
-                  className="w-full input-field focus:outline-none focus:ring-2 focus:ring-purple-500/50 transition-all duration-200 appearance-none"
+                  className="w-full input-field focus:outline-none focus:ring-2 focus:ring-indigo-500/50 transition-all duration-200 appearance-none"
                 >
                   <option value={5} className="bg-slate-800">5 minutes</option>
                   <option value={10} className="bg-slate-800">10 minutes</option>
@@ -516,7 +516,7 @@ const SessionPage: React.FC = () => {
                   type="button"
                   onClick={() => setRequireGps((v) => !v)}
                   className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors duration-200 focus:outline-none ${
-                    requireGps ? 'bg-purple-600' : 'bg-white/20'
+                    requireGps ? 'bg-indigo-600' : 'bg-white/20'
                   }`}
                 >
                   <span
@@ -541,7 +541,7 @@ const SessionPage: React.FC = () => {
                       max={10000}
                       value={gpsRadiusM}
                       onChange={(e) => setGpsRadiusM(Math.max(10, Math.min(10000, parseInt(e.target.value) || 100)))}
-                      className="flex-1 input-field focus:outline-none focus:ring-2 focus:ring-purple-500/50 transition-all duration-200"
+                      className="flex-1 input-field focus:outline-none focus:ring-2 focus:ring-indigo-500/50 transition-all duration-200"
                     />
                     <span className="text-sm text-ink-muted shrink-0">m</span>
                   </div>
@@ -554,7 +554,7 @@ const SessionPage: React.FC = () => {
               <button
                 onClick={generateLink}
                 disabled={linkLoading}
-                className="w-full btn-primary font-semibold py-3 px-5 rounded-xl shadow-lg shadow-purple-500/25 hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200"
+                className="w-full btn-primary font-semibold py-3 px-5 rounded-xl shadow-lg shadow-indigo-500/25 hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200"
               >
                 {linkLoading ? (
                   <span className="flex items-center justify-center gap-2">
@@ -575,7 +575,7 @@ const SessionPage: React.FC = () => {
               {/* GPS badge */}
               <div className="flex items-center gap-2">
                 {requireGps ? (
-                  <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-purple-500/20 border border-purple-500/30 text-purple-300">
+                  <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-indigo-500/20 border border-indigo-500/30 text-indigo-300">
                     <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                       <path strokeLinecap="round" strokeLinejoin="round" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
                       <path strokeLinecap="round" strokeLinejoin="round" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
@@ -583,7 +583,7 @@ const SessionPage: React.FC = () => {
                     GPS required · {gpsRadiusM}m radius
                   </span>
                 ) : (
-                  <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-yellow-500/20 border border-yellow-500/30 text-yellow-300">
+                  <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-orange-500/20 border border-orange-500/30 text-orange-400">
                     <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                       <path strokeLinecap="round" strokeLinejoin="round" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21" />
                     </svg>
@@ -620,7 +620,7 @@ const SessionPage: React.FC = () => {
                 <div className="flex items-center justify-between">
                   <span className="text-xs text-ink-muted">Time remaining</span>
                   <span className={`text-sm font-mono font-semibold ${
-                    linkTimeRemaining <= 60 ? 'text-yellow-300' : 'text-indigo-300'
+                    linkTimeRemaining <= 60 ? 'text-orange-400' : 'text-indigo-300'
                   }`}>
                     {formatTimeRemaining(linkTimeRemaining)}
                   </span>
@@ -658,7 +658,7 @@ const SessionPage: React.FC = () => {
         <div className="surface-card rounded-2xl p-6">
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-lg font-semibold text-ink">Live Attendance</h2>
-            <span className="px-3 py-1 bg-purple-500/20 border border-purple-500/30 rounded-full text-xs font-semibold text-purple-300">
+            <span className="px-3 py-1 bg-indigo-500/20 border border-indigo-500/30 rounded-full text-xs font-semibold text-indigo-300">
               {activeSession.records.length} scanned
             </span>
           </div>
@@ -680,7 +680,7 @@ const SessionPage: React.FC = () => {
                   className="flex items-center justify-between p-3 surface-muted-row"
                 >
                   <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-xs font-bold text-ink">
+                    <div className="w-8 h-8 rounded-full bg-gradient-to-br from-indigo-500 to-indigo-700 flex items-center justify-center text-xs font-bold text-ink">
                       {record.studentName.charAt(0)}
                     </div>
                     <div>

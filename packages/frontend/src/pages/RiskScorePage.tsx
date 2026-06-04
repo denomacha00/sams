@@ -16,7 +16,7 @@ interface RiskScoreEntry {
 
 const RISK_COLORS: Record<RiskLevel, { bar: string; badge: string; text: string; glow: string }> = {
   [RiskLevel.LOW]: { bar: 'bg-indigo-500', badge: 'bg-indigo-500/20 border-indigo-500/30', text: 'text-indigo-300', glow: 'shadow-orange-500/20' },
-  [RiskLevel.MEDIUM]: { bar: 'bg-yellow-500', badge: 'bg-yellow-500/20 border-yellow-500/30', text: 'text-yellow-300', glow: 'shadow-yellow-500/20' },
+  [RiskLevel.MEDIUM]: { bar: 'bg-orange-400', badge: 'bg-orange-500/20 border-orange-500/30', text: 'text-orange-400', glow: 'shadow-orange-500/20' },
   [RiskLevel.HIGH]: { bar: 'bg-orange-500', badge: 'bg-orange-500/20 border-orange-500/30', text: 'text-orange-300', glow: 'shadow-orange-500/20' },
   [RiskLevel.CRITICAL]: { bar: 'bg-red-500', badge: 'bg-red-500/20 border-red-500/30', text: 'text-red-300', glow: 'shadow-red-500/20' },
 };
@@ -55,7 +55,7 @@ const RiskScorePage: React.FC = () => {
     return (
       <div className="page-shell flex items-center justify-center">
         <div className="flex items-center gap-3">
-          <svg className="animate-spin h-5 w-5 text-purple-400" viewBox="0 0 24 24">
+          <svg className="animate-spin h-5 w-5 text-indigo-400" viewBox="0 0 24 24">
             <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
             <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
           </svg>
@@ -76,7 +76,7 @@ const RiskScorePage: React.FC = () => {
 
         {error && (
           <div className="mb-4 p-3 alert-error">
-            <p className="text-sm text-red-800 text-center">{error}</p>
+            <p className="text-sm text-red-300 text-center">{error}</p>
           </div>
         )}
 
@@ -87,7 +87,7 @@ const RiskScorePage: React.FC = () => {
               onClick={() => setFilterLevel('ALL')}
               className={`px-4 py-2 rounded-xl text-sm font-medium transition-all duration-200 ${
                 filterLevel === 'ALL'
-                  ? 'bg-gradient-to-r from-blue-600 to-purple-600 text-white shadow-lg shadow-purple-500/25'
+                  ? 'bg-gradient-to-r from-indigo-600 to-indigo-700 text-white shadow-lg shadow-indigo-500/25'
                   : 'bg-white/10 text-ink-muted border border-white/10 hover:bg-white/20'
               }`}
             >
@@ -130,7 +130,7 @@ const RiskScorePage: React.FC = () => {
                 >
                   <div className="flex items-center justify-between mb-3">
                     <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-sm font-bold text-ink">
+                      <div className="w-10 h-10 rounded-full bg-gradient-to-br from-indigo-500 to-indigo-700 flex items-center justify-center text-sm font-bold text-ink">
                         {entry.studentName.charAt(0)}
                       </div>
                       <div>

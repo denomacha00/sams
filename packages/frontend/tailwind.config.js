@@ -36,9 +36,9 @@ export default {
           light: 'var(--color-accent-orange-light, #431407)',
         },
         'accent-blue': {
-          DEFAULT: 'var(--color-accent-blue, #2563eb)',
-          hover: 'var(--color-accent-blue-hover, #1d4ed8)',
-          light: 'var(--color-accent-blue-light, #1e3a5f)',
+          DEFAULT: 'var(--color-accent-blue, #4f46e5)',
+          hover: 'var(--color-accent-blue-hover, #4338ca)',
+          light: 'var(--color-accent-blue-light, #1e1b4b)',
         },
         primary: {
           50: 'var(--color-primary-50, #eef2ff)',

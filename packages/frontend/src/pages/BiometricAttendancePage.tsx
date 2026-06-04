@@ -244,7 +244,7 @@ const BiometricAttendancePage: React.FC = () => {
 
         {error && (
           <div className="mb-4 p-3 alert-error">
-            <p className="text-sm text-red-800 text-center">{error}</p>
+            <p className="text-sm text-red-300 text-center">{error}</p>
           </div>
         )}
 
@@ -262,7 +262,7 @@ const BiometricAttendancePage: React.FC = () => {
           )}
 
           {modelsLoaded && !sessionId && !submitted && (
-            <p className="text-amber-200/90 text-sm text-center mb-4">
+            <p className="text-orange-400/90 text-sm text-center mb-4">
               Start an attendance session before using face scan.
             </p>
           )}

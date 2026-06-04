@@ -171,7 +171,7 @@ const ForgotPasswordPage: React.FC = () => {
                 </div>
               )}
               <form onSubmit={handleSendOtp} className="space-y-5">
-                <p className="text-xs text-amber-200/90 bg-amber-500/10 border border-amber-500/20 rounded-lg px-3 py-2">
+                <p className="text-xs text-orange-400/90 bg-orange-500/10 border border-orange-500/20 rounded-lg px-3 py-2">
                   SMS codes are sent to the phone number on your account. Use the same phone you registered with the school.
                 </p>
                 <Field label="School Code" id="schoolCode" value={schoolCode} onChange={setSchoolCode} placeholder="e.g. KHS2024" />
@@ -273,7 +273,7 @@ function SubmitButton({ loading, label }: { loading: boolean; label: string }) {
     <button
       type="submit"
       disabled={loading}
-      className="w-full bg-gradient-to-r from-indigo-500 to-blue-600 text-white font-bold py-3.5 px-4 rounded-xl hover:from-indigo-400 hover:to-blue-500 disabled:opacity-50 transition-all"
+      className="w-full bg-gradient-to-r from-indigo-500 to-indigo-700 text-white font-bold py-3.5 px-4 rounded-xl hover:from-indigo-400 hover:to-indigo-600 disabled:opacity-50 transition-all"
     >
       {loading ? 'Please wait...' : label}
     </button>
