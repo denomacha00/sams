@@ -298,7 +298,7 @@ const SessionPage: React.FC = () => {
   const getStatusBadge = (status: AttendanceStatus) => {
     switch (status) {
       case AttendanceStatus.PRESENT:
-        return 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30';
+        return 'bg-orange-500/20 text-indigo-300 border border-orange-500/30';
       case AttendanceStatus.LATE:
         return 'bg-yellow-500/20 text-yellow-300 border border-yellow-500/30';
       default:
@@ -471,7 +471,7 @@ const SessionPage: React.FC = () => {
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-lg font-semibold text-ink">Share Attendance Link</h2>
             {linkUrl && linkTimeRemaining > 0 && (
-              <span className="px-3 py-1 bg-emerald-500/20 border border-emerald-500/30 rounded-full text-xs font-semibold text-emerald-300">
+              <span className="px-3 py-1 bg-orange-500/20 border border-orange-500/30 rounded-full text-xs font-semibold text-indigo-300">
                 Active
               </span>
             )}
@@ -601,7 +601,7 @@ const SessionPage: React.FC = () => {
                   onClick={copyLink}
                   className={`shrink-0 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all duration-200 ${
                     linkCopied
-                      ? 'bg-emerald-500/20 border border-emerald-500/30 text-emerald-300'
+                      ? 'bg-orange-500/20 border border-orange-500/30 text-indigo-300'
                       : 'btn-secondary text-sm hover:bg-white/20'
                   }`}
                 >
@@ -620,7 +620,7 @@ const SessionPage: React.FC = () => {
                 <div className="flex items-center justify-between">
                   <span className="text-xs text-ink-muted">Time remaining</span>
                   <span className={`text-sm font-mono font-semibold ${
-                    linkTimeRemaining <= 60 ? 'text-yellow-300' : 'text-emerald-300'
+                    linkTimeRemaining <= 60 ? 'text-yellow-300' : 'text-indigo-300'
                   }`}>
                     {formatTimeRemaining(linkTimeRemaining)}
                   </span>

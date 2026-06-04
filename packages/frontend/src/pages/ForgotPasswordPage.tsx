@@ -143,10 +143,10 @@ const ForgotPasswordPage: React.FC = () => {
           )}
 
           {success ? (
-            <div className="p-4 bg-emerald-500/20 border border-emerald-400/30 rounded-xl text-center">
-              <p className="text-emerald-800 font-medium">Password reset complete!</p>
-              <p className="text-emerald-300/70 text-sm mt-1">You can now sign in with your new password.</p>
-              <Link to="/login" className="inline-block mt-4 text-sm text-teal-400 hover:text-teal-300 font-semibold">
+            <div className="p-4 bg-indigo-500/20 border border-indigo-400/30 rounded-xl text-center">
+              <p className="text-indigo-200 font-medium">Password reset complete!</p>
+              <p className="text-indigo-300/70 text-sm mt-1">You can now sign in with your new password.</p>
+              <Link to="/login" className="inline-block mt-4 text-sm text-indigo-400 hover:text-indigo-300 font-semibold">
                 ← Back to Login
               </Link>
             </div>
@@ -225,7 +225,7 @@ const ForgotPasswordPage: React.FC = () => {
 
           {!success && (
             <div className="mt-6 pt-6 border-t border-white/10 text-center">
-              <Link to="/login" className="text-sm text-teal-400 hover:text-teal-300 font-semibold">
+              <Link to="/login" className="text-sm text-indigo-400 hover:text-indigo-300 font-semibold">
                 ← Back to Login
               </Link>
             </div>
@@ -273,7 +273,7 @@ function SubmitButton({ loading, label }: { loading: boolean; label: string }) {
     <button
       type="submit"
       disabled={loading}
-      className="w-full bg-gradient-to-r from-teal-500 to-cyan-600 text-white font-bold py-3.5 px-4 rounded-xl hover:from-teal-400 hover:to-cyan-500 disabled:opacity-50 transition-all"
+      className="w-full bg-gradient-to-r from-indigo-500 to-blue-600 text-white font-bold py-3.5 px-4 rounded-xl hover:from-indigo-400 hover:to-blue-500 disabled:opacity-50 transition-all"
     >
       {loading ? 'Please wait...' : label}
     </button>

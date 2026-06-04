@@ -183,7 +183,7 @@ const RegisterPage: React.FC = () => {
     return (
       <div className="page-shell flex items-center justify-center">
         <div className="flex items-center gap-3">
-          <svg className="animate-spin h-5 w-5 text-teal-400" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" /><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" /></svg>
+          <svg className="animate-spin h-5 w-5 text-indigo-400" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" /><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" /></svg>
           <p className="text-ink-muted">Verifying registration link...</p>
         </div>
       </div>
@@ -209,14 +209,14 @@ const RegisterPage: React.FC = () => {
       <div className="max-w-md w-full surface-card rounded-2xl p-8">
         {/* Header */}
         <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-gradient-to-br from-teal-500 to-cyan-600 shadow-lg shadow-teal-500/20 mb-4">
+          <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-gradient-to-br from-indigo-500 to-blue-600 shadow-lg shadow-indigo-500/20 mb-4">
             <svg className="w-8 h-8 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z" /></svg>
           </div>
           <h1 className="text-2xl font-bold text-ink">
             {isStudent ? 'Student Registration' : 'Staff Registration'}
           </h1>
           <p className="text-ink-muted text-sm mt-1">
-            Registering as <span className="text-teal-400 font-medium">{linkMeta?.targetRole}</span>
+            Registering as <span className="text-indigo-400 font-medium">{linkMeta?.targetRole}</span>
           </p>
         </div>
 
@@ -225,19 +225,19 @@ const RegisterPage: React.FC = () => {
           <div className="mb-6 p-3 bg-surface-muted border border-line rounded-xl space-y-1.5" role="region" aria-label="Registration context">
             {linkMeta.schoolName && (
               <div className="flex items-center gap-2">
-                <svg className="w-4 h-4 text-teal-400 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" /></svg>
+                <svg className="w-4 h-4 text-indigo-400 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" /></svg>
                 <span className="text-sm text-ink-muted"><span className="text-ink-subtle">School:</span> {linkMeta.schoolName}</span>
               </div>
             )}
             {linkMeta.departmentName && (
               <div className="flex items-center gap-2">
-                <svg className="w-4 h-4 text-teal-400 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zm10 0a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2z" /></svg>
+                <svg className="w-4 h-4 text-indigo-400 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zm10 0a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2z" /></svg>
                 <span className="text-sm text-ink-muted"><span className="text-ink-subtle">Department:</span> {linkMeta.departmentName}</span>
               </div>
             )}
             {linkMeta.className && (
               <div className="flex items-center gap-2">
-                <svg className="w-4 h-4 text-teal-400 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" /></svg>
+                <svg className="w-4 h-4 text-indigo-400 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" /></svg>
                 <span className="text-sm text-ink-muted"><span className="text-ink-subtle">Class:</span> {linkMeta.className}</span>
               </div>
             )}
@@ -246,9 +246,9 @@ const RegisterPage: React.FC = () => {
 
         {/* Success */}
         {success && !showBiometric && (
-          <div className="mb-6 p-4 bg-emerald-500/20 border border-emerald-400/30 rounded-xl text-center">
-            <svg className="w-8 h-8 text-emerald-400 mx-auto mb-2" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
-            <p className="text-emerald-800 font-medium">Registration successful!</p>
+          <div className="mb-6 p-4 bg-indigo-500/20 border border-indigo-400/30 rounded-xl text-center">
+            <svg className="w-8 h-8 text-orange-400 mx-auto mb-2" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
+            <p className="text-indigo-200 font-medium">Registration successful!</p>
             {isStudent ? (
               <div className="mt-4 space-y-3">
                 <p className="text-ink-muted text-sm">Would you like to enroll your face for biometric attendance?</p>
@@ -268,7 +268,7 @@ const RegisterPage: React.FC = () => {
                 </div>
               </div>
             ) : (
-              <p className="text-emerald-300/70 text-sm mt-1">Redirecting to login...</p>
+              <p className="text-indigo-300/70 text-sm mt-1">Redirecting to login...</p>
             )}
           </div>
         )}
@@ -333,12 +333,12 @@ const RegisterPage: React.FC = () => {
 
             {bioStep === 'done' && (
               <div className="text-center py-4">
-                <svg className="w-10 h-10 text-emerald-400 mx-auto mb-2" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
-                <p className="text-emerald-800 font-medium">Face enrolled successfully!</p>
+                <svg className="w-10 h-10 text-orange-400 mx-auto mb-2" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
+                <p className="text-indigo-200 font-medium">Face enrolled successfully!</p>
                 <p className="text-ink-muted text-sm mt-1">You can now use biometric attendance.</p>
                 <button
                   onClick={() => navigate('/login', { replace: true })}
-                  className="mt-4 bg-gradient-to-r from-teal-500 to-cyan-600 text-white font-semibold py-2.5 px-6 rounded-xl hover:scale-[1.02] active:scale-[0.98] transition-all"
+                  className="mt-4 bg-gradient-to-r from-indigo-500 to-blue-600 text-white font-semibold py-2.5 px-6 rounded-xl hover:scale-[1.02] active:scale-[0.98] transition-all"
                 >
                   Continue to Login
                 </button>
@@ -453,7 +453,7 @@ const RegisterPage: React.FC = () => {
             <button
               type="submit"
               disabled={loading}
-              className="w-full bg-gradient-to-r from-teal-500 to-cyan-600 text-white font-bold py-3.5 px-4 rounded-xl hover:from-teal-400 hover:to-cyan-500 focus:outline-none focus:ring-2 focus:ring-brand/40/50 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-lg shadow-teal-500/30 hover:scale-[1.01] active:scale-[0.99]"
+              className="w-full bg-gradient-to-r from-indigo-500 to-blue-600 text-white font-bold py-3.5 px-4 rounded-xl hover:from-indigo-400 hover:to-blue-500 focus:outline-none focus:ring-2 focus:ring-brand/40/50 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-lg shadow-indigo-500/30 hover:scale-[1.01] active:scale-[0.99]"
             >
               {loading ? 'Registering...' : 'Register'}
             </button>

@@ -199,13 +199,13 @@ const RegistrationLinksPage: React.FC = () => {
     const expires = new Date(link.expiresAt);
     if (link.useCount >= link.maxUses) return { label: 'Exhausted', color: 'bg-orange-500/20 text-orange-300' };
     if (expires < now) return { label: 'Expired', color: 'bg-red-500/20 text-red-300' };
-    return { label: 'Active', color: 'bg-green-500/20 text-green-300' };
+    return { label: 'Active', color: 'bg-indigo-500/20 text-indigo-300' };
   };
 
   const getRoleBadge = (role: string) => {
     switch (role) {
       case 'STUDENT': return 'bg-blue-500/20 text-blue-300';
-      case 'TEACHER': return 'bg-green-500/20 text-green-300';
+      case 'TEACHER': return 'bg-indigo-500/20 text-indigo-300';
       case 'HOD': return 'bg-orange-500/20 text-orange-300';
       default: return 'bg-gray-500/20 text-ink-muted';
     }
@@ -244,7 +244,7 @@ const RegistrationLinksPage: React.FC = () => {
           </div>
           <button
             onClick={() => { setError(''); setShowModal(true); }}
-            className="px-4 py-2 rounded-xl bg-gradient-to-r from-teal-500 to-cyan-500 text-white text-sm font-semibold hover:from-teal-400 hover:to-cyan-400 transition-all shadow-lg shadow-cyan-500/20"
+            className="px-4 py-2 rounded-xl bg-gradient-to-r from-indigo-500 to-blue-600 text-white text-sm font-semibold hover:from-indigo-400 hover:to-blue-400 transition-all shadow-lg shadow-cyan-500/20"
           >
             + Generate Link
           </button>
@@ -291,7 +291,7 @@ const RegistrationLinksPage: React.FC = () => {
                               <span className="text-xs text-ink-muted">{link.departmentName}</span>
                             )}
                             {link.className && (
-                              <span className="text-xs text-teal-400">{link.className}</span>
+                              <span className="text-xs text-indigo-400">{link.className}</span>
                             )}
                             {!link.departmentName && !link.className && (
                               <span className="text-xs text-ink-muted">—</span>
@@ -367,7 +367,7 @@ const RegistrationLinksPage: React.FC = () => {
                     </div>
                   ) : (
                     <>
-                      <p className="text-xs text-teal-400 mb-3">Generating a student registration link for your department</p>
+                      <p className="text-xs text-indigo-400 mb-3">Generating a student registration link for your department</p>
                       <label className="block text-sm text-ink-muted mb-1">Class *</label>
                       {loadingClasses ? (
                         <div className="w-full px-4 py-2.5 rounded-xl bg-surface-muted border border-line text-ink-muted text-sm">
@@ -503,8 +503,8 @@ const RegistrationLinksPage: React.FC = () => {
               </div>
 
               {/* Info box */}
-              <div className="p-3 rounded-xl bg-teal-500/10 border border-teal-500/20">
-                <p className="text-xs text-teal-300">
+              <div className="p-3 rounded-xl bg-indigo-500/10 border border-indigo-500/20">
+                <p className="text-xs text-indigo-300">
                   This link will allow up to <strong>{maxUses}</strong> {targetRole.toLowerCase()}s to self-register.
                   {targetRole === 'STUDENT' && selectedClass && ' They will be assigned to the selected class.'}
                   {targetRole !== 'STUDENT' && ' They will need to provide their Work ID and phone number.'}
@@ -522,7 +522,7 @@ const RegistrationLinksPage: React.FC = () => {
                 <button
                   type="submit"
                   disabled={isGenerateDisabled()}
-                  className="flex-1 px-4 py-2.5 rounded-xl bg-gradient-to-r from-teal-500 to-cyan-500 text-white font-semibold hover:from-teal-400 hover:to-cyan-400 transition-all shadow-lg shadow-cyan-500/20 disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="flex-1 px-4 py-2.5 rounded-xl bg-gradient-to-r from-indigo-500 to-blue-600 text-white font-semibold hover:from-indigo-400 hover:to-blue-400 transition-all shadow-lg shadow-cyan-500/20 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {submitting ? 'Generating...' : 'Generate Link'}
                 </button>

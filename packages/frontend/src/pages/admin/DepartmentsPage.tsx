@@ -261,7 +261,7 @@ const DepartmentsPage: React.FC = () => {
           </div>
           <button
             onClick={openAddDeptModal}
-            className="px-4 py-2 rounded-xl bg-gradient-to-r from-teal-500 to-cyan-500 text-white text-sm font-semibold hover:from-teal-400 hover:to-cyan-400 transition-all shadow-lg shadow-cyan-500/20"
+            className="px-4 py-2 rounded-xl bg-gradient-to-r from-indigo-500 to-blue-600 text-white text-sm font-semibold hover:from-indigo-400 hover:to-blue-400 transition-all shadow-lg shadow-cyan-500/20"
           >
             + Add Department
           </button>
@@ -276,7 +276,7 @@ const DepartmentsPage: React.FC = () => {
             <p className="mb-4">No departments found</p>
             <button
               onClick={openAddDeptModal}
-              className="px-4 py-2 rounded-xl bg-gradient-to-r from-teal-500 to-cyan-500 text-white text-sm font-semibold"
+              className="px-4 py-2 rounded-xl bg-gradient-to-r from-indigo-500 to-blue-600 text-white text-sm font-semibold"
             >
               Create your first department
             </button>
@@ -374,7 +374,7 @@ const DepartmentsPage: React.FC = () => {
                               <p className="text-ink-subtle text-xs">Capacity: {cls.capacity}</p>
                               <p className="text-xs mt-0.5">
                                 {cls.classTeacherName ? (
-                                  <span className="text-teal-400">Class Teacher: {cls.classTeacherName}</span>
+                                  <span className="text-indigo-400">Class Teacher: {cls.classTeacherName}</span>
                                 ) : (
                                   <span className="text-ink-muted italic">No class teacher assigned</span>
                                 )}
@@ -444,7 +444,7 @@ const DepartmentsPage: React.FC = () => {
                 <button
                   type="submit"
                   disabled={submitting}
-                  className="flex-1 px-4 py-2.5 rounded-xl bg-gradient-to-r from-teal-500 to-cyan-500 text-white font-semibold hover:from-teal-400 hover:to-cyan-400 transition-all shadow-lg shadow-cyan-500/20 disabled:opacity-50"
+                  className="flex-1 px-4 py-2.5 rounded-xl bg-gradient-to-r from-indigo-500 to-blue-600 text-white font-semibold hover:from-indigo-400 hover:to-blue-400 transition-all shadow-lg shadow-cyan-500/20 disabled:opacity-50"
                 >
                   {submitting ? 'Saving...' : editingDept ? 'Update' : 'Create'}
                 </button>
@@ -503,7 +503,7 @@ const DepartmentsPage: React.FC = () => {
                 <button
                   type="submit"
                   disabled={submitting}
-                  className="flex-1 px-4 py-2.5 rounded-xl bg-gradient-to-r from-teal-500 to-cyan-500 text-white font-semibold hover:from-teal-400 hover:to-cyan-400 transition-all shadow-lg shadow-cyan-500/20 disabled:opacity-50"
+                  className="flex-1 px-4 py-2.5 rounded-xl bg-gradient-to-r from-indigo-500 to-blue-600 text-white font-semibold hover:from-indigo-400 hover:to-blue-400 transition-all shadow-lg shadow-cyan-500/20 disabled:opacity-50"
                 >
                   {submitting ? 'Saving...' : editingClass ? 'Update' : 'Create'}
                 </button>

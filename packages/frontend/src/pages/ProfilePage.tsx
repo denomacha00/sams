@@ -255,8 +255,8 @@ const ProfilePage: React.FC = () => {
         </div>
 
         {success && (
-          <div className="mb-4 p-3 bg-emerald-500/20 border border-emerald-400/30 rounded-xl backdrop-blur-sm">
-            <p className="text-sm text-emerald-800 text-center">{success}</p>
+          <div className="mb-4 p-3 bg-indigo-500/20 border border-indigo-400/30 rounded-xl backdrop-blur-sm">
+            <p className="text-sm text-indigo-200 text-center">{success}</p>
           </div>
         )}
         {error && (
@@ -281,7 +281,7 @@ const ProfilePage: React.FC = () => {
               <button
                 onClick={() => fileInputRef.current?.click()}
                 disabled={uploadingAvatar}
-                className="absolute -bottom-1 -right-1 w-7 h-7 rounded-full bg-teal-500 border-2 border-slate-900 flex items-center justify-center hover:bg-teal-400 transition-colors"
+                className="absolute -bottom-1 -right-1 w-7 h-7 rounded-full bg-indigo-500 border-2 border-slate-900 flex items-center justify-center hover:bg-indigo-400 transition-colors"
               >
                 <svg className="w-3.5 h-3.5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
@@ -292,7 +292,7 @@ const ProfilePage: React.FC = () => {
             </div>
             <div>
               <h2 className="text-lg font-semibold text-ink">{user?.fullName}</h2>
-              <p className="text-sm text-teal-400 font-medium">{getRoleLabel()}</p>
+              <p className="text-sm text-indigo-400 font-medium">{getRoleLabel()}</p>
               <p className="text-xs text-ink-subtle mt-0.5">Click the camera icon to change your photo</p>
             </div>
           </div>
@@ -354,7 +354,7 @@ const ProfilePage: React.FC = () => {
             </div>
             <div className="flex justify-between items-center py-2 border-b border-white/5">
               <span className="text-sm text-ink-muted">Account Status</span>
-              <span className="text-sm text-emerald-400 font-medium">Active</span>
+              <span className="text-sm text-orange-400 font-medium">Active</span>
             </div>
             <div className="flex justify-between items-center py-2">
               <span className="text-sm text-ink-muted">App Version</span>

@@ -208,7 +208,7 @@ const QRScanPage: React.FC = () => {
 
         <div className="mb-4 flex items-center gap-2">
           <div className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-medium ${
-            gpsStatus === 'success' ? 'bg-emerald-50 text-emerald-800 border border-emerald-200' :
+            gpsStatus === 'success' ? 'bg-indigo-950/50 text-indigo-200 border border-indigo-500/30' :
             gpsStatus === 'failed' ? 'bg-red-50 text-red-800 border border-red-200' :
             gpsStatus === 'acquiring' ? 'bg-amber-50 text-amber-800 border border-amber-200' :
             'bg-slate-800 text-ink-muted border border-line'
@@ -222,7 +222,7 @@ const QRScanPage: React.FC = () => {
 
         {success && (
           <div className="mb-4 p-4 alert-success rounded-xl text-center">
-            <p className="text-emerald-800 font-medium">Attendance recorded</p>
+            <p className="text-indigo-200 font-medium">Attendance recorded</p>
           </div>
         )}
 

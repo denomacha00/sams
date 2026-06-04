@@ -144,9 +144,9 @@ const DepartmentManagementPage: React.FC = () => {
         </div>
 
         {assignSuccess && (
-          <div className="mb-6 p-4 rounded-xl bg-teal-500/10 border border-teal-500/20 text-teal-300 text-sm flex items-center justify-between">
+          <div className="mb-6 p-4 rounded-xl bg-indigo-500/10 border border-indigo-500/20 text-indigo-300 text-sm flex items-center justify-between">
             <span>{assignSuccess}</span>
-            <button onClick={() => setAssignSuccess('')} className="ml-4 text-teal-400 hover:text-ink">✕</button>
+            <button onClick={() => setAssignSuccess('')} className="ml-4 text-indigo-400 hover:text-ink">✕</button>
           </div>
         )}
 
@@ -158,7 +158,7 @@ const DepartmentManagementPage: React.FC = () => {
               onClick={() => setActiveTab(tab)}
               className={`px-4 py-2 rounded-lg text-sm font-medium transition-all capitalize ${
                 activeTab === tab
-                  ? 'bg-gradient-to-r from-teal-500 to-cyan-500 text-white shadow-lg shadow-cyan-500/20'
+                  ? 'bg-gradient-to-r from-indigo-500 to-blue-600 text-white shadow-lg shadow-cyan-500/20'
                   : 'bg-white/5 text-ink-muted hover:bg-white/10 hover:text-ink border border-white/10'
               }`}
             >
@@ -228,12 +228,12 @@ const DepartmentManagementPage: React.FC = () => {
                     <p className="text-xs text-ink-muted">Capacity: {cls.capacity}</p>
                     <p className="text-xs mt-1">
                       {cls.classTeacherName
-                        ? <span className="text-teal-300">Class Teacher: {cls.classTeacherName}</span>
+                        ? <span className="text-indigo-300">Class Teacher: {cls.classTeacherName}</span>
                         : <span className="text-ink-subtle italic">No class teacher assigned</span>}
                     </p>
                   </div>
                   {selectedClassId !== cls.id && (
-                    <button onClick={() => openAssignForm(cls.id)} className="shrink-0 px-3 py-1.5 rounded-lg text-xs font-medium text-white bg-gradient-to-r from-teal-500 to-cyan-500 hover:from-teal-600 hover:to-cyan-600 transition-all">
+                    <button onClick={() => openAssignForm(cls.id)} className="shrink-0 px-3 py-1.5 rounded-lg text-xs font-medium text-white bg-gradient-to-r from-indigo-500 to-blue-600 hover:from-indigo-600 hover:to-blue-600 transition-all">
                       Assign Teacher
                     </button>
                   )}
@@ -251,7 +251,7 @@ const DepartmentManagementPage: React.FC = () => {
                         <option key={t.id} value={t.id} className="bg-slate-800">{t.fullName}</option>
                       ))}
                     </select>
-                    <button onClick={() => handleAssign(cls.id)} disabled={assigning || !selectedTeacherId} className="px-4 py-2 rounded-xl text-xs font-medium text-white bg-gradient-to-r from-teal-500 to-cyan-500 disabled:opacity-50 transition-all">
+                    <button onClick={() => handleAssign(cls.id)} disabled={assigning || !selectedTeacherId} className="px-4 py-2 rounded-xl text-xs font-medium text-white bg-gradient-to-r from-indigo-500 to-blue-600 disabled:opacity-50 transition-all">
                       {assigning ? 'Assigning…' : 'Assign'}
                     </button>
                     <button onClick={cancelAssign} disabled={assigning} className="px-3 py-2 rounded-xl text-xs text-ink-muted hover:text-ink hover:bg-white/10 transition-colors">
@@ -285,7 +285,7 @@ const DepartmentManagementPage: React.FC = () => {
                       <p className="text-xs text-ink-muted">
                         {s.admissionNumber ? `ADM: ${s.admissionNumber}` : '—'}
                         {s.classId && classes.find(c => c.id === s.classId) && (
-                          <span className="ml-2 text-teal-400">· {classes.find(c => c.id === s.classId)?.name}</span>
+                          <span className="ml-2 text-indigo-400">· {classes.find(c => c.id === s.classId)?.name}</span>
                         )}
                       </p>
                     </div>

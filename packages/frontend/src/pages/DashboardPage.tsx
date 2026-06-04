@@ -21,7 +21,7 @@ interface QuickAction {
   label: string;
   icon: string;
   gradient: string;
-  /** Primary attendance CTAs use emerald styling */
+  /** Primary attendance CTAs use orange styling */
   variant?: 'attendance' | 'alert' | 'default';
 }
 
@@ -290,7 +290,7 @@ const AtAGlancePanel: React.FC<{ role?: UserRole; userId?: string }> = ({ role, 
       ) : role === UserRole.STUDENT ? (
         <div className="space-y-4">
           <div className="text-center py-4">
-            <p className="text-4xl font-bold text-emerald-600">{studentPresent}</p>
+            <p className="text-4xl font-bold text-orange-500">{studentPresent}</p>
             <p className="text-sm text-ink-muted mt-1">classes marked present today</p>
           </div>
           <Link
@@ -315,18 +315,18 @@ const AtAGlancePanel: React.FC<{ role?: UserRole; userId?: string }> = ({ role, 
             </div>
           ) : (
             <>
-              <p className="text-xs font-medium text-emerald-600 uppercase tracking-wide">Active now</p>
+              <p className="text-xs font-medium text-orange-500 uppercase tracking-wide">Active now</p>
               {activeSessions.map((s) => (
                 <Link
                   key={s.id}
                   to="/sessions"
-                  className="surface-muted-row hover:border-emerald-300"
+                  className="surface-muted-row hover:border-orange-400"
                 >
                   <div>
                     <p className="text-sm text-ink font-medium">{s.subject}</p>
                     {s.className && <p className="text-xs text-ink-subtle">{s.className}</p>}
                   </div>
-                  <span className="text-xs font-semibold text-emerald-600">Live</span>
+                  <span className="text-xs font-semibold text-orange-500">Live</span>
                 </Link>
               ))}
               <Link to="/sessions" className="block text-center text-sm text-brand hover:text-brand-hover pt-1">
@@ -490,7 +490,7 @@ function getQuickActionGroups(role?: UserRole): QuickActionGroup[] {
           title: 'School Management',
           actions: [
             { to: '/admin/users', label: 'Manage Users', icon: ICONS.users, gradient: 'from-indigo-600 to-slate-700' },
-            { to: '/admin/departments', label: 'Departments', icon: ICONS.building, gradient: 'from-green-500 to-emerald-500' },
+            { to: '/admin/departments', label: 'Departments', icon: ICONS.building, gradient: 'from-indigo-500 to-blue-600' },
             { to: '/admin/links', label: 'Registration Links', icon: ICONS.link, gradient: 'from-slate-600 to-indigo-600' },
             { to: '/class-roster', label: 'Class Reps', icon: ICONS.users, gradient: 'from-amber-500 to-orange-500' },
           ],
@@ -516,9 +516,9 @@ function getQuickActionGroups(role?: UserRole): QuickActionGroup[] {
         {
           title: 'Attendance',
           actions: [
-            { to: '/sessions', label: 'Sign In Students', icon: ICONS.qr, gradient: 'from-emerald-600 to-teal-600', variant: 'attendance' },
-            { to: '/attendance', label: 'Mark Attendance', icon: ICONS.clipboard, gradient: 'from-emerald-500 to-teal-500', variant: 'attendance' },
-            { to: '/biometric/attendance', label: 'Face Scan', icon: ICONS.check, gradient: 'from-emerald-600 to-teal-600', variant: 'attendance' },
+            { to: '/sessions', label: 'Sign In Students', icon: ICONS.qr, gradient: 'from-orange-500 to-orange-600', variant: 'attendance' },
+            { to: '/attendance', label: 'Mark Attendance', icon: ICONS.clipboard, gradient: 'from-orange-500 to-orange-600', variant: 'attendance' },
+            { to: '/biometric/attendance', label: 'Face Scan', icon: ICONS.check, gradient: 'from-orange-500 to-orange-600', variant: 'attendance' },
           ],
         },
         {
@@ -533,7 +533,7 @@ function getQuickActionGroups(role?: UserRole): QuickActionGroup[] {
           actions: [
             { to: '/timetable', label: 'My Timetable', icon: ICONS.calendar, gradient: 'from-orange-500 to-amber-500' },
             { to: '/reports', label: 'View Reports', icon: ICONS.chart, gradient: 'from-indigo-600 to-slate-700' },
-            { to: '/admin/links', label: 'Registration Links', icon: ICONS.link, gradient: 'from-emerald-500 to-teal-500' },
+            { to: '/admin/links', label: 'Registration Links', icon: ICONS.link, gradient: 'from-orange-500 to-orange-600' },
             { to: '/admin/knowledge', label: 'Knowledge Base', icon: ICONS.book, gradient: 'from-amber-500 to-yellow-500' },
           ],
         },
@@ -550,7 +550,7 @@ function getQuickActionGroups(role?: UserRole): QuickActionGroup[] {
         {
           title: 'Today',
           actions: [
-            { to: '/sessions/scan', label: 'Scan QR', icon: ICONS.qr, gradient: 'from-emerald-500 to-teal-500', variant: 'attendance' },
+            { to: '/sessions/scan', label: 'Scan QR', icon: ICONS.qr, gradient: 'from-orange-500 to-orange-600', variant: 'attendance' },
             { to: '/timetable', label: 'View Timetable', icon: ICONS.calendar, gradient: 'from-blue-500 to-indigo-500' },
           ],
         },
@@ -574,9 +574,9 @@ function getQuickActionGroups(role?: UserRole): QuickActionGroup[] {
         {
           title: 'Attendance',
           actions: [
-            { to: '/sessions', label: 'Sign In Students', icon: ICONS.qr, gradient: 'from-emerald-600 to-teal-600', variant: 'attendance' },
-            { to: '/attendance', label: 'Mark Attendance', icon: ICONS.clipboard, gradient: 'from-emerald-500 to-teal-500', variant: 'attendance' },
-            { to: '/biometric/attendance', label: 'Face Scan', icon: ICONS.check, gradient: 'from-emerald-600 to-teal-600', variant: 'attendance' },
+            { to: '/sessions', label: 'Sign In Students', icon: ICONS.qr, gradient: 'from-orange-500 to-orange-600', variant: 'attendance' },
+            { to: '/attendance', label: 'Mark Attendance', icon: ICONS.clipboard, gradient: 'from-orange-500 to-orange-600', variant: 'attendance' },
+            { to: '/biometric/attendance', label: 'Face Scan', icon: ICONS.check, gradient: 'from-orange-500 to-orange-600', variant: 'attendance' },
           ],
         },
         {
@@ -585,7 +585,7 @@ function getQuickActionGroups(role?: UserRole): QuickActionGroup[] {
             { to: '/hod/department', label: 'Department Management', icon: ICONS.building, gradient: 'from-indigo-500 to-blue-500' },
             { to: '/admin/users', label: 'Manage Users', icon: ICONS.users, gradient: 'from-blue-500 to-indigo-500' },
             { to: '/class-roster', label: 'Class Reps', icon: ICONS.users, gradient: 'from-amber-500 to-orange-500' },
-            { to: '/admin/links', label: 'Registration Links', icon: ICONS.link, gradient: 'from-emerald-500 to-teal-500' },
+            { to: '/admin/links', label: 'Registration Links', icon: ICONS.link, gradient: 'from-orange-500 to-orange-600' },
           ],
         },
         {
@@ -890,7 +890,7 @@ const TeacherClassPanel: React.FC<{ classId?: string; attendanceRate?: string }>
     >
       <div className="flex items-center justify-between gap-3 mb-5">
         <div className="flex items-center gap-3">
-          <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-green-500 to-emerald-500 flex items-center justify-center shadow-lg shadow-green-500/20">
+          <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-indigo-500 to-blue-600 flex items-center justify-center shadow-lg shadow-indigo-500/20">
             <svg className="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={ICONS.academic} />
             </svg>
@@ -900,7 +900,7 @@ const TeacherClassPanel: React.FC<{ classId?: string; attendanceRate?: string }>
             {className && <p className="text-xs text-ink-muted">{className}</p>}
           </div>
         </div>
-        <span className="text-sm font-semibold text-teal-400">
+        <span className="text-sm font-semibold text-indigo-400">
           {loading ? '…' : `${students.length} student${students.length !== 1 ? 's' : ''}`}
         </span>
       </div>
@@ -988,7 +988,7 @@ const HodDepartmentPanel: React.FC<{ stats: StatCard[]; departmentName?: string 
       <div className="space-y-3">
         <div className="surface-muted-row">
           <span className="text-sm text-ink-muted">Students</span>
-          <span className="text-sm font-semibold text-teal-400">{deptStudents}</span>
+          <span className="text-sm font-semibold text-indigo-400">{deptStudents}</span>
         </div>
         <div className="surface-muted-row">
           <span className="text-sm text-ink-muted">Teachers</span>
@@ -996,7 +996,7 @@ const HodDepartmentPanel: React.FC<{ stats: StatCard[]; departmentName?: string 
         </div>
         <div className="surface-muted-row">
           <span className="text-sm text-ink-muted">Avg. Attendance</span>
-          <span className="text-sm font-semibold text-emerald-400">{attendanceRate}</span>
+          <span className="text-sm font-semibold text-orange-400">{attendanceRate}</span>
         </div>
         <div className="surface-muted-row">
           <span className="text-sm text-ink-muted">High Risk Students</span>
@@ -1307,7 +1307,7 @@ const DashboardPage: React.FC = () => {
             {user?.role === UserRole.STUDENT && (
               <div className="surface-panel" style={{ animation: 'fadeInUp 0.5s ease-out 0.7s forwards', opacity: 0 }}>
                 <div className="flex items-center gap-3 mb-5">
-                  <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-emerald-600 to-teal-600 flex items-center justify-center shadow-lg shadow-emerald-500/20">
+                  <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-orange-500 to-orange-600 flex items-center justify-center shadow-lg shadow-orange-500/20">
                     <svg className="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={ICONS.fire} />
                     </svg>
@@ -1315,7 +1315,7 @@ const DashboardPage: React.FC = () => {
                   <h3 className="text-lg font-semibold text-ink">Attendance Streak</h3>
                 </div>
                 <div className="text-center py-6">
-                  <div className="text-5xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-emerald-300 to-teal-300 mb-2">
+                  <div className="text-5xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-orange-300 to-orange-400 mb-2">
                     {daysPresentStat ?? '—'}
                   </div>
                   <p className="text-sm text-ink-muted">days present (term total)</p>

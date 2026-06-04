@@ -256,7 +256,7 @@ const UserManagementPage: React.FC = () => {
           </div>
           <button
             onClick={openAddModal}
-            className="px-4 py-2 rounded-xl bg-gradient-to-r from-teal-500 to-cyan-500 text-white text-sm font-semibold hover:from-teal-400 hover:to-cyan-400 transition-all shadow-lg shadow-cyan-500/20"
+            className="px-4 py-2 rounded-xl bg-gradient-to-r from-indigo-500 to-blue-600 text-white text-sm font-semibold hover:from-indigo-400 hover:to-blue-400 transition-all shadow-lg shadow-cyan-500/20"
           >
             + Add User
           </button>
@@ -272,7 +272,7 @@ const UserManagementPage: React.FC = () => {
               onClick={() => setActiveTab(tab)}
               className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
                 activeTab === tab
-                  ? 'bg-gradient-to-r from-teal-500 to-cyan-500 text-white shadow-lg shadow-cyan-500/20'
+                  ? 'bg-gradient-to-r from-indigo-500 to-blue-600 text-white shadow-lg shadow-cyan-500/20'
                   : 'bg-white/5 text-ink-muted hover:bg-white/10 hover:text-ink border border-white/10'
               }`}
             >
@@ -342,14 +342,14 @@ const UserManagementPage: React.FC = () => {
                         <div className="flex items-center gap-1.5 flex-wrap">
                           <span className={`inline-flex px-2 py-1 rounded-full text-xs font-medium ${
                             u.role === 'HOD' ? 'bg-orange-500/20 text-orange-300' :
-                            u.role === 'TEACHER' ? 'bg-green-500/20 text-green-300' :
+                            u.role === 'TEACHER' ? 'bg-indigo-500/20 text-indigo-300' :
                             u.role === 'STUDENT' ? 'bg-blue-500/20 text-blue-300' :
                             'bg-purple-500/20 text-purple-300'
                           }`}>
                             {u.role}
                           </span>
                           {u.role === 'TEACHER' && u.classId && (
-                            <span className="inline-flex px-2 py-1 rounded-full text-xs font-medium bg-teal-500/20 text-teal-300">
+                            <span className="inline-flex px-2 py-1 rounded-full text-xs font-medium bg-indigo-500/20 text-indigo-300">
                               Class Teacher
                             </span>
                           )}
@@ -369,7 +369,7 @@ const UserManagementPage: React.FC = () => {
                             </span>
                           )}
                           {u.classId && (
-                            <span className="text-xs text-teal-400">
+                            <span className="text-xs text-indigo-400">
                               {departments.flatMap(d => d.classes || []).find(c => c.id === u.classId)?.name || u.classId}
                             </span>
                           )}
@@ -378,7 +378,7 @@ const UserManagementPage: React.FC = () => {
                       </td>
                       <td className="px-6 py-4">
                         <span className={`inline-flex px-2 py-1 rounded-full text-xs font-medium ${
-                          u.isLocked ? 'bg-red-500/20 text-red-300' : 'bg-green-500/20 text-green-300'
+                          u.isLocked ? 'bg-red-500/20 text-red-300' : 'bg-indigo-500/20 text-indigo-300'
                         }`}>
                           {u.isLocked ? 'Locked' : 'Active'}
                         </span>
@@ -553,7 +553,7 @@ const UserManagementPage: React.FC = () => {
                     Class {needsClass ? '*' : formData.role === 'TEACHER' ? '(optional — teacher can teach multiple)' : ''}
                   </label>
                   {formData.role === 'TEACHER' && (
-                    <p className="text-xs text-teal-400 mb-1">
+                    <p className="text-xs text-indigo-400 mb-1">
                       Setting a class here makes this teacher the <strong>Class Teacher</strong> for that class.
                     </p>
                   )}
@@ -601,7 +601,7 @@ const UserManagementPage: React.FC = () => {
                 <button
                   type="submit"
                   disabled={submitting}
-                  className="flex-1 px-4 py-2.5 rounded-xl bg-gradient-to-r from-teal-500 to-cyan-500 text-white font-semibold hover:from-teal-400 hover:to-cyan-400 transition-all shadow-lg shadow-cyan-500/20 disabled:opacity-50"
+                  className="flex-1 px-4 py-2.5 rounded-xl bg-gradient-to-r from-indigo-500 to-blue-600 text-white font-semibold hover:from-indigo-400 hover:to-blue-400 transition-all shadow-lg shadow-cyan-500/20 disabled:opacity-50"
                 >
                   {submitting ? 'Saving...' : editingUser ? 'Update User' : 'Create User'}
                 </button>

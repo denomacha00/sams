@@ -127,7 +127,7 @@ const ManualAttendancePage: React.FC = () => {
 
   const getStatusColor = (status: AttendanceStatus) => {
     switch (status) {
-      case AttendanceStatus.PRESENT: return 'text-emerald-700';
+      case AttendanceStatus.PRESENT: return 'text-orange-400';
       case AttendanceStatus.LATE: return 'text-amber-700';
       case AttendanceStatus.EXCUSED: return 'text-blue-700';
       case AttendanceStatus.ABSENT: return 'text-red-700';
@@ -145,8 +145,8 @@ const ManualAttendancePage: React.FC = () => {
         </div>
 
         {success && (
-          <div className="mb-4 p-3 bg-emerald-500/20 border border-emerald-400/30 rounded-xl backdrop-blur-sm">
-            <p className="text-sm text-emerald-800 text-center">Attendance submitted successfully!</p>
+          <div className="mb-4 p-3 bg-indigo-500/20 border border-indigo-400/30 rounded-xl backdrop-blur-sm">
+            <p className="text-sm text-indigo-200 text-center">Attendance submitted successfully!</p>
           </div>
         )}
 
@@ -217,7 +217,7 @@ const ManualAttendancePage: React.FC = () => {
                     onChange={(e) => updateMark(student.id, 'status', e.target.value)}
                     className={`bg-surface-muted border border-line rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500/50 appearance-none ${getStatusColor(marks[student.id]?.status)}`}
                   >
-                    <option value={AttendanceStatus.PRESENT} className="bg-slate-800 text-emerald-400">Present</option>
+                    <option value={AttendanceStatus.PRESENT} className="bg-slate-800 text-orange-400">Present</option>
                     <option value={AttendanceStatus.LATE} className="bg-slate-800 text-yellow-400">Late</option>
                     <option value={AttendanceStatus.EXCUSED} className="bg-slate-800 text-blue-400">Excused</option>
                     <option value={AttendanceStatus.ABSENT} className="bg-slate-800 text-red-400">Absent</option>
@@ -241,7 +241,7 @@ const ManualAttendancePage: React.FC = () => {
               <div className="flex gap-2 flex-wrap">
                 <button
                   onClick={() => markAllAs(AttendanceStatus.PRESENT)}
-                  className="px-3 py-1.5 text-xs font-medium bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 rounded-lg hover:bg-emerald-500/30 transition-colors"
+                  className="px-3 py-1.5 text-xs font-medium bg-orange-500/20 text-indigo-300 border border-orange-500/30 rounded-lg hover:bg-indigo-500/30 transition-colors"
                 >
                   All Present
                 </button>

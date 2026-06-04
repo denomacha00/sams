@@ -54,7 +54,7 @@ const ResetPasswordPage: React.FC = () => {
       <div className="w-full max-w-md">
         <div className="bg-white/5 backdrop-blur-xl rounded-2xl shadow-2xl shadow-black/20 p-8 border border-white/10">
           <div className="text-center mb-8">
-            <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-gradient-to-br from-teal-500 to-cyan-600 shadow-lg shadow-teal-500/20 mb-4">
+            <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-gradient-to-br from-indigo-500 to-blue-600 shadow-lg shadow-indigo-500/20 mb-4">
               <svg className="w-8 h-8 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
               </svg>
@@ -64,13 +64,13 @@ const ResetPasswordPage: React.FC = () => {
           </div>
 
           {success ? (
-            <div className="p-4 bg-emerald-500/20 border border-emerald-400/30 rounded-xl text-center">
-              <svg className="w-8 h-8 text-emerald-400 mx-auto mb-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <div className="p-4 bg-indigo-500/20 border border-indigo-400/30 rounded-xl text-center">
+              <svg className="w-8 h-8 text-orange-400 mx-auto mb-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
               </svg>
-              <p className="text-emerald-800 font-medium">Password reset successfully!</p>
-              <p className="text-emerald-300/70 text-sm mt-1">Redirecting you to login...</p>
-              <Link to="/login" className="inline-block mt-4 text-sm text-teal-400 hover:text-teal-300 font-semibold transition-colors">
+              <p className="text-indigo-200 font-medium">Password reset successfully!</p>
+              <p className="text-indigo-300/70 text-sm mt-1">Redirecting you to login...</p>
+              <Link to="/login" className="inline-block mt-4 text-sm text-indigo-400 hover:text-indigo-300 font-semibold transition-colors">
                 ← Go to Login
               </Link>
             </div>
@@ -84,7 +84,7 @@ const ResetPasswordPage: React.FC = () => {
 
               {!token ? (
                 <div className="text-center">
-                  <Link to="/forgot-password" className="text-sm text-teal-400 hover:text-teal-300 font-semibold transition-colors">
+                  <Link to="/forgot-password" className="text-sm text-indigo-400 hover:text-indigo-300 font-semibold transition-colors">
                     Request a new reset link →
                   </Link>
                 </div>
@@ -142,7 +142,7 @@ const ResetPasswordPage: React.FC = () => {
                   <button
                     type="submit"
                     disabled={loading}
-                    className="w-full bg-gradient-to-r from-teal-500 to-cyan-600 text-white font-bold py-3.5 px-4 rounded-xl hover:from-teal-400 hover:to-cyan-500 focus:outline-none focus:ring-2 focus:ring-brand/40/50 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 shadow-lg shadow-teal-500/30 hover:shadow-teal-500/50 hover:scale-[1.01] active:scale-[0.99]"
+                    className="w-full bg-gradient-to-r from-indigo-500 to-blue-600 text-white font-bold py-3.5 px-4 rounded-xl hover:from-indigo-400 hover:to-blue-500 focus:outline-none focus:ring-2 focus:ring-brand/40/50 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 shadow-lg shadow-indigo-500/30 hover:shadow-indigo-500/50 hover:scale-[1.01] active:scale-[0.99]"
                   >
                     {loading ? (
                       <span className="flex items-center justify-center gap-2">
@@ -158,7 +158,7 @@ const ResetPasswordPage: React.FC = () => {
               )}
 
               <div className="mt-6 pt-6 border-t border-white/10 text-center">
-                <Link to="/login" className="text-sm text-teal-400 hover:text-teal-300 font-semibold transition-colors">
+                <Link to="/login" className="text-sm text-indigo-400 hover:text-indigo-300 font-semibold transition-colors">
                   ← Back to Login
                 </Link>
               </div>

@@ -8,12 +8,12 @@ export default {
     extend: {
       colors: {
         canvas: {
-          DEFAULT: 'var(--color-bg, #0d2818)',
+          DEFAULT: 'var(--color-bg, #0f172a)',
         },
         surface: {
-          DEFAULT: 'var(--color-surface, #1a2e1f)',
-          muted: 'var(--color-surface-muted, #122a1c)',
-          elevated: 'var(--color-surface-elevated, #243d2a)',
+          DEFAULT: 'var(--color-surface, #1e293b)',
+          muted: 'var(--color-surface-muted, #1a1a1a)',
+          elevated: 'var(--color-surface-elevated, #334155)',
         },
         ink: {
           DEFAULT: 'var(--color-text, #f5f5f5)',
@@ -21,8 +21,8 @@ export default {
           subtle: 'var(--color-text-subtle, #9ca3af)',
         },
         line: {
-          DEFAULT: 'var(--color-border, #2d4a35)',
-          strong: 'var(--color-border-strong, #3d5c47)',
+          DEFAULT: 'var(--color-border, #334155)',
+          strong: 'var(--color-border-strong, #475569)',
         },
         brand: {
           DEFAULT: 'var(--color-brand, #4f46e5)',
@@ -54,17 +54,17 @@ export default {
           950: 'var(--color-primary-950, #1e1b4b)',
         },
         accent: {
-          50: 'var(--color-accent-50, #f0fdf4)',
-          100: 'var(--color-accent-100, #dcfce7)',
-          200: 'var(--color-accent-200, #bbf7d0)',
-          300: 'var(--color-accent-300, #86efac)',
-          400: 'var(--color-accent-400, #4ade80)',
-          500: 'var(--color-accent-500, #22c55e)',
-          600: 'var(--color-accent-600, #16a34a)',
-          700: 'var(--color-accent-700, #15803d)',
-          800: 'var(--color-accent-800, #166534)',
-          900: 'var(--color-accent-900, #14532d)',
-          950: 'var(--color-accent-950, #052e16)',
+          50: 'var(--color-accent-50, #f8fafc)',
+          100: 'var(--color-accent-100, #f1f5f9)',
+          200: 'var(--color-accent-200, #e2e8f0)',
+          300: 'var(--color-accent-300, #cbd5e1)',
+          400: 'var(--color-accent-400, #94a3b8)',
+          500: 'var(--color-accent-500, #64748b)',
+          600: 'var(--color-accent-600, #475569)',
+          700: 'var(--color-accent-700, #334155)',
+          800: 'var(--color-accent-800, #1e293b)',
+          900: 'var(--color-accent-900, #0f172a)',
+          950: 'var(--color-accent-950, #020617)',
         },
       },
       fontFamily: {

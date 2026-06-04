@@ -157,13 +157,13 @@ const BiometricEnrollPage: React.FC = () => {
         </div>
 
         {success && (
-          <div className="mb-4 p-4 bg-emerald-500/20 border border-emerald-400/30 rounded-xl backdrop-blur-sm text-center">
-            <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-emerald-500/30 mb-3">
-              <svg className="w-8 h-8 text-emerald-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <div className="mb-4 p-4 bg-indigo-500/20 border border-indigo-400/30 rounded-xl backdrop-blur-sm text-center">
+            <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-indigo-500/30 mb-3">
+              <svg className="w-8 h-8 text-indigo-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
               </svg>
             </div>
-            <p className="text-emerald-800 font-medium text-lg">Enrollment Complete</p>
+            <p className="text-indigo-200 font-medium text-lg">Enrollment Complete</p>
             <p className="text-ink-muted text-sm mt-1">Your face has been registered for biometric attendance.</p>
           </div>
         )}
@@ -238,7 +238,7 @@ const BiometricEnrollPage: React.FC = () => {
 
               {step === 'capture' && (
                 <div className="text-center">
-                  <p className="text-emerald-300 font-medium mb-2">✓ Liveness confirmed</p>
+                  <p className="text-indigo-300 font-medium mb-2">✓ Liveness confirmed</p>
                   <p className="text-ink-muted text-sm mb-4">Look directly at the camera and press capture.</p>
                   <button
                     onClick={captureAndEnroll}

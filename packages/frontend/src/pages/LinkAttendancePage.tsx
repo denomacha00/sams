@@ -252,8 +252,8 @@ const LinkAttendancePage: React.FC = () => {
         <div className="max-w-sm w-full">
           <div className="surface-card rounded-2xl p-8 text-center">
             {/* Green checkmark */}
-            <div className="inline-flex items-center justify-center w-20 h-20 rounded-full bg-emerald-500/20 border-2 border-emerald-500/50 mb-6">
-              <svg className="w-10 h-10 text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+            <div className="inline-flex items-center justify-center w-20 h-20 rounded-full bg-orange-500/20 border-2 border-orange-500/50 mb-6">
+              <svg className="w-10 h-10 text-orange-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
               </svg>
             </div>
@@ -262,11 +262,11 @@ const LinkAttendancePage: React.FC = () => {
 
             <div className={`inline-flex items-center gap-2 px-4 py-2 rounded-full text-sm font-semibold mb-4 ${
               result.status === 'PRESENT'
-                ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
+                ? 'bg-orange-500/20 text-indigo-300 border border-orange-500/30'
                 : 'bg-yellow-500/20 text-yellow-300 border border-yellow-500/30'
             }`}>
               <span className={`w-2 h-2 rounded-full ${
-                result.status === 'PRESENT' ? 'bg-emerald-400' : 'bg-yellow-400'
+                result.status === 'PRESENT' ? 'bg-orange-400' : 'bg-yellow-400'
               }`} />
               {result.status}
             </div>
@@ -360,7 +360,7 @@ const LinkAttendancePage: React.FC = () => {
             <div className="flex items-center justify-between p-3 bg-white/5 border border-white/5 rounded-xl">
               <span className="text-xs font-semibold text-ink-muted uppercase tracking-wider">Expires in</span>
               <span className={`text-sm font-bold ${
-                countdown === 'Expired' ? 'text-red-400' : 'text-emerald-400'
+                countdown === 'Expired' ? 'text-red-400' : 'text-orange-400'
               }`}>
                 {countdown || '—'}
               </span>
@@ -384,14 +384,14 @@ const LinkAttendancePage: React.FC = () => {
               )}
 
               {gpsCoords && !gpsError && (
-                <div className="mb-4 p-3 bg-emerald-500/10 border border-emerald-500/20 rounded-xl flex items-center gap-2">
-                  <svg className="w-4 h-4 text-emerald-400 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <div className="mb-4 p-3 bg-indigo-500/10 border border-indigo-500/20 rounded-xl flex items-center gap-2">
+                  <svg className="w-4 h-4 text-orange-400 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                     <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
                   </svg>
-                  <p className="text-xs text-emerald-300">
+                  <p className="text-xs text-indigo-300">
                     GPS location acquired
                     {sessionInfo?.gpsRadiusM && (
-                      <span className="text-emerald-400/70"> · must be within {sessionInfo.gpsRadiusM}m</span>
+                      <span className="text-orange-400/70"> · must be within {sessionInfo.gpsRadiusM}m</span>
                     )}
                   </p>
                 </div>

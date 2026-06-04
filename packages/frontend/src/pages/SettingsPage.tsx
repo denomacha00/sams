@@ -234,7 +234,7 @@ const SettingsPage: React.FC = () => {
         {/* Edit Profile Link */}
         <Link
           to="/profile"
-          className="inline-flex items-center gap-2 text-teal-400 hover:text-teal-300 font-medium text-sm mb-6 transition-colors"
+          className="inline-flex items-center gap-2 text-indigo-400 hover:text-indigo-300 font-medium text-sm mb-6 transition-colors"
         >
           Edit your profile
           <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -243,8 +243,8 @@ const SettingsPage: React.FC = () => {
         </Link>
 
         {success && (
-          <div className="mb-4 p-3 bg-emerald-500/20 border border-emerald-400/30 rounded-xl backdrop-blur-sm">
-            <p className="text-sm text-emerald-800 text-center">{success}</p>
+          <div className="mb-4 p-3 bg-indigo-500/20 border border-indigo-400/30 rounded-xl backdrop-blur-sm">
+            <p className="text-sm text-indigo-200 text-center">{success}</p>
           </div>
         )}
         {error && (
@@ -295,7 +295,7 @@ const SettingsPage: React.FC = () => {
         {(webauthnAvailable || isStudent) && (
           <div className="mb-4">
             <h2 className="text-lg font-semibold text-ink flex items-center gap-2">
-              <svg className="w-5 h-5 text-teal-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <svg className="w-5 h-5 text-indigo-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 11c0 3.517-1.009 6.799-2.753 9.571m-3.44-2.04l.054-.09A13.916 13.916 0 008 11a4 4 0 118 0c0 1.017-.07 2.019-.203 3m-2.118 6.844A21.88 21.88 0 0015.171 17m3.839 1.132c.645-2.266.99-4.659.99-7.132A8 8 0 008 4.07M3 15.364c.64-1.319 1-2.8 1-4.364 0-1.457.39-2.823 1.07-4" />
               </svg>
               Biometrics
@@ -320,9 +320,9 @@ const SettingsPage: React.FC = () => {
               </div>
             </div>
             {bioEnrolled ? (
-              <div className="flex items-center gap-3 p-3 bg-emerald-500/10 border border-emerald-400/20 rounded-xl">
-                <svg className="w-5 h-5 text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
-                <p className="text-sm text-emerald-300">Face enrolled. Biometric attendance is active.</p>
+              <div className="flex items-center gap-3 p-3 bg-indigo-500/10 border border-indigo-400/20 rounded-xl">
+                <svg className="w-5 h-5 text-orange-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
+                <p className="text-sm text-indigo-300">Face enrolled. Biometric attendance is active.</p>
               </div>
             ) : (
               <div>
@@ -344,8 +344,8 @@ const SettingsPage: React.FC = () => {
         {webauthnAvailable && (
           <div className="surface-card rounded-2xl p-6 mb-6">
             <div className="flex items-center gap-3 mb-4">
-              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-teal-500/20 to-cyan-500/20 border border-teal-500/30 flex items-center justify-center">
-                <svg className="w-5 h-5 text-teal-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-500/20 to-blue-600/20 border border-indigo-500/30 flex items-center justify-center">
+                <svg className="w-5 h-5 text-indigo-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 11c0 3.517-1.009 6.799-2.753 9.571m-3.44-2.04l.054-.09A13.916 13.916 0 008 11a4 4 0 118 0c0 1.017-.07 2.019-.203 3m-2.118 6.844A21.88 21.88 0 0015.171 17m3.839 1.132c.645-2.266.99-4.659.99-7.132A8 8 0 008 4.07M3 15.364c.64-1.319 1-2.8 1-4.364 0-1.457.39-2.823 1.07-4" />
                 </svg>
               </div>
@@ -366,15 +366,15 @@ const SettingsPage: React.FC = () => {
               </div>
             )}
             {fingerprintRegistered ? (
-              <div className="flex items-center gap-3 p-3 bg-emerald-500/10 border border-emerald-400/20 rounded-xl">
-                <svg className="w-5 h-5 text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
-                <p className="text-sm text-emerald-300">Fingerprint registered. Use it on the login page.</p>
+              <div className="flex items-center gap-3 p-3 bg-indigo-500/10 border border-indigo-400/20 rounded-xl">
+                <svg className="w-5 h-5 text-orange-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
+                <p className="text-sm text-indigo-300">Fingerprint registered. Use it on the login page.</p>
               </div>
             ) : (
               <div>
                 <p className="text-sm text-ink-muted mb-4">Register your fingerprint for biometric verification and quick sign-in.</p>
                 <button onClick={handleFingerprintRegister} disabled={fingerprintLoading}
-                  className="w-full flex items-center justify-center gap-2 bg-gradient-to-r from-teal-600 to-cyan-600 text-white font-semibold py-3 px-4 rounded-xl shadow-lg shadow-teal-500/25 hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50 transition-all">
+                  className="w-full flex items-center justify-center gap-2 bg-gradient-to-r from-indigo-600 to-blue-600 text-white font-semibold py-3 px-4 rounded-xl shadow-lg shadow-indigo-500/25 hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50 transition-all">
                   {fingerprintLoading ? (
                     <><svg className="animate-spin h-5 w-5" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" /><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" /></svg> Touch your sensor...</>
                   ) : (
@@ -391,7 +391,7 @@ const SettingsPage: React.FC = () => {
           <>
             <div className="mb-4 mt-2">
               <h2 className="text-lg font-semibold text-ink flex items-center gap-2">
-                <svg className="w-5 h-5 text-teal-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <svg className="w-5 h-5 text-indigo-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
                 </svg>
                 Sent Notifications
@@ -402,7 +402,7 @@ const SettingsPage: React.FC = () => {
             <div className="surface-card rounded-2xl p-6 mb-6">
               {sentLoading ? (
                 <div className="flex items-center justify-center py-8">
-                  <svg className="animate-spin h-6 w-6 text-teal-400" viewBox="0 0 24 24">
+                  <svg className="animate-spin h-6 w-6 text-indigo-400" viewBox="0 0 24 24">
                     <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
                     <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
                   </svg>
@@ -420,7 +420,7 @@ const SettingsPage: React.FC = () => {
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center gap-2 flex-wrap mb-1">
                               <span className="text-xs font-semibold text-ink-muted uppercase tracking-wider">{notif.title}</span>
-                              <span className="text-xs px-2 py-0.5 rounded-full bg-teal-500/10 text-teal-400 border border-teal-500/20">
+                              <span className="text-xs px-2 py-0.5 rounded-full bg-indigo-500/10 text-indigo-400 border border-indigo-500/20">
                                 {notif.recipientCount} recipient{notif.recipientCount !== 1 ? 's' : ''}
                               </span>
                               {notif.updatedAt && (
@@ -494,7 +494,7 @@ const SettingsPage: React.FC = () => {
                 <button
                   onClick={handleEditSave}
                   disabled={editSaving || editMsg.trim().length < 1}
-                  className="px-4 py-2 text-sm font-semibold text-ink bg-gradient-to-r from-teal-500 to-cyan-600 rounded-xl hover:from-teal-400 hover:to-cyan-500 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+                  className="px-4 py-2 text-sm font-semibold text-ink bg-gradient-to-r from-indigo-500 to-blue-600 rounded-xl hover:from-indigo-400 hover:to-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
                 >
                   {editSaving ? 'Saving...' : 'Save Changes'}
                 </button>

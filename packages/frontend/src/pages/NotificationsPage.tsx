@@ -652,8 +652,8 @@ const NotificationsPage: React.FC = () => {
           <div className="mb-8 surface-card p-6">
             <h2 className="text-lg font-semibold text-ink mb-4">Send Notification</h2>
             {sendSuccess && (
-              <div className="mb-4 p-3 bg-emerald-500/20 border border-emerald-400/30 rounded-xl">
-                <p className="text-sm text-emerald-300 text-center">
+              <div className="mb-4 p-3 bg-indigo-500/20 border border-indigo-400/30 rounded-xl">
+                <p className="text-sm text-indigo-300 text-center">
                   Message delivered in-app. Recipients see it under Notifications (bell icon).
                 </p>
               </div>
@@ -858,7 +858,7 @@ const NotificationsPage: React.FC = () => {
             <div className="flex gap-3 justify-end">
               <button onClick={() => setEditingNotification(null)} className="px-4 py-2 text-sm font-medium text-ink-muted bg-surface-muted border border-line rounded-xl hover:bg-white/10 transition-all">Cancel</button>
               <button onClick={handleEdit} disabled={editLoading || editMessage.trim().length < 1}
-                className="px-4 py-2 text-sm font-semibold text-ink bg-gradient-to-r from-teal-500 to-cyan-600 rounded-xl hover:from-teal-400 hover:to-cyan-500 disabled:opacity-50 disabled:cursor-not-allowed transition-all">
+                className="px-4 py-2 text-sm font-semibold text-ink bg-gradient-to-r from-indigo-500 to-blue-600 rounded-xl hover:from-indigo-400 hover:to-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-all">
                 {editLoading ? 'Saving...' : 'Save Changes'}
               </button>
             </div>

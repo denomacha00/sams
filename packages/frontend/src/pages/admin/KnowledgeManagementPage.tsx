@@ -60,7 +60,7 @@ const ScopeBadge: React.FC<{ scope: 'school' | 'department' | 'class' }> = ({ sc
   const config = {
     school: { label: 'School', classes: 'bg-blue-500/20 text-blue-300 border-blue-500/30' },
     department: { label: 'Department', classes: 'bg-purple-500/20 text-purple-300 border-purple-500/30' },
-    class: { label: 'Class', classes: 'bg-green-500/20 text-green-300 border-green-500/30' },
+    class: { label: 'Class', classes: 'bg-indigo-500/20 text-indigo-300 border-indigo-500/30' },
   };
   const { label, classes } = config[scope];
   return (
@@ -207,7 +207,7 @@ const KnowledgeFormModal: React.FC<KnowledgeFormModalProps> = ({ isOpen, onClose
               <button
                 type="submit"
                 disabled={submitting}
-                className="px-5 py-2 rounded-xl text-sm font-medium text-ink bg-gradient-to-r from-teal-500 to-cyan-500 hover:from-teal-600 hover:to-cyan-600 shadow-lg shadow-teal-500/20 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+                className="px-5 py-2 rounded-xl text-sm font-medium text-ink bg-gradient-to-r from-indigo-500 to-blue-600 hover:from-indigo-600 hover:to-blue-600 shadow-lg shadow-indigo-500/20 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
               >
                 {submitting ? 'Saving...' : mode === 'create' ? 'Create Entry' : 'Save Changes'}
               </button>
@@ -380,7 +380,7 @@ const KnowledgeManagementPage: React.FC = () => {
       <header className="inner-page-header">
         <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-teal-500 to-cyan-500 flex items-center justify-center shadow-lg shadow-teal-500/20">
+            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-500 to-blue-600 flex items-center justify-center shadow-lg shadow-indigo-500/20">
               <svg className="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
               </svg>
@@ -408,7 +408,7 @@ const KnowledgeManagementPage: React.FC = () => {
           </div>
           <button
             onClick={handleCreate}
-            className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-medium text-ink bg-gradient-to-r from-teal-500 to-cyan-500 hover:from-teal-600 hover:to-cyan-600 shadow-lg shadow-teal-500/20 transition-all hover:scale-[1.02]"
+            className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-medium text-ink bg-gradient-to-r from-indigo-500 to-blue-600 hover:from-indigo-600 hover:to-blue-600 shadow-lg shadow-indigo-500/20 transition-all hover:scale-[1.02]"
           >
             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
@@ -462,7 +462,7 @@ const KnowledgeManagementPage: React.FC = () => {
             <p className="text-ink-muted text-sm mb-6">Create your first knowledge entry to get started.</p>
             <button
               onClick={handleCreate}
-              className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-medium text-ink bg-gradient-to-r from-teal-500 to-cyan-500 hover:from-teal-600 hover:to-cyan-600 shadow-lg shadow-teal-500/20 transition-all"
+              className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-medium text-ink bg-gradient-to-r from-indigo-500 to-blue-600 hover:from-indigo-600 hover:to-blue-600 shadow-lg shadow-indigo-500/20 transition-all"
             >
               <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
@@ -557,7 +557,7 @@ const KnowledgeManagementPage: React.FC = () => {
                         onClick={() => setPage(pageNum)}
                         className={`w-9 h-9 rounded-lg text-sm font-medium transition-colors ${
                           page === pageNum
-                            ? 'bg-teal-500/20 text-teal-300 border border-teal-500/30'
+                            ? 'bg-indigo-500/20 text-indigo-300 border border-indigo-500/30'
                             : 'text-ink-muted hover:text-ink hover:bg-white/10'
                         }`}
                       >
