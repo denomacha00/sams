@@ -1,5 +1,63 @@
 const AI_THREAD_STORAGE_KEY = 'sams-ai-thread-id';
 
+export interface AiThreadRecord {
+  id: string;
+  message: string;
+  response: string;
+  createdAt: string;
+}
+
+export interface AiThreadHistory {
+  records: AiThreadRecord[];
+  total: number;
+  skippedCount?: number;
+  memoryStatus?: 'ok' | 'partial' | 'unreadable' | 'empty';
+  memoryNotice?: string;
+}
+
+export interface AiChatMessage {
+  id: string;
+  role: 'user' | 'assistant';
+  content: string;
+  timestamp: Date;
+  isSystemNotice?: boolean;
+}
+
+/** Expand server thread records into alternating user/assistant chat messages. */
+export function threadRecordsToMessages(records: AiThreadRecord[]): AiChatMessage[] {
+  const messages: AiChatMessage[] = [];
+  for (const record of records) {
+    if (record.message?.trim()) {
+      messages.push({
+        id: `${record.id}-u`,
+        role: 'user',
+        content: record.message,
+        timestamp: new Date(record.createdAt),
+      });
+    }
+    if (record.response?.trim()) {
+      messages.push({
+        id: `${record.id}-a`,
+        role: 'assistant',
+        content: record.response,
+        timestamp: new Date(record.createdAt),
+      });
+    }
+  }
+  return messages;
+}
+
+/** Build a system notice message when encrypted history could not be fully loaded. */
+export function buildMemoryNoticeMessage(notice: string): AiChatMessage {
+  return {
+    id: `memory-notice-${Date.now()}`,
+    role: 'assistant',
+    content: notice,
+    timestamp: new Date(),
+    isSystemNotice: true,
+  };
+}
+
 /** Persist server thread id so refresh keeps the same encrypted conversation. */
 export function loadAiThreadId(): string | null {
   try {

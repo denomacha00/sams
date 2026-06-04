@@ -7,7 +7,7 @@ import {
   SAMS_DATA_NOT_FOUND_MESSAGE,
 } from './ai/dataQueryRouter';
 import { openaiQuery, openaiQueryWithHistory } from './ai/openaiEngine';
-import { conversationMemoryService } from './conversationMemoryService';
+import { conversationMemoryService, buildMemoryNotice } from './conversationMemoryService';
 import { tokenBudgetManager } from './ai/tokenBudgetManager';
 import { actionIntentDetector, type DetectedAction } from './ai/actionIntentDetector';
 import {
@@ -52,6 +52,9 @@ export interface AIServiceResponse {
   threadId?: string;
   pendingAction?: PendingAction;
   requiresConfirmation?: boolean;
+  /** Set when encrypted history could not be fully loaded for this thread. */
+  memoryNotice?: string;
+  memoryStatus?: 'ok' | 'partial' | 'unreadable' | 'empty' | 'disabled';
 }
 
 // ─── AI Service ───────────────────────────────────────────────────────────────
@@ -273,18 +276,22 @@ export class AIService {
 
     // Step 3: Load encrypted conversation history for LLM context
     let historyMessages: Array<{ role: 'user' | 'assistant'; content: string }> = [];
+    let memoryNotice: string | undefined;
+    let memoryStatus: AIServiceResponse['memoryStatus'];
 
     if (user.sub !== 'guest' && threadId) {
       try {
-        const contextWindow = await conversationMemoryService.getContextWindow(
+        const contextResult = await conversationMemoryService.getContextWindow(
           user.sub,
           user.schoolId,
           threadId,
           20,
         );
         historyMessages = tokenBudgetManager.formatAsMessages(
-          tokenBudgetManager.trimToFitBudget(contextWindow, 2048),
+          tokenBudgetManager.trimToFitBudget(contextResult.records, 2048),
         );
+        memoryStatus = contextResult.status;
+        memoryNotice = buildMemoryNotice(contextResult.status, contextResult.skippedCount);
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);
         console.warn(
@@ -293,6 +300,8 @@ export class AIService {
         );
         historyMessages = [];
       }
+    } else if (user.sub !== 'guest' && !isConversationMemoryEnabled()) {
+      memoryStatus = 'disabled';
     }
 
     // Local engine couldn't resolve — try OpenAI/Groq
@@ -315,6 +324,8 @@ export class AIService {
           intent: openaiResult.intent,
           engine: 'openai',
           threadId,
+          memoryNotice,
+          memoryStatus,
         };
       }
 
@@ -325,6 +336,8 @@ export class AIService {
           intent: 'unknown',
           engine: 'local',
           threadId,
+          memoryNotice,
+          memoryStatus,
         };
       }
 
@@ -339,6 +352,8 @@ export class AIService {
         engine: 'openai',
         data: openaiResult.data,
         threadId,
+        memoryNotice,
+        memoryStatus,
       };
     } catch (err) {
       console.error('[AIService] OpenAI fallback failed:', err);
@@ -347,6 +362,8 @@ export class AIService {
         intent: 'ai_error',
         engine: 'openai',
         threadId,
+        memoryNotice,
+        memoryStatus,
       };
     }
   }

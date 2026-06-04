@@ -26,6 +26,53 @@ const MAX_RECORDS_PAGE_SIZE = 200;
 /** Default max records for context window */
 const DEFAULT_CONTEXT_MAX_RECORDS = 20;
 
+export type ConversationMemoryStatus = 'ok' | 'partial' | 'unreadable' | 'empty';
+
+export interface ContextWindowResult {
+  records: DecryptedConversationRecord[];
+  status: ConversationMemoryStatus;
+  skippedCount: number;
+  totalRaw: number;
+}
+
+export interface ThreadRecordsResult {
+  records: DecryptedConversationRecord[];
+  total: number;
+  skippedCount: number;
+  status: ConversationMemoryStatus;
+  memoryNotice?: string;
+}
+
+/** User-facing notice when encrypted history cannot be read. */
+export function buildMemoryNotice(
+  status: ConversationMemoryStatus,
+  skippedCount: number,
+): string | undefined {
+  if (status === 'unreadable') {
+    return (
+      'Your earlier messages in this thread could not be read — the conversation encryption key may have changed. ' +
+      'You can continue in this thread (new messages will be saved) or start a new chat. ' +
+      'Contact your administrator if you need old history recovered from backup.'
+    );
+  }
+  if (status === 'partial' && skippedCount > 0) {
+    const noun = skippedCount === 1 ? 'message' : 'messages';
+    return `${skippedCount} earlier ${noun} in this thread could not be read; showing the rest.`;
+  }
+  return undefined;
+}
+
+function resolveMemoryStatus(
+  decryptedCount: number,
+  rawCount: number,
+  skippedCount: number,
+): ConversationMemoryStatus {
+  if (rawCount === 0) return 'empty';
+  if (decryptedCount === 0 && skippedCount > 0) return 'unreadable';
+  if (skippedCount > 0) return 'partial';
+  return 'ok';
+}
+
 // ─── ConversationMemoryService ────────────────────────────────────────────────
 
 /**
@@ -181,7 +228,7 @@ class ConversationMemoryService {
     threadId: string,
     page: number = 1,
     pageSize: number = DEFAULT_RECORDS_PAGE_SIZE,
-  ): Promise<{ records: DecryptedConversationRecord[]; total: number }> {
+  ): Promise<ThreadRecordsResult> {
     const effectivePageSize = Math.min(Math.max(1, pageSize), MAX_RECORDS_PAGE_SIZE);
     const effectivePage = Math.max(1, page);
     const skip = (effectivePage - 1) * effectivePageSize;
@@ -207,9 +254,16 @@ class ConversationMemoryService {
       }),
     ]);
 
-    const records = await this.decryptRecords(rawRecords, userId);
+    const { records, skippedCount } = await this.decryptRecords(rawRecords, userId);
+    const status = resolveMemoryStatus(records.length, rawRecords.length, skippedCount);
 
-    return { records, total };
+    return {
+      records,
+      total,
+      skippedCount,
+      status,
+      memoryNotice: buildMemoryNotice(status, skippedCount),
+    };
   }
 
   // ─── Context Window ───────────────────────────────────────────────────
@@ -225,7 +279,7 @@ class ConversationMemoryService {
     schoolId: string,
     threadId?: string,
     maxRecords: number = DEFAULT_CONTEXT_MAX_RECORDS,
-  ): Promise<DecryptedConversationRecord[]> {
+  ): Promise<ContextWindowResult> {
     // Determine which thread to use
     let targetThreadId = threadId;
 
@@ -237,7 +291,7 @@ class ConversationMemoryService {
       });
 
       if (!mostRecentThread) {
-        return [];
+        return { records: [], status: 'empty', skippedCount: 0, totalRaw: 0 };
       }
 
       targetThreadId = mostRecentThread.id;
@@ -254,9 +308,15 @@ class ConversationMemoryService {
     rawRecords.reverse();
 
     // Decrypt records, skipping failures
-    const decrypted = await this.decryptRecords(rawRecords, userId);
+    const { records, skippedCount } = await this.decryptRecords(rawRecords, userId);
+    const status = resolveMemoryStatus(records.length, rawRecords.length, skippedCount);
 
-    return decrypted;
+    return {
+      records,
+      status,
+      skippedCount,
+      totalRaw: rawRecords.length,
+    };
   }
 
   // ─── Thread Resolution ────────────────────────────────────────────────
@@ -368,8 +428,9 @@ class ConversationMemoryService {
       createdAt: Date;
     }>,
     userId: string,
-  ): Promise<DecryptedConversationRecord[]> {
+  ): Promise<{ records: DecryptedConversationRecord[]; skippedCount: number }> {
     const decrypted: DecryptedConversationRecord[] = [];
+    let skippedCount = 0;
 
     for (const record of rawRecords) {
       try {
@@ -398,6 +459,7 @@ class ConversationMemoryService {
           });
         }
       } catch (err) {
+        skippedCount += 1;
         // Skip corrupted or key-mismatched records; do not fail the AI query
         const msg = err instanceof Error ? err.message : String(err);
         console.warn(
@@ -422,7 +484,7 @@ class ConversationMemoryService {
       }
     }
 
-    return decrypted;
+    return { records: decrypted, skippedCount };
   }
 
   /**

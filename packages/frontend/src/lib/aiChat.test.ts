@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { getAiErrorMessage, isAiVisionFailureIntent } from './aiChat';
+import { getAiErrorMessage, isAiVisionFailureIntent, threadRecordsToMessages, buildMemoryNoticeMessage } from './aiChat';
 
 describe('aiChat', () => {
   it('prefers server answer from error responses', () => {
@@ -27,5 +27,20 @@ describe('aiChat', () => {
   it('detects vision failure intents', () => {
     expect(isAiVisionFailureIntent('image_analysis_error')).toBe(true);
     expect(isAiVisionFailureIntent('image_analysis')).toBe(false);
+  });
+
+  it('expands thread records into user/assistant messages', () => {
+    const messages = threadRecordsToMessages([
+      { id: 'r1', message: 'Hi', response: 'Hello', createdAt: '2026-06-01T10:00:00Z' },
+    ]);
+    expect(messages).toHaveLength(2);
+    expect(messages[0].role).toBe('user');
+    expect(messages[1].role).toBe('assistant');
+  });
+
+  it('builds memory notice system messages', () => {
+    const msg = buildMemoryNoticeMessage('Key rotated');
+    expect(msg.isSystemNotice).toBe(true);
+    expect(msg.content).toBe('Key rotated');
   });
 });

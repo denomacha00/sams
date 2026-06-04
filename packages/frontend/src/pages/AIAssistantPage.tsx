@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import apiClient from '../services/apiClient';
 import { useVoiceQuery } from '../hooks/useVoiceQuery';
 import {
+  buildMemoryNoticeMessage,
   getAiAuthHint,
   getAiErrorMessage,
   isAiAuthIntent,
@@ -10,6 +11,8 @@ import {
   isAiVisionFailureIntent,
   loadAiThreadId,
   saveAiThreadId,
+  threadRecordsToMessages,
+  type AiChatMessage,
 } from '../lib/aiChat';
 import { prepareImagesForAiUpload } from '../lib/aiImageUpload';
 import { AiMessageContent } from '../lib/aiMessageContent';
@@ -22,12 +25,8 @@ interface PendingAction {
   awaitingSlot?: string;
 }
 
-interface Message {
-  id: string;
-  role: 'user' | 'assistant';
-  content: string;
+interface Message extends AiChatMessage {
   userImages?: string[];
-  timestamp: Date;
   pendingAction?: PendingAction;
   isError?: boolean;
 }
@@ -46,6 +45,7 @@ const AIAssistantPage: React.FC = () => {
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
   const [threadId, setThreadId] = useState<string | null>(() => loadAiThreadId());
+  const [historyLoaded, setHistoryLoaded] = useState(false);
   const pendingActionRef = useRef<PendingAction | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -88,6 +88,44 @@ const AIAssistantPage: React.FC = () => {
   const clearImages = () => {
     setSelectedImages([]);
     setImagePreviews([]);
+  };
+
+  // Restore encrypted thread history after refresh.
+  useEffect(() => {
+    if (!threadId || historyLoaded) return;
+    let cancelled = false;
+
+    void (async () => {
+      try {
+        const { data } = await apiClient.get(`/ai/conversations/${threadId}`);
+        if (cancelled) return;
+        const restored = threadRecordsToMessages(data.records ?? []);
+        const next: Message[] = [];
+        if (data.memoryNotice) {
+          next.push(buildMemoryNoticeMessage(data.memoryNotice));
+        }
+        if (restored.length > 0) {
+          next.push(...restored);
+        }
+        setMessages(next);
+      } catch {
+        // Keep empty — user can start fresh
+      } finally {
+        if (!cancelled) setHistoryLoaded(true);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [threadId, historyLoaded]);
+
+  const appendMemoryNotice = (notice?: string) => {
+    if (!notice) return;
+    setMessages((prev) => {
+      if (prev.some((m) => m.isSystemNotice && m.content === notice)) return prev;
+      return [...prev, buildMemoryNoticeMessage(notice)];
+    });
   };
 
   const confirmPendingAction = async (pending: PendingAction) => {
@@ -178,6 +216,7 @@ const AIAssistantPage: React.FC = () => {
         setThreadId(data.threadId);
         saveAiThreadId(data.threadId);
       }
+      appendMemoryNotice(data.memoryNotice);
 
       if (data.pendingAction) {
         pendingActionRef.current = data.pendingAction;
@@ -285,7 +324,9 @@ const AIAssistantPage: React.FC = () => {
                     ? 'bg-gradient-to-r from-purple-600 to-blue-600 text-white shadow-lg shadow-purple-500/20'
                     : msg.isError
                       ? 'bg-red-950/70 border border-red-500/50 text-red-100'
-                      : 'bg-white/10 border border-white/10 text-gray-200'
+                      : msg.isSystemNotice
+                        ? 'bg-amber-950/70 border border-amber-500/50 text-amber-100'
+                        : 'bg-white/10 border border-white/10 text-gray-200'
                 }`}
               >
                 {msg.role === 'assistant' ? (

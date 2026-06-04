@@ -7,13 +7,17 @@ const { getContextWindow, resolveThread, persistRecord } = vi.hoisted(() => ({
   persistRecord: vi.fn(),
 }));
 
-vi.mock('../conversationMemoryService', () => ({
-  conversationMemoryService: {
-    resolveThread,
-    getContextWindow,
-    persistRecord,
-  },
-}));
+vi.mock('../conversationMemoryService', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../conversationMemoryService')>();
+  return {
+    conversationMemoryService: {
+      resolveThread,
+      getContextWindow,
+      persistRecord,
+    },
+    buildMemoryNotice: actual.buildMemoryNotice,
+  };
+});
 
 vi.mock('./roleActionsPrompt', () => ({
   isConversationMemoryEnabled: () => true,
@@ -104,5 +108,20 @@ describe('AIService conversation memory decrypt failures', () => {
       'explain gravity briefly',
       [],
     );
+  });
+
+  it('surfaces memoryNotice when context window has unreadable records', async () => {
+    getContextWindow.mockResolvedValue({
+      records: [],
+      status: 'unreadable',
+      skippedCount: 3,
+      totalRaw: 3,
+    });
+
+    const service = new AIService();
+    const result = await service.query(studentUser as never, 'continue our chat');
+
+    expect(result.memoryStatus).toBe('unreadable');
+    expect(result.memoryNotice).toContain('encryption key');
   });
 });

@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect, useCallback } from 'react';
 import apiClient from '../services/apiClient';
 import { useVoiceQuery } from '../hooks/useVoiceQuery';
 import {
+  buildMemoryNoticeMessage,
   getAiAuthHint,
   getAiErrorMessage,
   isAiAuthIntent,
@@ -10,6 +11,8 @@ import {
   isAiVisionFailureIntent,
   loadAiThreadId,
   saveAiThreadId,
+  threadRecordsToMessages,
+  type AiChatMessage,
 } from '../lib/aiChat';
 import { prepareImagesForAiUpload } from '../lib/aiImageUpload';
 import { AiMessageContent } from '../lib/aiMessageContent';
@@ -21,13 +24,9 @@ interface PendingAction {
   awaitingSlot?: string;
 }
 
-interface Message {
-  id: string;
-  role: 'user' | 'assistant';
-  content: string;
+interface Message extends AiChatMessage {
   imageUrl?: string;
   userImages?: string[];
-  timestamp: Date;
   pendingAction?: PendingAction;
   isError?: boolean;
 }
@@ -61,6 +60,7 @@ const FloatingAI: React.FC = () => {
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
   const [threadId, setThreadId] = useState<string | null>(() => loadAiThreadId());
+  const [historyLoaded, setHistoryLoaded] = useState(false);
   const pendingActionRef = useRef<PendingAction | null>(null);
   const [selectedImages, setSelectedImages] = useState<File[]>([]);
   const [imagePreviews, setImagePreviews] = useState<string[]>([]);
@@ -114,6 +114,46 @@ const FloatingAI: React.FC = () => {
   };
 
   const clearImages = () => { setSelectedImages([]); setImagePreviews([]); };
+
+  // Restore encrypted thread history after refresh (thread id alone is not enough for UI).
+  useEffect(() => {
+    if (!threadId || historyLoaded) return;
+    let cancelled = false;
+
+    void (async () => {
+      try {
+        const { data } = await apiClient.get(`/ai/conversations/${threadId}`);
+        if (cancelled) return;
+        const restored = threadRecordsToMessages(data.records ?? []);
+        const next: Message[] = [];
+        if (data.memoryNotice) {
+          next.push(buildMemoryNoticeMessage(data.memoryNotice));
+        }
+        if (restored.length > 0) {
+          next.push(...restored);
+        } else if (next.length === 0) {
+          next.push(WELCOME_MESSAGE);
+        }
+        setMessages(next);
+      } catch {
+        if (!cancelled) setMessages([WELCOME_MESSAGE]);
+      } finally {
+        if (!cancelled) setHistoryLoaded(true);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [threadId, historyLoaded]);
+
+  const appendMemoryNotice = useCallback((notice?: string) => {
+    if (!notice) return;
+    setMessages((prev) => {
+      if (prev.some((m) => m.isSystemNotice && m.content === notice)) return prev;
+      return [...prev, buildMemoryNoticeMessage(notice)];
+    });
+  }, []);
 
   const confirmPendingAction = useCallback(async (pending: PendingAction) => {
     setLoading(true);
@@ -209,6 +249,7 @@ const FloatingAI: React.FC = () => {
         setThreadId(data.threadId);
         saveAiThreadId(data.threadId);
       }
+      appendMemoryNotice(data.memoryNotice);
 
       if (data.pendingAction) {
         pendingActionRef.current = data.pendingAction;
@@ -242,7 +283,7 @@ const FloatingAI: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  }, [selectedImages, imagePreviews, threadId, messages]);
+  }, [selectedImages, imagePreviews, threadId, appendMemoryNotice]);
 
   const { isListening, startListening, stopListening } = useVoiceQuery(submitQuery);
 
@@ -313,7 +354,9 @@ const FloatingAI: React.FC = () => {
                     ? 'bg-indigo-600 text-white'
                     : msg.isError
                       ? 'bg-red-950/80 border border-red-600/60 text-red-100'
-                      : 'bg-slate-900 border border-slate-700 text-slate-200'
+                      : msg.isSystemNotice
+                        ? 'bg-amber-950/80 border border-amber-600/50 text-amber-100'
+                        : 'bg-slate-900 border border-slate-700 text-slate-200'
                 }`}
               >
                 {/* User uploaded images */}
