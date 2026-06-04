@@ -111,7 +111,7 @@ sessionsRouter.get('/:id', async (req: Request, res: Response): Promise<void> =>
         schoolId: req.schoolId,
         classId: session.classId,
         role: UserRole.STUDENT,
-        isActive: true,
+        isLocked: false,
       },
       select: { id: true, fullName: true, admissionNumber: true },
       orderBy: { fullName: 'asc' },
