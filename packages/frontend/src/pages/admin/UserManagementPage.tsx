@@ -264,6 +264,15 @@ const UserManagementPage: React.FC = () => {
       </header>
 
       <main className="max-w-7xl mx-auto px-6 py-8">
+        {!isHOD && (
+          <p className="text-sm text-ink-muted mb-6 max-w-3xl">
+            Most people join via{' '}
+            <Link to="/admin/links" className="text-brand hover:text-brand-hover font-medium">
+              Registration Links
+            </Link>
+            . Use manual add here only when someone has no phone number for SMS or link signup.
+          </p>
+        )}
         {/* Tabs */}
         <div className="flex gap-2 mb-4">
           {tabs.map((tab) => (

@@ -89,7 +89,7 @@ function getRoleLabel(role?: UserRole): string {
 
 function getRoleGreeting(role?: UserRole): string {
   switch (role) {
-    case UserRole.SCHOOL_ADMIN: return 'Your school is running smoothly. Here\'s your command center.';
+    case UserRole.SCHOOL_ADMIN: return 'Onboard students and staff with Registration Links — your main signup path.';
     case UserRole.HOD: return 'Your department is performing well. Monitor and manage from here.';
     case UserRole.TEACHER: return 'Ready to inspire today? Here\'s your teaching overview.';
     case UserRole.STUDENT: return 'Stay on track with your attendance and schedule.';
@@ -598,9 +598,9 @@ function getQuickActionGroups(role?: UserRole): QuickActionGroup[] {
         {
           title: 'School Management',
           actions: [
-            { to: '/admin/users', label: 'Manage Users', subtitle: 'Staff, students, roles', icon: ICONS.users },
+            { to: '/admin/links', label: 'Registration Links', subtitle: 'Main way to onboard students and staff', icon: ICONS.link, variant: 'signin' },
+            { to: '/admin/users', label: 'User Management', subtitle: 'Manual add only if someone has no phone for SMS/link signup', icon: ICONS.users },
             { to: '/admin/departments', label: 'Departments', subtitle: 'Organize faculties', icon: ICONS.building },
-            { to: '/admin/links', label: 'Registration Links', subtitle: 'Invite new accounts', icon: ICONS.link },
             { to: '/class-roster', label: 'Class Reps', subtitle: 'Assign student leaders', icon: ICONS.users },
           ],
         },
@@ -1354,6 +1354,17 @@ const DashboardPage: React.FC = () => {
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={ICONS.qr} />
                   </svg>
                   Scan QR Now
+                </Link>
+              )}
+              {user?.role === UserRole.SCHOOL_ADMIN && (
+                <Link
+                  to="/admin/links"
+                  className="mt-4 inline-flex items-center justify-center gap-2 btn-primary py-3 px-6 text-sm w-full sm:w-auto"
+                >
+                  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={ICONS.link} />
+                  </svg>
+                  Registration Links
                 </Link>
               )}
             </div>
