@@ -164,11 +164,11 @@ const AISAMSWidget: React.FC = () => {
     <>
       {/* Chat Panel */}
       <div
-        className={`fixed bottom-20 right-4 z-[9999] transition-all duration-300 ease-in-out ${
+        className={`ai-chat-panel bottom-20 transition-all duration-300 ease-in-out ${
           isOpen
             ? 'opacity-100 translate-y-0 pointer-events-auto'
             : 'opacity-0 translate-y-4 pointer-events-none'
-        } w-[calc(100vw-2rem)] sm:w-[400px] h-[500px] max-h-[70vh] flex flex-col rounded-2xl border border-line bg-surface shadow-card-hover`}
+        }`}
       >
         {/* Header */}
         <div className="flex items-center justify-between px-4 py-3 border-b border-line bg-surface-muted rounded-t-2xl">
@@ -311,12 +311,9 @@ const AISAMSWidget: React.FC = () => {
 
       {/* Floating Button */}
       <button
+        type="button"
         onClick={() => setIsOpen((prev) => !prev)}
-        className={`fixed bottom-4 right-4 z-[9999] w-14 h-14 rounded-full shadow-lg shadow-black/40 flex items-center justify-center transition-all duration-300 hover:scale-110 active:scale-95 ${
-          isOpen
-            ? 'bg-slate-800 border border-white/20 rotate-0'
-            : 'bg-indigo-600 rotate-0'
-        }`}
+        className={`${isOpen ? 'ai-fab ai-fab-open bottom-4' : 'ai-fab bottom-4'}`}
         aria-label={isOpen ? 'Close AI-SAMS chat' : 'Open AI-SAMS chat'}
       >
         {isOpen ? (

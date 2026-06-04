@@ -308,11 +308,11 @@ const FloatingAI: React.FC = () => {
     <>
       {/* Chat Panel */}
       <div
-        className={`fixed bottom-24 right-4 z-[9998] transition-all duration-300 ease-in-out ${
+        className={`ai-chat-panel transition-all duration-300 ease-in-out ${
           isOpen
             ? 'opacity-100 translate-y-0 pointer-events-auto'
             : 'opacity-0 translate-y-4 pointer-events-none'
-        } w-[calc(100vw-2rem)] sm:w-[400px] h-[520px] max-h-[70vh] flex flex-col rounded-2xl border border-line bg-surface shadow-card-hover`}
+        }`}
       >
         {/* Header */}
         <div className="flex items-center justify-between px-4 py-3 border-b border-line bg-surface-muted rounded-t-2xl">
@@ -490,17 +490,13 @@ const FloatingAI: React.FC = () => {
 
       {/* Floating Button with pulse animation */}
       <button
+        type="button"
         onClick={() => setIsOpen((prev) => !prev)}
-        className={`fixed bottom-6 right-6 z-[9999] w-14 h-14 rounded-full shadow-lg shadow-black/40 flex items-center justify-center transition-all duration-300 hover:scale-110 active:scale-95 ${
-          isOpen
-            ? 'bg-surface border border-line text-ink'
-            : 'bg-brand'
-        }`}
+        className={isOpen ? 'ai-fab ai-fab-open' : 'ai-fab'}
         aria-label={isOpen ? 'Close SAMS AI Assistant' : 'Open SAMS AI Assistant'}
       >
-        {/* Pulse ring animation when closed */}
         {!isOpen && (
-          <span className="absolute inset-0 rounded-full bg-brand animate-ping opacity-20" />
+          <span className="absolute inset-0 rounded-full bg-indigo-400/30 animate-ping opacity-40 pointer-events-none" />
         )}
 
         {isOpen ? (

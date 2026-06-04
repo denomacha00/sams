@@ -70,20 +70,91 @@
     @apply flex items-center justify-between p-3 rounded-xl bg-surface-muted border border-line hover:bg-surface-elevated transition-colors;
   }
 
+  /* Dashboard: flat cards with left accent — not chat-bubble tiles */
+  .dash-card {
+    @apply relative flex flex-col gap-2 rounded-xl border border-line bg-surface p-4 shadow-card
+      hover:-translate-y-0.5 hover:border-line-strong hover:shadow-card-hover transition-all duration-200;
+  }
+
+  .dash-card-primary {
+    @apply border-l-[3px] border-l-orange-500 pl-[calc(1rem-3px)];
+  }
+
+  .dash-card-secondary {
+    @apply border-l-[3px] border-l-indigo-500 pl-[calc(1rem-3px)];
+  }
+
+  .dash-card-icon {
+    @apply w-9 h-9 rounded-lg flex items-center justify-center shrink-0 border border-line bg-surface-muted;
+  }
+
+  .dash-card-icon-primary {
+    @apply text-orange-400 border-orange-500/30 bg-orange-500/10;
+  }
+
+  .dash-card-icon-secondary {
+    @apply text-indigo-300 border-indigo-500/30 bg-indigo-500/10;
+  }
+
+  .dash-stat {
+    @apply flex items-center gap-4 rounded-xl border border-line bg-surface px-4 py-3 shadow-card
+      hover:border-line-strong hover:shadow-card-hover transition-all duration-200 cursor-default;
+  }
+
+  .dash-stat-accent-orange {
+    @apply border-l-[3px] border-l-orange-500;
+  }
+
+  .dash-stat-accent-indigo {
+    @apply border-l-[3px] border-l-indigo-500;
+  }
+
+  .dash-stat-value {
+    @apply text-2xl font-bold text-ink tabular-nums leading-none;
+  }
+
+  .dash-stat-label {
+    @apply text-xs font-medium text-ink-muted uppercase tracking-wide;
+  }
+
+  .dash-section-title {
+    @apply text-lg font-semibold text-ink tracking-tight;
+  }
+
+  .dash-group-label {
+    @apply text-xs font-semibold text-ink-subtle uppercase tracking-wider mb-3;
+  }
+
+  /* Floating AI — circular FAB, distinct from dashboard grid cards */
+  .ai-fab {
+    @apply fixed bottom-6 right-6 z-[9999] w-14 h-14 rounded-full flex items-center justify-center
+      bg-brand text-white shadow-[0_4px_20px_rgb(0_0_0/0.45)] ring-2 ring-indigo-400/40
+      hover:scale-105 active:scale-95 transition-all duration-200;
+  }
+
+  .ai-fab-open {
+    @apply bg-surface text-ink ring-line border border-line shadow-card-hover scale-100;
+  }
+
+  .ai-chat-panel {
+    @apply fixed bottom-24 right-4 z-[9998] flex flex-col rounded-2xl border border-indigo-500/30
+      bg-surface shadow-card-hover w-[calc(100vw-2rem)] sm:w-[400px] h-[520px] max-h-[70vh];
+  }
+
   .stat-card {
-    @apply relative overflow-hidden rounded-2xl border border-line bg-surface p-6 min-h-[140px] shadow-card hover:shadow-card-hover hover:border-line-strong transition-all duration-300 cursor-default;
+    @apply dash-stat dash-stat-accent-indigo;
   }
 
   .quick-action-card {
-    @apply relative overflow-hidden rounded-2xl border border-line bg-surface p-5 min-h-[120px] shadow-card hover:shadow-card-hover hover:border-line-strong transition-all duration-300 flex flex-col justify-between;
+    @apply dash-card;
   }
 
   .quick-action-card--primary {
-    @apply border-orange-500/40 hover:border-orange-500/70;
+    @apply dash-card-primary;
   }
 
   .quick-action-card--secondary {
-    @apply border-indigo-500/30 hover:border-indigo-500/50;
+    @apply dash-card-secondary;
   }
 
   .nav-icon-btn {
@@ -172,7 +243,7 @@
   }
 
   .text-yellow-300, .text-yellow-400, .text-amber-300, .text-amber-400 {
-    color: rgb(251 146 60) !important;
+    color: rgb(148 163 184) !important;
   }
 
   .border-teal-500\/20, .border-teal-500\/30, .border-teal-500\/40,

@@ -12,16 +12,16 @@ interface StatCard {
   label: string;
   value: string | number;
   icon: string;
-  gradient: string;
-  shadowColor: string;
+  /** Orange accent only for attendance / risk metrics */
+  accent?: 'orange' | 'indigo';
 }
 
 interface QuickAction {
   to: string;
   label: string;
+  subtitle: string;
   icon: string;
-  gradient: string;
-  /** Primary attendance CTAs use orange styling */
+  /** Primary attendance CTAs use orange left accent */
   variant?: 'attendance' | 'alert' | 'default';
 }
 
@@ -99,15 +99,15 @@ function getRoleGreeting(role?: UserRole): string {
 
 // ─── Section Header Component ────────────────────────────────────────────────
 
-const SectionHeader: React.FC<{ title: string; icon: string; gradient: string }> = ({ title, icon, gradient }) => (
-  <div className="mb-6">
-    <div className="flex items-center gap-3 mb-3">
-      <div className={`w-8 h-8 rounded-lg bg-gradient-to-br ${gradient} flex items-center justify-center shadow-lg`}>
-        <svg className="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+const SectionHeader: React.FC<{ title: string; icon: string }> = ({ title, icon }) => (
+  <div className="mb-5">
+    <div className="flex items-center gap-3 mb-2">
+      <div className="dash-card-icon dash-card-icon-secondary">
+        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={icon} />
         </svg>
       </div>
-      <h3 className="text-lg font-semibold text-ink tracking-tight">{title}</h3>
+      <h3 className="dash-section-title">{title}</h3>
     </div>
     <div className="h-px bg-line" />
   </div>
@@ -116,76 +116,76 @@ const SectionHeader: React.FC<{ title: string; icon: string; gradient: string }>
 // ─── Skeleton Loader ─────────────────────────────────────────────────────────
 
 const SkeletonCard: React.FC = () => (
-  <div className="animate-pulse rounded-2xl border border-line bg-surface-muted p-6 min-h-[140px]">
-    <div className="w-12 h-12 rounded-xl bg-surface-elevated mb-4" />
-    <div className="h-4 w-20 bg-slate-200 rounded mb-2" />
-    <div className="h-8 w-16 bg-slate-200 rounded" />
+  <div className="animate-pulse dash-stat border-l-indigo-500/30">
+    <div className="w-9 h-9 rounded-lg bg-surface-elevated shrink-0" />
+    <div className="flex-1 space-y-2">
+      <div className="h-3 w-24 bg-surface-elevated rounded" />
+      <div className="h-7 w-14 bg-surface-elevated rounded" />
+    </div>
   </div>
 );
 
 // ─── Stat Card Component ─────────────────────────────────────────────────────
 
-const AnimatedStatCard: React.FC<{ stat: StatCard; index: number }> = ({ stat, index }) => (
-  <div
-    className="group stat-card"
-    style={{
-      animationDelay: `${index * 100}ms`,
-      animation: 'fadeInUp 0.5s ease-out forwards',
-      opacity: 0,
-    }}
-  >
-    <div className={`absolute inset-0 bg-gradient-to-br ${stat.gradient} opacity-[0.04] group-hover:opacity-[0.07] transition-opacity duration-300 rounded-2xl`} />
-    <div className="relative z-10">
-      <div className={`w-12 h-12 rounded-xl bg-gradient-to-br ${stat.gradient} flex items-center justify-center shadow-lg ${stat.shadowColor} mb-4 group-hover:shadow-xl transition-shadow duration-500`}>
-        <svg className="w-6 h-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+const AnimatedStatCard: React.FC<{ stat: StatCard; index: number }> = ({ stat, index }) => {
+  const isOrange = stat.accent === 'orange';
+  return (
+    <div
+      className={`dash-stat ${isOrange ? 'dash-stat-accent-orange' : 'dash-stat-accent-indigo'}`}
+      style={{
+        animationDelay: `${index * 80}ms`,
+        animation: 'fadeInUp 0.5s ease-out forwards',
+        opacity: 0,
+      }}
+    >
+      <div className={`dash-card-icon ${isOrange ? 'dash-card-icon-primary' : 'dash-card-icon-secondary'}`}>
+        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d={stat.icon} />
         </svg>
       </div>
-      <p className="text-sm text-ink-muted mb-1 font-medium">{stat.label}</p>
-      <p className="text-2xl font-bold text-ink tracking-tight">{stat.value}</p>
+      <div className="min-w-0 flex-1">
+        <p className="dash-stat-label">{stat.label}</p>
+        <p className={`dash-stat-value mt-1 ${isOrange ? 'text-orange-400' : 'text-ink'}`}>{stat.value}</p>
+      </div>
     </div>
-  </div>
-);
+  );
+};
 
 // ─── Quick Action Button ─────────────────────────────────────────────────────
 
 const QuickActionButton: React.FC<{ action: QuickAction; index: number }> = ({ action, index }) => {
-  const isPrimary = action.variant === 'attendance' || action.variant === 'alert';
-  const topBarClass =
-    action.variant === 'attendance'
-      ? 'from-orange-500 to-orange-600'
-      : action.variant === 'alert'
-        ? 'from-orange-400 to-orange-600'
-        : 'from-indigo-500 to-indigo-700';
-  const iconBgClass =
-    action.variant === 'attendance'
-      ? 'from-orange-500 to-orange-600'
-      : action.variant === 'alert'
-        ? 'from-orange-400 to-orange-600'
-        : 'from-indigo-600 to-indigo-700';
-  const cardClass = isPrimary ? 'quick-action-card--primary' : 'quick-action-card--secondary';
+  const isAttendance = action.variant === 'attendance';
+  const cardClass = isAttendance ? 'quick-action-card--primary' : 'quick-action-card--secondary';
+  const iconClass = isAttendance ? 'dash-card-icon-primary' : 'dash-card-icon-secondary';
 
   return (
-  <Link
-    to={action.to}
-    className={`group quick-action-card ${cardClass}`}
-    style={{ animationDelay: `${(index + 4) * 80}ms`, animation: 'fadeInUp 0.5s ease-out forwards', opacity: 0 }}
-  >
-    <div className={`absolute top-0 left-0 right-0 h-px bg-gradient-to-r ${topBarClass} opacity-40 group-hover:opacity-70 transition-opacity duration-300`} />
-    <div>
-      <div className={`w-10 h-10 rounded-lg bg-gradient-to-br ${iconBgClass} flex items-center justify-center shadow-md mb-3 group-hover:shadow-lg transition-shadow duration-500`}>
-        <svg className="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d={action.icon} />
+    <Link
+      to={action.to}
+      className={`group quick-action-card ${cardClass}`}
+      style={{ animationDelay: `${(index + 4) * 80}ms`, animation: 'fadeInUp 0.5s ease-out forwards', opacity: 0 }}
+    >
+      <div className="flex items-start gap-3">
+        <div className={`dash-card-icon ${iconClass}`}>
+          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d={action.icon} />
+          </svg>
+        </div>
+        <div className="min-w-0 flex-1">
+          <h3 className={`text-sm font-semibold text-ink ${isAttendance ? 'group-hover:text-orange-400' : 'group-hover:text-indigo-300'} transition-colors`}>
+            {action.label}
+          </h3>
+          <p className="text-xs text-ink-muted mt-0.5 line-clamp-2">{action.subtitle}</p>
+        </div>
+        <svg
+          className="w-4 h-4 text-ink-subtle shrink-0 mt-0.5 opacity-40 group-hover:opacity-100 group-hover:translate-x-0.5 transition-all"
+          fill="none"
+          viewBox="0 0 24 24"
+          stroke="currentColor"
+        >
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
         </svg>
       </div>
-      <h3 className={`text-sm font-medium text-ink transition-colors ${isPrimary ? 'group-hover:text-orange-400' : 'group-hover:text-brand'}`}>{action.label}</h3>
-    </div>
-    <div className="absolute bottom-4 right-4 opacity-0 group-hover:opacity-100 transition-all duration-300 translate-x-2 group-hover:translate-x-0">
-      <svg className="w-4 h-4 text-ink-subtle" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 8l4 4m0 0l-4 4m4-4H3" />
-      </svg>
-    </div>
-  </Link>
+    </Link>
   );
 };
 
@@ -268,8 +268,8 @@ const AtAGlancePanel: React.FC<{ role?: UserRole; userId?: string }> = ({ role, 
   return (
     <div className={panelShellClass} style={panelAnimStyle}>
       <div className="flex items-center gap-3 mb-5">
-        <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-indigo-600 to-slate-700 flex items-center justify-center shadow-lg shadow-indigo-500/20">
-          <svg className="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <div className="dash-card-icon dash-card-icon-secondary">
+          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path
               strokeLinecap="round"
               strokeLinejoin="round"
@@ -278,7 +278,7 @@ const AtAGlancePanel: React.FC<{ role?: UserRole; userId?: string }> = ({ role, 
             />
           </svg>
         </div>
-        <h3 className="text-lg font-semibold text-ink">{title}</h3>
+        <h3 className="dash-section-title">{title}</h3>
       </div>
 
       {loading ? (
@@ -438,12 +438,12 @@ const ActivityFeed: React.FC = () => {
   return (
     <div className="surface-panel" style={{ animation: 'fadeInUp 0.5s ease-out 0.7s forwards', opacity: 0 }}>
       <div className="flex items-center gap-3 mb-5">
-      <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-indigo-600 to-slate-700 flex items-center justify-center shadow-lg shadow-indigo-500/20">
-          <svg className="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <div className="dash-card-icon dash-card-icon-secondary">
+          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={ICONS.trending} />
           </svg>
         </div>
-        <h3 className="text-lg font-semibold text-ink">Recent Activity</h3>
+        <h3 className="dash-section-title">Recent Activity</h3>
       </div>
       {loading ? (
         <div className="space-y-3">
@@ -489,25 +489,25 @@ function getQuickActionGroups(role?: UserRole): QuickActionGroup[] {
         {
           title: 'School Management',
           actions: [
-            { to: '/admin/users', label: 'Manage Users', icon: ICONS.users, gradient: 'from-indigo-600 to-slate-700' },
-            { to: '/admin/departments', label: 'Departments', icon: ICONS.building, gradient: 'from-indigo-500 to-indigo-700' },
-            { to: '/admin/links', label: 'Registration Links', icon: ICONS.link, gradient: 'from-slate-600 to-indigo-600' },
-            { to: '/class-roster', label: 'Class Reps', icon: ICONS.users, gradient: 'from-orange-400 to-orange-600' },
+            { to: '/admin/users', label: 'Manage Users', subtitle: 'Staff, students, roles', icon: ICONS.users },
+            { to: '/admin/departments', label: 'Departments', subtitle: 'Organize faculties', icon: ICONS.building },
+            { to: '/admin/links', label: 'Registration Links', subtitle: 'Invite new accounts', icon: ICONS.link },
+            { to: '/class-roster', label: 'Class Reps', subtitle: 'Assign student leaders', icon: ICONS.users },
           ],
         },
         {
           title: 'Reports & Schedule',
           actions: [
-            { to: '/reports', label: 'View Reports', icon: ICONS.chart, gradient: 'from-indigo-600 to-slate-700' },
-            { to: '/timetable', label: 'View Timetable', icon: ICONS.calendar, gradient: 'from-orange-500 to-orange-600' },
-            { to: '/admin/knowledge', label: 'Knowledge Base', icon: ICONS.book, gradient: 'from-orange-500 to-orange-600' },
+            { to: '/reports', label: 'View Reports', subtitle: 'School-wide attendance', icon: ICONS.chart },
+            { to: '/timetable', label: 'View Timetable', subtitle: 'Master schedule', icon: ICONS.calendar },
+            { to: '/admin/knowledge', label: 'Knowledge Base', subtitle: 'Policies & guides', icon: ICONS.book },
           ],
         },
         {
           title: 'Communication',
           actions: [
-            { to: '/notifications', label: 'Notifications', icon: ICONS.bell, gradient: 'from-orange-500 to-orange-600', variant: 'alert' },
-            { to: '/ai', label: 'AI Assistant', icon: ICONS.ai, gradient: 'from-indigo-600 to-slate-700' },
+            { to: '/notifications', label: 'Notifications', subtitle: 'Alerts & broadcasts', icon: ICONS.bell },
+            { to: '/ai', label: 'AI Assistant', subtitle: 'Ask SAMS anything', icon: ICONS.ai },
           ],
         },
       ];
@@ -516,32 +516,32 @@ function getQuickActionGroups(role?: UserRole): QuickActionGroup[] {
         {
           title: 'Attendance',
           actions: [
-            { to: '/sessions', label: 'Sign In Students', icon: ICONS.qr, gradient: 'from-orange-500 to-orange-600', variant: 'attendance' },
-            { to: '/attendance', label: 'Mark Attendance', icon: ICONS.clipboard, gradient: 'from-orange-500 to-orange-600', variant: 'attendance' },
-            { to: '/biometric/attendance', label: 'Face Scan', icon: ICONS.check, gradient: 'from-orange-500 to-orange-600', variant: 'attendance' },
+            { to: '/sessions', label: 'Sign In Students', subtitle: 'Start session & QR', icon: ICONS.qr, variant: 'attendance' },
+            { to: '/attendance', label: 'Mark Attendance', subtitle: 'Manual roll call', icon: ICONS.clipboard, variant: 'attendance' },
+            { to: '/biometric/attendance', label: 'Face Scan', subtitle: 'Biometric check-in', icon: ICONS.check, variant: 'attendance' },
           ],
         },
         {
           title: 'My Class',
           actions: [
-            { to: '/class/students', label: 'My Students', icon: ICONS.users, gradient: 'from-slate-600 to-indigo-600' },
-            { to: '/class-roster', label: 'Assign Class Rep', icon: ICONS.users, gradient: 'from-orange-400 to-orange-600' },
+            { to: '/class/students', label: 'My Students', subtitle: 'Class roster & details', icon: ICONS.users },
+            { to: '/class-roster', label: 'Assign Class Rep', subtitle: 'Pick a class representative', icon: ICONS.users },
           ],
         },
         {
           title: 'Schedule & Reports',
           actions: [
-            { to: '/timetable', label: 'My Timetable', icon: ICONS.calendar, gradient: 'from-orange-500 to-orange-600' },
-            { to: '/reports', label: 'View Reports', icon: ICONS.chart, gradient: 'from-indigo-600 to-slate-700' },
-            { to: '/admin/links', label: 'Registration Links', icon: ICONS.link, gradient: 'from-orange-500 to-orange-600' },
-            { to: '/admin/knowledge', label: 'Knowledge Base', icon: ICONS.book, gradient: 'from-orange-500 to-orange-600' },
+            { to: '/timetable', label: 'My Timetable', subtitle: 'Your weekly schedule', icon: ICONS.calendar },
+            { to: '/reports', label: 'View Reports', subtitle: 'Class attendance stats', icon: ICONS.chart },
+            { to: '/admin/links', label: 'Registration Links', subtitle: 'Share signup links', icon: ICONS.link },
+            { to: '/admin/knowledge', label: 'Knowledge Base', subtitle: 'Teaching resources', icon: ICONS.book },
           ],
         },
         {
           title: 'Communication',
           actions: [
-            { to: '/notifications', label: 'Notifications', icon: ICONS.bell, gradient: 'from-slate-600 to-indigo-700', variant: 'alert' },
-            { to: '/ai', label: 'AI Assistant', icon: ICONS.ai, gradient: 'from-indigo-600 to-slate-700' },
+            { to: '/notifications', label: 'Notifications', subtitle: 'Messages from school', icon: ICONS.bell },
+            { to: '/ai', label: 'AI Assistant', subtitle: 'Teaching & SAMS help', icon: ICONS.ai },
           ],
         },
       ];
@@ -550,22 +550,22 @@ function getQuickActionGroups(role?: UserRole): QuickActionGroup[] {
         {
           title: 'Today',
           actions: [
-            { to: '/sessions/scan', label: 'Scan QR', icon: ICONS.qr, gradient: 'from-orange-500 to-orange-600', variant: 'attendance' },
-            { to: '/timetable', label: 'View Timetable', icon: ICONS.calendar, gradient: 'from-indigo-500 to-indigo-500' },
+            { to: '/sessions/scan', label: 'Scan QR', subtitle: 'Check in to class', icon: ICONS.qr, variant: 'attendance' },
+            { to: '/timetable', label: 'View Timetable', subtitle: 'Classes & rooms', icon: ICONS.calendar },
           ],
         },
         {
           title: 'Stay Informed',
           actions: [
-            { to: '/notifications', label: 'Messages', icon: ICONS.bell, gradient: 'from-orange-500 to-orange-600', variant: 'alert' },
-            { to: '/reports', label: 'My Reports', icon: ICONS.chart, gradient: 'from-indigo-600 to-slate-700' },
-            { to: '/ai', label: 'AI Assistant', icon: ICONS.ai, gradient: 'from-indigo-600 to-slate-700' },
+            { to: '/notifications', label: 'Messages', subtitle: 'School announcements', icon: ICONS.bell },
+            { to: '/reports', label: 'My Reports', subtitle: 'Your attendance history', icon: ICONS.chart },
+            { to: '/ai', label: 'AI Assistant', subtitle: 'Help with SAMS', icon: ICONS.ai },
           ],
         },
         {
           title: 'Account',
           actions: [
-            { to: '/profile', label: 'Profile', icon: ICONS.profile, gradient: 'from-slate-600 to-indigo-600' },
+            { to: '/profile', label: 'Profile', subtitle: 'Photo & account info', icon: ICONS.profile },
           ],
         },
       ];
@@ -574,35 +574,35 @@ function getQuickActionGroups(role?: UserRole): QuickActionGroup[] {
         {
           title: 'Attendance',
           actions: [
-            { to: '/sessions', label: 'Sign In Students', icon: ICONS.qr, gradient: 'from-orange-500 to-orange-600', variant: 'attendance' },
-            { to: '/attendance', label: 'Mark Attendance', icon: ICONS.clipboard, gradient: 'from-orange-500 to-orange-600', variant: 'attendance' },
-            { to: '/biometric/attendance', label: 'Face Scan', icon: ICONS.check, gradient: 'from-orange-500 to-orange-600', variant: 'attendance' },
+            { to: '/sessions', label: 'Sign In Students', subtitle: 'Department sessions', icon: ICONS.qr, variant: 'attendance' },
+            { to: '/attendance', label: 'Mark Attendance', subtitle: 'Override or manual', icon: ICONS.clipboard, variant: 'attendance' },
+            { to: '/biometric/attendance', label: 'Face Scan', subtitle: 'Biometric check-in', icon: ICONS.check, variant: 'attendance' },
           ],
         },
         {
           title: 'Department',
           actions: [
-            { to: '/hod/department', label: 'Department Management', icon: ICONS.building, gradient: 'from-indigo-500 to-indigo-600' },
-            { to: '/admin/users', label: 'Manage Users', icon: ICONS.users, gradient: 'from-indigo-500 to-indigo-500' },
-            { to: '/class-roster', label: 'Class Reps', icon: ICONS.users, gradient: 'from-orange-400 to-orange-600' },
-            { to: '/admin/links', label: 'Registration Links', icon: ICONS.link, gradient: 'from-orange-500 to-orange-600' },
+            { to: '/hod/department', label: 'Department Management', subtitle: 'Staff & structure', icon: ICONS.building },
+            { to: '/admin/users', label: 'Manage Users', subtitle: 'Dept. accounts', icon: ICONS.users },
+            { to: '/class-roster', label: 'Class Reps', subtitle: 'Student leaders', icon: ICONS.users },
+            { to: '/admin/links', label: 'Registration Links', subtitle: 'Onboarding links', icon: ICONS.link },
           ],
         },
         {
           title: 'Schedule & Insights',
           actions: [
-            { to: '/timetable', label: 'View Timetable', icon: ICONS.calendar, gradient: 'from-orange-500 to-orange-600' },
-            { to: '/admin/timetable', label: 'Edit Timetable', icon: ICONS.calendar, gradient: 'from-orange-500 to-orange-600' },
-            { to: '/reports', label: 'View Reports', icon: ICONS.chart, gradient: 'from-indigo-600 to-slate-700' },
-            { to: '/risk-scores', label: 'Risk Scores', icon: ICONS.warning, gradient: 'from-orange-500 to-red-500', variant: 'alert' },
-            { to: '/admin/knowledge', label: 'Knowledge Base', icon: ICONS.book, gradient: 'from-orange-500 to-orange-600' },
+            { to: '/timetable', label: 'View Timetable', subtitle: 'Dept. schedule', icon: ICONS.calendar },
+            { to: '/admin/timetable', label: 'Edit Timetable', subtitle: 'Build & publish slots', icon: ICONS.calendar },
+            { to: '/reports', label: 'View Reports', subtitle: 'Dept. analytics', icon: ICONS.chart },
+            { to: '/risk-scores', label: 'Risk Scores', subtitle: 'At-risk students', icon: ICONS.warning },
+            { to: '/admin/knowledge', label: 'Knowledge Base', subtitle: 'Dept. documentation', icon: ICONS.book },
           ],
         },
         {
           title: 'Communication',
           actions: [
-            { to: '/notifications', label: 'Notifications', icon: ICONS.bell, gradient: 'from-orange-500 to-orange-600', variant: 'alert' },
-            { to: '/ai', label: 'AI Assistant', icon: ICONS.ai, gradient: 'from-indigo-600 to-slate-700' },
+            { to: '/notifications', label: 'Notifications', subtitle: 'Dept. alerts', icon: ICONS.bell },
+            { to: '/ai', label: 'AI Assistant', subtitle: 'Insights & SAMS help', icon: ICONS.ai },
           ],
         },
       ];
@@ -615,31 +615,31 @@ function getDefaultStats(role?: UserRole): StatCard[] {
   switch (role) {
     case UserRole.SCHOOL_ADMIN:
       return [
-        { label: 'Total Students', value: '—', icon: ICONS.users, gradient: 'from-indigo-600 to-slate-700', shadowColor: 'shadow-indigo-500/20' },
-        { label: 'Total Teachers', value: '—', icon: ICONS.academic, gradient: 'from-slate-600 to-indigo-600', shadowColor: 'shadow-slate-600/20' },
-        { label: 'Active Sessions', value: '—', icon: ICONS.session, gradient: 'from-indigo-600 to-slate-700', shadowColor: 'shadow-indigo-500/20' },
-        { label: 'Attendance Rate', value: '—', icon: ICONS.chart, gradient: 'from-slate-600 to-slate-700', shadowColor: 'shadow-slate-600/20' },
+        { label: 'Total Students', value: '—', icon: ICONS.users, accent: 'indigo' },
+        { label: 'Total Teachers', value: '—', icon: ICONS.academic, accent: 'indigo' },
+        { label: 'Active Sessions', value: '—', icon: ICONS.session, accent: 'indigo' },
+        { label: 'Attendance Rate', value: '—', icon: ICONS.chart, accent: 'orange' },
       ];
     case UserRole.TEACHER:
       return [
-        { label: 'My Students', value: '—', icon: ICONS.users, gradient: 'from-indigo-600 to-slate-700', shadowColor: 'shadow-indigo-500/20' },
-        { label: "Today's Sessions", value: '—', icon: ICONS.session, gradient: 'from-indigo-500 to-indigo-500', shadowColor: 'shadow-indigo-500/20' },
-        { label: 'Attendance Rate', value: '—', icon: ICONS.chart, gradient: 'from-indigo-600 to-slate-700', shadowColor: 'shadow-indigo-500/20' },
-        { label: 'Pending Marks', value: '—', icon: ICONS.clipboard, gradient: 'from-orange-500 to-orange-600', shadowColor: 'shadow-orange-500/20' },
+        { label: 'My Students', value: '—', icon: ICONS.users, accent: 'indigo' },
+        { label: "Today's Sessions", value: '—', icon: ICONS.session, accent: 'indigo' },
+        { label: 'Attendance Rate', value: '—', icon: ICONS.chart, accent: 'orange' },
+        { label: 'Pending Marks', value: '—', icon: ICONS.clipboard, accent: 'indigo' },
       ];
     case UserRole.STUDENT:
       return [
-        { label: 'My Attendance %', value: '—', icon: ICONS.check, gradient: 'from-indigo-600 to-slate-700', shadowColor: 'shadow-indigo-500/20' },
-        { label: 'Classes Today', value: '—', icon: ICONS.calendar, gradient: 'from-indigo-500 to-indigo-500', shadowColor: 'shadow-indigo-500/20' },
-        { label: 'Risk Score', value: '—', icon: ICONS.warning, gradient: 'from-orange-400 to-orange-600', shadowColor: 'shadow-orange-500/20' },
-        { label: 'Days Present', value: '—', icon: ICONS.fire, gradient: 'from-slate-600 to-slate-700', shadowColor: 'shadow-slate-600/20' },
+        { label: 'My Attendance %', value: '—', icon: ICONS.check, accent: 'orange' },
+        { label: 'Classes Today', value: '—', icon: ICONS.calendar, accent: 'indigo' },
+        { label: 'Risk Score', value: '—', icon: ICONS.warning, accent: 'orange' },
+        { label: 'Days Present', value: '—', icon: ICONS.fire, accent: 'indigo' },
       ];
     case UserRole.HOD:
       return [
-        { label: 'Dept. Students', value: '—', icon: ICONS.users, gradient: 'from-indigo-600 to-slate-700', shadowColor: 'shadow-indigo-500/20' },
-        { label: 'Dept. Teachers', value: '—', icon: ICONS.academic, gradient: 'from-indigo-500 to-indigo-500', shadowColor: 'shadow-indigo-500/20' },
-        { label: 'Attendance Rate', value: '—', icon: ICONS.chart, gradient: 'from-indigo-600 to-slate-700', shadowColor: 'shadow-indigo-500/20' },
-        { label: 'At-Risk Students', value: '—', icon: ICONS.warning, gradient: 'from-orange-500 to-orange-600', shadowColor: 'shadow-orange-500/20' },
+        { label: 'Dept. Students', value: '—', icon: ICONS.users, accent: 'indigo' },
+        { label: 'Dept. Teachers', value: '—', icon: ICONS.academic, accent: 'indigo' },
+        { label: 'Attendance Rate', value: '—', icon: ICONS.chart, accent: 'orange' },
+        { label: 'At-Risk Students', value: '—', icon: ICONS.warning, accent: 'orange' },
       ];
     default:
       return [];
@@ -683,10 +683,10 @@ function useDashboardStats(user?: { id: string; role?: UserRole; classId?: strin
 
             if (!cancelled) {
               setStats([
-                { label: 'Total Students', value: totalStudents, icon: ICONS.users, gradient: 'from-indigo-600 to-slate-700', shadowColor: 'shadow-indigo-500/20' },
-                { label: 'Total Teachers', value: totalTeachers, icon: ICONS.academic, gradient: 'from-slate-600 to-indigo-600', shadowColor: 'shadow-slate-600/20' },
-                { label: 'Active Sessions', value: activeSessions, icon: ICONS.session, gradient: 'from-indigo-600 to-slate-700', shadowColor: 'shadow-indigo-500/20' },
-                { label: 'Attendance Rate', value: attendanceRate, icon: ICONS.chart, gradient: 'from-slate-600 to-slate-700', shadowColor: 'shadow-slate-600/20' },
+                { label: 'Total Students', value: totalStudents, icon: ICONS.users, accent: 'indigo' },
+                { label: 'Total Teachers', value: totalTeachers, icon: ICONS.academic, accent: 'indigo' },
+                { label: 'Active Sessions', value: activeSessions, icon: ICONS.session, accent: 'indigo' },
+                { label: 'Attendance Rate', value: attendanceRate, icon: ICONS.chart, accent: 'orange' },
               ]);
             }
             break;
@@ -715,10 +715,10 @@ function useDashboardStats(user?: { id: string; role?: UserRole; classId?: strin
 
             if (!cancelled) {
               setStats([
-                { label: 'My Students', value: myStudents, icon: ICONS.users, gradient: 'from-indigo-600 to-slate-700', shadowColor: 'shadow-indigo-500/20' },
-                { label: "Today's Sessions", value: todaySessions, icon: ICONS.session, gradient: 'from-indigo-500 to-indigo-500', shadowColor: 'shadow-indigo-500/20' },
-                { label: 'Attendance Rate', value: attendanceRate, icon: ICONS.chart, gradient: 'from-indigo-600 to-slate-700', shadowColor: 'shadow-indigo-500/20' },
-                { label: 'Pending Marks', value: '—', icon: ICONS.clipboard, gradient: 'from-orange-500 to-orange-600', shadowColor: 'shadow-orange-500/20' },
+                { label: 'My Students', value: myStudents, icon: ICONS.users, accent: 'indigo' },
+                { label: "Today's Sessions", value: todaySessions, icon: ICONS.session, accent: 'indigo' },
+                { label: 'Attendance Rate', value: attendanceRate, icon: ICONS.chart, accent: 'orange' },
+                { label: 'Pending Marks', value: '—', icon: ICONS.clipboard, accent: 'indigo' },
               ]);
             }
             break;
@@ -748,10 +748,10 @@ function useDashboardStats(user?: { id: string; role?: UserRole; classId?: strin
 
             if (!cancelled) {
               setStats([
-                { label: 'My Attendance %', value: attendancePct, icon: ICONS.check, gradient: 'from-indigo-600 to-slate-700', shadowColor: 'shadow-indigo-500/20' },
-                { label: 'Classes Today', value: classesToday, icon: ICONS.calendar, gradient: 'from-indigo-500 to-indigo-500', shadowColor: 'shadow-indigo-500/20' },
-                { label: 'Risk Score', value: riskScore, icon: ICONS.warning, gradient: 'from-orange-400 to-orange-600', shadowColor: 'shadow-orange-500/20' },
-                { label: 'Days Present', value: daysPresent, icon: ICONS.fire, gradient: 'from-slate-600 to-slate-700', shadowColor: 'shadow-slate-600/20' },
+                { label: 'My Attendance %', value: attendancePct, icon: ICONS.check, accent: 'orange' },
+                { label: 'Classes Today', value: classesToday, icon: ICONS.calendar, accent: 'indigo' },
+                { label: 'Risk Score', value: riskScore, icon: ICONS.warning, accent: 'orange' },
+                { label: 'Days Present', value: daysPresent, icon: ICONS.fire, accent: 'indigo' },
               ]);
             }
             break;
@@ -784,10 +784,10 @@ function useDashboardStats(user?: { id: string; role?: UserRole; classId?: strin
 
             if (!cancelled) {
               setStats([
-                { label: 'Dept. Students', value: deptStudents, icon: ICONS.users, gradient: 'from-indigo-600 to-slate-700', shadowColor: 'shadow-indigo-500/20' },
-                { label: 'Dept. Teachers', value: deptTeachers, icon: ICONS.academic, gradient: 'from-indigo-500 to-indigo-500', shadowColor: 'shadow-indigo-500/20' },
-                { label: 'Attendance Rate', value: attendanceRate, icon: ICONS.chart, gradient: 'from-indigo-600 to-slate-700', shadowColor: 'shadow-indigo-500/20' },
-                { label: 'At-Risk Students', value: atRisk, icon: ICONS.warning, gradient: 'from-orange-500 to-orange-600', shadowColor: 'shadow-orange-500/20' },
+                { label: 'Dept. Students', value: deptStudents, icon: ICONS.users, accent: 'indigo' },
+                { label: 'Dept. Teachers', value: deptTeachers, icon: ICONS.academic, accent: 'indigo' },
+                { label: 'Attendance Rate', value: attendanceRate, icon: ICONS.chart, accent: 'orange' },
+                { label: 'At-Risk Students', value: atRisk, icon: ICONS.warning, accent: 'orange' },
               ]);
             }
             break;
@@ -867,11 +867,11 @@ const TeacherClassPanel: React.FC<{ classId?: string; attendanceRate?: string }>
   if (!classId) {
     return (
       <div
-        className="rounded-2xl border border-orange-500/30 bg-orange-500/10 p-6 min-h-[280px]"
+        className="surface-panel alert-warning min-h-[280px]"
         style={{ animation: 'fadeInUp 0.5s ease-out 0.7s forwards', opacity: 0 }}
       >
-        <h3 className="text-lg font-semibold text-orange-400 mb-2">No class assigned</h3>
-        <p className="text-sm text-orange-400 mb-4">
+        <h3 className="dash-section-title text-orange-400 mb-2">No class assigned</h3>
+        <p className="text-sm text-ink-muted mb-4">
           You must be assigned as class teacher before you can see students. Ask your HOD or school admin to assign your class in user management.
         </p>
         <Link to="/profile" className="text-sm text-brand hover:text-brand-hover">
@@ -890,13 +890,13 @@ const TeacherClassPanel: React.FC<{ classId?: string; attendanceRate?: string }>
     >
       <div className="flex items-center justify-between gap-3 mb-5">
         <div className="flex items-center gap-3">
-          <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-indigo-500 to-indigo-700 flex items-center justify-center shadow-lg shadow-indigo-500/20">
-            <svg className="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <div className="dash-card-icon dash-card-icon-secondary">
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={ICONS.academic} />
             </svg>
           </div>
           <div>
-            <h3 className="text-lg font-semibold text-ink">My Class</h3>
+            <h3 className="dash-section-title">My Class</h3>
             {className && <p className="text-xs text-ink-muted">{className}</p>}
           </div>
         </div>
@@ -973,13 +973,13 @@ const HodDepartmentPanel: React.FC<{ stats: StatCard[]; departmentName?: string 
       style={{ animation: 'fadeInUp 0.5s ease-out 0.7s forwards', opacity: 0 }}
     >
       <div className="flex items-center gap-3 mb-5">
-        <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-indigo-500 to-indigo-600 flex items-center justify-center shadow-lg shadow-indigo-500/20">
-          <svg className="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <div className="dash-card-icon dash-card-icon-secondary">
+          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={ICONS.building} />
           </svg>
         </div>
         <div>
-          <h3 className="text-lg font-semibold text-ink">Department Overview</h3>
+          <h3 className="dash-section-title">Department Overview</h3>
           {departmentName && (
             <p className="text-xs text-brand/90">{departmentName}</p>
           )}
@@ -1257,8 +1257,8 @@ const DashboardPage: React.FC = () => {
 
         {/* Stats Section */}
         <section className="mb-10">
-          <SectionHeader title="Overview" icon={ICONS.chart} gradient="from-indigo-600 to-slate-700" />
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
+          <SectionHeader title="Overview" icon={ICONS.chart} />
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
             {statsLoading
               ? [1, 2, 3, 4].map((i) => <SkeletonCard key={i} />)
               : stats.map((stat, i) => <AnimatedStatCard key={stat.label} stat={stat} index={i} />)
@@ -1268,11 +1268,11 @@ const DashboardPage: React.FC = () => {
 
         {/* Quick Actions — grouped by purpose, no duplicate routes */}
         <section className="mb-10">
-          <SectionHeader title="Quick Actions" icon={ICONS.trending} gradient="from-slate-600 to-indigo-600" />
+          <SectionHeader title="Quick Actions" icon={ICONS.trending} />
           <div className="space-y-8">
             {quickActionGroups.map((group) => (
               <div key={group.title}>
-                <h4 className="text-sm font-medium text-ink-muted mb-3 uppercase tracking-wide">{group.title}</h4>
+                <h4 className="dash-group-label">{group.title}</h4>
                 <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
                   {group.actions.map((action) => {
                     const index = quickActionIndex++;
@@ -1288,7 +1288,7 @@ const DashboardPage: React.FC = () => {
 
         {/* Bottom Grid: role-specific insights (timetable lives on /timetable) */}
         <section>
-          <SectionHeader title={atAGlanceTitle} icon={ICONS.trending} gradient="from-indigo-600 to-slate-700" />
+          <SectionHeader title={atAGlanceTitle} icon={ICONS.trending} />
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             <AtAGlancePanel role={user?.role} userId={user?.id} />
 
@@ -1307,17 +1307,15 @@ const DashboardPage: React.FC = () => {
             {user?.role === UserRole.STUDENT && (
               <div className="surface-panel" style={{ animation: 'fadeInUp 0.5s ease-out 0.7s forwards', opacity: 0 }}>
                 <div className="flex items-center gap-3 mb-5">
-                  <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-orange-500 to-orange-600 flex items-center justify-center shadow-lg shadow-orange-500/20">
-                    <svg className="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <div className="dash-card-icon dash-card-icon-primary">
+                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={ICONS.fire} />
                     </svg>
                   </div>
-                  <h3 className="text-lg font-semibold text-ink">Attendance Streak</h3>
+                  <h3 className="dash-section-title">Attendance Streak</h3>
                 </div>
                 <div className="text-center py-6">
-                  <div className="text-5xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-orange-300 to-orange-400 mb-2">
-                    {daysPresentStat ?? '—'}
-                  </div>
+                  <p className="dash-stat-value text-orange-400 text-4xl mb-2">{daysPresentStat ?? '—'}</p>
                   <p className="text-sm text-ink-muted">days present (term total)</p>
                 </div>
                 <Link
