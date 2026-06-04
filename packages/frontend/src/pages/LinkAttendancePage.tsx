@@ -251,17 +251,17 @@ const LinkAttendancePage: React.FC = () => {
       <div className="page-shell flex items-center justify-center p-6">
         <div className="max-w-sm w-full">
           <div className="surface-card rounded-2xl p-8 text-center">
-            {/* Green checkmark */}
-            <div className="inline-flex items-center justify-center w-20 h-20 rounded-full bg-accent-orange-light border-2 border-accent-orange/50 mb-6">
-              <svg className="w-10 h-10 text-accent-orange" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+            {/* Success checkmark */}
+            <div className="inline-flex items-center justify-center w-20 h-20 rounded-full bg-brand-light border-2 border-indigo-500/50 mb-6">
+              <svg className="w-10 h-10 text-indigo-300" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
               </svg>
             </div>
 
             <h1 className="text-2xl font-bold text-ink mb-2">Attendance Recorded!</h1>
 
-            <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full text-sm font-semibold mb-4 bg-[#f97316]/20 text-accent-orange border border-[#f97316]/30">
-              <span className="w-2 h-2 rounded-full bg-accent-orange" />
+            <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full text-sm font-semibold mb-4 bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">
+              <span className="w-2 h-2 rounded-full bg-indigo-400" />
               {result.status}
             </div>
 

@@ -242,7 +242,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
   },
   gpsIdle: { backgroundColor: colors.slate800, borderColor: colors.slate700 },
-  gpsPending: { backgroundColor: 'rgba(245, 158, 11, 0.15)', borderColor: 'rgba(245, 158, 11, 0.35)' },
+  gpsPending: { backgroundColor: 'rgba(99, 102, 241, 0.15)', borderColor: 'rgba(129, 140, 248, 0.35)' },
   gpsSuccess: { backgroundColor: 'rgba(16, 185, 129, 0.15)', borderColor: 'rgba(52, 211, 153, 0.35)' },
   gpsFailed: { backgroundColor: 'rgba(248, 113, 113, 0.15)', borderColor: 'rgba(248, 113, 113, 0.35)' },
   gpsText: { color: colors.slate300, fontSize: 12, fontWeight: '600' },

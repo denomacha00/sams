@@ -79,12 +79,12 @@ const DashboardPage: React.FC = () => {
             className={`inline-flex items-center gap-2 px-3 py-1.5 text-sm rounded-lg border transition-colors ${
               systemStatus.status === 'ok'
                 ? 'bg-green-900/30 border-green-700 text-green-300 hover:bg-green-900/50'
-                : 'bg-yellow-900/30 border-yellow-700 text-yellow-300 hover:bg-yellow-900/50'
+                : 'bg-indigo-900/30 border-indigo-700 text-indigo-300 hover:bg-indigo-900/50'
             }`}
           >
             <span
               className={`w-2 h-2 rounded-full ${
-                systemStatus.status === 'ok' ? 'bg-green-400' : 'bg-yellow-400'
+                systemStatus.status === 'ok' ? 'bg-green-400' : 'bg-indigo-400'
               }`}
             />
             {systemStatus.status === 'ok' ? 'Platform healthy' : 'Platform degraded'}
@@ -120,7 +120,7 @@ const DashboardPage: React.FC = () => {
         </div>
         <div className="bg-gray-800 rounded-lg p-6 border border-gray-700">
           <p className="text-gray-400 text-sm">License Status</p>
-          <p className="text-3xl font-bold text-yellow-400 mt-1">{analytics?.expiredSchools ?? 0}</p>
+          <p className="text-3xl font-bold text-indigo-300 mt-1">{analytics?.expiredSchools ?? 0}</p>
           <p className="text-xs text-gray-500 mt-1">schools with expired licenses</p>
         </div>
         <div className="bg-gray-800 rounded-lg p-6 border border-gray-700">

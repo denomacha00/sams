@@ -562,7 +562,7 @@ const SessionPage: React.FC = () => {
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-lg font-semibold text-ink">Share Attendance Link</h2>
             {linkUrl && linkTimeRemaining > 0 && (
-              <span className="px-3 py-1 bg-[#f97316]/20 border border-[#f97316]/30 rounded-full text-xs font-semibold text-accent-orange">
+              <span className="px-3 py-1 bg-indigo-500/20 border border-indigo-500/30 rounded-full text-xs font-semibold text-indigo-300">
                 Active
               </span>
             )}
@@ -693,14 +693,14 @@ const SessionPage: React.FC = () => {
                   className={`shrink-0 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all duration-200 ${
                     linkCopied
                       ? 'bg-indigo-500/20 border border-indigo-500/30 text-indigo-300'
-                      : 'btn-secondary text-sm hover:bg-white/20'
+                      : 'btn-secondary hover:bg-white/20'
                   }`}
                 >
                   {linkCopied ? '✓ Copied' : 'Copy'}
                 </button>
                 <button
                   onClick={shareLink}
-                  className="shrink-0 px-3 py-1.5 rounded-lg text-xs font-semibold btn-secondary text-sm hover:bg-white/20 transition-all duration-200"
+                  className="shrink-0 px-3 py-1.5 rounded-lg text-xs font-semibold btn-secondary hover:bg-white/20 transition-all duration-200"
                 >
                   Share
                 </button>

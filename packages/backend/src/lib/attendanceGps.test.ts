@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { shouldEnforceSessionGps } from './attendanceGps';
+import { hasSessionGpsAnchor, hasSubmittedGps, shouldEnforceSessionGps } from './attendanceGps';
 
 describe('shouldEnforceSessionGps', () => {
   const anchor = { locationLat: -1.2921, locationLng: 36.8219 };
@@ -10,16 +10,19 @@ describe('shouldEnforceSessionGps', () => {
     ).toBe(false);
   });
 
-  it('skips when student sends no GPS (0,0)', () => {
+  it('detects missing submitted GPS (0,0)', () => {
+    expect(hasSubmittedGps({ lat: 0, lng: 0 })).toBe(false);
     expect(
       shouldEnforceSessionGps(anchor, { lat: 0, lng: 0 }, false),
     ).toBe(false);
   });
 
   it('skips when session has no anchor (teacher disabled GPS)', () => {
+    const noAnchor = { locationLat: null, locationLng: null };
+    expect(hasSessionGpsAnchor(noAnchor)).toBe(false);
     expect(
       shouldEnforceSessionGps(
-        { locationLat: null, locationLng: null },
+        noAnchor,
         { lat: -1.29, lng: 36.82 },
         false,
       ),

@@ -168,7 +168,7 @@ const LicenseGeneratorPage: React.FC = () => {
         <div className="bg-green-900/30 border border-green-600 rounded-lg p-6">
           <div className="flex items-center justify-between mb-2">
             <h3 className="text-green-400 font-semibold">License Key Generated</h3>
-            <span className="text-yellow-400 text-xs">Store securely — shown only once</span>
+            <span className="text-indigo-300 text-xs">Store securely — shown only once</span>
           </div>
           <div className="bg-gray-900 rounded p-4 font-mono text-sm text-green-300 break-all">
             {generatedKey}
@@ -234,7 +234,7 @@ const LicenseGeneratorPage: React.FC = () => {
                             Used
                           </span>
                         ) : isExpired ? (
-                          <span className="px-2 py-0.5 text-xs rounded bg-yellow-900/50 text-yellow-300">
+                          <span className="px-2 py-0.5 text-xs rounded bg-slate-700 text-slate-300">
                             Expired
                           </span>
                         ) : (

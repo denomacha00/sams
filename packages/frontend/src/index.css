@@ -4,7 +4,7 @@
 
 @layer base {
   :root {
-    /* SAMS strict palette: canvas, surface, text, orange CTA, indigo secondary */
+    /* SAMS strict palette: canvas, surface, text, indigo attendance CTA */
     --color-bg: #0f172a;
     --color-surface: #1e293b;
     --color-surface-muted: #1a1a1a;
@@ -17,9 +17,9 @@
     --color-brand: #4f46e5;
     --color-brand-hover: #4338ca;
     --color-brand-light: #1e1b4b;
-    --color-accent-orange: #f97316;
-    --color-accent-orange-hover: #ea580c;
-    --color-accent-orange-light: #431407;
+    --color-accent-orange: #4f46e5;
+    --color-accent-orange-hover: #4338ca;
+    --color-accent-orange-light: #1e1b4b;
     --color-accent-blue: #4f46e5;
     --color-accent-blue-hover: #4338ca;
     --color-accent-blue-light: #1e1b4b;
@@ -55,7 +55,7 @@
   }
 
   .app-header {
-    @apply relative border-b border-line bg-surface backdrop-blur-sm sticky top-0 z-50 shadow-card;
+    @apply border-b border-line bg-surface backdrop-blur-sm sticky top-0 z-50 shadow-card;
   }
 
   .surface-card {
@@ -89,7 +89,7 @@
   }
 
   .dash-card-icon-primary {
-    @apply text-[#f97316] border border-[#f97316]/30 bg-[#f97316]/10;
+    @apply text-indigo-300 border border-indigo-500/30 bg-indigo-500/10;
   }
 
   .dash-card-icon-secondary {
@@ -170,7 +170,7 @@
   }
 
   .btn-attendance {
-    @apply bg-[#f97316] text-white font-semibold rounded-xl hover:bg-[#ea580c] focus:outline-none focus:ring-2 focus:ring-[#f97316]/40 disabled:opacity-50 disabled:cursor-not-allowed transition-colors;
+    @apply bg-indigo-600 text-white font-semibold rounded-xl hover:bg-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/40 disabled:opacity-50 disabled:cursor-not-allowed transition-colors;
   }
 
   .btn-secondary {
@@ -210,7 +210,7 @@
   }
 
   .badge-primary {
-    @apply inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-[#f97316]/20 border border-[#f97316]/30 text-[#f97316];
+    @apply inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-indigo-500/20 border border-indigo-500/30 text-indigo-300;
   }
 
   .badge-secondary {
@@ -247,7 +247,7 @@
     @apply rounded-2xl border border-line bg-surface shadow-card p-6;
   }
 
-  /* Login — slate canvas + indigo Sign In (btn-primary); solid orange for attendance CTAs (btn-attendance) */
+  /* Login — slate canvas + indigo Sign In and attendance CTAs */
   .login-page {
     @apply bg-canvas text-ink;
   }
@@ -265,7 +265,7 @@
     @apply backdrop-blur-xl bg-surface border border-line;
   }
 
-  /* Legacy rainbow classes → orange (CTA/warning) or indigo (info/links) */
+  /* Legacy rainbow classes → slate/indigo to avoid yellow/orange UI */
   .text-teal-300, .text-teal-400, .text-cyan-300, .text-cyan-400,
   .text-purple-300, .text-purple-400, .text-pink-300, .text-pink-400,
   .text-blue-300, .text-blue-400, .text-emerald-300, .text-emerald-400,
@@ -277,7 +277,7 @@
     color: rgb(148 163 184) !important;
   }
 
-  /* Tailwind orange-* reads yellow on dark UI — map to slate; use text-accent-orange / btn-attendance for CTAs */
+  /* Tailwind orange-* reads yellow on dark UI — map to slate/indigo */
   .text-orange-300, .text-orange-400, .text-orange-500 {
     color: rgb(148 163 184) !important;
   }

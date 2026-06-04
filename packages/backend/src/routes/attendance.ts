@@ -327,7 +327,7 @@ attendanceRouter.post('/sync', requirePermission('mark:attendance'), async (req:
   }
 
   try {
-    const result = await attendanceService.syncOfflineRecords(req.schoolId, parsed.data.records);
+    const result = await attendanceService.syncOfflineRecords(req.schoolId, req.user.sub, parsed.data.records);
     res.status(200).json(result);
   } catch (err) {
     if (err instanceof AppError) throw err;

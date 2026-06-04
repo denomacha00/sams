@@ -7,11 +7,12 @@ import { riskService } from './riskService';
 import { broadcastAttendanceNew, broadcastAttendanceUpdated } from '../sockets/attendanceSocket';
 import { buildAttendanceEventPayload } from '../lib/attendanceEvent';
 import { getQrSecret } from '../config/secrets';
-import { shouldEnforceSessionGps } from '../lib/attendanceGps';
+import { hasSessionGpsAnchor, hasSubmittedGps, shouldEnforceSessionGps } from '../lib/attendanceGps';
 import {
   haversineDistance,
   classifyAttendanceStatus,
   AttendanceStatus,
+  UserRole,
   OfflineAttendanceRecord,
   ConflictResult,
   SyncResult,
@@ -44,9 +45,140 @@ interface LinkTokenPayload {
   exp: number;
 }
 
+interface AttendanceSessionScope {
+  id: string;
+  schoolId: string;
+  classId: string;
+  teacherId: string;
+  locationLat: number | null;
+  locationLng: number | null;
+  locationRadiusM: number;
+}
+
+interface AttendanceStudentScope {
+  id: string;
+  schoolId: string;
+  role: string;
+  classId: string | null;
+  isLocked: boolean;
+  attendanceGpsExempt: boolean;
+}
+
 // ─── Attendance Service ───────────────────────────────────────────────────────
 
 export class AttendanceService {
+  private async getStudentForSession(
+    studentId: string,
+    schoolId: string,
+    session: { schoolId: string; classId: string },
+  ): Promise<AttendanceStudentScope> {
+    if (session.schoolId !== schoolId) {
+      throw new AppError(403, 'FORBIDDEN', 'Session does not belong to your school');
+    }
+
+    const student = await prisma.user.findUnique({
+      where: { id: studentId },
+      select: {
+        id: true,
+        schoolId: true,
+        role: true,
+        classId: true,
+        isLocked: true,
+        attendanceGpsExempt: true,
+      },
+    });
+
+    if (!student || student.schoolId !== schoolId) {
+      throw new AppError(403, 'FORBIDDEN', 'Student does not belong to your school');
+    }
+
+    if (student.role !== UserRole.STUDENT) {
+      throw new AppError(403, 'STUDENT_ONLY', 'Only students can mark attendance with QR or links');
+    }
+
+    if (student.isLocked) {
+      throw new AppError(403, 'USER_LOCKED', 'This student account is locked');
+    }
+
+    if (student.classId !== session.classId) {
+      throw new AppError(403, 'WRONG_CLASS', 'Student does not belong to this class');
+    }
+
+    return student;
+  }
+
+  private enforceGpsForSession(
+    session: { locationLat: number | null; locationLng: number | null },
+    gpsCoords: { lat: number; lng: number },
+    radiusM: number,
+    studentGpsExempt: boolean,
+  ): void {
+    if (studentGpsExempt || !hasSessionGpsAnchor(session)) return;
+
+    if (!hasSubmittedGps(gpsCoords)) {
+      throw new AppError(400, 'GPS_REQUIRED', 'Location is required to mark attendance for this session');
+    }
+
+    if (shouldEnforceSessionGps(session, gpsCoords, false)) {
+      const distance = haversineDistance(
+        gpsCoords.lat,
+        gpsCoords.lng,
+        session.locationLat!,
+        session.locationLng!,
+      );
+
+      if (distance > radiusM) {
+        throw new AppError(
+          400,
+          'GPS_OUT_OF_RANGE',
+          `Student is ${Math.round(distance)}m away, must be within ${radiusM}m`,
+          { distance, radiusM },
+        );
+      }
+    }
+  }
+
+  private async getOwnedSession(
+    sessionId: string,
+    schoolId: string,
+    teacherId: string,
+  ): Promise<AttendanceSessionScope> {
+    const session = await prisma.attendanceSession.findUnique({
+      where: { id: sessionId },
+      select: {
+        id: true,
+        schoolId: true,
+        classId: true,
+        teacherId: true,
+        locationLat: true,
+        locationLng: true,
+        locationRadiusM: true,
+      },
+    });
+
+    if (!session) {
+      throw new AppError(404, 'SESSION_NOT_FOUND', 'Attendance session not found');
+    }
+
+    if (session.schoolId !== schoolId) {
+      throw new AppError(403, 'FORBIDDEN', 'Session does not belong to your school');
+    }
+
+    if (session.teacherId !== teacherId) {
+      throw new AppError(403, 'FORBIDDEN', 'You do not own this attendance session');
+    }
+
+    return session;
+  }
+
+  private async assertStudentInSession(
+    studentId: string,
+    schoolId: string,
+    session: { schoolId: string; classId: string },
+  ): Promise<AttendanceStudentScope> {
+    return this.getStudentForSession(studentId, schoolId, session);
+  }
+
   private async emitAttendanceNew(sessionId: string, record: { id: string; studentId: string; status: string; method: string; scannedAt: Date }): Promise<void> {
     const payload = await buildAttendanceEventPayload(record as Parameters<typeof buildAttendanceEventPayload>[0]);
     broadcastAttendanceNew(sessionId, payload);
@@ -83,6 +215,14 @@ export class AttendanceService {
 
     if (session.schoolId !== schoolId) {
       throw new AppError(403, 'FORBIDDEN', 'Session does not belong to your school');
+    }
+
+    if (requireGps && !hasSessionGpsAnchor(session)) {
+      throw new AppError(
+        400,
+        'GPS_ANCHOR_REQUIRED',
+        'Start the session with GPS enabled before generating a GPS-protected attendance link',
+      );
     }
 
     // 2. Generate JWT with type 'LINK' — embed GPS settings in the token
@@ -154,30 +294,23 @@ export class AttendanceService {
       throw new AppError(400, 'SESSION_ENDED', 'Attendance session has ended');
     }
 
-    const student = await prisma.user.findUnique({
-      where: { id: studentId },
-      select: { attendanceGpsExempt: true },
-    });
+    if (session.schoolId !== schoolId) {
+      throw new AppError(403, 'FORBIDDEN', 'Session does not belong to your school');
+    }
+
+    if (session.currentLinkToken !== linkToken) {
+      throw new AppError(400, 'LINK_REVOKED', 'This attendance link has been replaced. Ask your teacher for the latest link.');
+    }
+
+    if (session.linkExpiresAt && session.linkExpiresAt.getTime() < Date.now()) {
+      throw new AppError(400, 'LINK_EXPIRED', 'Attendance link has expired');
+    }
+
+    const student = await this.getStudentForSession(studentId, schoolId, session);
 
     // 4. Validate GPS proximity — only if the token requires GPS
-    if (
-      payload.requireGps &&
-      shouldEnforceSessionGps(session, gpsCoords, student?.attendanceGpsExempt ?? false)
-    ) {
-      const distance = haversineDistance(
-        gpsCoords.lat,
-        gpsCoords.lng,
-        session.locationLat!,
-        session.locationLng!,
-      );
-
-      if (distance > payload.gpsRadiusM) {
-        throw new AppError(
-          400,
-          'GPS_OUT_OF_RANGE',
-          `Student is ${Math.round(distance)}m away, must be within ${payload.gpsRadiusM}m`,
-        );
-      }
+    if (payload.requireGps) {
+      this.enforceGpsForSession(session, gpsCoords, payload.gpsRadiusM, student.attendanceGpsExempt);
     }
 
     // 5. Check duplicate via sessionId + studentId unique constraint
@@ -257,30 +390,10 @@ export class AttendanceService {
       throw new AppError(400, 'SESSION_ENDED', 'Attendance session has ended');
     }
 
-    const student = await prisma.user.findUnique({
-      where: { id: studentId },
-      select: { attendanceGpsExempt: true },
-    });
+    const student = await this.getStudentForSession(studentId, schoolId, session);
 
     // 3. Validate GPS proximity when session anchor is set and student has no exemption
-    if (
-      shouldEnforceSessionGps(session, gpsCoords, student?.attendanceGpsExempt ?? false)
-    ) {
-      const distance = haversineDistance(
-        gpsCoords.lat,
-        gpsCoords.lng,
-        session.locationLat!,
-        session.locationLng!,
-      );
-
-      if (distance > session.locationRadiusM) {
-        throw new AppError(
-          400,
-          'GPS_OUT_OF_RANGE',
-          `Student is ${Math.round(distance)}m away, must be within ${session.locationRadiusM}m`,
-        );
-      }
-    }
+    this.enforceGpsForSession(session, gpsCoords, session.locationRadiusM, student.attendanceGpsExempt);
 
     // 4. Check duplicate
     const existing = await prisma.attendanceRecord.findUnique({
@@ -365,6 +478,9 @@ export class AttendanceService {
         'Note must be 500 characters or fewer',
       );
     }
+
+    const session = await this.getOwnedSession(sessionId, schoolId, teacherId);
+    await this.assertStudentInSession(studentId, schoolId, session);
 
     // Check for existing record (duplicate)
     const existing = await prisma.attendanceRecord.findUnique({
@@ -458,6 +574,9 @@ export class AttendanceService {
       );
     }
 
+    const session = await this.getOwnedSession(sessionId, schoolId, teacherId);
+    await this.assertStudentInSession(studentId, schoolId, session);
+
     // Check for existing record
     const existing = await prisma.attendanceRecord.findUnique({
       where: {
@@ -512,6 +631,7 @@ export class AttendanceService {
     // Fetch record and assert school ownership
     const record = await prisma.attendanceRecord.findUnique({
       where: { id: recordId },
+      include: { session: { select: { id: true, schoolId: true, classId: true, teacherId: true, locationLat: true, locationLng: true, locationRadiusM: true } } },
     });
 
     if (!record) {
@@ -520,6 +640,10 @@ export class AttendanceService {
 
     if (record.schoolId !== schoolId) {
       throw new AppError(403, 'FORBIDDEN', 'Record does not belong to this school');
+    }
+
+    if (record.session.teacherId !== teacherId) {
+      throw new AppError(403, 'FORBIDDEN', 'You do not own this attendance session');
     }
 
     // Validate status
@@ -583,12 +707,16 @@ export class AttendanceService {
    */
   async syncOfflineRecords(
     schoolId: string,
+    teacherId: string,
     records: OfflineAttendanceRecord[],
   ): Promise<SyncResult> {
     const synced: string[] = [];
     const conflicts: ConflictResult[] = [];
 
     for (const offlineRecord of records) {
+      const session = await this.getOwnedSession(offlineRecord.sessionId, schoolId, teacherId);
+      await this.assertStudentInSession(offlineRecord.studentId, schoolId, session);
+
       const existing = await prisma.attendanceRecord.findUnique({
         where: {
           sessionId_studentId: {

@@ -232,7 +232,7 @@ const SuperAdminAI: React.FC = () => {
                 xmlns="http://www.w3.org/2000/svg"
                 viewBox="0 0 24 24"
                 fill="currentColor"
-                className="w-5 h-5 text-yellow-300"
+                className="w-5 h-5 text-indigo-200"
               >
                 <path
                   fillRule="evenodd"
@@ -280,7 +280,7 @@ const SuperAdminAI: React.FC = () => {
                     <button
                       onClick={() => void handleConfirmAction(msg.pendingAction!)}
                       disabled={loading}
-                      className="mt-2 w-full bg-yellow-600 hover:bg-yellow-700 disabled:opacity-50 text-white text-xs font-medium py-1.5 px-3 rounded transition-colors"
+                      className="mt-2 w-full bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white text-xs font-medium py-1.5 px-3 rounded transition-colors"
                     >
                       ✓ Confirm: {msg.pendingAction.description}
                     </button>

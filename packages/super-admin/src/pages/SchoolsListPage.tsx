@@ -212,7 +212,7 @@ const SchoolsListPage: React.FC = () => {
                       Suspended
                     </span>
                   ) : school.isReadOnly ? (
-                    <span className="px-2 py-1 text-xs rounded bg-yellow-900/50 text-yellow-300">
+                    <span className="px-2 py-1 text-xs rounded bg-slate-700 text-slate-300">
                       Read-Only
                     </span>
                   ) : (

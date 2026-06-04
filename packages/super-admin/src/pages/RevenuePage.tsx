@@ -17,7 +17,7 @@ const TIER_COLORS: Record<string, string> = {
   TRIAL: 'bg-gray-600',
   BASIC: 'bg-blue-600',
   PROFESSIONAL: 'bg-purple-600',
-  ENTERPRISE: 'bg-amber-600',
+  ENTERPRISE: 'bg-indigo-600',
 };
 
 const RevenuePage: React.FC = () => {

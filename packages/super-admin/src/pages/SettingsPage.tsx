@@ -182,7 +182,7 @@ const SettingsPage: React.FC = () => {
                 className={`px-3 py-1 text-sm font-medium rounded ${
                   systemStatus.status === 'ok'
                     ? 'bg-green-900/50 text-green-300'
-                    : 'bg-yellow-900/50 text-yellow-300'
+                    : 'bg-indigo-900/50 text-indigo-300'
                 }`}
               >
                 {systemStatus.status === 'ok' ? 'All systems operational' : 'Degraded'}
