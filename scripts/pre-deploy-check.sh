@@ -63,13 +63,13 @@ done < <(merged_env_secrets_paths)
 
 if [[ -n "$REDIS_RAW" ]]; then
   raw_val="${REDIS_RAW#*=}"
-  if [[ "$raw_val" =~ ^[\"'].*[\"']$ ]]; then
+  if [[ "${raw_val:0:1}" == '"' && "${raw_val: -1}" == '"' ]] || [[ "${raw_val:0:1}" == "'" && "${raw_val: -1}" == "'" ]]; then
     warn "REDIS_URL has wrapping quotes in env file — runtime strips them; remove quotes to avoid confusion"
   fi
   REDIS_MERGED="$(read_merged_env REDIS_URL)"
   if [[ -z "$REDIS_MERGED" ]]; then
     fail "REDIS_URL empty after merge"
-  elif [[ "$REDIS_MERGED" =~ ^[\"'] ]]; then
+  elif [[ "${REDIS_MERGED:0:1}" == '"' || "${REDIS_MERGED:0:1}" == "'" ]]; then
     fail "REDIS_URL still has quotes after merge — fix env files"
   else
     pass "REDIS_URL ok (no stray quotes)"
