@@ -252,22 +252,16 @@ const LinkAttendancePage: React.FC = () => {
         <div className="max-w-sm w-full">
           <div className="surface-card rounded-2xl p-8 text-center">
             {/* Green checkmark */}
-            <div className="inline-flex items-center justify-center w-20 h-20 rounded-full bg-orange-500/20 border-2 border-orange-500/50 mb-6">
-              <svg className="w-10 h-10 text-orange-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+            <div className="inline-flex items-center justify-center w-20 h-20 rounded-full bg-accent-orange-light border-2 border-accent-orange/50 mb-6">
+              <svg className="w-10 h-10 text-accent-orange" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
               </svg>
             </div>
 
             <h1 className="text-2xl font-bold text-ink mb-2">Attendance Recorded!</h1>
 
-            <div className={`inline-flex items-center gap-2 px-4 py-2 rounded-full text-sm font-semibold mb-4 ${
-              result.status === 'PRESENT'
-                ? 'bg-orange-500/20 text-indigo-300 border border-orange-500/30'
-                : 'bg-orange-500/20 text-orange-400 border border-orange-500/30'
-            }`}>
-              <span className={`w-2 h-2 rounded-full ${
-                result.status === 'PRESENT' ? 'bg-orange-400' : 'bg-orange-400'
-              }`} />
+            <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full text-sm font-semibold mb-4 bg-[#f97316]/20 text-accent-orange border border-[#f97316]/30">
+              <span className="w-2 h-2 rounded-full bg-accent-orange" />
               {result.status}
             </div>
 
@@ -360,7 +354,7 @@ const LinkAttendancePage: React.FC = () => {
             <div className="flex items-center justify-between p-3 bg-white/5 border border-white/5 rounded-xl">
               <span className="text-xs font-semibold text-ink-muted uppercase tracking-wider">Expires in</span>
               <span className={`text-sm font-bold ${
-                countdown === 'Expired' ? 'text-red-400' : 'text-orange-400'
+                countdown === 'Expired' ? 'text-red-400' : 'text-indigo-300'
               }`}>
                 {countdown || '—'}
               </span>
@@ -369,29 +363,29 @@ const LinkAttendancePage: React.FC = () => {
 
           {/* GPS status */}
           {sessionInfo?.requireGps === false ? (
-            <div className="mb-4 p-3 bg-orange-500/10 border border-orange-500/20 rounded-xl flex items-center gap-2">
-              <svg className="w-4 h-4 text-orange-400 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <div className="mb-4 p-3 bg-indigo-500/10 border border-indigo-500/20 rounded-xl flex items-center gap-2">
+              <svg className="w-4 h-4 text-indigo-300 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21" />
               </svg>
-              <p className="text-xs text-orange-400">No GPS check — teacher has disabled location verification for this link</p>
+              <p className="text-xs text-indigo-300">No GPS check — teacher has disabled location verification for this link</p>
             </div>
           ) : (
             <>
               {gpsError && (
-                <div className="mb-4 p-3 bg-orange-500/10 border border-orange-500/20 rounded-xl">
-                  <p className="text-xs text-orange-400">{gpsError}</p>
+                <div className="mb-4 p-3 alert-error rounded-xl">
+                  <p className="text-xs text-red-300">{gpsError}</p>
                 </div>
               )}
 
               {gpsCoords && !gpsError && (
                 <div className="mb-4 p-3 bg-indigo-500/10 border border-indigo-500/20 rounded-xl flex items-center gap-2">
-                  <svg className="w-4 h-4 text-orange-400 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <svg className="w-4 h-4 text-indigo-300 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                     <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
                   </svg>
                   <p className="text-xs text-indigo-300">
                     GPS location acquired
                     {sessionInfo?.gpsRadiusM && (
-                      <span className="text-orange-400/70"> · must be within {sessionInfo.gpsRadiusM}m</span>
+                      <span className="text-ink-muted"> · must be within {sessionInfo.gpsRadiusM}m</span>
                     )}
                   </p>
                 </div>
@@ -403,7 +397,7 @@ const LinkAttendancePage: React.FC = () => {
           <button
             onClick={handleMarkAttendance}
             disabled={pageState === 'submitting' || pageState === 'gps-pending'}
-            className="w-full btn-primary font-semibold py-3.5 px-4 rounded-xl shadow-lg shadow-indigo-500/25 hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200"
+            className="w-full btn-attendance font-semibold py-3.5 px-4 rounded-xl hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200"
           >
             {pageState === 'submitting' || pageState === 'gps-pending' ? (
               <span className="flex items-center justify-center gap-2">

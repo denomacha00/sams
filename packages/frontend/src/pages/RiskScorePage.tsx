@@ -16,8 +16,8 @@ interface RiskScoreEntry {
 
 const RISK_COLORS: Record<RiskLevel, { bar: string; badge: string; text: string; glow: string }> = {
   [RiskLevel.LOW]: { bar: 'bg-indigo-500', badge: 'bg-indigo-500/20 border-indigo-500/30', text: 'text-indigo-300', glow: 'shadow-orange-500/20' },
-  [RiskLevel.MEDIUM]: { bar: 'bg-orange-400', badge: 'bg-orange-500/20 border-orange-500/30', text: 'text-orange-400', glow: 'shadow-orange-500/20' },
-  [RiskLevel.HIGH]: { bar: 'bg-orange-500', badge: 'bg-orange-500/20 border-orange-500/30', text: 'text-orange-300', glow: 'shadow-orange-500/20' },
+  [RiskLevel.MEDIUM]: { bar: 'bg-indigo-500', badge: 'bg-indigo-500/20 border-indigo-500/30', text: 'text-indigo-300', glow: 'shadow-indigo-500/20' },
+  [RiskLevel.HIGH]: { bar: 'bg-red-500', badge: 'bg-red-500/20 border-red-500/30', text: 'text-red-300', glow: 'shadow-red-500/20' },
   [RiskLevel.CRITICAL]: { bar: 'bg-red-500', badge: 'bg-red-500/20 border-red-500/30', text: 'text-red-300', glow: 'shadow-red-500/20' },
 };
 

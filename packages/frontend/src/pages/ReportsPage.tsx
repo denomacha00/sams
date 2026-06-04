@@ -343,7 +343,7 @@ const ReportsPage: React.FC = () => {
           <>
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-6">
               <div className="surface-card rounded-2xl p-5 text-center">
-                <p className="text-3xl font-bold text-orange-400">
+                <p className="text-3xl font-bold text-accent-orange">
                   {displayPercentage.toFixed(1)}%
                 </p>
                 <p className="text-xs text-ink-muted mt-1 uppercase tracking-wider">Avg Attendance</p>
@@ -388,8 +388,8 @@ const ReportsPage: React.FC = () => {
                           </td>
                           <td className="py-3 px-2 text-right">
                             <span className={`font-semibold text-sm ${
-                              s.attendancePercentage >= 80 ? 'text-orange-400' :
-                              s.attendancePercentage >= 60 ? 'text-orange-400' :
+                              s.attendancePercentage >= 80 ? 'text-indigo-300' :
+                              s.attendancePercentage >= 60 ? 'text-ink-muted' :
                               'text-red-400'
                             }`}>
                               {s.attendancePercentage.toFixed(1)}%
@@ -397,8 +397,8 @@ const ReportsPage: React.FC = () => {
                           </td>
                           <td className="py-3 px-2 text-right">
                             <span className={`px-2 py-1 text-xs font-medium rounded-full ${
-                              s.attendancePercentage >= 80 ? 'bg-orange-500/20 text-indigo-300' :
-                              s.attendancePercentage >= 60 ? 'bg-orange-500/20 text-orange-400' :
+                              s.attendancePercentage >= 80 ? 'bg-indigo-500/20 text-indigo-300' :
+                              s.attendancePercentage >= 60 ? 'bg-slate-700/50 text-ink-muted' :
                               'bg-red-500/20 text-red-300'
                             }`}>
                               {s.attendancePercentage >= 80 ? 'Good' : s.attendancePercentage >= 60 ? 'Warning' : 'At Risk'}

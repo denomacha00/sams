@@ -245,7 +245,7 @@ const ManualAttendancePage: React.FC = () => {
       case AttendanceStatus.PRESENT:
         return 'border-emerald-500/50 bg-emerald-500/20 text-emerald-300';
       case AttendanceStatus.LATE:
-        return 'border-orange-500/50 bg-orange-500/20 text-orange-300';
+        return 'border-indigo-500/50 bg-indigo-500/20 text-indigo-200';
       case AttendanceStatus.EXCUSED:
         return 'border-indigo-500/50 bg-indigo-500/20 text-indigo-200';
       case AttendanceStatus.ABSENT:

@@ -325,7 +325,7 @@ const AIAssistantPage: React.FC = () => {
                     : msg.isError
                       ? 'bg-red-950/50 border border-red-500/40 text-red-200'
                       : msg.isSystemNotice
-                        ? 'bg-orange-950/50 border border-orange-500/40 text-orange-400'
+                        ? 'bg-indigo-950/50 border border-indigo-500/40 text-indigo-300'
                         : 'bg-surface-muted border border-line text-ink'
                 }`}
               >

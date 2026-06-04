@@ -740,7 +740,7 @@ function getDefaultStats(role?: UserRole): StatCard[] {
       return [
         { label: 'My Attendance %', value: '—', icon: ICONS.check, accent: 'orange' },
         { label: 'Classes Today', value: '—', icon: ICONS.calendar, accent: 'indigo' },
-        { label: 'Risk Score', value: '—', icon: ICONS.warning, accent: 'orange' },
+        { label: 'Risk Score', value: '—', icon: ICONS.warning, accent: 'indigo' },
         { label: 'Days Present', value: '—', icon: ICONS.fire, accent: 'indigo' },
       ];
     case UserRole.HOD:
@@ -748,7 +748,7 @@ function getDefaultStats(role?: UserRole): StatCard[] {
         { label: 'Dept. Students', value: '—', icon: ICONS.users, accent: 'indigo' },
         { label: 'Dept. Teachers', value: '—', icon: ICONS.academic, accent: 'indigo' },
         { label: 'Attendance Rate', value: '—', icon: ICONS.chart, accent: 'orange' },
-        { label: 'At-Risk Students', value: '—', icon: ICONS.warning, accent: 'orange' },
+        { label: 'At-Risk Students', value: '—', icon: ICONS.warning, accent: 'indigo' },
       ];
     default:
       return [];
@@ -859,7 +859,7 @@ function useDashboardStats(user?: { id: string; role?: UserRole; classId?: strin
               setStats([
                 { label: 'My Attendance %', value: attendancePct, icon: ICONS.check, accent: 'orange' },
                 { label: 'Classes Today', value: classesToday, icon: ICONS.calendar, accent: 'indigo' },
-                { label: 'Risk Score', value: riskScore, icon: ICONS.warning, accent: 'orange' },
+                { label: 'Risk Score', value: riskScore, icon: ICONS.warning, accent: 'indigo' },
                 { label: 'Days Present', value: daysPresent, icon: ICONS.fire, accent: 'indigo' },
               ]);
             }
@@ -896,7 +896,7 @@ function useDashboardStats(user?: { id: string; role?: UserRole; classId?: strin
                 { label: 'Dept. Students', value: deptStudents, icon: ICONS.users, accent: 'indigo' },
                 { label: 'Dept. Teachers', value: deptTeachers, icon: ICONS.academic, accent: 'indigo' },
                 { label: 'Attendance Rate', value: attendanceRate, icon: ICONS.chart, accent: 'orange' },
-                { label: 'At-Risk Students', value: atRisk, icon: ICONS.warning, accent: 'orange' },
+                { label: 'At-Risk Students', value: atRisk, icon: ICONS.warning, accent: 'indigo' },
               ]);
             }
             break;
@@ -979,7 +979,7 @@ const TeacherClassPanel: React.FC<{ classId?: string; attendanceRate?: string }>
         className="surface-panel alert-warning min-h-[280px]"
         style={{ animation: 'fadeInUp 0.5s ease-out 0.7s forwards', opacity: 0 }}
       >
-        <h3 className="dash-section-title text-accent-orange mb-2">No class assigned</h3>
+        <h3 className="dash-section-title text-indigo-300 mb-2">No class assigned</h3>
         <p className="text-sm text-ink-muted mb-4">
           You must be assigned as class teacher before you can see students. Ask your HOD or school admin to assign your class in user management.
         </p>

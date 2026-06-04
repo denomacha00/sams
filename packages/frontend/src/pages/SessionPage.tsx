@@ -381,7 +381,7 @@ const SessionPage: React.FC = () => {
       case AttendanceStatus.PRESENT:
         return 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/35';
       case AttendanceStatus.LATE:
-        return 'bg-orange-500/20 text-orange-300 border border-orange-500/30';
+        return 'bg-indigo-500/20 text-indigo-200 border border-indigo-500/30';
       case AttendanceStatus.EXCUSED:
         return 'bg-indigo-500/20 text-indigo-200 border border-indigo-500/30';
       default:
@@ -425,7 +425,7 @@ const SessionPage: React.FC = () => {
                 ))}
               </select>
               {timetableEntries.length === 0 && (
-                <p className="text-xs text-orange-400/90 mt-2">
+                <p className="text-xs text-ink-muted mt-2">
                   No classes on your timetable for today. Ask your HOD or admin to add entries, or try again on the scheduled day.
                 </p>
               )}
@@ -518,7 +518,7 @@ const SessionPage: React.FC = () => {
           <div className="flex flex-wrap items-center gap-2">
             <Link
               to={`/attendance?sessionId=${activeSession.id}`}
-              className="btn-secondary py-2 px-4 text-sm font-medium text-orange-200 border-orange-500/35 hover:bg-orange-500/10 transition-all duration-200"
+              className="btn-attendance py-2 px-4 text-sm font-medium transition-all duration-200"
             >
               Manual roll call
             </Link>
@@ -562,7 +562,7 @@ const SessionPage: React.FC = () => {
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-lg font-semibold text-ink">Share Attendance Link</h2>
             {linkUrl && linkTimeRemaining > 0 && (
-              <span className="px-3 py-1 bg-orange-500/20 border border-orange-500/30 rounded-full text-xs font-semibold text-indigo-300">
+              <span className="px-3 py-1 bg-[#f97316]/20 border border-[#f97316]/30 rounded-full text-xs font-semibold text-accent-orange">
                 Active
               </span>
             )}
@@ -674,7 +674,7 @@ const SessionPage: React.FC = () => {
                     GPS required · {gpsRadiusM}m radius
                   </span>
                 ) : (
-                  <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-orange-500/20 border border-orange-500/30 text-orange-400">
+                  <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-indigo-500/20 border border-indigo-500/30 text-indigo-300">
                     <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                       <path strokeLinecap="round" strokeLinejoin="round" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21" />
                     </svg>
@@ -692,7 +692,7 @@ const SessionPage: React.FC = () => {
                   onClick={copyLink}
                   className={`shrink-0 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all duration-200 ${
                     linkCopied
-                      ? 'bg-orange-500/20 border border-orange-500/30 text-indigo-300'
+                      ? 'bg-indigo-500/20 border border-indigo-500/30 text-indigo-300'
                       : 'btn-secondary text-sm hover:bg-white/20'
                   }`}
                 >
@@ -711,7 +711,7 @@ const SessionPage: React.FC = () => {
                 <div className="flex items-center justify-between">
                   <span className="text-xs text-ink-muted">Time remaining</span>
                   <span className={`text-sm font-mono font-semibold ${
-                    linkTimeRemaining <= 60 ? 'text-orange-400' : 'text-indigo-300'
+                    linkTimeRemaining <= 60 ? 'text-red-400' : 'text-indigo-300'
                   }`}>
                     {formatTimeRemaining(linkTimeRemaining)}
                   </span>
