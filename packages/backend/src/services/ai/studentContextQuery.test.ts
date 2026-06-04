@@ -75,6 +75,27 @@ describe('studentContextQuery', () => {
     await expect(queryStudentContext(teacher as never, 'my hod')).resolves.toBeNull();
   });
 
+  it('allows HOD to query school admin', async () => {
+    const handler = vi.fn().mockResolvedValue({
+      answer: '🏫 **School administrator**\n\n• **Admin One**',
+      data: { admins: [{ fullName: 'Admin One' }] },
+    });
+    vi.mocked(findAction).mockReturnValue({
+      action: 'list_school_admin',
+      handler,
+      patterns: [],
+      description: '',
+      destructive: false,
+      extractParams: () => ({}),
+      descriptionTemplate: () => '',
+    });
+
+    const hod = { ...studentUser, role: UserRole.HOD, departmentId: 'dept-1', classId: undefined };
+    const result = await queryStudentContext(hod as never, 'who is adim of this school');
+    expect(result?.intent).toBe('list_school_admin');
+    expect(handler).toHaveBeenCalled();
+  });
+
   it('allows teachers to query school admin', async () => {
     const handler = vi.fn().mockResolvedValue({
       answer: '🏫 **School administrator**\n\n• **Admin One**',

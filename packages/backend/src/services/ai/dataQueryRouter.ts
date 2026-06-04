@@ -9,8 +9,8 @@ import { isTimetableManageQuery, isTimetableViewQuery } from './timetableQuery';
 import {
   isSchoolPersonnelQuery,
   isStudentContextQuery,
-  queryStudentContext,
-} from './studentContextQuery';
+  queryRoleContext,
+} from './roleContextQuery';
 
 /** Broad SAMS data keywords — used only when intent is still unknown. */
 const SAMS_DATA_KEYWORD_RE =
@@ -65,7 +65,7 @@ export async function querySamsDataFallback(
   const timetable = await queryTimetableView(user, question);
   if (timetable) return timetable;
 
-  const studentContext = await queryStudentContext(user, question);
+  const studentContext = await queryRoleContext(user, question);
   if (studentContext) return studentContext;
 
   if (detectDataIntent(question) === 'unknown') return null;

@@ -1,6 +1,6 @@
 import { type AccessTokenPayload, UserRole } from '@sams/shared';
 import { localQuery, type AIQueryResult, queryTimetableView } from './ai/localEngine';
-import { queryStudentContext } from './ai/studentContextQuery';
+import { queryRoleContext, isSchoolPersonnelQuery } from './ai/roleContextQuery';
 import {
   isSamsDataQuery,
   querySamsDataFallback,
@@ -133,6 +133,21 @@ export class AIService {
       }
     }
 
+    // School admin / HOD / student self-context — DB before local engine (avoids LLM hallucination).
+    if (user.sub !== 'guest' && isSchoolPersonnelQuery(question)) {
+      const personnelResult = await queryRoleContext(user, question);
+      if (personnelResult) {
+        threadId = await this.safelyPersist(user, question, personnelResult.answer, threadId);
+        return {
+          answer: personnelResult.answer,
+          intent: personnelResult.intent,
+          engine: 'local',
+          data: personnelResult.data,
+          threadId,
+        };
+      }
+    }
+
     // Step 2: Try local engine — wrapped in try-catch so it never throws
     let localResult: AIQueryResult;
     try {
@@ -187,7 +202,7 @@ export class AIService {
     }
 
     // Student HOD, teachers, class, department, class rep — DB-backed answers only.
-    const studentContextResult = await queryStudentContext(user, question);
+    const studentContextResult = await queryRoleContext(user, question);
     if (studentContextResult) {
       if (user.sub !== 'guest') {
         threadId = await this.safelyPersist(user, question, studentContextResult.answer, threadId);

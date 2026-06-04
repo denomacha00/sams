@@ -73,6 +73,10 @@ describe('roleActionRegistry permissions', () => {
     expect(isActionPermitted('UNKNOWN', 'start_session')).toBe(false);
   });
 
+  it('HOD is permitted for list_school_admin', () => {
+    expect(isActionPermitted(UserRole.HOD, 'list_school_admin')).toBe(true);
+  });
+
   it('HOD can view department stats', () => {
     expect(isActionPermitted(UserRole.HOD, 'view_department_stats')).toBe(true);
     expect(findAction(UserRole.HOD, 'view_department_stats')?.destructive).toBe(false);

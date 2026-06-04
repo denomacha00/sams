@@ -169,13 +169,15 @@ describe('actionIntentDetector role scoping (regex path)', () => {
     }
   });
 
-  it('detects list_school_admin for students and teachers', async () => {
+  it('detects list_school_admin for students, teachers, and HOD', async () => {
     const cases = ['who is admin of this school', 'who is adim of this school', 'school admin'];
     for (const message of cases) {
       const student = await actionIntentDetector.detect(message, UserRole.STUDENT);
       expect(student.action).toBe('list_school_admin');
       const teacher = await actionIntentDetector.detect(message, UserRole.TEACHER);
       expect(teacher.action).toBe('list_school_admin');
+      const hod = await actionIntentDetector.detect(message, UserRole.HOD);
+      expect(hod.action).toBe('list_school_admin');
     }
   });
 

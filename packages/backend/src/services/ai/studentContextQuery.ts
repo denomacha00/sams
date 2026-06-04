@@ -1,6 +1,4 @@
-import { type AccessTokenPayload, UserRole } from '@sams/shared';
-import type { AIQueryResult } from './localEngine';
-import { findAction, type ActionScope } from './roleActionRegistry';
+import { UserRole } from '@sams/shared';
 
 /** Head of Department lookup — must catch bare "my hod" before LLM fallback. */
 export const STUDENT_HOD_QUERY_PATTERNS: RegExp[] = [
@@ -102,37 +100,6 @@ export function isSchoolPersonnelQuery(question: string): boolean {
 
 /**
  * Fetch real student class/department/HOD/teachers/rep data — never LLM for these phrases.
+ * @deprecated Prefer queryRoleContext — kept for existing imports.
  */
-export async function queryStudentContext(
-  user: AccessTokenPayload,
-  question: string,
-): Promise<AIQueryResult | null> {
-  const action = detectStudentContextAction(question);
-  if (!action) return null;
-
-  if (action === 'list_school_admin') {
-    if (!SCHOOL_ADMIN_LOOKUP_ROLES.includes(user.role)) return null;
-  } else if (user.role !== UserRole.STUDENT) {
-    return null;
-  }
-
-  const registryRole =
-    action === 'list_school_admin' ? UserRole.STUDENT : user.role;
-  const actionDef = findAction(registryRole, action);
-  if (!actionDef) return null;
-
-  const scope: ActionScope = {
-    userId: user.sub,
-    role: user.role,
-    schoolId: user.schoolId,
-    departmentId: user.departmentId,
-    classId: user.classId,
-  };
-
-  const result = await actionDef.handler({}, scope);
-  return {
-    answer: result.answer,
-    intent: action,
-    data: result.data,
-  };
-}
+export { queryRoleContext as queryStudentContext } from './roleContextQuery';

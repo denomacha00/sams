@@ -23,7 +23,15 @@ vi.mock('./aiProviderConfig', () => ({
 
 const localQuery = vi.fn();
 const queryTimetableView = vi.fn();
-const queryStudentContext = vi.fn();
+const queryRoleContext = vi.fn();
+
+vi.mock('./roleContextQuery', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('./roleContextQuery')>();
+  return {
+    ...actual,
+    queryRoleContext: (...args: unknown[]) => queryRoleContext(...args),
+  };
+});
 
 vi.mock('./localEngine', async (importOriginal) => {
   const actual = await importOriginal<typeof import('./localEngine')>();
@@ -31,14 +39,6 @@ vi.mock('./localEngine', async (importOriginal) => {
     ...actual,
     localQuery: (...args: unknown[]) => localQuery(...args),
     queryTimetableView: (...args: unknown[]) => queryTimetableView(...args),
-  };
-});
-
-vi.mock('./studentContextQuery', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('./studentContextQuery')>();
-  return {
-    ...actual,
-    queryStudentContext: (...args: unknown[]) => queryStudentContext(...args),
   };
 });
 
@@ -77,11 +77,20 @@ const studentUser = {
   exp: 9999999999,
 };
 
+const hodUser = {
+  sub: 'hod-1',
+  schoolId: 'school-greenwood',
+  role: UserRole.HOD,
+  departmentId: 'dept-1',
+  iat: 0,
+  exp: 9999999999,
+};
+
 describe('AIService anti-hallucination routing', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     queryTimetableView.mockResolvedValue(null);
-    queryStudentContext.mockResolvedValue(null);
+    queryRoleContext.mockResolvedValue(null);
     vi.mocked(openaiQueryWithHistory).mockResolvedValue({
       answer: 'Photosynthesis converts light to chemical energy.',
       intent: 'openai_response',
@@ -123,7 +132,7 @@ describe('AIService anti-hallucination routing', () => {
 
   it('blocks LLM for who-is school admin phrasing when context returns null', async () => {
     localQuery.mockResolvedValue({ answer: 'help', intent: 'unknown' });
-    queryStudentContext.mockResolvedValue(null);
+    queryRoleContext.mockResolvedValue(null);
 
     const service = new AIService();
     const r = await service.query(studentUser as never, 'who is adim of this school');
@@ -132,9 +141,27 @@ describe('AIService anti-hallucination routing', () => {
     expect(r.intent).toBe('data_not_found');
   });
 
+  it('returns DB school admin for HOD before LLM', async () => {
+    queryRoleContext.mockResolvedValue({
+      answer: '🏫 **School administrator**\n\n• **Greenwood Admin**',
+      intent: 'list_school_admin',
+      data: { admins: [{ fullName: 'Greenwood Admin' }] },
+    });
+
+    const service = new AIService();
+    const r = await service.query(hodUser as never, 'who is adim of this school');
+
+    expect(openaiQueryWithHistory).not.toHaveBeenCalled();
+    expect(localQuery).not.toHaveBeenCalled();
+    expect(queryRoleContext).toHaveBeenCalled();
+    expect(r.engine).toBe('local');
+    expect(r.intent).toBe('list_school_admin');
+    expect(r.answer).toMatch(/Greenwood Admin/);
+  });
+
   it('uses student context handler for my hod without LLM', async () => {
     localQuery.mockResolvedValue({ answer: 'help', intent: 'unknown' });
-    queryStudentContext.mockResolvedValue({
+    queryRoleContext.mockResolvedValue({
       answer: '👤 **Your Head of Department** (Science)\n\n**Dr. Ada** is the HOD.',
       intent: 'list_my_hod',
       data: {},
@@ -144,7 +171,7 @@ describe('AIService anti-hallucination routing', () => {
     const r = await service.query(studentUser as never, 'my hod');
 
     expect(openaiQueryWithHistory).not.toHaveBeenCalled();
-    expect(queryStudentContext).toHaveBeenCalled();
+    expect(queryRoleContext).toHaveBeenCalled();
     expect(r.engine).toBe('local');
     expect(r.intent).toBe('list_my_hod');
     expect(r.answer).toMatch(/Dr\. Ada/);
