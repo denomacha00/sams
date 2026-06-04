@@ -1,6 +1,7 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { UserRole } from '@sams/shared';
 import { actionIntentDetector } from './actionIntentDetector';
+import * as roleActionRegistry from './roleActionRegistry';
 
 describe('actionIntentDetector role scoping (regex path)', () => {
   it('detects teacher start_session', async () => {
@@ -225,5 +226,24 @@ describe('actionIntentDetector role scoping (regex path)', () => {
     expect(result.isAction).toBe(true);
     expect(result.action).toBe('get_school_info');
     expect(result.params?.schoolName).toBe('Test Academy');
+  });
+
+  it('does not throw when an action definition has no patterns array', async () => {
+    const spy = vi.spyOn(roleActionRegistry, 'getActionsForRole').mockReturnValue([
+      {
+        action: 'broken_action',
+        description: 'test',
+        destructive: false,
+        patterns: undefined as unknown as RegExp[],
+        extractParams: () => ({}),
+        descriptionTemplate: () => 'test',
+        handler: async () => ({ answer: 'ok' }),
+      },
+    ]);
+
+    const result = await actionIntentDetector.detect('who is admin of this school', UserRole.STUDENT);
+    expect(result.isAction).toBe(false);
+
+    spy.mockRestore();
   });
 });

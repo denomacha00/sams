@@ -2,11 +2,34 @@ import { describe, expect, it } from 'vitest';
 import { UserRole } from '@sams/shared';
 import {
   getActionNames,
+  getActionsForRole,
   isActionPermitted,
   findAction,
+  roleActionRegistry,
 } from './roleActionRegistry';
 
 describe('roleActionRegistry permissions', () => {
+  it('every registered action has an iterable patterns array', () => {
+    const roles = Object.keys(roleActionRegistry);
+    expect(roles.length).toBeGreaterThan(0);
+    for (const role of roles) {
+      for (const action of getActionsForRole(role)) {
+        expect(Array.isArray(action.patterns), `${role}/${action.action}`).toBe(true);
+        for (const pattern of action.patterns) {
+          expect(pattern).toBeInstanceOf(RegExp);
+        }
+      }
+    }
+  });
+
+  it('student context actions include patterns (list_school_admin, describe_my_class)', () => {
+    for (const actionName of ['list_school_admin', 'describe_my_class', 'list_my_hod']) {
+      const def = findAction(UserRole.STUDENT, actionName);
+      expect(def, actionName).toBeDefined();
+      expect(def!.patterns.length).toBeGreaterThan(0);
+    }
+  });
+
   it('SUPER_ADMIN has platform actions', () => {
     expect(isActionPermitted(UserRole.SUPER_ADMIN, 'suspend_school')).toBe(true);
     expect(isActionPermitted(UserRole.SUPER_ADMIN, 'get_system_stats')).toBe(true);

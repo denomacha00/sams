@@ -1,4 +1,4 @@
-import { getActionsForRole, type ActionDefinition } from './roleActionRegistry';
+import { getActionsForRole, normalizeActionPatterns } from './roleActionRegistry';
 import { classifyIntent } from './llmActionClassifier';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -51,7 +51,8 @@ class ActionIntentDetector {
     const actions = getActionsForRole(role);
 
     for (const actionDef of actions) {
-      for (const pattern of actionDef.patterns) {
+      const patterns = normalizeActionPatterns(actionDef.patterns);
+      for (const pattern of patterns) {
         const match = message.match(pattern);
         if (match) {
           const params = actionDef.extractParams(message, match);

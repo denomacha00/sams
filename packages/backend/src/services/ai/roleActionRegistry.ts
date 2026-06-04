@@ -38,16 +38,32 @@ export interface ActionResult {
 
 export type RoleActionMap = Record<string, ActionDefinition[]>;
 
+/** Coerce action patterns to RegExp[] (empty when missing; wrap a lone RegExp). */
+export function normalizeActionPatterns(
+  patterns: RegExp[] | RegExp | undefined | null,
+): RegExp[] {
+  if (patterns == null) return [];
+  if (Array.isArray(patterns)) return patterns;
+  return [patterns];
+}
+
+function normalizeRoleActions(actions: ActionDefinition[]): ActionDefinition[] {
+  return actions.map((action) => ({
+    ...action,
+    patterns: normalizeActionPatterns(action.patterns),
+  }));
+}
+
 // ─── Registry ─────────────────────────────────────────────────────────────────
 
 // Registry - populated by handler imports
 export const roleActionRegistry: RoleActionMap = {};
 
-roleActionRegistry['SUPER_ADMIN'] = superAdminActions;
-roleActionRegistry['SCHOOL_ADMIN'] = schoolAdminActions;
-roleActionRegistry['HOD'] = hodActions;
-roleActionRegistry['TEACHER'] = teacherActions;
-roleActionRegistry['STUDENT'] = studentActions;
+roleActionRegistry['SUPER_ADMIN'] = normalizeRoleActions(superAdminActions);
+roleActionRegistry['SCHOOL_ADMIN'] = normalizeRoleActions(schoolAdminActions);
+roleActionRegistry['HOD'] = normalizeRoleActions(hodActions);
+roleActionRegistry['TEACHER'] = normalizeRoleActions(teacherActions);
+roleActionRegistry['STUDENT'] = normalizeRoleActions(studentActions);
 
 // ─── Lookup Utilities ─────────────────────────────────────────────────────────
 

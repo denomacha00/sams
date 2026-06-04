@@ -286,7 +286,12 @@ export class AIService {
           tokenBudgetManager.trimToFitBudget(contextWindow, 2048),
         );
       } catch (err) {
-        console.error('[AIService] Memory retrieval failed, proceeding without history:', err);
+        const msg = err instanceof Error ? err.message : String(err);
+        console.warn(
+          '[AIService] Memory retrieval failed, proceeding without conversation history:',
+          msg,
+        );
+        historyMessages = [];
       }
     }
 

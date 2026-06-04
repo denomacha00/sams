@@ -398,8 +398,12 @@ class ConversationMemoryService {
           });
         }
       } catch (err) {
-        // Skip corrupted records, log to AuditLog
-        console.error(`[ConversationMemoryService] Decryption failed for record ${record.id}:`, err);
+        // Skip corrupted or key-mismatched records; do not fail the AI query
+        const msg = err instanceof Error ? err.message : String(err);
+        console.warn(
+          `[ConversationMemoryService] Decryption failed for record ${record.id}, skipping:`,
+          msg,
+        );
         try {
           await auditService.log({
             eventType: 'CONFLICT_RESOLVED',
