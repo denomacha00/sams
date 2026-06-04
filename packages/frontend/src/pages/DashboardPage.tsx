@@ -21,6 +21,13 @@ interface QuickAction {
   label: string;
   icon: string;
   gradient: string;
+  /** Primary attendance CTAs use emerald styling */
+  variant?: 'attendance' | 'alert' | 'default';
+}
+
+interface QuickActionGroup {
+  title: string;
+  actions: QuickAction[];
 }
 
 interface DashboardStats {
@@ -142,15 +149,29 @@ const AnimatedStatCard: React.FC<{ stat: StatCard; index: number }> = ({ stat, i
 
 // ─── Quick Action Button ─────────────────────────────────────────────────────
 
-const QuickActionButton: React.FC<{ action: QuickAction; index: number }> = ({ action, index }) => (
+const QuickActionButton: React.FC<{ action: QuickAction; index: number }> = ({ action, index }) => {
+  const topBarClass =
+    action.variant === 'attendance'
+      ? 'from-emerald-500 to-teal-500'
+      : action.variant === 'alert'
+        ? 'from-amber-500 to-orange-500'
+        : action.gradient;
+  const iconBgClass =
+    action.variant === 'attendance'
+      ? 'from-emerald-600 to-teal-600'
+      : action.variant === 'alert'
+        ? 'from-amber-500 to-orange-500'
+        : action.gradient;
+
+  return (
   <Link
     to={action.to}
     className="group relative overflow-hidden rounded-2xl border border-slate-700/80 bg-slate-900/80 p-5 min-h-[120px] hover:bg-slate-800/80 hover:border-slate-600 transition-all duration-300 flex flex-col justify-between"
     style={{ animationDelay: `${(index + 4) * 80}ms`, animation: 'fadeInUp 0.5s ease-out forwards', opacity: 0 }}
   >
-    <div className={`absolute top-0 left-0 right-0 h-px bg-gradient-to-r ${action.gradient} opacity-40 group-hover:opacity-70 transition-opacity duration-300`} />
+    <div className={`absolute top-0 left-0 right-0 h-px bg-gradient-to-r ${topBarClass} opacity-40 group-hover:opacity-70 transition-opacity duration-300`} />
     <div>
-      <div className={`w-10 h-10 rounded-lg bg-gradient-to-br ${action.gradient} flex items-center justify-center shadow-md mb-3 group-hover:shadow-lg transition-shadow duration-500`}>
+      <div className={`w-10 h-10 rounded-lg bg-gradient-to-br ${iconBgClass} flex items-center justify-center shadow-md mb-3 group-hover:shadow-lg transition-shadow duration-500`}>
         <svg className="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d={action.icon} />
         </svg>
@@ -163,7 +184,8 @@ const QuickActionButton: React.FC<{ action: QuickAction; index: number }> = ({ a
       </svg>
     </div>
   </Link>
-);
+  );
+};
 
 
 // ─── Role-specific "At a glance" (replaces duplicate timetable on dashboard) ─
@@ -267,44 +289,37 @@ const AtAGlancePanel: React.FC<{ role?: UserRole; userId?: string }> = ({ role, 
       ) : role === UserRole.STUDENT ? (
         <div className="space-y-4">
           <div className="text-center py-4">
-            <p className="text-4xl font-bold text-indigo-300">{studentPresent}</p>
+            <p className="text-4xl font-bold text-emerald-300">{studentPresent}</p>
             <p className="text-sm text-gray-400 mt-1">classes marked present today</p>
           </div>
-          <Link to="/sessions/scan" className="btn-primary w-full py-3 text-sm flex items-center justify-center gap-2">
-            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={ICONS.qr} />
-            </svg>
-            Scan attendance QR
+          <Link
+            to="/reports"
+            className="block text-center text-sm text-indigo-300 hover:text-indigo-200 transition-colors py-2"
+          >
+            View my attendance reports →
           </Link>
           <Link
             to="/timetable"
-            className="block text-center text-sm text-indigo-300 hover:text-indigo-200 transition-colors"
+            className="block text-center text-sm text-gray-400 hover:text-gray-300 transition-colors"
           >
             Open full timetable →
           </Link>
         </div>
       ) : role === UserRole.TEACHER ? (
         <div className="space-y-3">
-          <Link to="/sessions" className="btn-primary w-full py-3 text-sm flex items-center justify-center gap-2">
-            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={ICONS.qr} />
-            </svg>
-            Sign In Students
-          </Link>
           {activeSessions.length === 0 ? (
-            <div className="text-center py-4">
-              <p className="text-gray-500 text-sm mb-3">No active sessions right now</p>
-              <Link to="/sessions" className="text-sm text-indigo-300 hover:text-indigo-200">
-                Start attendance session →
-              </Link>
+            <div className="text-center py-6">
+              <p className="text-gray-400 text-sm mb-1">No active sessions</p>
+              <p className="text-xs text-gray-500">Use Sign In Students above to start a session and show the QR code.</p>
             </div>
           ) : (
             <>
+              <p className="text-xs font-medium text-emerald-400/90 uppercase tracking-wide">Active now</p>
               {activeSessions.map((s) => (
                 <Link
                   key={s.id}
                   to="/sessions"
-                  className="flex items-center justify-between p-3 rounded-xl bg-white/[0.03] hover:bg-white/[0.07] border border-white/5 hover:border-indigo-500/30 transition-all"
+                  className="flex items-center justify-between p-3 rounded-xl bg-white/[0.03] hover:bg-white/[0.07] border border-white/5 hover:border-emerald-500/30 transition-all"
                 >
                   <div>
                     <p className="text-sm text-white font-medium">{s.subject}</p>
@@ -318,62 +333,46 @@ const AtAGlancePanel: React.FC<{ role?: UserRole; userId?: string }> = ({ role, 
               </Link>
             </>
           )}
-          <Link
-            to="/notifications"
-            className="block p-3 rounded-xl bg-white/[0.03] hover:bg-white/[0.07] border border-white/5 text-sm text-gray-200"
-          >
-            Send or read class messages →
-          </Link>
         </div>
       ) : role === UserRole.HOD ? (
         <div className="space-y-3">
           <div className="flex items-center justify-between p-3 rounded-xl bg-white/[0.03] border border-white/5">
             <span className="text-sm text-gray-300">Unread notifications</span>
-            <span className="text-sm font-semibold text-indigo-300">{unreadCount}</span>
+            <span className={`text-sm font-semibold ${unreadCount > 0 ? 'text-amber-300' : 'text-indigo-300'}`}>
+              {unreadCount}
+            </span>
           </div>
-          <Link
-            to="/hod/department"
-            className="block p-3 rounded-xl bg-white/[0.03] hover:bg-white/[0.07] border border-white/5 text-sm text-gray-200"
-          >
-            Department management →
-          </Link>
-          <Link
-            to="/risk-scores"
-            className="block p-3 rounded-xl bg-white/[0.03] hover:bg-white/[0.07] border border-white/5 text-sm text-gray-200"
-          >
-            Review at-risk students →
-          </Link>
-          <Link
-            to="/notifications"
-            className="block text-center text-sm text-indigo-300 hover:text-indigo-200"
-          >
-            Open notifications →
-          </Link>
+          <p className="text-xs text-gray-500 px-1">
+            Use Quick Actions below for department tools, timetable, and reports.
+          </p>
+          {unreadCount > 0 && (
+            <Link
+              to="/notifications"
+              className="btn-secondary w-full py-2.5 text-sm text-center block"
+            >
+              Read notifications →
+            </Link>
+          )}
         </div>
       ) : role === UserRole.SCHOOL_ADMIN ? (
         <div className="space-y-3">
           <div className="flex items-center justify-between p-3 rounded-xl bg-white/[0.03] border border-white/5">
             <span className="text-sm text-gray-300">Unread notifications</span>
-            <span className="text-sm font-semibold text-indigo-300">{unreadCount}</span>
+            <span className={`text-sm font-semibold ${unreadCount > 0 ? 'text-amber-300' : 'text-indigo-300'}`}>
+              {unreadCount}
+            </span>
           </div>
-          <Link
-            to="/admin/users"
-            className="block p-3 rounded-xl bg-white/[0.03] hover:bg-white/[0.07] border border-white/5 text-sm text-gray-200"
-          >
-            Manage users →
-          </Link>
-          <Link
-            to="/reports"
-            className="block p-3 rounded-xl bg-white/[0.03] hover:bg-white/[0.07] border border-white/5 text-sm text-gray-200"
-          >
-            School attendance reports →
-          </Link>
-          <Link
-            to="/notifications"
-            className="block text-center text-sm text-indigo-300 hover:text-indigo-200"
-          >
-            Send or view notifications →
-          </Link>
+          <p className="text-xs text-gray-500 px-1">
+            Manage users, departments, and registration links from Quick Actions.
+          </p>
+          {unreadCount > 0 && (
+            <Link
+              to="/notifications"
+              className="btn-secondary w-full py-2.5 text-sm text-center block"
+            >
+              Read notifications →
+            </Link>
+          )}
         </div>
       ) : (
         <p className="text-gray-500 text-sm text-center py-8">Welcome to SAMS</p>
@@ -482,57 +481,121 @@ const ActivityFeed: React.FC = () => {
 
 // ─── Role-specific config ────────────────────────────────────────────────────
 
-function getQuickActions(role?: UserRole): QuickAction[] {
+function getQuickActionGroups(role?: UserRole): QuickActionGroup[] {
   switch (role) {
     case UserRole.SCHOOL_ADMIN:
       return [
-        { to: '/admin/users', label: 'Manage Users', icon: ICONS.users, gradient: 'from-indigo-600 to-slate-700' },
-        { to: '/admin/links', label: 'Generate Links', icon: ICONS.link, gradient: 'from-slate-600 to-indigo-600' },
-        { to: '/reports', label: 'View Reports', icon: ICONS.chart, gradient: 'from-indigo-600 to-slate-700' },
-        { to: '/timetable', label: 'View Timetable', icon: ICONS.calendar, gradient: 'from-orange-500 to-amber-500' },
-        { to: '/admin/departments', label: 'Departments', icon: ICONS.building, gradient: 'from-green-500 to-emerald-500' },
-        { to: '/admin/knowledge', label: 'Knowledge Base', icon: ICONS.book, gradient: 'from-amber-500 to-yellow-500' },
-        { to: '/class-roster', label: 'View Class Reps', icon: ICONS.users, gradient: 'from-amber-500 to-orange-500' },
-        { to: '/notifications', label: 'Messages', icon: ICONS.bell, gradient: 'from-rose-500 to-red-500' },
-        { to: '/ai', label: 'AI Assistant', icon: ICONS.ai, gradient: 'from-violet-500 to-purple-500' },
+        {
+          title: 'School Management',
+          actions: [
+            { to: '/admin/users', label: 'Manage Users', icon: ICONS.users, gradient: 'from-indigo-600 to-slate-700' },
+            { to: '/admin/departments', label: 'Departments', icon: ICONS.building, gradient: 'from-green-500 to-emerald-500' },
+            { to: '/admin/links', label: 'Registration Links', icon: ICONS.link, gradient: 'from-slate-600 to-indigo-600' },
+            { to: '/class-roster', label: 'Class Reps', icon: ICONS.users, gradient: 'from-amber-500 to-orange-500' },
+          ],
+        },
+        {
+          title: 'Reports & Schedule',
+          actions: [
+            { to: '/reports', label: 'View Reports', icon: ICONS.chart, gradient: 'from-indigo-600 to-slate-700' },
+            { to: '/timetable', label: 'View Timetable', icon: ICONS.calendar, gradient: 'from-orange-500 to-amber-500' },
+            { to: '/admin/knowledge', label: 'Knowledge Base', icon: ICONS.book, gradient: 'from-amber-500 to-yellow-500' },
+          ],
+        },
+        {
+          title: 'Communication',
+          actions: [
+            { to: '/notifications', label: 'Notifications', icon: ICONS.bell, gradient: 'from-rose-500 to-red-500', variant: 'alert' },
+            { to: '/ai', label: 'AI Assistant', icon: ICONS.ai, gradient: 'from-violet-500 to-purple-500' },
+          ],
+        },
       ];
     case UserRole.TEACHER:
       return [
-        { to: '/sessions', label: 'Sign In Students', icon: ICONS.qr, gradient: 'from-indigo-600 to-slate-700' },
-        { to: '/sessions', label: 'Start Session', icon: ICONS.session, gradient: 'from-blue-500 to-indigo-500' },
-        { to: '/attendance', label: 'Mark Attendance', icon: ICONS.clipboard, gradient: 'from-indigo-600 to-slate-700' },
-        { to: '/biometric/attendance', label: 'Face Scan', icon: ICONS.check, gradient: 'from-emerald-500 to-teal-500' },
-        { to: '/class/students', label: 'My Students', icon: ICONS.users, gradient: 'from-slate-600 to-indigo-600' },
-        { to: '/class-roster', label: 'Assign Class Rep', icon: ICONS.users, gradient: 'from-amber-500 to-orange-500' },
-        { to: '/admin/links', label: 'Registration Links', icon: ICONS.link, gradient: 'from-emerald-500 to-teal-500' },
-        { to: '/reports', label: 'View Reports', icon: ICONS.chart, gradient: 'from-indigo-600 to-slate-700' },
-        { to: '/timetable', label: 'My Timetable', icon: ICONS.calendar, gradient: 'from-orange-500 to-amber-500' },
-        { to: '/admin/knowledge', label: 'Knowledge Base', icon: ICONS.book, gradient: 'from-amber-500 to-yellow-500' },
-        { to: '/ai', label: 'AI Assistant', icon: ICONS.ai, gradient: 'from-violet-500 to-purple-500' },
-        { to: '/notifications', label: 'Notifications', icon: ICONS.bell, gradient: 'from-slate-600 to-indigo-700' },
+        {
+          title: 'Attendance',
+          actions: [
+            { to: '/sessions', label: 'Sign In Students', icon: ICONS.qr, gradient: 'from-emerald-600 to-teal-600', variant: 'attendance' },
+            { to: '/attendance', label: 'Mark Attendance', icon: ICONS.clipboard, gradient: 'from-emerald-500 to-teal-500', variant: 'attendance' },
+            { to: '/biometric/attendance', label: 'Face Scan', icon: ICONS.check, gradient: 'from-teal-500 to-cyan-500', variant: 'attendance' },
+          ],
+        },
+        {
+          title: 'My Class',
+          actions: [
+            { to: '/class/students', label: 'My Students', icon: ICONS.users, gradient: 'from-slate-600 to-indigo-600' },
+            { to: '/class-roster', label: 'Assign Class Rep', icon: ICONS.users, gradient: 'from-amber-500 to-orange-500' },
+          ],
+        },
+        {
+          title: 'Schedule & Reports',
+          actions: [
+            { to: '/timetable', label: 'My Timetable', icon: ICONS.calendar, gradient: 'from-orange-500 to-amber-500' },
+            { to: '/reports', label: 'View Reports', icon: ICONS.chart, gradient: 'from-indigo-600 to-slate-700' },
+            { to: '/admin/links', label: 'Registration Links', icon: ICONS.link, gradient: 'from-emerald-500 to-teal-500' },
+            { to: '/admin/knowledge', label: 'Knowledge Base', icon: ICONS.book, gradient: 'from-amber-500 to-yellow-500' },
+          ],
+        },
+        {
+          title: 'Communication',
+          actions: [
+            { to: '/notifications', label: 'Notifications', icon: ICONS.bell, gradient: 'from-slate-600 to-indigo-700', variant: 'alert' },
+            { to: '/ai', label: 'AI Assistant', icon: ICONS.ai, gradient: 'from-violet-500 to-purple-500' },
+          ],
+        },
       ];
     case UserRole.STUDENT:
       return [
-        { to: '/sessions/scan', label: 'Scan QR', icon: ICONS.qr, gradient: 'from-teal-500 to-cyan-500' },
-        { to: '/timetable', label: 'View Timetable', icon: ICONS.calendar, gradient: 'from-blue-500 to-indigo-500' },
-        { to: '/notifications', label: 'Messages', icon: ICONS.bell, gradient: 'from-rose-500 to-red-500' },
-        { to: '/reports', label: 'My Reports', icon: ICONS.chart, gradient: 'from-purple-500 to-pink-500' },
-        { to: '/ai', label: 'AI Assistant', icon: ICONS.ai, gradient: 'from-violet-500 to-purple-500' },
-        { to: '/profile', label: 'Profile', icon: ICONS.profile, gradient: 'from-cyan-500 to-blue-500' },
-        { to: '/settings', label: 'Settings', icon: ICONS.settings, gradient: 'from-gray-500 to-slate-500' },
+        {
+          title: 'Today',
+          actions: [
+            { to: '/sessions/scan', label: 'Scan QR', icon: ICONS.qr, gradient: 'from-emerald-500 to-teal-500', variant: 'attendance' },
+            { to: '/timetable', label: 'View Timetable', icon: ICONS.calendar, gradient: 'from-blue-500 to-indigo-500' },
+          ],
+        },
+        {
+          title: 'Stay Informed',
+          actions: [
+            { to: '/notifications', label: 'Messages', icon: ICONS.bell, gradient: 'from-rose-500 to-red-500', variant: 'alert' },
+            { to: '/reports', label: 'My Reports', icon: ICONS.chart, gradient: 'from-purple-500 to-pink-500' },
+            { to: '/ai', label: 'AI Assistant', icon: ICONS.ai, gradient: 'from-violet-500 to-purple-500' },
+          ],
+        },
+        {
+          title: 'Account',
+          actions: [
+            { to: '/profile', label: 'Profile', icon: ICONS.profile, gradient: 'from-cyan-500 to-blue-500' },
+          ],
+        },
       ];
     case UserRole.HOD:
       return [
-        { to: '/reports', label: 'View Reports', icon: ICONS.chart, gradient: 'from-teal-500 to-cyan-500' },
-        { to: '/hod/department', label: 'Department Management', icon: ICONS.building, gradient: 'from-indigo-500 to-blue-500' },
-        { to: '/risk-scores', label: 'Risk Scores', icon: ICONS.warning, gradient: 'from-orange-500 to-red-500' },
-        { to: '/admin/links', label: 'Registration Links', icon: ICONS.link, gradient: 'from-emerald-500 to-teal-500' },
-        { to: '/admin/users', label: 'Manage Users', icon: ICONS.users, gradient: 'from-blue-500 to-indigo-500' },
-        { to: '/class-roster', label: 'View Class Reps', icon: ICONS.users, gradient: 'from-amber-500 to-orange-500' },
-        { to: '/admin/timetable', label: 'Timetable', icon: ICONS.calendar, gradient: 'from-purple-500 to-pink-500' },
-        { to: '/admin/knowledge', label: 'Knowledge Base', icon: ICONS.book, gradient: 'from-amber-500 to-yellow-500' },
-        { to: '/notifications', label: 'Messages', icon: ICONS.bell, gradient: 'from-rose-500 to-red-500' },
-        { to: '/ai', label: 'AI Assistant', icon: ICONS.ai, gradient: 'from-violet-500 to-purple-500' },
+        {
+          title: 'Department',
+          actions: [
+            { to: '/hod/department', label: 'Department Management', icon: ICONS.building, gradient: 'from-indigo-500 to-blue-500' },
+            { to: '/admin/users', label: 'Manage Users', icon: ICONS.users, gradient: 'from-blue-500 to-indigo-500' },
+            { to: '/class-roster', label: 'Class Reps', icon: ICONS.users, gradient: 'from-amber-500 to-orange-500' },
+            { to: '/admin/links', label: 'Registration Links', icon: ICONS.link, gradient: 'from-emerald-500 to-teal-500' },
+          ],
+        },
+        {
+          title: 'Schedule & Insights',
+          actions: [
+            { to: '/timetable', label: 'View Timetable', icon: ICONS.calendar, gradient: 'from-orange-500 to-amber-500' },
+            { to: '/admin/timetable', label: 'Edit Timetable', icon: ICONS.calendar, gradient: 'from-purple-500 to-pink-500' },
+            { to: '/reports', label: 'View Reports', icon: ICONS.chart, gradient: 'from-teal-500 to-cyan-500' },
+            { to: '/risk-scores', label: 'Risk Scores', icon: ICONS.warning, gradient: 'from-orange-500 to-red-500', variant: 'alert' },
+            { to: '/admin/knowledge', label: 'Knowledge Base', icon: ICONS.book, gradient: 'from-amber-500 to-yellow-500' },
+          ],
+        },
+        {
+          title: 'Communication',
+          actions: [
+            { to: '/notifications', label: 'Notifications', icon: ICONS.bell, gradient: 'from-rose-500 to-red-500', variant: 'alert' },
+            { to: '/ai', label: 'AI Assistant', icon: ICONS.ai, gradient: 'from-violet-500 to-purple-500' },
+          ],
+        },
       ];
     default:
       return [];
@@ -884,6 +947,63 @@ const TeacherClassPanel: React.FC<{ classId?: string; attendanceRate?: string }>
   );
 };
 
+// ─── HOD department overview (stats from dashboard hook) ─────────────────────
+
+const HodDepartmentPanel: React.FC<{ stats: StatCard[]; departmentName?: string | null }> = ({
+  stats,
+  departmentName,
+}) => {
+  const deptStudents = stats.find((s) => s.label === 'Dept. Students')?.value ?? '—';
+  const deptTeachers = stats.find((s) => s.label === 'Dept. Teachers')?.value ?? '—';
+  const attendanceRate = stats.find((s) => s.label === 'Attendance Rate')?.value ?? '—';
+  const atRisk = stats.find((s) => s.label === 'At-Risk Students')?.value ?? '—';
+
+  return (
+    <div
+      className="rounded-2xl border border-white/10 bg-white/[0.03] backdrop-blur-md p-6 min-h-[280px]"
+      style={{ animation: 'fadeInUp 0.5s ease-out 0.7s forwards', opacity: 0 }}
+    >
+      <div className="flex items-center gap-3 mb-5">
+        <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-indigo-500 to-blue-500 flex items-center justify-center shadow-lg shadow-indigo-500/20">
+          <svg className="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={ICONS.building} />
+          </svg>
+        </div>
+        <div>
+          <h3 className="text-lg font-semibold text-white">Department Overview</h3>
+          {departmentName && (
+            <p className="text-xs text-indigo-300/90">{departmentName}</p>
+          )}
+        </div>
+      </div>
+      <div className="space-y-3">
+        <div className="flex items-center justify-between p-3 rounded-xl bg-white/[0.03] border border-white/5">
+          <span className="text-sm text-gray-300">Students</span>
+          <span className="text-sm font-semibold text-teal-400">{deptStudents}</span>
+        </div>
+        <div className="flex items-center justify-between p-3 rounded-xl bg-white/[0.03] border border-white/5">
+          <span className="text-sm text-gray-300">Teachers</span>
+          <span className="text-sm font-semibold text-blue-400">{deptTeachers}</span>
+        </div>
+        <div className="flex items-center justify-between p-3 rounded-xl bg-white/[0.03] border border-white/5">
+          <span className="text-sm text-gray-300">Avg. Attendance</span>
+          <span className="text-sm font-semibold text-emerald-400">{attendanceRate}</span>
+        </div>
+        <div className="flex items-center justify-between p-3 rounded-xl bg-white/[0.03] border border-white/5">
+          <span className="text-sm text-gray-300">High Risk Students</span>
+          <span className="text-sm font-semibold text-amber-400">{atRisk}</span>
+        </div>
+      </div>
+      <Link
+        to="/hod/department"
+        className="block text-center text-sm text-indigo-300 hover:text-indigo-200 mt-4"
+      >
+        Open department management →
+      </Link>
+    </div>
+  );
+};
+
 // ─── Main Dashboard Component ────────────────────────────────────────────────
 
 const DashboardPage: React.FC = () => {
@@ -895,9 +1015,12 @@ const DashboardPage: React.FC = () => {
   const location = useLocation();
   const [currentTime, setCurrentTime] = useState(formatTime());
   const [unreadCount, setUnreadCount] = useState(0);
+  const [departmentName, setDepartmentName] = useState<string | null>(null);
 
   const { stats, loading: statsLoading } = useDashboardStats(user ?? undefined);
   const atAGlanceTitle = getAtAGlanceTitle(user?.role);
+  const quickActionGroups = getQuickActionGroups(user?.role);
+  let quickActionIndex = 0;
 
   // Update clock every minute
   useEffect(() => {
@@ -922,6 +1045,21 @@ const DashboardPage: React.FC = () => {
     }).catch(() => {});
   }, [user?.role, user?.classId, updateUser]);
 
+  // HOD: resolve department display name for scope label
+  useEffect(() => {
+    if (user?.role !== UserRole.HOD || !user?.departmentId) {
+      setDepartmentName(null);
+      return;
+    }
+    apiClient.get('/departments')
+      .then(({ data }) => {
+        const depts = Array.isArray(data) ? data : [];
+        const match = depts.find((d: { id: string; name?: string }) => d.id === user.departmentId);
+        setDepartmentName(match?.name ?? null);
+      })
+      .catch(() => setDepartmentName(null));
+  }, [user?.role, user?.departmentId]);
+
   // Real-time: increment badge on new notification
   useEffect(() => {
     if (!accessToken) return;
@@ -937,7 +1075,7 @@ const DashboardPage: React.FC = () => {
     navigate('/login');
   };
 
-  const quickActions = getQuickActions(user?.role);
+  const daysPresentStat = stats.find((s) => s.label === 'Days Present')?.value;
 
   return (
     <div className="page-shell relative overflow-hidden">
@@ -1068,6 +1206,11 @@ const DashboardPage: React.FC = () => {
                 <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold text-indigo-100 bg-indigo-600/30 border border-indigo-500/40 w-fit">
                   {getRoleLabel(user?.role)}
                 </span>
+                {user?.role === UserRole.HOD && departmentName && (
+                  <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium text-teal-100 bg-teal-600/20 border border-teal-500/30 w-fit">
+                    {departmentName}
+                  </span>
+                )}
               </div>
               <p className="text-slate-400 text-base max-w-lg">
                 {getRoleGreeting(user?.role)}
@@ -1080,7 +1223,7 @@ const DashboardPage: React.FC = () => {
               {user?.role === UserRole.TEACHER && (
                 <Link
                   to="/sessions"
-                  className="mt-4 inline-flex items-center justify-center gap-2 btn-primary py-3 px-6 text-sm w-full sm:w-auto"
+                  className="mt-4 inline-flex items-center justify-center gap-2 btn-attendance py-3 px-6 text-sm w-full sm:w-auto"
                 >
                   <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={ICONS.qr} />
@@ -1091,7 +1234,7 @@ const DashboardPage: React.FC = () => {
               {user?.role === UserRole.STUDENT && (
                 <Link
                   to="/sessions/scan"
-                  className="mt-4 inline-flex items-center justify-center gap-2 btn-primary py-3 px-6 text-sm w-full sm:w-auto"
+                  className="mt-4 inline-flex items-center justify-center gap-2 btn-attendance py-3 px-6 text-sm w-full sm:w-auto"
                 >
                   <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={ICONS.qr} />
@@ -1118,12 +1261,22 @@ const DashboardPage: React.FC = () => {
           </div>
         </section>
 
-        {/* Quick Actions Section */}
+        {/* Quick Actions — grouped by purpose, no duplicate routes */}
         <section className="mb-10">
           <SectionHeader title="Quick Actions" icon={ICONS.trending} gradient="from-slate-600 to-indigo-600" />
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-            {quickActions.map((action, i) => (
-              <QuickActionButton key={`${action.to}-${action.label}`} action={action} index={i} />
+          <div className="space-y-8">
+            {quickActionGroups.map((group) => (
+              <div key={group.title}>
+                <h4 className="text-sm font-medium text-slate-400 mb-3 uppercase tracking-wide">{group.title}</h4>
+                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                  {group.actions.map((action) => {
+                    const index = quickActionIndex++;
+                    return (
+                      <QuickActionButton key={`${group.title}-${action.to}-${action.label}`} action={action} index={index} />
+                    );
+                  })}
+                </div>
+              </div>
             ))}
           </div>
         </section>
@@ -1149,7 +1302,7 @@ const DashboardPage: React.FC = () => {
             {user?.role === UserRole.STUDENT && (
               <div className="rounded-2xl border border-white/10 bg-white/[0.03] backdrop-blur-md p-6 min-h-[280px]" style={{ animation: 'fadeInUp 0.5s ease-out 0.7s forwards', opacity: 0 }}>
                 <div className="flex items-center gap-3 mb-5">
-                  <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-indigo-600 to-slate-700 flex items-center justify-center shadow-lg shadow-indigo-500/20">
+                  <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-emerald-600 to-teal-600 flex items-center justify-center shadow-lg shadow-emerald-500/20">
                     <svg className="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={ICONS.fire} />
                     </svg>
@@ -1157,53 +1310,22 @@ const DashboardPage: React.FC = () => {
                   <h3 className="text-lg font-semibold text-white">Attendance Streak</h3>
                 </div>
                 <div className="text-center py-6">
-                  <div className="text-5xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-indigo-300 to-slate-300 mb-2">
-                    —
+                  <div className="text-5xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-emerald-300 to-teal-300 mb-2">
+                    {daysPresentStat ?? '—'}
                   </div>
-                  <p className="text-sm text-gray-400">consecutive days present</p>
+                  <p className="text-sm text-gray-400">days present (term total)</p>
                 </div>
-                <div className="grid grid-cols-7 gap-1.5 mt-4">
-                  {Array.from({ length: 14 }).map((_, i) => (
-                    <div
-                      key={i}
-                      className={`w-full aspect-square rounded-md ${i < 10 ? 'bg-indigo-500/35 border border-indigo-500/25' : 'bg-slate-800 border border-slate-700'}`}
-                      title={`Day ${i + 1}`}
-                    />
-                  ))}
-                </div>
-                <p className="text-xs text-gray-500 mt-3 text-center">Last 14 days</p>
+                <Link
+                  to="/reports"
+                  className="block text-center text-sm text-indigo-300 hover:text-indigo-200"
+                >
+                  View full attendance history →
+                </Link>
               </div>
             )}
 
             {user?.role === UserRole.HOD && (
-              <div className="rounded-2xl border border-white/10 bg-white/[0.03] backdrop-blur-md p-6 min-h-[280px]" style={{ animation: 'fadeInUp 0.5s ease-out 0.7s forwards', opacity: 0 }}>
-                <div className="flex items-center gap-3 mb-5">
-                  <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-indigo-500 to-blue-500 flex items-center justify-center shadow-lg shadow-indigo-500/20">
-                    <svg className="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={ICONS.building} />
-                    </svg>
-                  </div>
-                  <h3 className="text-lg font-semibold text-white">Department Overview</h3>
-                </div>
-                <div className="space-y-3">
-                  <div className="flex items-center justify-between p-3 rounded-xl bg-white/[0.03] border border-white/5">
-                    <span className="text-sm text-gray-300">Total Classes</span>
-                    <span className="text-sm font-semibold text-teal-400">—</span>
-                  </div>
-                  <div className="flex items-center justify-between p-3 rounded-xl bg-white/[0.03] border border-white/5">
-                    <span className="text-sm text-gray-300">Avg. Attendance</span>
-                    <span className="text-sm font-semibold text-blue-400">—</span>
-                  </div>
-                  <div className="flex items-center justify-between p-3 rounded-xl bg-white/[0.03] border border-white/5">
-                    <span className="text-sm text-gray-300">High Risk Students</span>
-                    <span className="text-sm font-semibold text-red-400">—</span>
-                  </div>
-                  <div className="flex items-center justify-between p-3 rounded-xl bg-white/[0.03] border border-white/5">
-                    <span className="text-sm text-gray-300">Active Sessions</span>
-                    <span className="text-sm font-semibold text-purple-400">—</span>
-                  </div>
-                </div>
-              </div>
+              <HodDepartmentPanel stats={stats} departmentName={departmentName} />
             )}
           </div>
         </section>

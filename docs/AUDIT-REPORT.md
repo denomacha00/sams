@@ -214,4 +214,112 @@ All registered actions are normalized to `patterns: RegExp[]` at registry load t
 
 ---
 
+## Local QA pass (2026-06-04)
+
+Full role-by-role audit and automated baseline on Windows dev machine. **No git push** — Denis pushes when ready.
+
+### Per-role status
+
+| Role | Status | Notes |
+|------|--------|-------|
+| **STUDENT** | PASS | Login, dashboard, `/timetable`, `/sessions/scan`, notifications inbox, AI self-scope, profile/settings; QR uses `getApiErrorMessage` |
+| **TEACHER** | PASS | Dashboard **Sign In Students** → `/sessions` (fd1365ab); sessions, manual attendance, class roster, registration links, AI, notifications |
+| **HOD** | FIXED | **GET /timetable** now auto-scopes to JWT `departmentId`; dashboard adds **View Timetable** quick action; notifications dept auto-target unchanged (e873beab) |
+| **SCHOOL_ADMIN** | PASS | Admin routes, users, departments, school-wide notify, registration links, AI, license paths |
+| **SUPER_ADMIN** | PASS | Super-admin SPA routes; suspend/unsuspend including “undo suspension for X” (9a795372); ops/runbook AI context |
+
+### Issues found vs fixed (this pass)
+
+| # | Issue | Fix |
+|---|--------|-----|
+| 1 | Initial `tsc` failed: `UserWhereInput` has no `isActive` on session student list | Already on `main` as `isLocked: false` (`7e96be84`); verified lint clean |
+| 2 | HOD **GET /timetable** returned whole-school entries | `listEntries` + route apply `departmentId` from JWT for HOD |
+| 3 | HOD dashboard missing read-only timetable shortcut | Added `/timetable` quick action |
+| 4 | Profile avatar upload opaque errors / 413 | `getApiErrorMessage` + explicit 413 hint (nginx 25m) |
+
+**Counts:** 4 issues identified · **3 code fixes** in this session (item 1 pre-committed) · 0 test regressions
+
+### Files changed (this pass)
+
+| File | Change |
+|------|--------|
+| `packages/backend/src/services/timetableService.ts` | `departmentId` filter on list |
+| `packages/backend/src/routes/timetable.ts` | HOD auto-scope on GET |
+| `packages/frontend/src/pages/DashboardPage.tsx` | HOD View Timetable link |
+| `packages/frontend/src/pages/ProfilePage.tsx` | API error + 413 messaging |
+| `docs/AUDIT-REPORT.md` | This section |
+
+### Test commands run and results
+
+| Command | Result |
+|---------|--------|
+| `npm run lint -w @sams/backend` | **PASS** |
+| `npx vitest run --dir packages/backend` | **PASS** — 40 files, **304** tests |
+| `npm run lint -w @sams/frontend` | **PASS** |
+| `npx vitest run --dir packages/frontend` | **PASS** — 14 tests |
+| `npm run lint -w @sams/super-admin` | **PASS** |
+| `npm run build -w @sams/shared` | **PASS** |
+| `npm run build -w @sams/backend` | **PASS** |
+| `npm run build -w @sams/frontend` | **PASS** |
+| `npm run build -w @sams/super-admin` | **PASS** |
+| `scripts/pre-deploy-check.sh` | **Skipped** (Windows; run on VPS) |
+
+### Pre-push checklist for Denis
+
+1. Review diff: `git log -3 --oneline` and `git diff origin/main` after local commit.
+2. On VPS: `cd /var/www/sams && bash scripts/pre-deploy-check.sh`
+3. Deploy: `bash scripts/deploy-production.sh` (build-before-PM2-restart per `35504a36`)
+4. Run **Top 10 VPS smoke tests** below (15–20 min).
+5. Confirm Cloudflare SSL **Full (strict)** if redirect loops (runbook §7).
+6. `pm2 logs sams-api --lines 50` — no crash loop.
+
+### Denis — push when ready
+
+```bash
+cd /var/www/sams   # or local repo path
+git status
+git add packages/backend/src/services/timetableService.ts \
+        packages/backend/src/routes/timetable.ts \
+        packages/frontend/src/pages/DashboardPage.tsx \
+        packages/frontend/src/pages/ProfilePage.tsx \
+        docs/AUDIT-REPORT.md
+git commit -m "fix(hod): scope timetable list to department; polish profile upload errors"
+git push origin main
+```
+
+Then on VPS: `bash scripts/deploy-production.sh`
+
+### Top 10 manual smoke tests (VPS after deploy)
+
+1. `curl -sS https://app.smart-managment.com/api/v1/health` — AI/SMS/email flags sane.
+2. **STUDENT** login → AI: “MY TIME TABLE” → DB-backed slots (not generic).
+3. **STUDENT** → Scan QR on active session → attendance recorded.
+4. **TEACHER** → Dashboard **Sign In Students** → start session → QR displays.
+5. **TEACHER** → Manual attendance for active session → roster loads.
+6. **HOD** → Notifications → send to department (no empty dept dropdown).
+7. **HOD** → View Timetable → only own department classes (not other depts).
+8. **SCHOOL_ADMIN** → Users → create/list; school notification send.
+9. **SUPER_ADMIN** (`super.smart-managment.com`) → AI: “undo suspension for &lt;School&gt;” → unsuspend action.
+10. Profile photo upload (small JPEG) — no 413; if 413, `grep client_max_body_size /etc/nginx/sites-enabled/sams.conf` (expect 3× `25m`).
+
+### VPS-only / not fully verified locally
+
+- SMS (Africa’s Talking sender ID, sandbox numbers)
+- Email SMTP (password reset, lockout alerts)
+- OpenAI LLM path with production key (regex/local paths tested in CI)
+- Socket.IO through nginx (`/socket.io/` proxy)
+- WebAuthn / biometric on real devices
+- `pre-deploy-check.sh` Redis/secrets merge
+- End-to-end Playwright (no E2E suite in repo)
+
+### Preserved recent fixes (not regressed)
+
+- Attendance flow `fd1365ab` / session response helpers
+- AI anti-hallucination `39ab7dc1`
+- HOD notifications `e873beab`
+- Conversation memory `11fbdce3`
+- Deploy safety `35504a36` / pre-deploy bash `5c8b0364`
+
+---
+
 *End of audit report.*

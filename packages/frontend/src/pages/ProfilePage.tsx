@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useAuthStore } from '../store/authStore';
 import apiClient from '../services/apiClient';
+import { getApiErrorMessage } from '../lib/apiError';
 import { UserRole } from '@sams/shared';
 import { UserAvatar } from '../components/UserAvatar';
 
@@ -65,8 +66,8 @@ const ProfilePage: React.FC = () => {
         phone: data.phone,
       });
       setSuccess('Profile updated successfully!');
-    } catch (err: any) {
-      setError(err.response?.data?.error || 'Failed to update profile');
+    } catch (err: unknown) {
+      setError(getApiErrorMessage(err, 'Failed to update profile'));
     } finally {
       setSaving(false);
     }
@@ -162,8 +163,13 @@ const ProfilePage: React.FC = () => {
       });
       setCropImage(null);
       setSuccess('Profile picture updated!');
-    } catch (err: any) {
-      setError(err.response?.data?.error || 'Failed to upload profile picture');
+    } catch (err: unknown) {
+      const status = (err as { response?: { status?: number } }).response?.status;
+      setError(
+        status === 413
+          ? 'Photo is too large for the server. Try a smaller image or ask your admin to confirm nginx allows 25MB uploads.'
+          : getApiErrorMessage(err, 'Failed to upload profile picture'),
+      );
     } finally {
       setUploadingAvatar(false);
     }

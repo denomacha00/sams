@@ -55,6 +55,9 @@ timetableRouter.get('/', requirePermission('view:timetable'), async (req: Reques
       classId: req.query.classId as string | undefined,
       teacherId: req.query.teacherId as string | undefined,
       dayOfWeek: req.query.dayOfWeek !== undefined ? Number(req.query.dayOfWeek) : undefined,
+      ...(req.user.role === UserRole.HOD && req.user.departmentId
+        ? { departmentId: req.user.departmentId }
+        : {}),
     };
 
     const entries = await timetableService.listEntries(req.schoolId, filters);

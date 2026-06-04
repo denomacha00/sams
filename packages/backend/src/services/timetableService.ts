@@ -27,6 +27,8 @@ export interface ListTimetableFilters {
   classId?: string;
   teacherId?: string;
   dayOfWeek?: number;
+  /** When set, only entries for classes in this department are returned (HOD scope). */
+  departmentId?: string;
 }
 
 // ─── Timetable Service ────────────────────────────────────────────────────────
@@ -157,6 +159,9 @@ export class TimetableService {
     }
     if (filters?.dayOfWeek !== undefined) {
       where.dayOfWeek = filters.dayOfWeek;
+    }
+    if (filters?.departmentId) {
+      where.class = { departmentId: filters.departmentId };
     }
 
     const entries = await prisma.timetableEntry.findMany({
