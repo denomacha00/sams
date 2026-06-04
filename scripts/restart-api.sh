@@ -33,6 +33,11 @@ if is_weak_production_secret "$(read_merged_env JWT_SECRET)"; then
   exit 1
 fi
 
+if [[ ! -f "$ROOT/packages/backend/dist/index.js" ]]; then
+  echo "ERROR: Missing packages/backend/dist/index.js — run deploy build first" >&2
+  exit 1
+fi
+
 mkdir -p /var/log/sams
 # shellcheck source=lib/merged-env.sh
 source_merged_env

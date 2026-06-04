@@ -6,6 +6,7 @@ import { aiService } from '../services/aiService';
 import { openaiQuery } from '../services/ai/openaiEngine';
 import { conversationMemoryService } from '../services/conversationMemoryService';
 import { AppError } from '../middleware/errors';
+import { asyncHandler } from '../middleware/asyncHandler';
 import {
   formatProviderError,
   getMissingAIKeyMessage,
@@ -133,19 +134,19 @@ export function isSamsDataQuestion(question: string, intent: string): boolean {
  * GET /api/v1/ai/conversations
  * List conversation threads for the authenticated user (paginated).
  */
-aiRouter.get('/conversations', async (req: Request, res: Response): Promise<void> => {
+aiRouter.get('/conversations', asyncHandler(async (req: Request, res: Response): Promise<void> => {
   if (!req.user) { res.status(401).json({ error: 'Authentication required' }); return; }
   const page = parseInt(req.query.page as string) || 1;
   const pageSize = parseInt(req.query.pageSize as string) || 50;
   const result = await conversationMemoryService.getThreads(req.user.sub, req.user.schoolId, page, pageSize);
   res.json(result);
-});
+}));
 
 /**
  * GET /api/v1/ai/conversations/:threadId
  * Get decrypted records for a specific thread (paginated).
  */
-aiRouter.get('/conversations/:threadId', async (req: Request, res: Response): Promise<void> => {
+aiRouter.get('/conversations/:threadId', asyncHandler(async (req: Request, res: Response): Promise<void> => {
   if (!req.user) { res.status(401).json({ error: 'Authentication required' }); return; }
   const threadId = req.params.threadId as string;
   const page = parseInt(req.query.page as string || '1') || 1;
@@ -160,13 +161,13 @@ aiRouter.get('/conversations/:threadId', async (req: Request, res: Response): Pr
     }
     throw err;
   }
-});
+}));
 
 /**
  * POST /api/v1/ai/conversations
  * Create a new conversation thread.
  */
-aiRouter.post('/conversations', async (req: Request, res: Response): Promise<void> => {
+aiRouter.post('/conversations', asyncHandler(async (req: Request, res: Response): Promise<void> => {
   if (!req.user) { res.status(401).json({ error: 'Authentication required' }); return; }
   const { title } = req.body;
   if (!title || typeof title !== 'string' || title.trim().length === 0 || title.trim().length > 200) {
@@ -175,13 +176,13 @@ aiRouter.post('/conversations', async (req: Request, res: Response): Promise<voi
   }
   const thread = await conversationMemoryService.createThread(req.user.sub, req.user.schoolId, title.trim());
   res.status(201).json({ thread });
-});
+}));
 
 /**
  * DELETE /api/v1/ai/conversations/:threadId
  * Delete a thread and all its records.
  */
-aiRouter.delete('/conversations/:threadId', async (req: Request, res: Response): Promise<void> => {
+aiRouter.delete('/conversations/:threadId', asyncHandler(async (req: Request, res: Response): Promise<void> => {
   if (!req.user) { res.status(401).json({ error: 'Authentication required' }); return; }
   const threadId = req.params.threadId as string;
   try {
@@ -194,17 +195,17 @@ aiRouter.delete('/conversations/:threadId', async (req: Request, res: Response):
     }
     throw err;
   }
-});
+}));
 
 /**
  * DELETE /api/v1/ai/conversations
  * Delete all conversation data for the authenticated user.
  */
-aiRouter.delete('/conversations', async (req: Request, res: Response): Promise<void> => {
+aiRouter.delete('/conversations', asyncHandler(async (req: Request, res: Response): Promise<void> => {
   if (!req.user) { res.status(401).json({ error: 'Authentication required' }); return; }
   await conversationMemoryService.deleteAllUserData(req.user.sub, req.user.schoolId);
   res.json({ message: 'All conversation data deleted' });
-});
+}));
 
 // ─── AI Query Endpoints ───────────────────────────────────────────────────────
 
@@ -213,7 +214,7 @@ aiRouter.delete('/conversations', async (req: Request, res: Response): Promise<v
  * - Authenticated users: full access to all AI features
  * - Unauthenticated users: can ask general knowledge + about SAMS, but NOT school data
  */
-aiRouter.post('/query', async (req: Request, res: Response): Promise<void> => {
+aiRouter.post('/query', asyncHandler(async (req: Request, res: Response): Promise<void> => {
   try {
     const { question, threadId, confirmAction, pendingAction } = req.body;
 
@@ -316,36 +317,40 @@ aiRouter.post('/query', async (req: Request, res: Response): Promise<void> => {
     if (err instanceof AppError) throw err;
     throw new AppError(500, 'INTERNAL_ERROR', 'Failed to process AI query');
   }
-});
+}));
 
 /**
  * POST /api/v1/ai/voice
  * Process a voice transcription query.
  */
-aiRouter.post('/voice', async (req: Request, res: Response): Promise<void> => {
+aiRouter.post('/voice', asyncHandler(async (req: Request, res: Response): Promise<void> => {
+  const { transcription, question } = req.body;
+  const text = transcription || question;
+
+  if (!text || typeof text !== 'string' || !text.trim()) {
+    throw new AppError(400, 'VALIDATION_ERROR', 'A non-empty transcription or question is required.');
+  }
+
+  const user = req.user || {
+    sub: 'guest',
+    schoolId: 'guest',
+    role: 'STUDENT' as any,
+    iat: 0,
+    exp: 0,
+  };
+
   try {
-    const { transcription, question } = req.body;
-    const text = transcription || question;
-
-    if (!text || typeof text !== 'string' || !text.trim()) {
-      throw new AppError(400, 'VALIDATION_ERROR', 'A non-empty transcription or question is required.');
-    }
-
-    const user = req.user || {
-      sub: 'guest',
-      schoolId: 'guest',
-      role: 'STUDENT' as any,
-      iat: 0,
-      exp: 0,
-    };
-
     const result = await aiService.voiceQuery(user, text.trim());
     res.status(200).json(result);
-  } catch (err) {
-    if (err instanceof AppError) throw err;
-    throw new AppError(500, 'INTERNAL_ERROR', 'Failed to process voice query');
+  } catch (voiceErr) {
+    console.error('[AI] Voice query error:', (voiceErr as Error).message);
+    res.status(200).json({
+      answer: formatProviderError(voiceErr),
+      intent: 'ai_error',
+      engine: 'openai',
+    });
   }
-});
+}));
 
 // ─── Image Vision Endpoint ────────────────────────────────────────────────────
 
@@ -353,7 +358,7 @@ aiRouter.post('/voice', async (req: Request, res: Response): Promise<void> => {
  * POST /api/v1/ai/query-with-image
  * Accepts up to 4 image uploads + question, sends to vision model for analysis.
  */
-aiRouter.post('/query-with-image', aiUploadMiddleware(aiUpload, 'images', 4), async (req: Request, res: Response): Promise<void> => {
+aiRouter.post('/query-with-image', aiUploadMiddleware(aiUpload, 'images', 4), asyncHandler(async (req: Request, res: Response): Promise<void> => {
   try {
     const files = (req as any).files as Express.Multer.File[];
     if (!files || files.length === 0) {
@@ -408,7 +413,7 @@ aiRouter.post('/query-with-image', aiUploadMiddleware(aiUpload, 'images', 4), as
       engine: 'openai',
     });
   }
-});
+}));
 
 // ─── Image Generation Endpoint ────────────────────────────────────────────────
 
@@ -416,7 +421,7 @@ aiRouter.post('/query-with-image', aiUploadMiddleware(aiUpload, 'images', 4), as
  * POST /api/v1/ai/generate-image
  * Generates an image from a text prompt using Pollinations AI (free).
  */
-aiRouter.post('/generate-image', async (req: Request, res: Response): Promise<void> => {
+aiRouter.post('/generate-image', asyncHandler(async (req: Request, res: Response): Promise<void> => {
   try {
     const { prompt } = req.body;
     if (!prompt || typeof prompt !== 'string' || !prompt.trim()) {
@@ -436,4 +441,4 @@ aiRouter.post('/generate-image', async (req: Request, res: Response): Promise<vo
     if (err instanceof AppError) throw err;
     throw new AppError(500, 'INTERNAL_ERROR', 'Failed to generate image');
   }
-});
+}));

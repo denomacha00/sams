@@ -358,6 +358,51 @@ bash scripts/restart-api.sh
 
 ## 13. Deploy (full)
 
+### Safe updates while live
+
+Use this sequence when schools are actively using SAMS. The deploy script **builds and verifies before touching PM2**, so a failed build leaves the old API running.
+
+```bash
+cd /var/www/sams
+
+# 1. Backup env + database (and uploads if you want)
+bash scripts/backup-production.sh --with-uploads
+
+# 2. Optional manual gate (same checks deploy runs before PM2 restart)
+bash scripts/pre-deploy-check.sh --skip-tsc
+
+# 3. Full deploy (git reset → npm ci → build → migrate → PM2 → nginx → verify)
+bash scripts/deploy-production.sh
+```
+
+**What deploy does (fail-safe order):**
+
+1. Backs up `.env` / secrets (never overwritten by git)
+2. `git reset --hard origin/main`
+3. `npm ci` + build all packages — **exits here if build fails; PM2 unchanged**
+4. `prisma migrate deploy`
+5. `pre-deploy-check.sh` (nginx `-t`, SSL, REDIS_URL, dist, JWT)
+6. PM2 delete + start (only after build OK)
+7. Remove nginx `sites-enabled/*.bak`, then `nginx -t` before reload
+8. `post-deploy-verify.sh` (health, dist, PM2 online)
+
+**Rollback if something looks wrong after deploy:**
+
+```bash
+cd /var/www/sams
+git log --oneline -5                    # find previous commit
+git reset --hard <previous-commit-sha>  # or: git reset --hard origin/main~1
+npm ci && npm run build -w @sams/shared && npm run build -w @sams/backend \
+  && npm run build -w @sams/frontend && npm run build -w @sams/super-admin
+bash scripts/restart-api.sh
+```
+
+**Quick API-only restart (no git/build):**
+
+```bash
+cd /var/www/sams && bash scripts/restart-api.sh
+```
+
 **Before deploy:**
 
 ```bash
@@ -484,6 +529,7 @@ cd /var/www/sams && git pull origin main
 | SMS failed | §9 |
 | School suspended | §11 |
 | Deploy failed | §13 |
+| Safe live update | §13 |
 | Need backup | §14 |
 
 ---

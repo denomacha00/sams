@@ -138,6 +138,11 @@ async function shutdown(signal: string): Promise<void> {
 process.on('SIGTERM', () => void shutdown('SIGTERM'));
 process.on('SIGINT', () => void shutdown('SIGINT'));
 
+// Keep PM2 alive on stray async errors — route handlers should use asyncHandler + errorHandler.
+process.on('unhandledRejection', (reason) => {
+  console.error('[SAMS] Unhandled promise rejection (process kept alive):', reason);
+});
+
 export { app, httpServer as server, prisma, redis };
 export { getIo as io } from './registerApplication';
 

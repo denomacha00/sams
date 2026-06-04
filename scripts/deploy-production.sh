@@ -155,6 +155,9 @@ if is_weak_production_secret "$JWT_VAL"; then
   exit 1
 fi
 
+echo "==> Pre-deploy gate (nginx, env, dist — sams-api still running until checks pass)"
+bash "$ROOT/scripts/pre-deploy-check.sh" --skip-tsc
+
 echo "==> Restarting services"
 mkdir -p /var/log/sams
 # Provider secrets: secrets/providers.env or packages/backend/.env.secrets (gitignored).
@@ -162,6 +165,7 @@ mkdir -p /var/log/sams
 mkdir -p "$ROOT/secrets"
 chmod 700 "$ROOT/secrets" 2>/dev/null || true
 # delete + start applies ecosystem changes (instances, exec_mode); reload keeps old cluster layout
+# Build and verify_backend_dist above must succeed first — old PM2 keeps serving until here.
 pm2 delete sams-api 2>/dev/null || true
 source_merged_env
 pm2 start ecosystem.config.js --env production --update-env
