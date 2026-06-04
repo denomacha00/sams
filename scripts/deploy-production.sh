@@ -166,6 +166,16 @@ pm2 delete sams-api 2>/dev/null || true
 source_merged_env
 pm2 start ecosystem.config.js --env production --update-env
 pm2 save
+
+# nginx includes every file in sites-enabled; leftover *.bak copies duplicate
+# limit_req_zone / upstream blocks and make `nginx -t` fail.
+echo "==> Nginx"
+if [[ -d /etc/nginx/sites-enabled ]]; then
+  while IFS= read -r -d '' bak; do
+    echo "    Removing stale sites-enabled backup: $bak"
+    sudo rm -f "$bak"
+  done < <(sudo find /etc/nginx/sites-enabled -maxdepth 1 -name '*.bak' -type f -print0 2>/dev/null || true)
+fi
 sudo nginx -t
 sudo systemctl reload nginx
 
