@@ -64,3 +64,8 @@ Thumbs.db
 
 # Editor
 .vscode/
+
+# Expo mobile
+packages/mobile/.expo/
+packages/mobile/android/
+packages/mobile/ios/

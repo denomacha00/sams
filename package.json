@@ -6,7 +6,8 @@
     "packages/shared",
     "packages/backend",
     "packages/frontend",
-    "packages/super-admin"
+    "packages/super-admin",
+    "packages/mobile"
   ],
   "scripts": {
     "build": "turbo run build",

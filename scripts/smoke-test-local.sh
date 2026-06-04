@@ -88,6 +88,26 @@ else
   fail "POST /api/v1/auth/forgot-password (HTTP ${FP_LINK_CODE})"
 fi
 
+# Forgot-password with valid-shaped body — expect 404/503/200, never opaque 500 (SMTP off → EMAIL_NOT_CONFIGURED)
+FP_BODY_CODE="$(curl -sS -o /tmp/sams-fp-body.json -w '%{http_code}' --max-time 10 \
+  -X POST "${API}/api/v1/auth/forgot-password" \
+  -H 'Content-Type: application/json' \
+  -d '{"schoolCode":"ZZZNOSCHOOL","identifier":"nobody@example.com"}' 2>/dev/null || echo 000)"
+if [[ "$FP_BODY_CODE" == "500" ]]; then
+  fail "POST /api/v1/auth/forgot-password returned HTTP 500"
+elif [[ "$FP_BODY_CODE" != "000" ]]; then
+  pass "POST /api/v1/auth/forgot-password structured (HTTP ${FP_BODY_CODE})"
+  if [[ "$FP_BODY_CODE" == "503" ]]; then
+    node -e "
+      const j=JSON.parse(require('fs').readFileSync('/tmp/sams-fp-body.json','utf8'));
+      if (j.code === 'EMAIL_NOT_CONFIGURED') console.log('       code: EMAIL_NOT_CONFIGURED (SMTP off — expected)');
+    " 2>/dev/null || true
+  fi
+else
+  fail "POST /api/v1/auth/forgot-password unreachable"
+fi
+rm -f /tmp/sams-fp-body.json
+
 # Optional authenticated smoke
 if [[ -n "${VERIFY_LOGIN_IDENTIFIER:-}" && -n "${VERIFY_LOGIN_PASSWORD:-}" ]]; then
   LOGIN_CODE="$(curl -sS -o /tmp/sams-local-login.json -w '%{http_code}' --max-time 15 \

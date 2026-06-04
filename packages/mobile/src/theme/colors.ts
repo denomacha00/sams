@@ -1,0 +1,20 @@
+/** Matches web app: slate backgrounds, indigo primary, emerald for attendance. */
+export const colors = {
+  slate950: '#020617',
+  slate900: '#0f172a',
+  slate800: '#1e293b',
+  slate700: '#334155',
+  slate500: '#64748b',
+  slate400: '#94a3b8',
+  slate300: '#cbd5e1',
+  indigo600: '#4f46e5',
+  indigo500: '#6366f1',
+  indigo400: '#818cf8',
+  emerald600: '#059669',
+  emerald500: '#10b981',
+  emerald400: '#34d399',
+  emerald200: '#a7f3d0',
+  red400: '#f87171',
+  orange400: '#fb923c',
+  white: '#ffffff',
+} as const;

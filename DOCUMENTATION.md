@@ -81,11 +81,19 @@ sams/
 │   ├── shared/          # Shared types, enums, utilities
 │   ├── backend/         # Express API server
 │   ├── frontend/        # React SPA (main app)
-│   └── super-admin/     # React SPA (super admin panel)
+│   ├── super-admin/     # React SPA (super admin panel)
+│   └── mobile/          # Expo React Native app (optional deploy)
 ├── nginx/               # NGINX configuration
 ├── ecosystem.config.js  # PM2 process manager config
 └── .github/workflows/   # CI/CD pipeline
 ```
+
+### Mobile app (separate from web deploy)
+
+Native client **`packages/mobile`** (display name **SAMS**) uses the same `/api/v1` JWT API. It is **not** built or deployed by `scripts/deploy-production.sh` — web and API stay online while mobile is developed or released via Expo/EAS.
+
+- Architecture and roadmap: **`docs/MOBILE-APP.md`**
+- Run locally: **`packages/mobile/README.md`** (`npx expo start`, `EXPO_PUBLIC_API_URL`)
 
 ---
 
@@ -94,6 +102,7 @@ sams/
 | Layer | Technology |
 |-------|-----------|
 | Frontend | React 18, TypeScript, Vite, TailwindCSS, Zustand |
+| Mobile | Expo SDK 52+, React Native, TypeScript, expo-secure-store |
 | Backend | Node.js, Express, TypeScript, Socket.io |
 | Database | PostgreSQL with Prisma ORM |
 | Cache | Redis (rate limiting, session events) |
@@ -571,6 +580,8 @@ Ensure the same shell user that runs `pm2` uses Node 20 (`which node` → `/usr/
 | `scripts/deploy-production.sh` | Pull main, `npm ci`, build all packages, migrate, PM2 reload |
 | `scripts/post-deploy-verify.sh` | Dist artifacts, PM2, `/health` (incl. AI/SMS block), optional AI/login smoke |
 | `scripts/smoke-test-local.sh` | Local dev curl smoke (`/health`, auth + timetable when creds set) |
+| `scripts/check-conversation-keys.sh` | Optional: `CONVERSATION_MASTER_KEY` + `_PREVIOUS` for AI thread decrypt |
+| `docs/MOBILE-APP.md` | Mobile architecture, zero-downtime web, phased roadmap |
 | `scripts/smoke-production.sh` | Lightweight curl smoke on VPS |
 | `scripts/smoke-role-checks.md` | Curl examples + manual checks by role |
 | `scripts/go-live.sh` | Backup secrets, pull main, build, migrate, readiness gate, restart, verify |

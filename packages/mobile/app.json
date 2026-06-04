@@ -1,0 +1,42 @@
+{
+  "expo": {
+    "name": "SAMS",
+    "slug": "sams",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "scheme": "sams",
+    "userInterfaceStyle": "dark",
+    "newArchEnabled": true,
+    "splash": {
+      "resizeMode": "contain",
+      "backgroundColor": "#020617"
+    },
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.smartmanagement.sams"
+    },
+    "android": {
+      "package": "com.smartmanagement.sams",
+      "adaptiveIcon": {
+        "backgroundColor": "#4F46E5"
+      }
+    },
+    "plugins": [
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Allow SAMS to scan attendance QR codes."
+        }
+      ],
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "Allow SAMS to record your location when marking attendance."
+        }
+      ]
+    ],
+    "extra": {
+      "apiUrl": "https://app.smart-managment.com/api/v1"
+    }
+  }
+}
