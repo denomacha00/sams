@@ -2,6 +2,7 @@ import React, { useState, useCallback, useEffect } from 'react';
 import { useNavigate, Link, useSearchParams } from 'react-router-dom';
 import { useAuthStore } from '../store/authStore';
 import apiClient from '../services/apiClient';
+import { clearAuthState } from '../lib/clearAuthState';
 import { UserRole } from '@sams/shared';
 import { redirectToSuperAdminPortal } from '../utils/superAdminPortal';
 
@@ -14,6 +15,13 @@ const LoginPage: React.FC = () => {
   const { login, verifyLoginOtp, loading, error, clearError, isAuthenticated } = useAuthStore();
   const [searchParams] = useSearchParams();
   const redirectTo = searchParams.get('redirect');
+  const authReason = searchParams.get('reason');
+  const authNotice =
+    authReason === 'school_suspended'
+      ? 'Your school was suspended. If access has been restored, please sign in again.'
+      : authReason === 'session_expired'
+        ? 'Your session ended (for example after a suspension). Please sign in again.'
+        : null;
   const [otpStep, setOtpStep] = useState(false);
   const [otpChallenge, setOtpChallenge] = useState('');
   const [otpCode, setOtpCode] = useState('');
@@ -49,10 +57,23 @@ const LoginPage: React.FC = () => {
   );
 
   useEffect(() => {
-    if (isAuthenticated) {
-      const user = useAuthStore.getState().user;
-      if (user) navigateAfterAuth(user.role);
-    }
+    if (!isAuthenticated) return;
+
+    let cancelled = false;
+    (async () => {
+      try {
+        await apiClient.get('/users/me');
+        if (cancelled) return;
+        const user = useAuthStore.getState().user;
+        if (user) navigateAfterAuth(user.role);
+      } catch {
+        if (!cancelled) clearAuthState();
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
   }, [isAuthenticated, navigateAfterAuth]);
 
   // Check if WebAuthn is available in this browser
@@ -223,6 +244,12 @@ const LoginPage: React.FC = () => {
                 ? `Code sent${otpDelivery?.email ? ` to ${otpDelivery.email}` : ''}${otpDelivery?.phone ? ` to ${otpDelivery.phone}` : ''}`
                 : 'Sign in to your school account'}
             </p>
+
+            {authNotice && (
+              <div className="mb-6 p-3 rounded-xl bg-amber-500/20 border border-amber-400/30">
+                <p className="text-sm text-center font-medium text-amber-200">{authNotice}</p>
+              </div>
+            )}
 
             {error && (
               <div className={`mb-6 p-3 rounded-xl ${

@@ -1,5 +1,6 @@
 import axios, { AxiosError, InternalAxiosRequestConfig } from 'axios';
 import { readAccessToken, readRefreshToken, writeTokens } from '../lib/authTokens';
+import { forceAuthRedirect } from '../lib/clearAuthState';
 
 const apiClient = axios.create({
   baseURL: import.meta.env.VITE_API_BASE_URL || '/api/v1',
@@ -51,8 +52,7 @@ apiClient.interceptors.response.use(
     const responseCode = (error.response?.data as { code?: string } | undefined)?.code;
 
     if (error.response?.status === 403 && responseCode === 'SCHOOL_SUSPENDED') {
-      localStorage.removeItem('auth-storage');
-      window.location.href = '/login';
+      forceAuthRedirect('school_suspended');
       return Promise.reject(error);
     }
 
@@ -96,9 +96,10 @@ apiClient.interceptors.response.use(
         return apiClient(originalRequest);
       } catch (refreshError) {
         processQueue(refreshError, null);
-        // Clear auth state on refresh failure
-        localStorage.removeItem('auth-storage');
-        window.location.href = '/login';
+        const refreshCode = (refreshError as AxiosError).response?.data as { code?: string } | undefined;
+        forceAuthRedirect(
+          refreshCode?.code === 'SCHOOL_SUSPENDED' ? 'school_suspended' : 'session_expired',
+        );
         return Promise.reject(refreshError);
       } finally {
         isRefreshing = false;

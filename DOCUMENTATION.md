@@ -440,8 +440,8 @@ Never run only `git pull` on the server without a build — that is what causes 
 - `POST /api/v1/super/licenses/:id/revoke` — Revoke a license
 - `GET /api/v1/super/schools` — List all schools
 - `GET /api/v1/super/schools/:id` — Get school details
-- `POST /api/v1/super/schools/:id/suspend` — Suspend school
-- `POST /api/v1/super/schools/:id/unsuspend` — Unsuspend school
+- `POST /api/v1/super/schools/:id/suspend` — Suspend school (revokes all refresh tokens for that school)
+- `POST /api/v1/super/schools/:id/unsuspend` — Unsuspend school (users must sign in again; old refresh tokens are not restored)
 - `POST /api/v1/super/schools/:id/extend` — Extend license
 - `DELETE /api/v1/super/schools/:id` — Delete school and all data
 - `GET /api/v1/super/analytics` — System stats

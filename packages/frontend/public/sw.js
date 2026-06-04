@@ -1,5 +1,4 @@
-const STATIC_CACHE = 'sams-static-v3';
-const API_CACHE = 'sams-api-v2';
+const STATIC_CACHE = 'sams-static-v4';
 const OFFLINE_QUEUE_STORE = 'offline-request-queue';
 
 const STATIC_ASSETS = [
@@ -107,7 +106,7 @@ self.addEventListener('activate', (event) => {
     caches.keys().then((keys) =>
       Promise.all(
         keys
-          .filter((key) => key !== STATIC_CACHE && key !== API_CACHE)
+          .filter((key) => key !== STATIC_CACHE)
           .map((key) => caches.delete(key))
       )
     )
@@ -132,7 +131,7 @@ self.addEventListener('fetch', (event) => {
 
   // API requests: network-first with cache fallback
   if (url.pathname.startsWith('/api/')) {
-    event.respondWith(networkFirst(request));
+    event.respondWith(networkFirstApi(request));
     return;
   }
 
@@ -210,19 +209,25 @@ async function networkFirstPage(request) {
   }
 }
 
-// ─── Network-first strategy (API GET requests) ──────────────────────────────
+// ─── Network-first (uploads and other non-API assets) ───────────────────────
 
 async function networkFirst(request) {
   try {
     const response = await fetch(request);
-    if (response.ok) {
-      const cache = await caches.open(API_CACHE);
-      cache.put(request, response.clone());
-    }
     return response;
   } catch {
     const cached = await caches.match(request);
     if (cached) return cached;
+    return new Response('Offline', { status: 503 });
+  }
+}
+
+// ─── API GET: network only (never cache auth/session responses) ─────────────
+
+async function networkFirstApi(request) {
+  try {
+    return await fetch(request);
+  } catch {
     return new Response(JSON.stringify({ error: 'Offline' }), {
       status: 503,
       headers: { 'Content-Type': 'application/json' },

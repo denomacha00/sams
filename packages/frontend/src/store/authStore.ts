@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import apiClient from '../services/apiClient';
+import { clearSuspendedSessionFlags } from '../lib/clearAuthState';
 import { UserRole } from '@sams/shared';
 
 export interface AuthUser {
@@ -47,6 +48,7 @@ export const useAuthStore = create<AuthState>()(
       loading: false,
 
       setAuth: (user: AuthUser, accessToken: string, refreshToken: string) => {
+        clearSuspendedSessionFlags();
         set({
           user,
           accessToken,
@@ -131,6 +133,7 @@ export const useAuthStore = create<AuthState>()(
           classId: tokenPayload.classId,
         };
 
+        clearSuspendedSessionFlags();
         set({
           user: partialUser,
           accessToken: data.accessToken,
