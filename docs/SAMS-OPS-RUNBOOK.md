@@ -13,6 +13,17 @@
 
 Use this when something breaks: **symptom → where to check → commands → fix**.
 
+
+---
+
+## VPS one-shot scripts
+
+For repeatable deploy and smoke tests after `git pull`, use the scripts in [VPS-SCRIPTS.md](./VPS-SCRIPTS.md):
+
+```bash
+cd /var/www/sams && git pull origin main && bash scripts/vps-import-bundle.sh
+```
+
 ---
 
 ## 1. First response (any outage)
