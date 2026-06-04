@@ -1,4 +1,5 @@
 import type { ActionDefinition, ActionHandler } from '../roleActionRegistry';
+import { HOD_DEPARTMENT_UNLINKED_MESSAGE } from '../../../lib/hodScope';
 import { listSchoolAdminHandler } from '../../../lib/schoolAdminLookup';
 import { fetchDepartmentStats, formatDepartmentStatsAnswer } from '../departmentStatsQuery';
 import { extractMessageBody, parseNotificationTargetRole } from '../notificationActionParams';
@@ -14,7 +15,7 @@ const addTeacherHandler: ActionHandler = async (params, scope) => {
   if (!teacherName) return { answer: 'Please provide the teacher name.' };
 
   if (!scope.departmentId) {
-    return { answer: 'Your account is not associated with a department.' };
+    return { answer: HOD_DEPARTMENT_UNLINKED_MESSAGE };
   }
 
   const teacher = await prisma.user.findFirst({
@@ -52,7 +53,7 @@ const sendClassNotificationHandler: ActionHandler = async (params, scope) => {
   }
 
   if (!scope.departmentId) {
-    return { answer: 'Your account is not associated with a department.' };
+    return { answer: HOD_DEPARTMENT_UNLINKED_MESSAGE };
   }
 
   let classId = params.classId as string | undefined;
@@ -127,7 +128,7 @@ const sendDepartmentNotificationHandler: ActionHandler = async (params, scope) =
   }
 
   if (!scope.departmentId) {
-    return { answer: 'Your account is not associated with a department.' };
+    return { answer: HOD_DEPARTMENT_UNLINKED_MESSAGE };
   }
 
   const targetRole = (params.targetRole as 'TEACHER' | 'STUDENT' | undefined) ?? undefined;
@@ -170,7 +171,7 @@ const sendDepartmentNotificationHandler: ActionHandler = async (params, scope) =
 
 const viewDepartmentStatsHandler: ActionHandler = async (_params, scope) => {
   if (!scope.departmentId) {
-    return { answer: 'Your account is not associated with a department.' };
+    return { answer: HOD_DEPARTMENT_UNLINKED_MESSAGE };
   }
 
   const stats = await fetchDepartmentStats(scope.schoolId, scope.departmentId);

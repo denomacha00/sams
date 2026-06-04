@@ -82,7 +82,7 @@ describe('AIService multi-turn notification flow', () => {
     vi.clearAllMocks();
   });
 
-  it('turn 1: bare post notification asks scope', async () => {
+  it('turn 1: bare post notification asks message (department auto-scoped)', async () => {
     vi.mocked(actionIntentDetector.detect).mockResolvedValue({
       isAction: true,
       action: 'send_department_notification',
@@ -93,24 +93,10 @@ describe('AIService multi-turn notification flow', () => {
 
     const r = await service.query(hodUser as any, 'post a notification');
     expect(r.intent).toBe('action_slot_fill');
-    expect(r.pendingAction?.awaitingSlot).toBe('notifyScope');
-    expect(r.answer).toMatch(/department/i);
-  });
-
-  it('turn 2: scope answer asks message', async () => {
-    const r = await service.query(hodUser as any, 'department', {
-      pendingAction: {
-        action: 'send_department_notification',
-        params: {},
-        description: 'Notify',
-        awaitingSlot: 'notifyScope',
-      },
-    });
-    expect(r.intent).toBe('action_slot_fill');
     expect(r.pendingAction?.awaitingSlot).toBe('message');
   });
 
-  it('turn 3: message triggers confirmation', async () => {
+  it('turn 2: message triggers confirmation', async () => {
     const r = await service.query(hodUser as any, 'Staff meeting at 3pm', {
       pendingAction: {
         action: 'send_department_notification',
@@ -124,7 +110,7 @@ describe('AIService multi-turn notification flow', () => {
     expect(r.pendingAction?.params.message).toBe('Staff meeting at 3pm');
   });
 
-  it('turn 4: confirm executes sendScopedNotification', async () => {
+  it('turn 3: confirm executes sendScopedNotification', async () => {
     const r = await service.query(hodUser as any, 'yes', {
       confirmAction: true,
       pendingAction: {

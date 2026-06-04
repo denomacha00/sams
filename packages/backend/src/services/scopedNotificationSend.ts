@@ -1,5 +1,9 @@
 import { createId } from '@paralleldrive/cuid2';
 import { UserRole, type AccessTokenPayload } from '@sams/shared';
+import {
+  HOD_DEPARTMENT_UNLINKED_MESSAGE,
+  resolveHodDepartmentId,
+} from '../lib/hodScope';
 import { prisma } from '../lib/prisma';
 import { getSocketIO } from '../lib/socket';
 import { resolveTeacherClassId } from '../lib/teacherScope';
@@ -48,6 +52,13 @@ export async function sendScopedNotification(
     throw new ScopedNotificationError(403, 'FORBIDDEN', 'You do not have permission to send notifications');
   }
 
+  const hodDepartmentId =
+    sender.role === UserRole.HOD ? await resolveHodDepartmentId(sender) : sender.departmentId;
+  const effectiveSender =
+    sender.role === UserRole.HOD
+      ? { ...sender, departmentId: hodDepartmentId }
+      : sender;
+
   let { scope, targetId, targetRole, message, channels } = input;
   const title = input.title?.trim() || 'New Message';
   const batchId = createId();
@@ -60,12 +71,21 @@ export async function sendScopedNotification(
   }
 
   const teacherClassId =
-    sender.role === UserRole.TEACHER
-      ? await resolveTeacherClassId(sender.sub, sender.classId)
+    effectiveSender.role === UserRole.TEACHER
+      ? await resolveTeacherClassId(effectiveSender.sub, effectiveSender.classId)
       : null;
 
-  if (sender.role === UserRole.TEACHER && scope === 'class' && !targetId && teacherClassId) {
+  if (effectiveSender.role === UserRole.TEACHER && scope === 'class' && !targetId && teacherClassId) {
     targetId = teacherClassId;
+  }
+
+  if (effectiveSender.role === UserRole.HOD) {
+    if (!hodDepartmentId) {
+      throw new ScopedNotificationError(403, 'FORBIDDEN', HOD_DEPARTMENT_UNLINKED_MESSAGE);
+    }
+    if (scope === 'department' && !targetId) {
+      targetId = hodDepartmentId;
+    }
   }
 
   const userFilter: {
@@ -73,7 +93,7 @@ export async function sendScopedNotification(
     departmentId?: string;
     classId?: string;
     role?: UserRole;
-  } = { schoolId: sender.schoolId };
+  } = { schoolId: effectiveSender.schoolId };
 
   if (scope === 'department') {
     if (!targetId) {
@@ -91,7 +111,7 @@ export async function sendScopedNotification(
     userFilter.role = targetRole as UserRole;
   }
 
-  if (sender.role === UserRole.HOD) {
+  if (effectiveSender.role === UserRole.HOD) {
     if (scope === 'school') {
       throw new ScopedNotificationError(
         403,
@@ -99,7 +119,7 @@ export async function sendScopedNotification(
         'HODs can only send to their department or classes within it',
       );
     }
-    if (scope === 'department' && targetId !== sender.departmentId) {
+    if (scope === 'department' && targetId !== hodDepartmentId) {
       throw new ScopedNotificationError(403, 'FORBIDDEN', 'HODs can only send to their own department');
     }
     if (scope === 'class' && targetId) {
@@ -107,7 +127,7 @@ export async function sendScopedNotification(
         where: { id: targetId },
         select: { departmentId: true },
       });
-      if (!classRecord || classRecord.departmentId !== sender.departmentId) {
+      if (!classRecord || classRecord.departmentId !== hodDepartmentId) {
         throw new ScopedNotificationError(
           403,
           'FORBIDDEN',
@@ -115,7 +135,7 @@ export async function sendScopedNotification(
         );
       }
     }
-  } else if (sender.role === UserRole.TEACHER) {
+  } else if (effectiveSender.role === UserRole.TEACHER) {
     if (scope !== 'class') {
       throw new ScopedNotificationError(403, 'FORBIDDEN', 'Teachers can only send to their class');
     }
@@ -161,9 +181,9 @@ export async function sendScopedNotification(
 
   if (channels.includes('inapp')) {
     const rows = targetUsers.map((u) => ({
-      schoolId: sender.schoolId,
+      schoolId: effectiveSender.schoolId,
       userId: u.id,
-      senderId: sender.sub,
+      senderId: effectiveSender.sub,
       batchId,
       title,
       message: message.trim(),
@@ -183,7 +203,7 @@ export async function sendScopedNotification(
     title,
     message: message.trim(),
     type: 'MESSAGE' as const,
-    senderId: sender.sub,
+    senderId: effectiveSender.sub,
     batchId,
     timestamp: new Date().toISOString(),
   };
@@ -195,7 +215,7 @@ export async function sendScopedNotification(
         for (const u of targetUsers) {
           io.to(`user:${u.id}`).emit('notification:new', payload);
         }
-        io.to(`school:${sender.schoolId}`).emit('notification:new', payload);
+        io.to(`school:${effectiveSender.schoolId}`).emit('notification:new', payload);
       }
       if (channels.includes('sms')) {
         void import('./notificationService').then(({ notificationService }) => {

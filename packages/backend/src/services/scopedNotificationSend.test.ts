@@ -17,6 +17,11 @@ vi.mock('../lib/socket', () => ({
 vi.mock('../lib/teacherScope', () => ({
   resolveTeacherClassId: resolveTeacherClassIdMock,
 }));
+vi.mock('../lib/hodScope', () => ({
+  resolveHodDepartmentId: vi.fn(async (user: { departmentId?: string }) => user.departmentId),
+  HOD_DEPARTMENT_UNLINKED_MESSAGE:
+    'Your account is not linked to a department — contact school admin.',
+}));
 
 import {
   ScopedNotificationError,
@@ -99,6 +104,37 @@ describe('scopedNotificationSend RBAC', () => {
         { scope: 'school', message: 'hi', channels: ['inapp'] },
       ),
     ).rejects.toMatchObject({ message: expect.stringContaining('department') });
+  });
+
+  it('auto-fills HOD department targetId when omitted', async () => {
+    const result = await sendScopedNotification(
+      {
+        sub: 'h1',
+        role: UserRole.HOD,
+        schoolId: 'school-1',
+        departmentId: 'dept-1',
+      },
+      {
+        scope: 'department',
+        message: 'Dept notice',
+        channels: ['inapp'],
+      },
+    );
+    expect(result.success).toBe(true);
+    expect(prismaMock.user.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({ departmentId: 'dept-1' }),
+      }),
+    );
+  });
+
+  it('rejects HOD without linked department', async () => {
+    await expect(
+      sendScopedNotification(
+        { sub: 'h1', role: UserRole.HOD, schoolId: 'school-1' },
+        { scope: 'department', message: 'hi', channels: ['inapp'] },
+      ),
+    ).rejects.toMatchObject({ message: expect.stringContaining('not linked to a department') });
   });
 
   it('allows HOD department scope for own department', async () => {

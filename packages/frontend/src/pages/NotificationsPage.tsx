@@ -127,6 +127,8 @@ const NotificationsPage: React.FC = () => {
   const [departments, setDepartments] = useState<Department[]>([]);
   const [classes, setClasses] = useState<{ id: string; name: string }[]>([]);
   const [selectedDepartmentId, setSelectedDepartmentId] = useState('');
+  const [hodDepartmentName, setHodDepartmentName] = useState<string | null>(null);
+  const [hodScopeError, setHodScopeError] = useState<string | null>(null);
 
   // Fetch notifications on mount; refresh classId for teachers (JWT may be stale)
   useEffect(() => {
@@ -143,6 +145,19 @@ const NotificationsPage: React.FC = () => {
           setTargetRole('STUDENT');
         }
       }).catch(() => {});
+    } else if (user?.role === 'HOD') {
+      apiClient.get('/users/me').then(({ data }) => {
+        if (data.departmentId) {
+          updateUser({ departmentId: data.departmentId });
+          setTargetId(data.departmentId);
+          setHodScopeError(null);
+        } else {
+          setHodScopeError(
+            'Your account is not linked to a department — contact school admin.',
+          );
+        }
+        if (data.departmentName) setHodDepartmentName(data.departmentName);
+      }).catch(() => {});
     }
   }, []);
 
@@ -156,6 +171,14 @@ const NotificationsPage: React.FC = () => {
       }
     }
   }, [user?.role, user?.classId]);
+
+  // HOD: always use JWT/profile department for department-scoped sends (never pick another dept)
+  useEffect(() => {
+    if (user?.role !== 'HOD') return;
+    if (scope === 'department' && user.departmentId) {
+      setTargetId(user.departmentId);
+    }
+  }, [user?.role, user?.departmentId, scope]);
 
   // Real-time socket listener
   useEffect(() => {
@@ -266,11 +289,22 @@ const NotificationsPage: React.FC = () => {
         return;
       }
 
+      const effectiveTargetId =
+        user?.role === 'HOD' && scope === 'department'
+          ? user.departmentId ?? targetId
+          : targetId;
+
+      if (user?.role === 'HOD' && scope === 'department' && !effectiveTargetId) {
+        setSendError('Your account is not linked to a department — contact school admin.');
+        setSending(false);
+        return;
+      }
+
       const { data } = await apiClient.post(
         '/notifications/send',
         {
           scope,
-          targetId: targetId || undefined,
+          targetId: effectiveTargetId || undefined,
           targetRole: targetRole === 'ALL' ? undefined : targetRole,
           title: title.trim() || undefined,
           message,
@@ -291,8 +325,12 @@ const NotificationsPage: React.FC = () => {
       setSendSuccess(true);
       setMessage('');
       setTitle('');
-      if (user?.role !== 'TEACHER') {
+      if (user?.role === 'HOD' && scope === 'department' && user.departmentId) {
+        setTargetId(user.departmentId);
+      } else if (user?.role !== 'TEACHER') {
         setTargetId('');
+      }
+      if (user?.role !== 'TEACHER') {
         setTargetRole('ALL');
       }
       void fetchNotifications();
@@ -625,11 +663,26 @@ const NotificationsPage: React.FC = () => {
                 <p className="text-sm text-red-300 text-center">{sendError}</p>
               </div>
             )}
+            {isHOD && hodScopeError && (
+              <div className="mb-4 p-3 bg-amber-500/20 border border-amber-400/30 rounded-xl">
+                <p className="text-sm text-amber-200 text-center">{hodScopeError}</p>
+              </div>
+            )}
             <form onSubmit={handleSend} className="space-y-4">
               {/* Scope */}
               <div>
                 <label className="block text-sm font-semibold text-gray-300 mb-1.5">Send to</label>
-                <select value={scope} onChange={(e) => { setScope(e.target.value as Scope); setTargetId(''); setTargetRole('ALL'); setSelectedDepartmentId(''); }}
+                <select value={scope} onChange={(e) => {
+                  const next = e.target.value as Scope;
+                  setScope(next);
+                  setTargetRole('ALL');
+                  setSelectedDepartmentId('');
+                  if (user?.role === 'HOD' && next === 'department' && user.departmentId) {
+                    setTargetId(user.departmentId);
+                  } else {
+                    setTargetId('');
+                  }
+                }}
                   className="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-3 text-white focus:outline-none focus:ring-2 focus:ring-indigo-500/40 transition-all">
                   {getScopeOptions().map((s) => (
                     <option key={s} value={s} className="bg-slate-800">
@@ -654,9 +707,18 @@ const NotificationsPage: React.FC = () => {
               {scope !== 'school' && (
                 <div>
                   <label className="block text-sm font-semibold text-gray-300 mb-1.5">
-                    {scope === 'department' ? 'Department *' : 'Class *'}
+                    {scope === 'department' ? 'Department' : 'Class *'}
                   </label>
-                  {scope === 'department' && (
+                  {scope === 'department' && isHOD && (
+                    <p className="w-full bg-slate-900/80 border border-slate-700 rounded-xl px-4 py-3 text-gray-300">
+                      {hodDepartmentName
+                        ? `Your department: ${hodDepartmentName}`
+                        : user?.departmentId
+                          ? 'Your department (from your account)'
+                          : 'Department not linked to your account'}
+                    </p>
+                  )}
+                  {scope === 'department' && !isHOD && (
                     <select value={targetId} onChange={(e) => setTargetId(e.target.value)}
                       className="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-3 text-white focus:outline-none focus:ring-2 focus:ring-indigo-500/40 transition-all">
                       <option value="" className="bg-slate-800">-- Select Department --</option>
@@ -722,7 +784,13 @@ const NotificationsPage: React.FC = () => {
                 </div>
               </div>
 
-              <button type="submit" disabled={sending || !message.trim() || channels.length === 0 || (scope !== 'school' && !targetId)}
+              <button type="submit" disabled={
+                sending ||
+                !message.trim() ||
+                channels.length === 0 ||
+                (scope !== 'school' && !(isHOD && scope === 'department' ? user?.departmentId : targetId)) ||
+                (isHOD && !!hodScopeError && scope === 'department')
+              }
                 className="w-full bg-indigo-600 text-white font-bold py-3 px-4 rounded-xl hover:bg-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors">
                 {sending ? 'Sending...' : 'Send Notification'}
               </button>

@@ -52,16 +52,16 @@ describe('actionSlotFilling', () => {
     expect(params.className).toBe('Form 2A');
   });
 
-  it('asks notifyScope for bare HOD department notification', async () => {
+  it('asks message only for bare HOD department notification (no department picker)', async () => {
     const slot = await getNextMissingSlot(hodUser as any, 'send_department_notification', {});
-    expect(slot).toBe('notifyScope');
+    expect(slot).toBe('message');
   });
 
-  it('asks message after scope is set for HOD', async () => {
+  it('is ready to confirm when HOD department message is provided', async () => {
     const slot = await getNextMissingSlot(hodUser as any, 'send_department_notification', {
-      notifyScope: 'department',
+      message: 'Staff meeting at 3pm',
     });
-    expect(slot).toBe('message');
+    expect(slot).toBeNull();
   });
 
   it('asks classId when HOD targets a class with multiple classes', async () => {

@@ -33,6 +33,10 @@ import {
   buildPendingFromIntent,
 } from './ai/actionSlotFilling';
 import type { PendingAction } from './ai/aiTypes';
+import {
+  getHodDepartmentBlocker,
+  resolveHodDepartmentId,
+} from '../lib/hodScope';
 
 export type { PendingAction };
 
@@ -372,15 +376,25 @@ export class AIService {
     intent: { action: string; params: Record<string, unknown>; description: string },
   ): Promise<AIServiceResponse> {
     let { action, params } = intent;
-    params = await resolveActionParams(user, action, params);
+    const scopedUser = await this.enrichUserScope(user);
+    params = await resolveActionParams(scopedUser, action, params);
 
-    const missingSlot = await getNextMissingSlot(user, action, params);
+    const hodBlock = getHodDepartmentBlocker(
+      scopedUser,
+      action,
+      params.departmentId as string | undefined,
+    );
+    if (hodBlock) {
+      return { answer: hodBlock, intent: 'action_denied', engine: 'openai' };
+    }
+
+    const missingSlot = await getNextMissingSlot(scopedUser, action, params);
     if (missingSlot) {
-      const question = await buildSlotQuestion(user, action, missingSlot, params);
+      const question = await buildSlotQuestion(scopedUser, action, missingSlot, params);
       const pending = buildPendingFromIntent(
         action,
         params,
-        mergePendingDescription(user.role, action, params),
+        mergePendingDescription(scopedUser.role, action, params),
         missingSlot,
       );
       return {
@@ -392,9 +406,9 @@ export class AIService {
       };
     }
 
-    const needsConfirm = actionRequiresConfirmation(user.role, action);
+    const needsConfirm = actionRequiresConfirmation(scopedUser.role, action);
     if (needsConfirm) {
-      const description = mergePendingDescription(user.role, action, params);
+      const description = mergePendingDescription(scopedUser.role, action, params);
       const confirmAnswer = `⚠️ **Confirm Action**: ${description}\n\nReply **yes** to proceed.`;
       return {
         answer: confirmAnswer,
@@ -405,11 +419,20 @@ export class AIService {
       };
     }
 
-    return this.executeAction(user, {
+    return this.executeAction(scopedUser, {
       action,
       params,
       description: intent.description,
     });
+  }
+
+  /** Merge HOD departmentId from DB when JWT is stale. */
+  private async enrichUserScope(user: AccessTokenPayload): Promise<AccessTokenPayload> {
+    const departmentId = await resolveHodDepartmentId(user);
+    if (departmentId && departmentId !== user.departmentId) {
+      return { ...user, departmentId };
+    }
+    return user;
   }
 
   private async resolveThreadForUser(
@@ -482,13 +505,15 @@ export class AIService {
       return this.buildDenialResponse(user.role, action);
     }
 
-    // Build scope from JWT claims
+    const scopedUser = await this.enrichUserScope(user);
+
+    // Build scope from JWT claims (HOD departmentId may come from DB)
     const scope: ActionScope = {
-      userId: user.sub,
-      role: user.role,
-      schoolId: user.schoolId,
-      departmentId: user.departmentId,
-      classId: user.classId,
+      userId: scopedUser.sub,
+      role: scopedUser.role,
+      schoolId: scopedUser.schoolId,
+      departmentId: scopedUser.departmentId,
+      classId: scopedUser.classId,
     };
 
     try {

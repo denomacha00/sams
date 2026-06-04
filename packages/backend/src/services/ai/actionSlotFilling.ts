@@ -1,4 +1,8 @@
 import { UserRole, type AccessTokenPayload } from '@sams/shared';
+import {
+  getHodDepartmentBlocker,
+  HOD_DEPARTMENT_UNLINKED_MESSAGE,
+} from '../../lib/hodScope';
 import { prisma } from '../../lib/prisma';
 import { resolveTeacherClassId } from '../../lib/teacherScope';
 import { findAction } from './roleActionRegistry';
@@ -35,6 +39,16 @@ const DESTRUCTIVE_CONFIRM_ACTIONS = new Set([
   'remove_user',
   'end_session',
 ]);
+
+function getActionSlotOrder(user: AccessTokenPayload, action: string): SlotName[] {
+  if (user.role === UserRole.HOD && action === 'send_department_notification') {
+    return ['message'];
+  }
+  if (user.role === UserRole.HOD && action === 'send_class_notification') {
+    return ['classId', 'message'];
+  }
+  return ACTION_SLOT_ORDER[action] ?? [];
+}
 
 /** Required slots per action (order matters — first missing is asked). */
 const ACTION_SLOT_ORDER: Record<string, SlotName[]> = {
@@ -202,14 +216,20 @@ export async function resolveActionParams(
     }
   }
 
+  if (user.role === UserRole.HOD && action === 'send_department_notification') {
+    if (user.departmentId) {
+      resolved.departmentId = user.departmentId;
+      resolved.notifyScope = 'department';
+    }
+  }
+
   if (NOTIFICATION_ACTIONS.has(action) && !resolved.notifyScope) {
     if (action === 'send_school_notification' && isFilled(resolved.message)) {
       resolved.notifyScope = 'school';
-    }
-    else if (
+    } else if (
       action === 'send_department_notification' &&
       user.role === UserRole.HOD &&
-      isFilled(resolved.message)
+      (isFilled(resolved.message) || user.departmentId)
     ) {
       resolved.notifyScope = 'department';
     } else if (action === 'send_class_message' || action === 'send_class_notification') {
@@ -355,10 +375,15 @@ export async function getNextMissingSlot(
   params: Record<string, unknown>,
 ): Promise<SlotName | null> {
   const resolved = await resolveActionParams(user, action, params);
+
+  if (getHodDepartmentBlocker(user, action, resolved.departmentId as string | undefined)) {
+    return null;
+  }
+
   const order =
     action === 'create_registration_link'
       ? getRegistrationLinkSlotOrder(user, resolved)
-      : ACTION_SLOT_ORDER[action] ?? [];
+      : getActionSlotOrder(user, action);
 
   if (needsNotifyScopePrompt(user.role, action, resolved) && !isFilled(resolved.notifyScope)) {
     return 'notifyScope';
@@ -513,6 +538,9 @@ export async function buildSlotQuestion(
       return `Which class should receive this? Reply with one of: ${names}`;
     }
     case 'departmentName': {
+      if (user.role === UserRole.HOD) {
+        return HOD_DEPARTMENT_UNLINKED_MESSAGE;
+      }
       const depts = await listSchoolDepartments(user.schoolId);
       if (depts.length === 0) return 'Which department? (None found — create a department first.)';
       const names = depts.map((d) => `**${d.name}**`).join(', ');

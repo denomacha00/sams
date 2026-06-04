@@ -51,6 +51,6 @@ describe('view_department_stats handler', () => {
       {},
       { userId: 'hod-1', role: UserRole.HOD, schoolId: 'school-1' },
     );
-    expect(result.answer).toMatch(/not associated with a department/i);
+    expect(result.answer).toMatch(/not linked to a department/i);
   });
 });
