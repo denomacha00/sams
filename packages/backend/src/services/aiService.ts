@@ -135,14 +135,25 @@ export class AIService {
 
     // School admin / HOD / student self-context — DB before local engine (avoids LLM hallucination).
     if (user.sub !== 'guest' && isSchoolPersonnelQuery(question)) {
-      const personnelResult = await queryRoleContext(user, question);
-      if (personnelResult) {
-        threadId = await this.safelyPersist(user, question, personnelResult.answer, threadId);
+      try {
+        const personnelResult = await queryRoleContext(user, question);
+        if (personnelResult) {
+          threadId = await this.safelyPersist(user, question, personnelResult.answer, threadId);
+          return {
+            answer: personnelResult.answer,
+            intent: personnelResult.intent,
+            engine: 'local',
+            data: personnelResult.data,
+            threadId,
+          };
+        }
+      } catch (err) {
+        console.error('[AIService] Role context query failed:', err);
         return {
-          answer: personnelResult.answer,
-          intent: personnelResult.intent,
+          answer:
+            'I could not load that from SAMS right now. Please try again in a moment or rephrase your question.',
+          intent: 'data_query_error',
           engine: 'local',
-          data: personnelResult.data,
           threadId,
         };
       }
@@ -202,7 +213,10 @@ export class AIService {
     }
 
     // Student HOD, teachers, class, department, class rep — DB-backed answers only.
-    const studentContextResult = await queryRoleContext(user, question);
+    const studentContextResult = await queryRoleContext(user, question).catch((err) => {
+      console.error('[AIService] Role context query failed:', err);
+      return null;
+    });
     if (studentContextResult) {
       if (user.sub !== 'guest') {
         threadId = await this.safelyPersist(user, question, studentContextResult.answer, threadId);

@@ -2,6 +2,7 @@ import OpenAI from 'openai';
 import { prisma } from '../../lib/prisma';
 import { type AccessTokenPayload, UserRole } from '@sams/shared';
 import {
+  extractProviderErrorText,
   formatProviderError,
   getFallbackClient,
   getOpenAIClient,
@@ -678,7 +679,11 @@ export async function openaiQuery(
           return { answer: fallbackAnswer, intent: 'openai_response' };
         }
       } catch (fallbackErr) {
-        console.error('[AI/Fallback] Also failed:', (fallbackErr as Error).message);
+        console.error('[AI/Fallback] Also failed:', extractProviderErrorText(fallbackErr));
+        return {
+          answer: formatProviderError(err, fallbackErr),
+          intent: 'ai_error',
+        };
       }
     }
 
@@ -752,7 +757,11 @@ export async function openaiQueryWithHistory(
           return { answer: fallbackAnswer, intent: 'openai_response' };
         }
       } catch (fallbackErr) {
-        console.error('[AI/Fallback] Also failed:', (fallbackErr as Error).message);
+        console.error('[AI/Fallback] Also failed:', extractProviderErrorText(fallbackErr));
+        return {
+          answer: formatProviderError(err, fallbackErr),
+          intent: 'ai_error',
+        };
       }
     }
 

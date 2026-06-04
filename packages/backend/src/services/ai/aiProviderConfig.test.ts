@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   DEFAULT_GROQ_CHAT_MODEL,
   DEFAULT_VISION_MODEL,
@@ -102,5 +102,31 @@ describe('aiProviderConfig', () => {
   it('formats vision-related provider errors', () => {
     const msg = formatProviderError(new Error('Model does not support image input'));
     expect(msg).toContain('VISION_MODEL');
+  });
+
+  it('extracts HTTP status from API errors', () => {
+    const err = Object.assign(new Error('Rate limit exceeded'), { status: 429 });
+    expect(formatProviderError(err)).toContain('rate-limited');
+  });
+
+  it('classifies provider downtime (503)', () => {
+    const msg = formatProviderError(new Error('503 Service Unavailable'));
+    expect(msg.toLowerCase()).toContain('temporarily down');
+  });
+
+  it('uses fallback error when primary error is generic', () => {
+    const msg = formatProviderError(
+      new Error('Connection reset'),
+      Object.assign(new Error('Too many requests'), { status: 429 }),
+    );
+    expect(msg.toLowerCase()).toContain('rate-limited');
+  });
+
+  it('logs unclassified errors and returns generic message', () => {
+    const logSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const msg = formatProviderError(new Error('xyzzy unknown failure'));
+    expect(msg).toContain('temporarily unavailable');
+    expect(logSpy).toHaveBeenCalled();
+    logSpy.mockRestore();
   });
 });

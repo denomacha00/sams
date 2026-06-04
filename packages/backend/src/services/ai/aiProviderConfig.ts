@@ -177,12 +177,43 @@ export function getMissingAIKeyMessage(): string {
   );
 }
 
+/** Collect message, HTTP status, and provider code from OpenAI SDK / fetch errors. */
+export function extractProviderErrorText(err: unknown): string {
+  if (!err) return '';
+  if (typeof err === 'string') return err;
+
+  const parts: string[] = [];
+  if (err instanceof Error) {
+    parts.push(err.message);
+    const apiErr = err as Error & {
+      status?: number;
+      code?: string;
+      type?: string;
+      error?: { message?: string; code?: string; type?: string };
+    };
+    if (apiErr.status) parts.push(String(apiErr.status));
+    if (apiErr.code) parts.push(apiErr.code);
+    if (apiErr.type) parts.push(apiErr.type);
+    if (apiErr.error?.message) parts.push(apiErr.error.message);
+    if (apiErr.error?.code) parts.push(apiErr.error.code);
+    if (apiErr.error?.type) parts.push(apiErr.error.type);
+  } else {
+    parts.push(String(err));
+  }
+
+  return parts.filter(Boolean).join(' ');
+}
+
 /**
  * Turn provider/API errors into a short message safe to show in the chat UI.
+ * Pass multiple errors (primary + fallback) to classify the most specific failure.
  */
-export function formatProviderError(err: unknown): string {
-  const msg = err instanceof Error ? err.message : String(err);
-  const lower = msg.toLowerCase();
+export function formatProviderError(...errors: unknown[]): string {
+  const combined = errors
+    .map(extractProviderErrorText)
+    .filter(Boolean)
+    .join('; ');
+  const lower = combined.toLowerCase();
 
   if (lower.includes('openai_api_key') || lower.includes('api key is not set')) {
     return getMissingAIKeyMessage();
@@ -199,14 +230,57 @@ export function formatProviderError(err: unknown): string {
       '(or gpt-4o-mini for OpenAI), then restart the backend.'
     );
   }
-  if (lower.includes('incorrect api key') || lower.includes('invalid_api_key') || lower.includes('401')) {
+  if (
+    lower.includes('incorrect api key') ||
+    lower.includes('invalid_api_key') ||
+    lower.includes('authentication') ||
+    /\b401\b/.test(lower)
+  ) {
     return 'The AI API key is invalid or expired. Update OPENAI_API_KEY in the server .env and restart the backend.';
   }
-  if (lower.includes('429') || lower.includes('rate limit') || lower.includes('rate_limit')) {
+  if (
+    lower.includes('429') ||
+    lower.includes('rate limit') ||
+    lower.includes('rate_limit') ||
+    lower.includes('over_capacity') ||
+    lower.includes('over capacity') ||
+    lower.includes('too many requests')
+  ) {
     return 'The AI service is rate-limited. Wait a moment and try again, or ask your administrator to add OPENAI_FALLBACK_KEY (OpenRouter).';
   }
-  if (lower.includes('timeout') || lower.includes('timed out') || lower.includes('econnrefused')) {
+  if (
+    lower.includes('timeout') ||
+    lower.includes('timed out') ||
+    lower.includes('econnrefused') ||
+    lower.includes('econnreset') ||
+    lower.includes('enotfound') ||
+    lower.includes('getaddrinfo') ||
+    lower.includes('fetch failed') ||
+    lower.includes('network')
+  ) {
     return 'The AI service did not respond in time. Check OPENAI_BASE_URL and network access from the server, then try again.';
+  }
+  if (
+    /\b503\b/.test(lower) ||
+    lower.includes('service unavailable') ||
+    lower.includes('temporarily unavailable') ||
+    /\b502\b/.test(lower) ||
+    lower.includes('bad gateway') ||
+    (/\b500\b/.test(lower) && lower.includes('internal'))
+  ) {
+    return (
+      'The AI provider is temporarily down. Wait a moment and try again, or ask your administrator to configure ' +
+      'OPENAI_FALLBACK_KEY (OpenRouter) as backup in secrets/providers.env.'
+    );
+  }
+  if (lower.includes('quota') || lower.includes('insufficient') || lower.includes('billing') || lower.includes('credits')) {
+    return 'The AI provider quota is exhausted. Update billing or switch OPENAI_BASE_URL / OPENAI_FALLBACK_KEY on the server.';
+  }
+  if (lower.includes('context_length') || lower.includes('maximum context') || lower.includes('token limit')) {
+    return 'That message is too long for the AI model. Shorten your question or start a new conversation thread.';
+  }
+  if (/\b403\b/.test(lower) || lower.includes('forbidden') || lower.includes('permission denied')) {
+    return 'The AI provider rejected this request (403). Check OPENAI_API_KEY permissions and OPENAI_BASE_URL on the server.';
   }
   if (
     lower.includes('image') ||
@@ -220,6 +294,7 @@ export function formatProviderError(err: unknown): string {
     );
   }
 
+  console.error('[AI/ProviderError] Unclassified provider failure:', combined || '(empty)');
   return 'The AI service is temporarily unavailable. Please try again in a moment.';
 }
 
