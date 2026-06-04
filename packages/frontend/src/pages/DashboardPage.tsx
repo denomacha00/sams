@@ -97,6 +97,62 @@ function getRoleGreeting(role?: UserRole): string {
   }
 }
 
+interface TimetableInsightEntry {
+  id: string;
+  subject: string;
+  dayOfWeek: number;
+  startTime: string;
+  endTime: string;
+  class?: { name: string };
+}
+
+const DAY_SHORT = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+
+function parseTimeMinutes(time: string): number {
+  const [h, m] = time.split(':').map((v) => parseInt(v, 10));
+  return (h || 0) * 60 + (m || 0);
+}
+
+function findNextTimetableEntry(entries: TimetableInsightEntry[]): TimetableInsightEntry | null {
+  if (!entries.length) return null;
+  const now = new Date();
+  const todayIndex = (now.getDay() + 6) % 7;
+  const nowMin = now.getHours() * 60 + now.getMinutes();
+
+  const sorted = [...entries].sort((a, b) => {
+    if (a.dayOfWeek !== b.dayOfWeek) return a.dayOfWeek - b.dayOfWeek;
+    return parseTimeMinutes(a.startTime) - parseTimeMinutes(b.startTime);
+  });
+
+  for (const entry of sorted) {
+    const dayOffset =
+      entry.dayOfWeek >= todayIndex ? entry.dayOfWeek - todayIndex : entry.dayOfWeek + 7 - todayIndex;
+    const endMin = parseTimeMinutes(entry.endTime);
+    const startMin = parseTimeMinutes(entry.startTime);
+    if (dayOffset === 0 && endMin <= nowMin) continue;
+    return entry;
+  }
+  return sorted[0] ?? null;
+}
+
+function describeNextClass(entry: TimetableInsightEntry | null): { title: string; detail: string } {
+  if (!entry) {
+    return { title: 'No upcoming class', detail: 'Check your full timetable for the week.' };
+  }
+  const todayIndex = (new Date().getDay() + 6) % 7;
+  const dayLabel = entry.dayOfWeek === todayIndex ? 'Today' : DAY_SHORT[entry.dayOfWeek] ?? '';
+  const classLabel = entry.class?.name ? ` · ${entry.class.name}` : '';
+  return {
+    title: entry.subject,
+    detail: `${dayLabel} ${entry.startTime}–${entry.endTime}${classLabel}`,
+  };
+}
+
+function isToday(iso?: string): boolean {
+  if (!iso) return false;
+  return new Date(iso).toDateString() === new Date().toDateString();
+}
+
 // ─── Section Header Component ────────────────────────────────────────────────
 
 const SectionHeader: React.FC<{ title: string; icon: string }> = ({ title, icon }) => (
@@ -197,26 +253,69 @@ const QuickActionButton: React.FC<{ action: QuickAction; index: number }> = ({ a
 function getAtAGlanceTitle(role?: UserRole): string {
   switch (role) {
     case UserRole.STUDENT:
-      return 'Attendance Today';
+      return 'My day';
     case UserRole.TEACHER:
-      return 'Live Sessions';
+      return 'Teaching today';
     case UserRole.HOD:
-      return 'Department Priorities';
+      return 'Department today';
     case UserRole.SCHOOL_ADMIN:
-      return 'School Activity';
+      return 'School today';
     default:
-      return 'At a Glance';
+      return 'At a glance';
   }
 }
 
-const panelShellClass = 'surface-panel';
-const panelAnimStyle = { animation: 'fadeInUp 0.5s ease-out 0.6s forwards', opacity: 0 };
+const insightsPanelAnim = { animation: 'fadeInUp 0.5s ease-out 0.6s forwards', opacity: 0 };
+const insightsPanelAnimLate = { animation: 'fadeInUp 0.5s ease-out 0.7s forwards', opacity: 0 };
 
-const AtAGlancePanel: React.FC<{ role?: UserRole; userId?: string }> = ({ role, userId }) => {
+const InsightRow: React.FC<{
+  label: string;
+  value: React.ReactNode;
+  valueClass?: string;
+  hint?: string;
+}> = ({ label, value, valueClass = 'text-ink font-semibold', hint }) => (
+  <div className="surface-muted-row">
+    <div className="min-w-0">
+      <span className="text-sm text-ink-muted">{label}</span>
+      {hint && <p className="text-xs text-ink-subtle mt-0.5 truncate">{hint}</p>}
+    </div>
+    <span className={`text-sm shrink-0 ml-3 ${valueClass}`}>{value}</span>
+  </div>
+);
+
+const InsightsPanelShell: React.FC<{
+  title: string;
+  icon: string;
+  animStyle?: React.CSSProperties;
+  children: React.ReactNode;
+}> = ({ title, icon, animStyle = insightsPanelAnim, children }) => (
+  <div className="dashboard-insights-panel" style={animStyle}>
+    <div className="flex items-center gap-3 mb-4">
+      <div className="dash-card-icon dash-card-icon-secondary">
+        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={icon} />
+        </svg>
+      </div>
+      <h3 className="dash-section-title">{title}</h3>
+    </div>
+    {children}
+  </div>
+);
+
+const AtAGlancePanel: React.FC<{
+  role?: UserRole;
+  userId?: string;
+  departmentId?: string;
+  classId?: string;
+}> = ({ role, userId, departmentId, classId }) => {
   const [loading, setLoading] = useState(true);
-  const [studentPresent, setStudentPresent] = useState(0);
-  const [activeSessions, setActiveSessions] = useState<Array<{ id: string; subject?: string; className?: string }>>([]);
-  const [unreadCount, setUnreadCount] = useState(0);
+  const [nextClass, setNextClass] = useState<{ title: string; detail: string } | null>(null);
+  const [activeSessionCount, setActiveSessionCount] = useState(0);
+  const [attendanceTodayLabel, setAttendanceTodayLabel] = useState('—');
+  const [pendingCount, setPendingCount] = useState(0);
+  const [studentStatus, setStudentStatus] = useState<string>('—');
+  const [schoolSessionsToday, setSchoolSessionsToday] = useState<number | string>('—');
+  const [schoolAbsentToday, setSchoolAbsentToday] = useState<number | string>('—');
 
   useEffect(() => {
     let cancelled = false;
@@ -224,33 +323,99 @@ const AtAGlancePanel: React.FC<{ role?: UserRole; userId?: string }> = ({ role, 
     async function load() {
       setLoading(true);
       try {
+        const timetableReq = apiClient.get('/timetable');
+        const unreadReq = apiClient.get('/notifications/unread-count');
+
         if (role === UserRole.STUDENT) {
-          const { data } = await apiClient.get('/attendance');
-          if (!cancelled) {
-            const today = new Date().toDateString();
-            const todayRecords = (Array.isArray(data) ? data : []).filter(
-              (r: { createdAt?: string; status?: string }) =>
-                r.createdAt &&
-                new Date(r.createdAt).toDateString() === today &&
-                (r.status === 'PRESENT' || r.status === 'LATE'),
+          const [timetableRes, attendanceRes] = await Promise.allSettled([timetableReq, apiClient.get('/attendance')]);
+          if (!cancelled && timetableRes.status === 'fulfilled') {
+            const entries = (Array.isArray(timetableRes.value.data) ? timetableRes.value.data : []) as TimetableInsightEntry[];
+            setNextClass(describeNextClass(findNextTimetableEntry(entries)));
+          }
+          if (!cancelled && attendanceRes.status === 'fulfilled') {
+            const todayRecords = (Array.isArray(attendanceRes.value.data) ? attendanceRes.value.data : []).filter(
+              (r: { createdAt?: string }) => isToday(r.createdAt),
             );
-            setStudentPresent(todayRecords.length);
+            const present = todayRecords.filter((r: { status?: string }) => r.status === 'PRESENT' || r.status === 'LATE').length;
+            const absent = todayRecords.filter((r: { status?: string }) => r.status === 'ABSENT').length;
+            if (present > 0) setStudentStatus(`${present} present`);
+            else if (absent > 0) setStudentStatus(`${absent} absent`);
+            else setStudentStatus('Not marked yet');
           }
         } else if (role === UserRole.TEACHER && userId) {
-          const { data } = await apiClient.get('/sessions', {
-            params: { teacherId: userId, isActive: true },
-          });
-          if (!cancelled) {
-            const list = (Array.isArray(data) ? data : []).slice(0, 4).map((s: Record<string, unknown>) => ({
-              id: s.id as string,
-              subject: (s.subject as string) ?? 'Session',
-              className: (s.className as string) ?? undefined,
-            }));
-            setActiveSessions(list);
+          const [timetableRes, sessionsRes, unreadRes, reportsRes] = await Promise.allSettled([
+            timetableReq,
+            apiClient.get('/sessions', { params: { teacherId: userId, isActive: true } }),
+            unreadReq,
+            classId ? apiClient.get(`/reports/class/${classId}`) : Promise.reject(new Error('no class')),
+          ]);
+          if (!cancelled && timetableRes.status === 'fulfilled') {
+            const entries = (Array.isArray(timetableRes.value.data) ? timetableRes.value.data : []) as TimetableInsightEntry[];
+            setNextClass(describeNextClass(findNextTimetableEntry(entries)));
           }
-        } else if (role === UserRole.HOD || role === UserRole.SCHOOL_ADMIN) {
-          const { data } = await apiClient.get('/notifications/unread-count');
-          if (!cancelled) setUnreadCount(data.count ?? 0);
+          if (!cancelled && sessionsRes.status === 'fulfilled') {
+            setActiveSessionCount(Array.isArray(sessionsRes.value.data) ? sessionsRes.value.data.length : 0);
+          }
+          if (!cancelled && reportsRes.status === 'fulfilled') {
+            setAttendanceTodayLabel(`${Math.round(reportsRes.value.data.averageAttendancePercentage ?? 0)}%`);
+          }
+          if (!cancelled && unreadRes.status === 'fulfilled') {
+            setPendingCount(unreadRes.value.data.count ?? 0);
+          }
+        } else if (role === UserRole.HOD) {
+          const [timetableRes, sessionsRes, unreadRes, reportsRes, riskRes] = await Promise.allSettled([
+            timetableReq,
+            apiClient.get('/sessions', { params: { isActive: true } }),
+            unreadReq,
+            departmentId
+              ? apiClient.get(`/reports/department/${departmentId}`)
+              : Promise.reject(new Error('no dept')),
+            apiClient.get('/risk-scores'),
+          ]);
+          if (!cancelled && timetableRes.status === 'fulfilled') {
+            const entries = (Array.isArray(timetableRes.value.data) ? timetableRes.value.data : []) as TimetableInsightEntry[];
+            setNextClass(describeNextClass(findNextTimetableEntry(entries)));
+          }
+          if (!cancelled && sessionsRes.status === 'fulfilled') {
+            setActiveSessionCount(Array.isArray(sessionsRes.value.data) ? sessionsRes.value.data.length : 0);
+          }
+          if (!cancelled && reportsRes.status === 'fulfilled') {
+            setAttendanceTodayLabel(`${Math.round(reportsRes.value.data.averageAttendancePercentage ?? 0)}%`);
+          }
+          const unread = unreadRes.status === 'fulfilled' ? (unreadRes.value.data.count ?? 0) : 0;
+          const atRisk =
+            riskRes.status === 'fulfilled' && Array.isArray(riskRes.value.data)
+              ? riskRes.value.data.filter(
+                  (s: { riskLevel?: string }) => s.riskLevel === 'HIGH' || s.riskLevel === 'CRITICAL',
+                ).length
+              : 0;
+          if (!cancelled) setPendingCount(unread + atRisk);
+        } else if (role === UserRole.SCHOOL_ADMIN) {
+          const [sessionsRes, attendanceRes, reportsRes, unreadRes] = await Promise.allSettled([
+            apiClient.get('/sessions'),
+            apiClient.get('/attendance', { params: { status: 'ABSENT' } }),
+            apiClient.get('/reports/school'),
+            unreadReq,
+          ]);
+          if (!cancelled && sessionsRes.status === 'fulfilled') {
+            const sessions = Array.isArray(sessionsRes.value.data) ? sessionsRes.value.data : [];
+            setSchoolSessionsToday(
+              sessions.filter((s: { startedAt?: string }) => isToday(s.startedAt)).length,
+            );
+            setActiveSessionCount(sessions.filter((s: { isActive?: boolean }) => s.isActive).length);
+          }
+          if (!cancelled && attendanceRes.status === 'fulfilled') {
+            const absentToday = (Array.isArray(attendanceRes.value.data) ? attendanceRes.value.data : []).filter(
+              (r: { createdAt?: string }) => isToday(r.createdAt),
+            ).length;
+            setSchoolAbsentToday(absentToday);
+          }
+          if (!cancelled && reportsRes.status === 'fulfilled') {
+            setAttendanceTodayLabel(`${Math.round(reportsRes.value.data.averageAttendancePercentage ?? 0)}%`);
+          }
+          if (!cancelled && unreadRes.status === 'fulfilled') {
+            setPendingCount(unreadRes.value.data.count ?? 0);
+          }
         }
       } catch {
         // Non-critical dashboard widget
@@ -263,221 +428,163 @@ const AtAGlancePanel: React.FC<{ role?: UserRole; userId?: string }> = ({ role, 
     return () => {
       cancelled = true;
     };
-  }, [role, userId]);
+  }, [role, userId, departmentId, classId]);
 
   const title = getAtAGlanceTitle(role);
 
   return (
-    <div className={panelShellClass} style={panelAnimStyle}>
-      <div className="flex items-center gap-3 mb-5">
-        <div className="dash-card-icon dash-card-icon-secondary">
-          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={2}
-              d={role === UserRole.STUDENT ? ICONS.qr : role === UserRole.TEACHER ? ICONS.session : ICONS.bell}
-            />
-          </svg>
-        </div>
-        <h3 className="dash-section-title">{title}</h3>
-      </div>
-
+    <InsightsPanelShell title={title} icon={ICONS.calendar}>
       {loading ? (
-        <div className="space-y-3">
+        <div className="space-y-2">
           {[1, 2, 3].map((i) => (
-            <div key={i} className="animate-pulse h-12 rounded-xl bg-surface-elevated" />
+            <div key={i} className="animate-pulse h-11 rounded-xl bg-surface-elevated" />
           ))}
         </div>
       ) : role === UserRole.STUDENT ? (
-        <div className="space-y-4">
-          <div className="text-center py-4">
-            <p className="text-4xl font-bold text-accent-orange">{studentPresent}</p>
-            <p className="text-sm text-ink-muted mt-1">classes marked present today</p>
-          </div>
-          <Link
-            to="/reports"
-            className="block text-center text-sm text-brand hover:text-brand-hover transition-colors py-2"
-          >
-            View my attendance reports →
-          </Link>
-          <Link
-            to="/timetable"
-            className="block text-center text-sm text-ink-muted hover:text-ink-muted transition-colors"
-          >
-            Open full timetable →
+        <div className="space-y-2">
+          <InsightRow
+            label="Next class"
+            value={nextClass?.title ?? '—'}
+            hint={nextClass?.detail}
+            valueClass="text-ink font-medium text-right max-w-[55%] truncate"
+          />
+          <InsightRow label="Today's attendance" value={studentStatus} valueClass="text-accent-orange font-semibold" />
+          <Link to="/timetable" className="block text-center text-sm text-brand hover:text-brand-hover pt-2">
+            Full timetable →
           </Link>
         </div>
       ) : role === UserRole.TEACHER ? (
-        <div className="space-y-3">
-          {activeSessions.length === 0 ? (
-            <div className="text-center py-6">
-              <p className="text-ink-muted text-sm mb-1">No active sessions</p>
-              <p className="text-xs text-ink-subtle">Use Sign In Students above to start a session and show the QR code.</p>
-            </div>
-          ) : (
-            <>
-              <p className="text-xs font-medium text-accent-orange uppercase tracking-wide">Active now</p>
-              {activeSessions.map((s) => (
-                <Link
-                  key={s.id}
-                  to="/sessions"
-                  className="surface-muted-row hover:border-accent-orange"
-                >
-                  <div>
-                    <p className="text-sm text-ink font-medium">{s.subject}</p>
-                    {s.className && <p className="text-xs text-ink-subtle">{s.className}</p>}
-                  </div>
-                  <span className="text-xs font-semibold text-accent-orange">Live</span>
-                </Link>
-              ))}
-              <Link to="/sessions" className="block text-center text-sm text-brand hover:text-brand-hover pt-1">
-                Manage session & QR →
-              </Link>
-            </>
-          )}
+        <div className="space-y-2">
+          <InsightRow
+            label="Next class"
+            value={nextClass?.title ?? '—'}
+            hint={nextClass?.detail}
+            valueClass="text-ink font-medium text-right max-w-[55%] truncate"
+          />
+          <InsightRow
+            label="Active sessions"
+            value={activeSessionCount}
+            valueClass={activeSessionCount > 0 ? 'text-accent-orange font-semibold' : 'text-brand font-semibold'}
+          />
+          <InsightRow label="Class attendance" value={attendanceTodayLabel} valueClass="text-accent-orange font-semibold" />
+          <InsightRow label="Pending actions" value={pendingCount} valueClass="text-brand font-semibold" />
+          <Link to="/sessions" className="block text-center text-sm text-brand hover:text-brand-hover pt-2">
+            Open sessions & QR →
+          </Link>
         </div>
       ) : role === UserRole.HOD ? (
-        <div className="space-y-3">
-          <div className="surface-muted-row">
-            <span className="text-sm text-ink-muted">Unread notifications</span>
-            <span className={`text-sm font-semibold ${unreadCount > 0 ? 'text-orange-400' : 'text-brand'}`}>
-              {unreadCount}
-            </span>
-          </div>
-          <p className="text-xs text-ink-subtle px-1">
-            Use Quick Actions below for department tools, timetable, and reports.
-          </p>
-          {unreadCount > 0 && (
-            <Link
-              to="/notifications"
-              className="btn-secondary w-full py-2.5 text-sm text-center block"
-            >
-              Read notifications →
+        <div className="space-y-2">
+          <InsightRow
+            label="Next class"
+            value={nextClass?.title ?? '—'}
+            hint={nextClass?.detail}
+            valueClass="text-ink font-medium text-right max-w-[55%] truncate"
+          />
+          <InsightRow
+            label="Live sessions (school)"
+            value={activeSessionCount}
+            valueClass={activeSessionCount > 0 ? 'text-accent-orange font-semibold' : 'text-brand font-semibold'}
+          />
+          <InsightRow label="Dept. attendance" value={attendanceTodayLabel} valueClass="text-accent-orange font-semibold" />
+          <InsightRow label="Pending (alerts + unread)" value={pendingCount} valueClass="text-brand font-semibold" />
+          <div className="flex gap-2 pt-2">
+            <Link to="/risk-scores" className="flex-1 text-center text-xs py-2 rounded-xl border border-line text-ink-muted hover:bg-surface-muted">
+              At-risk →
             </Link>
-          )}
+            <Link to="/notifications" className="flex-1 text-center text-xs py-2 rounded-xl border border-line text-ink-muted hover:bg-surface-muted">
+              Messages →
+            </Link>
+          </div>
         </div>
       ) : role === UserRole.SCHOOL_ADMIN ? (
-        <div className="space-y-3">
-          <div className="surface-muted-row">
-            <span className="text-sm text-ink-muted">Unread notifications</span>
-            <span className={`text-sm font-semibold ${unreadCount > 0 ? 'text-orange-400' : 'text-brand'}`}>
-              {unreadCount}
-            </span>
-          </div>
-          <p className="text-xs text-ink-subtle px-1">
-            Manage users, departments, and registration links from Quick Actions.
-          </p>
-          {unreadCount > 0 && (
-            <Link
-              to="/notifications"
-              className="btn-secondary w-full py-2.5 text-sm text-center block"
-            >
-              Read notifications →
-            </Link>
-          )}
+        <div className="space-y-2">
+          <InsightRow label="Sessions today" value={schoolSessionsToday} />
+          <InsightRow label="Absent today" value={schoolAbsentToday} valueClass="text-accent-orange font-semibold" />
+          <InsightRow label="School attendance" value={attendanceTodayLabel} valueClass="text-accent-orange font-semibold" />
+          <InsightRow
+            label="Active sessions now"
+            value={activeSessionCount}
+            valueClass={activeSessionCount > 0 ? 'text-accent-orange font-semibold' : 'text-brand font-semibold'}
+          />
+          <InsightRow label="Unread messages" value={pendingCount} valueClass="text-brand font-semibold" />
         </div>
       ) : (
-        <p className="text-ink-subtle text-sm text-center py-8">Welcome to SAMS</p>
+        <p className="text-ink-subtle text-sm text-center py-4">Welcome to SAMS</p>
       )}
-    </div>
+    </InsightsPanelShell>
   );
 };
 
-// ─── Activity Feed Component ─────────────────────────────────────────────────
-
-interface ActivityItem {
-  id: string;
-  message: string;
-  createdAt: string;
-  type: string;
-}
-
-const ActivityFeed: React.FC = () => {
-  const [items, setItems] = useState<ActivityItem[]>([]);
+const SchoolAdminInsightsPanel: React.FC = () => {
   const [loading, setLoading] = useState(true);
+  const [activeSessions, setActiveSessions] = useState(0);
+  const [sessionsToday, setSessionsToday] = useState(0);
+  const [absentToday, setAbsentToday] = useState(0);
+  const [attendanceRate, setAttendanceRate] = useState('—');
 
   useEffect(() => {
     let cancelled = false;
-    apiClient.get('/notifications/sent')
-      .then(({ data }) => {
-        if (!cancelled) {
-          const list: ActivityItem[] = (Array.isArray(data) ? data : []).slice(0, 5).map((n: any) => ({
-            id: n.id,
-            message: n.message ?? n.title ?? 'Notification sent',
-            createdAt: n.createdAt,
-            type: n.type ?? 'MESSAGE',
-          }));
-          setItems(list);
+    Promise.allSettled([
+      apiClient.get('/sessions', { params: { isActive: true } }),
+      apiClient.get('/sessions'),
+      apiClient.get('/attendance', { params: { status: 'ABSENT' } }),
+      apiClient.get('/reports/school'),
+    ])
+      .then(([activeRes, allRes, absentRes, reportRes]) => {
+        if (cancelled) return;
+        if (activeRes.status === 'fulfilled') {
+          setActiveSessions(Array.isArray(activeRes.value.data) ? activeRes.value.data.length : 0);
         }
-      })
-      .catch(() => {
-        // Silently fail — activity feed is non-critical
+        if (allRes.status === 'fulfilled') {
+          const sessions = Array.isArray(allRes.value.data) ? allRes.value.data : [];
+          setSessionsToday(sessions.filter((s: { startedAt?: string }) => isToday(s.startedAt)).length);
+        }
+        if (absentRes.status === 'fulfilled') {
+          setAbsentToday(
+            (Array.isArray(absentRes.value.data) ? absentRes.value.data : []).filter((r: { createdAt?: string }) =>
+              isToday(r.createdAt),
+            ).length,
+          );
+        }
+        if (reportRes.status === 'fulfilled') {
+          setAttendanceRate(`${Math.round(reportRes.value.data.averageAttendancePercentage ?? 0)}%`);
+        }
       })
       .finally(() => {
         if (!cancelled) setLoading(false);
       });
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
-  const typeColor: Record<string, string> = {
-    MESSAGE: 'bg-indigo-500',
-    NOTIFICATION_UPDATED: 'bg-indigo-500',
-    SYSTEM: 'bg-gray-500',
-  };
-
-  const formatRelative = (iso: string): string => {
-    const diff = Date.now() - new Date(iso).getTime();
-    const mins = Math.floor(diff / 60000);
-    if (mins < 1) return 'just now';
-    if (mins < 60) return `${mins} min ago`;
-    const hrs = Math.floor(mins / 60);
-    if (hrs < 24) return `${hrs} hour${hrs > 1 ? 's' : ''} ago`;
-    const days = Math.floor(hrs / 24);
-    return `${days} day${days > 1 ? 's' : ''} ago`;
-  };
-
   return (
-    <div className="surface-panel" style={{ animation: 'fadeInUp 0.5s ease-out 0.7s forwards', opacity: 0 }}>
-      <div className="flex items-center gap-3 mb-5">
-        <div className="dash-card-icon dash-card-icon-secondary">
-          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={ICONS.trending} />
-          </svg>
-        </div>
-        <h3 className="dash-section-title">Recent Activity</h3>
-      </div>
+    <InsightsPanelShell title="Quick stats" icon={ICONS.chart} animStyle={insightsPanelAnimLate}>
       {loading ? (
-        <div className="space-y-3">
+        <div className="space-y-2">
           {[1, 2, 3].map((i) => (
-            <div key={i} className="animate-pulse flex items-center gap-3 p-3 rounded-xl bg-surface-elevated">
-              <div className="w-2.5 h-2.5 rounded-full bg-slate-200 shrink-0" />
-              <div className="flex-1 h-3 bg-slate-200 rounded" />
-              <div className="w-16 h-3 bg-slate-200 rounded" />
-            </div>
+            <div key={i} className="animate-pulse h-11 rounded-xl bg-surface-elevated" />
           ))}
-        </div>
-      ) : items.length === 0 ? (
-        <div className="flex flex-col items-center justify-center py-8">
-          <div className="w-10 h-10 rounded-full bg-surface-elevated flex items-center justify-center mb-3">
-            <svg className="w-5 h-5 text-ink-subtle" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d={ICONS.bell} />
-            </svg>
-          </div>
-          <p className="text-ink-subtle text-sm">No recent activity</p>
         </div>
       ) : (
-        <div className="space-y-3">
-          {items.map((item) => (
-            <div key={item.id} className="flex items-center gap-3 p-3 rounded-xl bg-surface-muted hover:bg-surface-elevated border border-line transition-all duration-300">
-              <div className={`w-2.5 h-2.5 rounded-full ${typeColor[item.type] ?? 'bg-gray-500'} shadow-sm shrink-0`} />
-              <p className="text-sm text-ink-muted flex-1 truncate">{item.message}</p>
-              <span className="text-xs text-ink-subtle font-medium shrink-0">{formatRelative(item.createdAt)}</span>
-            </div>
-          ))}
+        <div className="space-y-2">
+          <InsightRow
+            label="Active sessions"
+            value={activeSessions}
+            valueClass={activeSessions > 0 ? 'text-accent-orange font-semibold' : 'text-brand font-semibold'}
+          />
+          <InsightRow label="Sessions started today" value={sessionsToday} />
+          <InsightRow label="Marked absent today" value={absentToday} valueClass="text-accent-orange font-semibold" />
+          <InsightRow label="Overall attendance" value={attendanceRate} valueClass="text-accent-orange font-semibold" />
+          <p className="text-xs text-ink-subtle pt-1 px-0.5">
+            For broadcasts and message history, use Notifications in Quick Actions — not a live feed here.
+          </p>
+          <Link to="/reports" className="block text-center text-sm text-brand hover:text-brand-hover pt-2">
+            School reports →
+          </Link>
         </div>
       )}
-    </div>
+    </InsightsPanelShell>
   );
 };
 
@@ -1292,10 +1399,15 @@ const DashboardPage: React.FC = () => {
         <section>
           <SectionHeader title={atAGlanceTitle} icon={ICONS.trending} />
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <AtAGlancePanel role={user?.role} userId={user?.id} />
+            <AtAGlancePanel
+              role={user?.role}
+              userId={user?.id}
+              departmentId={user?.departmentId}
+              classId={user?.classId}
+            />
 
             {/* Right panel varies by role */}
-            {user?.role === UserRole.SCHOOL_ADMIN && <ActivityFeed />}
+            {user?.role === UserRole.SCHOOL_ADMIN && <SchoolAdminInsightsPanel />}
 
             {user?.role === UserRole.TEACHER && (
               <TeacherClassPanel

@@ -34,6 +34,7 @@ const TimetableViewPage: React.FC = () => {
   const [filterClassId, setFilterClassId] = useState('');
   const [loading, setLoading] = useState(true);
   const [viewMode, setViewMode] = useState<'table' | 'grid'>('grid');
+  const [selectedEntryId, setSelectedEntryId] = useState<string | null>(null);
 
   useEffect(() => {
     const fetchEntries = async () => {
@@ -179,7 +180,7 @@ const TimetableViewPage: React.FC = () => {
               <div
                 key={day}
                 className={`surface-card p-4 transition-all ${
-                  idx === todayIndex ? 'border-indigo-300 ring-1 ring-indigo-100' : ''
+                  idx === todayIndex ? 'timetable-day--today' : ''
                 }`}
               >
                 <h4 className={`font-semibold text-sm mb-3 pb-2 border-b border-line flex items-center gap-2 ${
@@ -195,8 +196,22 @@ const TimetableViewPage: React.FC = () => {
                     <p className="text-ink-subtle text-xs py-2">No classes</p>
                   ) : (
                     getEntriesForDay(idx).map((entry) => (
-                      <div key={entry.id} className="p-3 rounded-xl input-field hover:border-indigo-500/30 transition-colors">
-                        <p className="text-ink text-sm font-medium">{entry.subject}</p>
+                      <div
+                        key={entry.id}
+                        role="button"
+                        tabIndex={0}
+                        onClick={() => setSelectedEntryId(entry.id === selectedEntryId ? null : entry.id)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter' || e.key === ' ') {
+                            e.preventDefault();
+                            setSelectedEntryId(entry.id === selectedEntryId ? null : entry.id);
+                          }
+                        }}
+                        className={`timetable-slot ${
+                          selectedEntryId === entry.id ? 'timetable-slot--selected' : ''
+                        }`}
+                      >
+                        <p className="text-sm font-medium text-ink">{entry.subject}</p>
                         <p className="text-brand text-xs mt-1 font-mono">{entry.startTime} - {entry.endTime}</p>
                         {entry.class?.name && <p className="text-ink-muted text-xs mt-0.5">{entry.class.name}</p>}
                         {entry.teacher?.fullName && <p className="text-ink-subtle text-xs">{entry.teacher.fullName}</p>}
@@ -229,7 +244,7 @@ const TimetableViewPage: React.FC = () => {
                       <tr
                         key={entry.id}
                         className={`border-b border-line hover:bg-surface-muted transition-colors ${
-                          entry.dayOfWeek === todayIndex ? 'bg-indigo-50/50' : ''
+                          entry.dayOfWeek === todayIndex ? 'timetable-row--today' : ''
                         }`}
                       >
                         <td className="px-6 py-4 text-sm text-ink">

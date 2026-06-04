@@ -225,6 +225,28 @@
     @apply border-b border-line bg-surface backdrop-blur-sm sticky top-0 z-40;
   }
 
+  /* Timetable grid: readable selection on dark canvas — no light-mode wash */
+  .timetable-slot {
+    @apply p-3 rounded-xl border border-line bg-surface-muted text-ink
+      hover:border-indigo-500/40 hover:bg-surface-elevated transition-colors cursor-pointer;
+  }
+
+  .timetable-slot--selected {
+    @apply border-indigo-500/60 bg-surface-elevated ring-1 ring-indigo-500/35 text-ink;
+  }
+
+  .timetable-day--today {
+    @apply border-indigo-500/40 ring-1 ring-indigo-500/25;
+  }
+
+  .timetable-row--today {
+    @apply bg-surface-elevated;
+  }
+
+  .dashboard-insights-panel {
+    @apply rounded-2xl border border-line bg-surface shadow-card p-6;
+  }
+
   /* Login — slate canvas + indigo Sign In (btn-primary); solid orange for attendance CTAs (btn-attendance) */
   .login-page {
     @apply bg-canvas text-ink;
