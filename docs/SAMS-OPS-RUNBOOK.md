@@ -204,6 +204,28 @@ npm run build -w @sams/frontend
 npm run build -w @sams/super-admin
 ```
 
+### Symptom: Redirect loop — "page isn't redirecting properly" (Firefox)
+
+Browser shows endless redirects; public URL returns **HTTP/2 301** in a loop. Often appears right after Let's Encrypt / nginx HTTPS setup.
+
+**Cause:** Cloudflare **Flexible** SSL talks to origin over HTTP, while nginx on port 80 unconditionally redirects to HTTPS (`return 301 https://$host`). Cloudflare and nginx chase each other forever.
+
+**Fix (Cloudflare dashboard):**
+
+1. Domain → **SSL/TLS** → **Overview**
+2. Set encryption mode to **Full (strict)** (not Flexible)
+3. Wait ~1 minute; hard-refresh browser or try incognito
+
+**Verify on VPS** (bypasses Cloudflare; origin must answer 200):
+
+```bash
+curl --resolve app.smart-managment.com:443:127.0.0.1 https://app.smart-managment.com/
+```
+
+Expect HTTP **200** and HTML. If this works locally but the public URL still loops → Cloudflare mode is still wrong or cached.
+
+**Cleanup:** Never leave `*.bak` or `sams-temp.conf` in `/etc/nginx/sites-enabled/` — duplicate server blocks cause odd redirect behavior. Only `sams.conf` should be enabled.
+
 ---
 
 ## 8. AI not working
@@ -457,6 +479,7 @@ cd /var/www/sams && git pull origin main
 | Redis errors | §5 |
 | Migration failed | §6 |
 | Photo upload 413 | §7 |
+| Redirect loop (Cloudflare SSL) | §7 |
 | AI broken | §8 |
 | SMS failed | §9 |
 | School suspended | §11 |
