@@ -21,8 +21,8 @@ interface QuickAction {
   label: string;
   subtitle: string;
   icon: string;
-  /** Primary attendance CTAs use orange left accent */
-  variant?: 'attendance' | 'alert' | 'default';
+  /** Sign-in tile uses indigo; other attendance CTAs use solid orange accent */
+  variant?: 'signin' | 'attendance' | 'alert' | 'default';
 }
 
 interface QuickActionGroup {
@@ -145,7 +145,7 @@ const AnimatedStatCard: React.FC<{ stat: StatCard; index: number }> = ({ stat, i
       </div>
       <div className="min-w-0 flex-1">
         <p className="dash-stat-label">{stat.label}</p>
-        <p className={`dash-stat-value mt-1 ${isOrange ? 'text-orange-400' : 'text-ink'}`}>{stat.value}</p>
+        <p className={`dash-stat-value mt-1 ${isOrange ? 'text-accent-orange' : 'text-ink'}`}>{stat.value}</p>
       </div>
     </div>
   );
@@ -154,9 +154,11 @@ const AnimatedStatCard: React.FC<{ stat: StatCard; index: number }> = ({ stat, i
 // ─── Quick Action Button ─────────────────────────────────────────────────────
 
 const QuickActionButton: React.FC<{ action: QuickAction; index: number }> = ({ action, index }) => {
+  const isSignIn = action.variant === 'signin';
   const isAttendance = action.variant === 'attendance';
-  const cardClass = isAttendance ? 'quick-action-card--primary' : 'quick-action-card--secondary';
-  const iconClass = isAttendance ? 'dash-card-icon-primary' : 'dash-card-icon-secondary';
+  const useIndigo = isSignIn || !isAttendance;
+  const cardClass = useIndigo ? 'quick-action-card--secondary' : 'quick-action-card--primary';
+  const iconClass = useIndigo ? 'dash-card-icon-secondary' : 'dash-card-icon-primary';
 
   return (
     <Link
@@ -171,7 +173,7 @@ const QuickActionButton: React.FC<{ action: QuickAction; index: number }> = ({ a
           </svg>
         </div>
         <div className="min-w-0 flex-1">
-          <h3 className={`text-sm font-semibold text-ink ${isAttendance ? 'group-hover:text-orange-400' : 'group-hover:text-indigo-300'} transition-colors`}>
+          <h3 className={`text-sm font-semibold text-ink ${useIndigo ? 'group-hover:text-indigo-300' : 'group-hover:text-accent-orange'} transition-colors`}>
             {action.label}
           </h3>
           <p className="text-xs text-ink-muted mt-0.5 line-clamp-2">{action.subtitle}</p>
@@ -290,7 +292,7 @@ const AtAGlancePanel: React.FC<{ role?: UserRole; userId?: string }> = ({ role, 
       ) : role === UserRole.STUDENT ? (
         <div className="space-y-4">
           <div className="text-center py-4">
-            <p className="text-4xl font-bold text-orange-500">{studentPresent}</p>
+            <p className="text-4xl font-bold text-accent-orange">{studentPresent}</p>
             <p className="text-sm text-ink-muted mt-1">classes marked present today</p>
           </div>
           <Link
@@ -315,18 +317,18 @@ const AtAGlancePanel: React.FC<{ role?: UserRole; userId?: string }> = ({ role, 
             </div>
           ) : (
             <>
-              <p className="text-xs font-medium text-orange-500 uppercase tracking-wide">Active now</p>
+              <p className="text-xs font-medium text-accent-orange uppercase tracking-wide">Active now</p>
               {activeSessions.map((s) => (
                 <Link
                   key={s.id}
                   to="/sessions"
-                  className="surface-muted-row hover:border-orange-400"
+                  className="surface-muted-row hover:border-accent-orange"
                 >
                   <div>
                     <p className="text-sm text-ink font-medium">{s.subject}</p>
                     {s.className && <p className="text-xs text-ink-subtle">{s.className}</p>}
                   </div>
-                  <span className="text-xs font-semibold text-orange-500">Live</span>
+                  <span className="text-xs font-semibold text-accent-orange">Live</span>
                 </Link>
               ))}
               <Link to="/sessions" className="block text-center text-sm text-brand hover:text-brand-hover pt-1">
@@ -516,7 +518,7 @@ function getQuickActionGroups(role?: UserRole): QuickActionGroup[] {
         {
           title: 'Attendance',
           actions: [
-            { to: '/sessions', label: 'Sign In Students', subtitle: 'Start session & QR', icon: ICONS.qr, variant: 'attendance' },
+            { to: '/sessions', label: 'Sign In Students', subtitle: 'Start session & QR', icon: ICONS.qr, variant: 'signin' },
             { to: '/attendance', label: 'Mark Attendance', subtitle: 'Manual roll call', icon: ICONS.clipboard, variant: 'attendance' },
             { to: '/biometric/attendance', label: 'Face Scan', subtitle: 'Biometric check-in', icon: ICONS.check, variant: 'attendance' },
           ],
@@ -574,7 +576,7 @@ function getQuickActionGroups(role?: UserRole): QuickActionGroup[] {
         {
           title: 'Attendance',
           actions: [
-            { to: '/sessions', label: 'Sign In Students', subtitle: 'Department sessions', icon: ICONS.qr, variant: 'attendance' },
+            { to: '/sessions', label: 'Sign In Students', subtitle: 'Department sessions', icon: ICONS.qr, variant: 'signin' },
             { to: '/attendance', label: 'Mark Attendance', subtitle: 'Override or manual', icon: ICONS.clipboard, variant: 'attendance' },
             { to: '/biometric/attendance', label: 'Face Scan', subtitle: 'Biometric check-in', icon: ICONS.check, variant: 'attendance' },
           ],
@@ -870,7 +872,7 @@ const TeacherClassPanel: React.FC<{ classId?: string; attendanceRate?: string }>
         className="surface-panel alert-warning min-h-[280px]"
         style={{ animation: 'fadeInUp 0.5s ease-out 0.7s forwards', opacity: 0 }}
       >
-        <h3 className="dash-section-title text-orange-400 mb-2">No class assigned</h3>
+        <h3 className="dash-section-title text-accent-orange mb-2">No class assigned</h3>
         <p className="text-sm text-ink-muted mb-4">
           You must be assigned as class teacher before you can see students. Ask your HOD or school admin to assign your class in user management.
         </p>
@@ -996,11 +998,11 @@ const HodDepartmentPanel: React.FC<{ stats: StatCard[]; departmentName?: string 
         </div>
         <div className="surface-muted-row">
           <span className="text-sm text-ink-muted">Avg. Attendance</span>
-          <span className="text-sm font-semibold text-orange-400">{attendanceRate}</span>
+          <span className="text-sm font-semibold text-accent-orange">{attendanceRate}</span>
         </div>
         <div className="surface-muted-row">
           <span className="text-sm text-ink-muted">High Risk Students</span>
-          <span className="text-sm font-semibold text-orange-400">{atRisk}</span>
+          <span className="text-sm font-semibold text-accent-orange">{atRisk}</span>
         </div>
       </div>
       <Link
@@ -1221,14 +1223,14 @@ const DashboardPage: React.FC = () => {
                 {getRoleGreeting(user?.role)}
               </p>
               {user?.role === UserRole.TEACHER && !user?.classId && (
-                <p className="mt-3 text-sm text-orange-400 max-w-lg">
+                <p className="mt-3 text-sm text-ink-muted max-w-lg">
                   No class is assigned to your account yet — student lists and class stats stay empty until an admin assigns you as class teacher.
                 </p>
               )}
               {(user?.role === UserRole.TEACHER || user?.role === UserRole.HOD) && (
                 <Link
                   to="/sessions"
-                  className="mt-4 inline-flex items-center justify-center gap-2 btn-attendance py-3 px-6 text-sm w-full sm:w-auto"
+                  className="mt-4 inline-flex items-center justify-center gap-2 btn-primary py-3 px-6 text-sm w-full sm:w-auto"
                 >
                   <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={ICONS.qr} />
@@ -1315,7 +1317,7 @@ const DashboardPage: React.FC = () => {
                   <h3 className="dash-section-title">Attendance Streak</h3>
                 </div>
                 <div className="text-center py-6">
-                  <p className="dash-stat-value text-orange-400 text-4xl mb-2">{daysPresentStat ?? '—'}</p>
+                  <p className="dash-stat-value text-accent-orange text-4xl mb-2">{daysPresentStat ?? '—'}</p>
                   <p className="text-sm text-ink-muted">days present (term total)</p>
                 </div>
                 <Link
