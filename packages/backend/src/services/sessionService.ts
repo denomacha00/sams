@@ -132,6 +132,7 @@ export class SessionService {
         qrRefreshedAt: new Date(),
         isActive: true,
       },
+      include: { class: { select: { name: true } } },
     });
 
     return session;

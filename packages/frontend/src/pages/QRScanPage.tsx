@@ -4,6 +4,7 @@ import apiClient from '../services/apiClient';
 import { saveAttendanceRecord } from '../services/offlineStore';
 import { AttendanceStatus } from '@sams/shared';
 import { useAuthStore } from '../store/authStore';
+import { getApiErrorMessage } from '../lib/apiError';
 
 declare global {
   interface Window {
@@ -102,8 +103,7 @@ const QRScanPage: React.FC = () => {
         setError('Saved offline. Will sync when connected.');
       }
     } catch (err: unknown) {
-      const apiErr = err as { response?: { data?: { error?: string } } };
-      setError(apiErr.response?.data?.error || 'Failed to record attendance');
+      setError(getApiErrorMessage(err, 'Failed to record attendance'));
     } finally {
       setLoading(false);
     }

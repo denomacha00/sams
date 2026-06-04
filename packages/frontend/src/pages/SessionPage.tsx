@@ -4,11 +4,13 @@ import { io, Socket } from 'socket.io-client';
 import apiClient from '../services/apiClient';
 import { useAuthStore } from '../store/authStore';
 import { AttendanceStatus } from '@sams/shared';
+import { getApiErrorMessage } from '../lib/apiError';
 
 interface TimetableEntry {
   id: string;
   subject: string;
-  className: string;
+  className?: string;
+  class?: { name?: string };
   dayOfWeek: number;
   startTime: string;
   endTime: string;
@@ -55,23 +57,29 @@ const SessionPage: React.FC = () => {
   const [linkTimeRemaining, setLinkTimeRemaining] = useState<number>(0);
   const linkTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  // Fetch timetable entries — filter to today's day by default
+  // Fetch today's timetable entries for this teacher
   useEffect(() => {
     const fetchEntries = async () => {
       try {
-        // JS getDay(): 0=Sun, 1=Mon … 6=Sat → schema: 0=Mon … 6=Sun
         const jsDayOfWeek = new Date().getDay();
         const schemaDayOfWeek = jsDayOfWeek === 0 ? 6 : jsDayOfWeek - 1;
         const { data } = await apiClient.get('/timetable', {
-          params: { dayOfWeek: schemaDayOfWeek },
+          params: {
+            dayOfWeek: schemaDayOfWeek,
+            ...(user?.id ? { teacherId: user.id } : {}),
+          },
         });
-        setTimetableEntries(Array.isArray(data) ? data : []);
-      } catch {
-        // ignore
+        const entries = (Array.isArray(data) ? data : []).map((entry: TimetableEntry) => ({
+          ...entry,
+          className: entry.className ?? entry.class?.name ?? 'Class',
+        }));
+        setTimetableEntries(entries);
+      } catch (err) {
+        setError(getApiErrorMessage(err, 'Could not load today\'s timetable'));
       }
     };
     fetchEntries();
-  }, []);
+  }, [user?.id]);
 
   // Generate QR code image from token
   useEffect(() => {
@@ -177,8 +185,8 @@ const SessionPage: React.FC = () => {
       setLinkUrl(data.linkUrl);
       setLinkToken(data.linkToken);
       setLinkExpiresAt(data.expiresAt);
-    } catch (err: any) {
-      setError(err.response?.data?.error || 'Failed to generate link');
+    } catch (err: unknown) {
+      setError(getApiErrorMessage(err, 'Failed to generate link'));
     } finally {
       setLinkLoading(false);
     }
@@ -235,31 +243,35 @@ const SessionPage: React.FC = () => {
     setError(null);
 
     try {
-      // Capture GPS
+      // Capture GPS when available; session still starts without it (GPS check skipped server-side)
       let location: { lat: number; lng: number } | undefined;
       if (navigator.geolocation) {
-        const pos = await new Promise<GeolocationPosition>((resolve, reject) =>
-          navigator.geolocation.getCurrentPosition(resolve, reject, { timeout: 10000 })
-        );
-        location = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+        try {
+          const pos = await new Promise<GeolocationPosition>((resolve, reject) =>
+            navigator.geolocation.getCurrentPosition(resolve, reject, { timeout: 10000 })
+          );
+          location = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+        } catch {
+          // Teacher can still start — students without GPS coords skip proximity check
+        }
       }
 
       const { data } = await apiClient.post('/sessions', {
         timetableEntryId: selectedEntry,
-        location,
+        ...(location ? { location } : {}),
       });
 
       setActiveSession({
         id: data.id,
         subject: data.subject,
-        className: data.className,
-        qrToken: data.qrToken,
+        className: data.className ?? 'Class',
+        qrToken: data.qrToken ?? data.currentQRToken ?? '',
         startedAt: data.startedAt,
         locationRadiusM: data.locationRadiusM || 100,
         records: [],
       });
-    } catch (err: any) {
-      setError(err.response?.data?.error || 'Failed to start session');
+    } catch (err: unknown) {
+      setError(getApiErrorMessage(err, 'Failed to start session'));
     } finally {
       setLoading(false);
     }
@@ -272,8 +284,8 @@ const SessionPage: React.FC = () => {
       await apiClient.post(`/sessions/${activeSession.id}/end`);
       setActiveSession(null);
       setQrDataUrl('');
-    } catch (err: any) {
-      setError(err.response?.data?.error || 'Failed to end session');
+    } catch (err: unknown) {
+      setError(getApiErrorMessage(err, 'Failed to end session'));
     } finally {
       setLoading(false);
     }
@@ -325,6 +337,11 @@ const SessionPage: React.FC = () => {
                   </option>
                 ))}
               </select>
+              {timetableEntries.length === 0 && (
+                <p className="text-xs text-amber-300/90 mt-2">
+                  No classes on your timetable for today. Ask your HOD or admin to add entries, or try again on the scheduled day.
+                </p>
+              )}
             </div>
 
             <button

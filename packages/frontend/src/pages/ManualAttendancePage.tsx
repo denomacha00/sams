@@ -3,6 +3,7 @@ import apiClient from '../services/apiClient';
 import { saveAttendanceRecord } from '../services/offlineStore';
 import { AttendanceStatus } from '@sams/shared';
 import { useAuthStore } from '../store/authStore';
+import { getApiErrorMessage } from '../lib/apiError';
 
 interface Student {
   id: string;
@@ -30,15 +31,18 @@ const ManualAttendancePage: React.FC = () => {
   useEffect(() => {
     const fetchSessions = async () => {
       try {
-        const { data } = await apiClient.get('/sessions?active=true');
-        setSessions(data);
-        if (data.length > 0) setSessionId(data[0].id);
-      } catch {
-        // ignore
+        const { data } = await apiClient.get('/sessions', {
+          params: { isActive: true, teacherId: user?.id },
+        });
+        const list = Array.isArray(data) ? data : [];
+        setSessions(list);
+        if (list.length > 0) setSessionId(list[0].id);
+      } catch (err) {
+        setError(getApiErrorMessage(err, 'Could not load active sessions'));
       }
     };
-    fetchSessions();
-  }, []);
+    void fetchSessions();
+  }, [user?.id]);
 
   // Fetch students when session is selected
   useEffect(() => {
@@ -53,8 +57,8 @@ const ManualAttendancePage: React.FC = () => {
           initial[s.id] = { studentId: s.id, status: AttendanceStatus.PRESENT, note: '' };
         });
         setMarks(initial);
-      } catch {
-        // ignore
+      } catch (err) {
+        setError(getApiErrorMessage(err, 'Could not load students for this session'));
       }
     };
     fetchStudents();
@@ -89,14 +93,14 @@ const ManualAttendancePage: React.FC = () => {
 
     try {
       if (navigator.onLine) {
-        await apiClient.post('/attendance/manual', {
-          sessionId,
-          records: entries.map((m) => ({
-            studentId: m.studentId,
-            status: m.status,
-            note: m.note || undefined,
-          })),
-        });
+        for (const entry of entries) {
+          await apiClient.post('/attendance/manual', {
+            sessionId,
+            studentId: entry.studentId,
+            status: entry.status,
+            note: entry.note || undefined,
+          });
+        }
         setSuccess(true);
       } else {
         for (const entry of entries) {
@@ -114,8 +118,8 @@ const ManualAttendancePage: React.FC = () => {
         setSuccess(true);
         setError('Saved offline. Will sync when connected.');
       }
-    } catch (err: any) {
-      setError(err.response?.data?.error || 'Failed to submit attendance');
+    } catch (err: unknown) {
+      setError(getApiErrorMessage(err, 'Failed to submit attendance'));
     } finally {
       setLoading(false);
     }
@@ -170,6 +174,15 @@ const ManualAttendancePage: React.FC = () => {
               </option>
             ))}
           </select>
+          {sessions.length === 0 && (
+            <p className="text-xs text-amber-300/90 mt-2">
+              No active session. Start one from{' '}
+              <a href="/sessions" className="text-indigo-300 hover:text-indigo-200 underline">
+                Sign In Students
+              </a>{' '}
+              first.
+            </p>
+          )}
         </div>
 
         {/* Student list */}

@@ -5,6 +5,7 @@ import { requirePermission } from '../middleware/rbac';
 import { sessionService } from '../services/sessionService';
 import { prisma } from '../lib/prisma';
 import { AppError } from '../middleware/errors';
+import { formatSessionForClient, formatStudentsForClient } from '../lib/sessionResponse';
 
 // ─── Validation Schemas ───────────────────────────────────────────────────────
 
@@ -13,7 +14,7 @@ const startSessionSchema = z.object({
   location: z.object({
     lat: z.number().min(-90).max(90),
     lng: z.number().min(-180).max(180),
-  }),
+  }).optional(),
 });
 
 // ─── Router ───────────────────────────────────────────────────────────────────
@@ -40,9 +41,9 @@ sessionsRouter.post('/', requirePermission('start:session'), async (req: Request
       req.user.sub,
       req.schoolId,
       parsed.data.timetableEntryId,
-      parsed.data.location,
+      parsed.data.location ?? { lat: 0, lng: 0 },
     );
-    res.status(201).json(session);
+    res.status(201).json(formatSessionForClient(session));
   } catch (err) {
     if (err instanceof AppError) throw err;
     throw new AppError(500, 'INTERNAL_ERROR', 'Failed to start session');
@@ -74,8 +75,12 @@ sessionsRouter.get('/', async (req: Request, res: Response): Promise<void> => {
       where.isActive = req.query.isActive === 'true';
     }
 
-    const sessions = await prisma.attendanceSession.findMany({ where });
-    res.status(200).json(sessions);
+    const sessions = await prisma.attendanceSession.findMany({
+      where,
+      include: { class: { select: { name: true } } },
+      orderBy: { startedAt: 'desc' },
+    });
+    res.status(200).json(sessions.map(formatSessionForClient));
   } catch (err) {
     if (err instanceof AppError) throw err;
     throw new AppError(500, 'INTERNAL_ERROR', 'Failed to list sessions');
@@ -90,6 +95,7 @@ sessionsRouter.get('/:id', async (req: Request, res: Response): Promise<void> =>
   try {
     const session = await prisma.attendanceSession.findUnique({
       where: { id: req.params.id as string },
+      include: { class: { select: { name: true } } },
     });
 
     if (!session) {
@@ -100,7 +106,21 @@ sessionsRouter.get('/:id', async (req: Request, res: Response): Promise<void> =>
       throw new AppError(403, 'FORBIDDEN', 'Access to this resource is not allowed');
     }
 
-    res.status(200).json(session);
+    const students = await prisma.user.findMany({
+      where: {
+        schoolId: req.schoolId,
+        classId: session.classId,
+        role: UserRole.STUDENT,
+        isActive: true,
+      },
+      select: { id: true, fullName: true, admissionNumber: true },
+      orderBy: { fullName: 'asc' },
+    });
+
+    res.status(200).json({
+      ...formatSessionForClient(session),
+      students: formatStudentsForClient(students),
+    });
   } catch (err) {
     if (err instanceof AppError) throw err;
     throw new AppError(500, 'INTERNAL_ERROR', 'Failed to get session');

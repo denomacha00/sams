@@ -5,6 +5,7 @@ import { AppError } from '../middleware/errors';
 import { auditService } from './auditService';
 import { riskService } from './riskService';
 import { broadcastAttendanceNew, broadcastAttendanceUpdated } from '../sockets/attendanceSocket';
+import { buildAttendanceEventPayload } from '../lib/attendanceEvent';
 import { getQrSecret } from '../config/secrets';
 import {
   haversineDistance,
@@ -45,6 +46,16 @@ interface LinkTokenPayload {
 // ─── Attendance Service ───────────────────────────────────────────────────────
 
 export class AttendanceService {
+  private async emitAttendanceNew(sessionId: string, record: { id: string; studentId: string; status: string; method: string; scannedAt: Date }): Promise<void> {
+    const payload = await buildAttendanceEventPayload(record as Parameters<typeof buildAttendanceEventPayload>[0]);
+    broadcastAttendanceNew(sessionId, payload);
+  }
+
+  private async emitAttendanceUpdated(sessionId: string, record: { id: string; studentId: string; status: string; method: string; scannedAt: Date }): Promise<void> {
+    const payload = await buildAttendanceEventPayload(record as Parameters<typeof buildAttendanceEventPayload>[0]);
+    broadcastAttendanceUpdated(sessionId, payload);
+  }
+
   /**
    * Generate a shareable attendance link for an active session.
    * Teacher can choose whether to enforce GPS proximity check.
@@ -199,7 +210,7 @@ export class AttendanceService {
     });
 
     // 8. Broadcast via WebSocket and trigger risk score recomputation
-    broadcastAttendanceNew(session.id, record);
+    await this.emitAttendanceNew(session.id, record);
     riskService.computeRiskScore(schoolId, studentId).catch(() => {});
 
     return record;
@@ -295,7 +306,7 @@ export class AttendanceService {
     });
 
     // Broadcast new attendance to session room
-    broadcastAttendanceNew(session.id, record);
+    await this.emitAttendanceNew(session.id, record);
 
     // Fire-and-forget: recompute student risk score
     riskService.computeRiskScore(schoolId, studentId).catch(() => {});
@@ -381,7 +392,7 @@ export class AttendanceService {
       });
 
       // Broadcast updated attendance to session room
-      broadcastAttendanceUpdated(sessionId, updated);
+      await this.emitAttendanceUpdated(sessionId, updated);
 
       // Fire-and-forget: recompute student risk score
       riskService.computeRiskScore(schoolId, studentId).catch(() => {});
@@ -404,7 +415,7 @@ export class AttendanceService {
     });
 
     // Broadcast new attendance to session room
-    broadcastAttendanceNew(sessionId, record);
+    await this.emitAttendanceNew(sessionId, record);
 
     // Fire-and-forget: recompute student risk score
     riskService.computeRiskScore(schoolId, studentId).catch(() => {});
@@ -464,7 +475,7 @@ export class AttendanceService {
     });
 
     // Broadcast new attendance to session room
-    broadcastAttendanceNew(sessionId, record);
+    await this.emitAttendanceNew(sessionId, record);
 
     // Fire-and-forget: recompute student risk score
     riskService.computeRiskScore(schoolId, studentId).catch(() => {});
@@ -541,7 +552,7 @@ export class AttendanceService {
     });
 
     // Broadcast updated attendance to session room
-    broadcastAttendanceUpdated(record.sessionId, updated);
+    await this.emitAttendanceUpdated(record.sessionId, updated);
 
     // Fire-and-forget: recompute student risk score
     riskService.computeRiskScore(schoolId, record.studentId).catch(() => {});

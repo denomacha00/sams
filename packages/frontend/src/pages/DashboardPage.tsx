@@ -285,21 +285,17 @@ const AtAGlancePanel: React.FC<{ role?: UserRole; userId?: string }> = ({ role, 
         </div>
       ) : role === UserRole.TEACHER ? (
         <div className="space-y-3">
-          <div className="flex items-center justify-between p-3 rounded-xl bg-white/[0.03] border border-white/5">
-            <span className="text-sm text-gray-300">Unread messages</span>
-            <span className="text-sm font-semibold text-indigo-300">{unreadCount}</span>
-          </div>
-          <Link
-            to="/notifications"
-            className="block p-3 rounded-xl bg-white/[0.03] hover:bg-white/[0.07] border border-white/5 text-sm text-gray-200"
-          >
-            Send or read class messages →
+          <Link to="/sessions" className="btn-primary w-full py-3 text-sm flex items-center justify-center gap-2">
+            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={ICONS.qr} />
+            </svg>
+            Sign In Students
           </Link>
           {activeSessions.length === 0 ? (
-            <div className="text-center py-6">
-              <p className="text-gray-500 text-sm mb-4">No active sessions right now</p>
-              <Link to="/sessions" className="btn-primary inline-flex py-2.5 px-5 text-sm">
-                Start a session
+            <div className="text-center py-4">
+              <p className="text-gray-500 text-sm mb-3">No active sessions right now</p>
+              <Link to="/sessions" className="text-sm text-indigo-300 hover:text-indigo-200">
+                Start attendance session →
               </Link>
             </div>
           ) : (
@@ -318,10 +314,16 @@ const AtAGlancePanel: React.FC<{ role?: UserRole; userId?: string }> = ({ role, 
                 </Link>
               ))}
               <Link to="/sessions" className="block text-center text-sm text-indigo-300 hover:text-indigo-200 pt-1">
-                Manage all sessions →
+                Manage session & QR →
               </Link>
             </>
           )}
+          <Link
+            to="/notifications"
+            className="block p-3 rounded-xl bg-white/[0.03] hover:bg-white/[0.07] border border-white/5 text-sm text-gray-200"
+          >
+            Send or read class messages →
+          </Link>
         </div>
       ) : role === UserRole.HOD ? (
         <div className="space-y-3">
@@ -496,10 +498,12 @@ function getQuickActions(role?: UserRole): QuickAction[] {
       ];
     case UserRole.TEACHER:
       return [
-        { to: '/sessions', label: 'Start Session', icon: ICONS.session, gradient: 'from-indigo-600 to-slate-700' },
+        { to: '/sessions', label: 'Sign In Students', icon: ICONS.qr, gradient: 'from-indigo-600 to-slate-700' },
+        { to: '/sessions', label: 'Start Session', icon: ICONS.session, gradient: 'from-blue-500 to-indigo-500' },
+        { to: '/attendance', label: 'Mark Attendance', icon: ICONS.clipboard, gradient: 'from-indigo-600 to-slate-700' },
+        { to: '/biometric/attendance', label: 'Face Scan', icon: ICONS.check, gradient: 'from-emerald-500 to-teal-500' },
         { to: '/class/students', label: 'My Students', icon: ICONS.users, gradient: 'from-slate-600 to-indigo-600' },
         { to: '/class-roster', label: 'Assign Class Rep', icon: ICONS.users, gradient: 'from-amber-500 to-orange-500' },
-        { to: '/attendance', label: 'Mark Attendance', icon: ICONS.clipboard, gradient: 'from-indigo-600 to-slate-700' },
         { to: '/admin/links', label: 'Registration Links', icon: ICONS.link, gradient: 'from-emerald-500 to-teal-500' },
         { to: '/reports', label: 'View Reports', icon: ICONS.chart, gradient: 'from-indigo-600 to-slate-700' },
         { to: '/timetable', label: 'My Timetable', icon: ICONS.calendar, gradient: 'from-orange-500 to-amber-500' },
@@ -1073,6 +1077,17 @@ const DashboardPage: React.FC = () => {
                   No class is assigned to your account yet — student lists and class stats stay empty until an admin assigns you as class teacher.
                 </p>
               )}
+              {user?.role === UserRole.TEACHER && (
+                <Link
+                  to="/sessions"
+                  className="mt-4 inline-flex items-center justify-center gap-2 btn-primary py-3 px-6 text-sm w-full sm:w-auto"
+                >
+                  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={ICONS.qr} />
+                  </svg>
+                  Sign In Students
+                </Link>
+              )}
               {user?.role === UserRole.STUDENT && (
                 <Link
                   to="/sessions/scan"
@@ -1108,7 +1123,7 @@ const DashboardPage: React.FC = () => {
           <SectionHeader title="Quick Actions" icon={ICONS.trending} gradient="from-slate-600 to-indigo-600" />
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
             {quickActions.map((action, i) => (
-              <QuickActionButton key={action.to} action={action} index={i} />
+              <QuickActionButton key={`${action.to}-${action.label}`} action={action} index={i} />
             ))}
           </div>
         </section>
