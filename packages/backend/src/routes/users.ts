@@ -50,6 +50,7 @@ const updateUserSchema = z.object({
   departmentId: z.string().optional(),
   classId: z.string().optional(),
   isLocked: z.boolean().optional(),
+  attendanceGpsExempt: z.boolean().optional(),
 });
 
 const generateLinkSchema = z.object({
@@ -476,6 +477,17 @@ usersRouter.put('/:id', requirePermission('manage:users'), async (req: Request, 
       // HOD cannot move a user to a different department
       if (parsed.data.departmentId && parsed.data.departmentId !== req.user.departmentId) {
         throw new AppError(403, 'FORBIDDEN', 'HODs cannot move users to a different department');
+      }
+    }
+
+    if (parsed.data.attendanceGpsExempt !== undefined) {
+      const target = await userService.getUser(req.schoolId, req.params.id as string);
+      if (target.role !== UserRole.STUDENT) {
+        throw new AppError(
+          400,
+          'VALIDATION_ERROR',
+          'GPS attendance permission applies to students only',
+        );
       }
     }
 

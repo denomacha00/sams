@@ -15,6 +15,8 @@ const startSessionSchema = z.object({
     lat: z.number().min(-90).max(90),
     lng: z.number().min(-180).max(180),
   }).optional(),
+  requireGps: z.boolean().default(true),
+  locationRadiusM: z.number().int().min(10).max(10000).default(100),
 });
 
 // ─── Router ───────────────────────────────────────────────────────────────────
@@ -41,7 +43,11 @@ sessionsRouter.post('/', requirePermission('start:session'), async (req: Request
       req.user.sub,
       req.schoolId,
       parsed.data.timetableEntryId,
-      parsed.data.location ?? { lat: 0, lng: 0 },
+      parsed.data.location,
+      {
+        requireGps: parsed.data.requireGps,
+        locationRadiusM: parsed.data.locationRadiusM,
+      },
     );
     res.status(201).json(formatSessionForClient(session));
   } catch (err) {

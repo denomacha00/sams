@@ -571,6 +571,14 @@ function getQuickActionGroups(role?: UserRole): QuickActionGroup[] {
     case UserRole.HOD:
       return [
         {
+          title: 'Attendance',
+          actions: [
+            { to: '/sessions', label: 'Sign In Students', icon: ICONS.qr, gradient: 'from-emerald-600 to-teal-600', variant: 'attendance' },
+            { to: '/attendance', label: 'Mark Attendance', icon: ICONS.clipboard, gradient: 'from-emerald-500 to-teal-500', variant: 'attendance' },
+            { to: '/biometric/attendance', label: 'Face Scan', icon: ICONS.check, gradient: 'from-emerald-600 to-teal-600', variant: 'attendance' },
+          ],
+        },
+        {
           title: 'Department',
           actions: [
             { to: '/hod/department', label: 'Department Management', icon: ICONS.building, gradient: 'from-indigo-500 to-blue-500' },
@@ -1220,7 +1228,7 @@ const DashboardPage: React.FC = () => {
                   No class is assigned to your account yet — student lists and class stats stay empty until an admin assigns you as class teacher.
                 </p>
               )}
-              {user?.role === UserRole.TEACHER && (
+              {(user?.role === UserRole.TEACHER || user?.role === UserRole.HOD) && (
                 <Link
                   to="/sessions"
                   className="mt-4 inline-flex items-center justify-center gap-2 btn-attendance py-3 px-6 text-sm w-full sm:w-auto"

@@ -129,6 +129,8 @@ model User {
   lastLoginAt            DateTime?
   avatarUrl              String?
   isClassRep             Boolean   @default(false)
+  /// When true, QR/link GPS radius checks are skipped (medical leave, permission, etc.)
+  attendanceGpsExempt    Boolean   @default(false)
   createdAt              DateTime  @default(now())
   updatedAt              DateTime  @updatedAt
 

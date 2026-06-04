@@ -314,7 +314,9 @@ Then on VPS: `bash scripts/deploy-production.sh`
 
 ### Preserved recent fixes (not regressed)
 
+- School unsuspend auth clear `6753c1d0` (frontend `clearAuthState` / login messaging)
 - Attendance flow `fd1365ab` / session response helpers
+- HOD teacher attendance: `start:session` + `mark:attendance` in RBAC; dashboard Sign In Students; `User.attendanceGpsExempt` for permitted off-radius sign-in (see `docs/ATTENDANCE.md`)
 - AI anti-hallucination `39ab7dc1`
 - HOD notifications `e873beab`
 - Conversation memory `11fbdce3`

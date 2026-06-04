@@ -34,8 +34,11 @@ export class SessionService {
     teacherId: string,
     schoolId: string,
     timetableEntryId: string,
-    location: { lat: number; lng: number },
+    location: { lat: number; lng: number } | undefined,
+    options: { requireGps?: boolean; locationRadiusM?: number } = {},
   ) {
+    const requireGps = options.requireGps ?? true;
+    const locationRadiusM = options.locationRadiusM ?? 100;
     // Validate timetable entry belongs to teacher and school
     const timetableEntry = await prisma.timetableEntry.findFirst({
       where: {
@@ -117,6 +120,11 @@ export class SessionService {
     );
 
     // Create the attendance session
+    const useLocation =
+      requireGps &&
+      location != null &&
+      (location.lat !== 0 || location.lng !== 0);
+
     const session = await prisma.attendanceSession.create({
       data: {
         id: sessionId,
@@ -126,8 +134,9 @@ export class SessionService {
         timetableEntryId,
         subject: timetableEntry.subject,
         lateThresholdMin: DEFAULT_LATE_THRESHOLD_MIN,
-        locationLat: location.lat,
-        locationLng: location.lng,
+        locationLat: useLocation ? location!.lat : null,
+        locationLng: useLocation ? location!.lng : null,
+        locationRadiusM,
         currentQRToken: qrToken,
         qrRefreshedAt: new Date(),
         isActive: true,

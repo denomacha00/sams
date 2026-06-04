@@ -56,6 +56,8 @@ const SessionPage: React.FC = () => {
   const [linkCopied, setLinkCopied] = useState(false);
   const [linkTimeRemaining, setLinkTimeRemaining] = useState<number>(0);
   const linkTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const [sessionRequireGps, setSessionRequireGps] = useState<boolean>(true);
+  const [sessionRadiusM, setSessionRadiusM] = useState<number>(100);
 
   // Fetch today's timetable entries for this teacher
   useEffect(() => {
@@ -190,7 +192,7 @@ const SessionPage: React.FC = () => {
     } finally {
       setLinkLoading(false);
     }
-  }, [activeSession, expiryMinutes]);
+  }, [activeSession, expiryMinutes, requireGps, gpsRadiusM]);
 
   const copyLink = useCallback(async () => {
     if (!linkUrl) return;
@@ -243,21 +245,23 @@ const SessionPage: React.FC = () => {
     setError(null);
 
     try {
-      // Capture GPS when available; session still starts without it (GPS check skipped server-side)
       let location: { lat: number; lng: number } | undefined;
-      if (navigator.geolocation) {
+      if (sessionRequireGps && navigator.geolocation) {
         try {
           const pos = await new Promise<GeolocationPosition>((resolve, reject) =>
             navigator.geolocation.getCurrentPosition(resolve, reject, { timeout: 10000 })
           );
           location = { lat: pos.coords.latitude, lng: pos.coords.longitude };
         } catch {
-          // Teacher can still start — students without GPS coords skip proximity check
+          setError('Could not get your location. Allow GPS or turn off "Require GPS" for this session.');
+          return;
         }
       }
 
       const { data } = await apiClient.post('/sessions', {
         timetableEntryId: selectedEntry,
+        requireGps: sessionRequireGps,
+        locationRadiusM: sessionRequireGps ? sessionRadiusM : 100,
         ...(location ? { location } : {}),
       });
 
@@ -343,6 +347,52 @@ const SessionPage: React.FC = () => {
                 </p>
               )}
             </div>
+
+            <div className="flex items-center justify-between p-3 bg-white/5 border border-white/10 rounded-xl">
+              <div>
+                <p className="text-sm font-medium text-white">Require GPS (QR scan)</p>
+                <p className="text-xs text-gray-400 mt-0.5">
+                  {sessionRequireGps
+                    ? 'Students must be within radius of your location when scanning'
+                    : 'No location check for QR — use link GPS toggle separately if needed'}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setSessionRequireGps((v) => !v)}
+                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors duration-200 focus:outline-none ${
+                  sessionRequireGps ? 'bg-purple-600' : 'bg-white/20'
+                }`}
+              >
+                <span
+                  className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform duration-200 ${
+                    sessionRequireGps ? 'translate-x-6' : 'translate-x-1'
+                  }`}
+                />
+              </button>
+            </div>
+
+            {sessionRequireGps && (
+              <div>
+                <label htmlFor="sessionRadiusM" className="block text-xs font-semibold text-gray-300 uppercase tracking-wider mb-2">
+                  QR allowed radius (meters)
+                </label>
+                <div className="flex items-center gap-3">
+                  <input
+                    id="sessionRadiusM"
+                    type="number"
+                    min={10}
+                    max={10000}
+                    value={sessionRadiusM}
+                    onChange={(e) =>
+                      setSessionRadiusM(Math.max(10, Math.min(10000, parseInt(e.target.value, 10) || 100)))
+                    }
+                    className="flex-1 bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:ring-2 focus:ring-purple-500/50 transition-all duration-200"
+                  />
+                  <span className="text-sm text-gray-400 shrink-0">m</span>
+                </div>
+              </div>
+            )}
 
             <button
               onClick={startSession}

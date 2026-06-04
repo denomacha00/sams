@@ -50,13 +50,15 @@ describe('ROLE_PERMISSIONS', () => {
     expect(perms).toContain('manage:payments');
   });
 
-  it('HOD has manage:users, manage:timetable, view:timetable, view:reports, view:risk', () => {
+  it('HOD has manage:users, manage:timetable, view:timetable, view:reports, view:risk, and teacher attendance', () => {
     const perms = ROLE_PERMISSIONS[UserRole.HOD];
     expect(perms).toContain('manage:users');
     expect(perms).toContain('manage:timetable');
     expect(perms).toContain('view:timetable');
     expect(perms).toContain('view:reports');
     expect(perms).toContain('view:risk');
+    expect(perms).toContain('start:session');
+    expect(perms).toContain('mark:attendance');
     expect(perms).not.toContain('manage:payments');
     expect(perms).not.toContain('super:admin');
   });
@@ -159,6 +161,22 @@ describe('requirePermission', () => {
 
     expect(next).not.toHaveBeenCalled();
     expect(status).toHaveBeenCalledWith(403);
+  });
+
+  it('HOD can start:session and mark:attendance', () => {
+    const req = makeReq({ user: { sub: 'u1', schoolId: 's1', role: UserRole.HOD, iat: 0, exp: 9999 } } as any);
+    const { res } = makeRes();
+    const next = makeNext();
+
+    requirePermission('start:session')(req, res, next);
+    expect(next).toHaveBeenCalledOnce();
+
+    const req2 = makeReq({ user: { sub: 'u1', schoolId: 's1', role: UserRole.HOD, iat: 0, exp: 9999 } } as any);
+    const { res: res2 } = makeRes();
+    const next2 = makeNext();
+
+    requirePermission('mark:attendance')(req2, res2, next2);
+    expect(next2).toHaveBeenCalledOnce();
   });
 
   it('HOD can view:risk and manage:timetable', () => {

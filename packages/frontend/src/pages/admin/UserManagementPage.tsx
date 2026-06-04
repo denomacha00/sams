@@ -16,6 +16,7 @@ interface User {
   classId?: string;
   isLocked: boolean;
   isClassRep?: boolean;
+  attendanceGpsExempt?: boolean;
   createdAt: string;
 }
 
@@ -37,6 +38,7 @@ interface UserFormData {
   password: string;
   departmentId: string;
   classId: string;
+  attendanceGpsExempt: boolean;
 }
 
 const emptyForm: UserFormData = {
@@ -49,6 +51,7 @@ const emptyForm: UserFormData = {
   password: '',
   departmentId: '',
   classId: '',
+  attendanceGpsExempt: false,
 };
 
 const UserManagementPage: React.FC = () => {
@@ -169,6 +172,7 @@ const UserManagementPage: React.FC = () => {
       password: '',
       departmentId: user.departmentId || '',
       classId: user.classId || '',
+      attendanceGpsExempt: user.attendanceGpsExempt ?? false,
     });
     setError('');
     setHodWarning(null);
@@ -206,6 +210,9 @@ const UserManagementPage: React.FC = () => {
 
       if (editingUser) {
         if (formData.password) payload.password = formData.password;
+        if (editingUser.role === 'STUDENT') {
+          payload.attendanceGpsExempt = formData.attendanceGpsExempt;
+        }
         await apiClient.put(`/users/${editingUser.id}`, payload);
       } else {
         payload.password = formData.password;
@@ -463,6 +470,25 @@ const UserManagementPage: React.FC = () => {
                   />
                 </div>
               </div>
+
+              {editingUser?.role === 'STUDENT' && (
+                <label className="flex items-start gap-3 p-3 rounded-xl bg-white/5 border border-white/10 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={formData.attendanceGpsExempt}
+                    onChange={(e) =>
+                      setFormData({ ...formData, attendanceGpsExempt: e.target.checked })
+                    }
+                    className="mt-1 rounded border-white/20"
+                  />
+                  <span>
+                    <span className="text-sm text-white font-medium">GPS attendance permission</span>
+                    <span className="block text-xs text-gray-400 mt-0.5">
+                      Allow sign-in outside the session radius (medical leave, approved absence on campus, etc.)
+                    </span>
+                  </span>
+                </label>
+              )}
 
               <div className="grid grid-cols-2 gap-4">
                 <div>

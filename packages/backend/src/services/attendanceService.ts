@@ -7,6 +7,7 @@ import { riskService } from './riskService';
 import { broadcastAttendanceNew, broadcastAttendanceUpdated } from '../sockets/attendanceSocket';
 import { buildAttendanceEventPayload } from '../lib/attendanceEvent';
 import { getQrSecret } from '../config/secrets';
+import { shouldEnforceSessionGps } from '../lib/attendanceGps';
 import {
   haversineDistance,
   classifyAttendanceStatus,
@@ -153,13 +154,21 @@ export class AttendanceService {
       throw new AppError(400, 'SESSION_ENDED', 'Attendance session has ended');
     }
 
+    const student = await prisma.user.findUnique({
+      where: { id: studentId },
+      select: { attendanceGpsExempt: true },
+    });
+
     // 4. Validate GPS proximity — only if the token requires GPS
-    if (payload.requireGps && session.locationLat != null && session.locationLng != null) {
+    if (
+      payload.requireGps &&
+      shouldEnforceSessionGps(session, gpsCoords, student?.attendanceGpsExempt ?? false)
+    ) {
       const distance = haversineDistance(
         gpsCoords.lat,
         gpsCoords.lng,
-        session.locationLat,
-        session.locationLng,
+        session.locationLat!,
+        session.locationLng!,
       );
 
       if (distance > payload.gpsRadiusM) {
@@ -248,14 +257,20 @@ export class AttendanceService {
       throw new AppError(400, 'SESSION_ENDED', 'Attendance session has ended');
     }
 
-    // 3. Validate GPS proximity (skip if no real GPS coords provided)
-    const hasGPS = gpsCoords.lat !== 0 || gpsCoords.lng !== 0;
-    if (hasGPS && session.locationLat != null && session.locationLng != null) {
+    const student = await prisma.user.findUnique({
+      where: { id: studentId },
+      select: { attendanceGpsExempt: true },
+    });
+
+    // 3. Validate GPS proximity when session anchor is set and student has no exemption
+    if (
+      shouldEnforceSessionGps(session, gpsCoords, student?.attendanceGpsExempt ?? false)
+    ) {
       const distance = haversineDistance(
         gpsCoords.lat,
         gpsCoords.lng,
-        session.locationLat,
-        session.locationLng,
+        session.locationLat!,
+        session.locationLng!,
       );
 
       if (distance > session.locationRadiusM) {

@@ -31,6 +31,7 @@ export interface UpdateUserData {
   departmentId?: string;
   classId?: string;
   isLocked?: boolean;
+  attendanceGpsExempt?: boolean;
 }
 
 export interface ListUsersFilters {
@@ -154,6 +155,9 @@ export class UserService {
         ...(data.departmentId !== undefined && { departmentId: data.departmentId }),
         ...(data.classId !== undefined && { classId: data.classId }),
         ...(data.isLocked !== undefined && { isLocked: data.isLocked }),
+        ...(data.attendanceGpsExempt !== undefined && {
+          attendanceGpsExempt: data.attendanceGpsExempt,
+        }),
       },
     });
 
