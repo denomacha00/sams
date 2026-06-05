@@ -19,6 +19,42 @@ async function assertHODOwnsTimetableEntry(req: Request, entryId: string): Promi
   }
 }
 
+async function assertHODCanUseTimetableRefs(
+  req: Request,
+  refs: { classId?: string; teacherId?: string },
+): Promise<void> {
+  if (req.user?.role !== UserRole.HOD || !req.user.departmentId) return;
+
+  const [cls, teacher] = await Promise.all([
+    refs.classId
+      ? prisma.class.findUnique({
+          where: { id: refs.classId },
+          select: { schoolId: true, departmentId: true },
+        })
+      : null,
+    refs.teacherId
+      ? prisma.user.findUnique({
+          where: { id: refs.teacherId },
+          select: { schoolId: true, role: true, departmentId: true },
+        })
+      : null,
+  ]);
+
+  if (refs.classId && (!cls || cls.schoolId !== req.schoolId || cls.departmentId !== req.user.departmentId)) {
+    throw new AppError(403, 'FORBIDDEN', 'HODs can only schedule classes in their own department');
+  }
+
+  if (
+    refs.teacherId &&
+    (!teacher ||
+      teacher.schoolId !== req.schoolId ||
+      (teacher.role !== UserRole.TEACHER && teacher.role !== UserRole.HOD) ||
+      teacher.departmentId !== req.user.departmentId)
+  ) {
+    throw new AppError(403, 'FORBIDDEN', 'HODs can only schedule teachers in their own department');
+  }
+}
+
 // ─── Validation Schemas ───────────────────────────────────────────────────────
 
 const createTimetableSchema = z.object({
@@ -85,6 +121,10 @@ timetableRouter.post('/', requirePermission('manage:timetable'), requireHODScope
   }
 
   try {
+    await assertHODCanUseTimetableRefs(req, {
+      classId: parsed.data.classId,
+      teacherId: parsed.data.teacherId,
+    });
     const entry = await timetableService.createEntry(req.schoolId, parsed.data);
     res.status(201).json(entry);
   } catch (err) {
@@ -113,6 +153,10 @@ timetableRouter.put('/:id', requirePermission('manage:timetable'), requireHODSco
   }
 
   try {
+    await assertHODCanUseTimetableRefs(req, {
+      classId: parsed.data.classId,
+      teacherId: parsed.data.teacherId,
+    });
     const entry = await timetableService.updateEntry(req.schoolId, req.params.id as string, parsed.data as Parameters<typeof timetableService.updateEntry>[2]);
     res.status(200).json(entry);
   } catch (err) {

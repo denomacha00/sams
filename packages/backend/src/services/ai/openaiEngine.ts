@@ -27,6 +27,16 @@ export interface OpenAIQueryResult {
 
 // ─── System Prompt Builder ────────────────────────────────────────────────────
 
+const MAX_KNOWLEDGE_ENTRIES_IN_PROMPT = 24;
+const MAX_KNOWLEDGE_ENTRY_CHARS = 1_500;
+const MAX_KNOWLEDGE_SECTION_CHARS = 18_000;
+
+function truncateForPrompt(value: string, maxChars: number): string {
+  const trimmed = value.trim();
+  if (trimmed.length <= maxChars) return trimmed;
+  return `${trimmed.slice(0, maxChars)}…`;
+}
+
 /**
  * Build a system prompt that includes the user's scope context.
  * This ensures the AI model understands the user's permissions and data boundaries.
@@ -104,9 +114,12 @@ Your knowledge is LIMITED to: (1) the SAMS Platform Documentation excerpt below,
       const knowledgeEntries = await knowledgeService.getForAIContext(user);
       if (knowledgeEntries.length > 0) {
         const formatted = knowledgeEntries
-          .map((entry) => `- [${entry.title}]: ${entry.content}`)
+          .slice(0, MAX_KNOWLEDGE_ENTRIES_IN_PROMPT)
+          .map((entry) =>
+            `- [${truncateForPrompt(entry.title, 120)}]: ${truncateForPrompt(entry.content, MAX_KNOWLEDGE_ENTRY_CHARS)}`,
+          )
           .join('\n');
-        knowledgeSection = `\n\nCustom Knowledge:\n${formatted}`;
+        knowledgeSection = `\n\nCustom Knowledge:\n${truncateForPrompt(formatted, MAX_KNOWLEDGE_SECTION_CHARS)}`;
       }
     } else {
       // Guest/unauthenticated user — fetch only global super admin knowledge entries
@@ -117,9 +130,12 @@ Your knowledge is LIMITED to: (1) the SAMS Platform Documentation excerpt below,
       });
       if (globalEntries.length > 0) {
         const formatted = globalEntries
-          .map((entry: { title: string; content: string }) => `- [${entry.title}]: ${entry.content}`)
+          .slice(0, MAX_KNOWLEDGE_ENTRIES_IN_PROMPT)
+          .map((entry: { title: string; content: string }) =>
+            `- [${truncateForPrompt(entry.title, 120)}]: ${truncateForPrompt(entry.content, MAX_KNOWLEDGE_ENTRY_CHARS)}`,
+          )
           .join('\n');
-        knowledgeSection = `\n\nCustom Knowledge:\n${formatted}`;
+        knowledgeSection = `\n\nCustom Knowledge:\n${truncateForPrompt(formatted, MAX_KNOWLEDGE_SECTION_CHARS)}`;
       }
     }
   } catch (err) {

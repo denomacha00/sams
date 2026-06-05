@@ -320,6 +320,7 @@ export class KnowledgeService {
       where,
       select: { title: true, content: true, category: true },
       orderBy: { createdAt: 'desc' },
+      take: 30,
     });
 
     // Also include global entries from super admin
@@ -328,6 +329,8 @@ export class KnowledgeService {
         createdBy: { role: 'SUPER_ADMIN' },
       },
       select: { title: true, content: true, category: true },
+      orderBy: { createdAt: 'desc' },
+      take: 20,
     });
 
     // Merge and deduplicate

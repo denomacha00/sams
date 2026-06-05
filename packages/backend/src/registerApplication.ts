@@ -55,7 +55,7 @@ const PUBLIC_REGISTRATION_LINK_PATHS = [
 ];
 
 function isPublicPath(path: string, method?: string): boolean {
-  if (PUBLIC_PATHS.some((pub) => path === pub || path.startsWith(pub + '/') || path.startsWith(pub))) {
+  if (PUBLIC_PATHS.some((pub) => path === pub || path.startsWith(pub + '/'))) {
     return true;
   }
   return PUBLIC_REGISTRATION_LINK_PATHS.some(
