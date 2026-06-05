@@ -114,6 +114,38 @@ describe('actionSlotFilling', () => {
     expect(slot).toBe('maxUses');
   });
 
+  it('Super Admin generate_license asks for schoolName when missing', async () => {
+    const superAdmin = {
+      sub: 'super-1',
+      role: UserRole.SUPER_ADMIN,
+      schoolId: 'platform',
+    };
+    const slot = await getNextMissingSlot(superAdmin as any, 'generate_license', {});
+    expect(slot).toBe('schoolName');
+  });
+
+  it('Super Admin generate_license accepts a real school name answer', () => {
+    const { params } = applySlotAnswer(
+      'generate_license',
+      'schoolName',
+      'school called Mwihoko',
+      {},
+      UserRole.SUPER_ADMIN,
+    );
+    expect(params.schoolName).toBe('Mwihoko');
+  });
+
+  it('Super Admin generate_license ignores filler school name answers', () => {
+    const { params } = applySlotAnswer(
+      'generate_license',
+      'schoolName',
+      'come on',
+      {},
+      UserRole.SUPER_ADMIN,
+    );
+    expect(params.schoolName).toBeUndefined();
+  });
+
   it('teacher send_class_message only needs message', async () => {
     const teacher = {
       sub: 't1',

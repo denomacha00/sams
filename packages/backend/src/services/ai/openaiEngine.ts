@@ -231,9 +231,15 @@ CRITICAL — NEVER MAKE UP DATA:
 
 If the user asks for something above their permission level, politely tell them they don't have access and suggest who to contact.
 
-ACT AS THE USER: When they ask you to notify a class, department, or school, check department stats, mark attendance, or similar — use the ROLE ACTIONS backend (do not say "go to the Notifications page", "use view_department_stats manually", or "you need to do this yourself") unless the action is forbidden or requires SMS outside chat.
+ACT AS THE USER: When they ask you to notify a class, department, or school, check department stats, mark attendance, generate/extend licenses, mark attendance, reset passwords, or similar — use the ROLE ACTIONS backend (do not say "go to the Notifications page", "use view_department_stats manually", or "you need to do this yourself") unless the action is forbidden or requires SMS outside chat.
 
-MULTI-TURN ACTIONS: If a role action needs more detail (class, department, message text, user name), the backend will ask exactly ONE clear question per turn. Do not list every field at once. Execute when you have enough; never invent data.
+ACTION RESULT RULES — critical:
+- NEVER say an action has completed unless the backend ROLE ACTION result in this response says it completed.
+- NEVER invent license keys, temporary passwords, reset codes, school codes, or IDs. License keys and temporary passwords must appear only when returned by a backend action result.
+- If a previous turn asked for missing information and the user does not provide it, ask for that exact missing information again. Do not pretend the action ran.
+- Fake placeholders like LK-XXXX-XXXX-XXXX-XXXX are forbidden.
+
+MULTI-TURN ACTIONS: If a role action needs more detail (class, department, message text, user name, school name), the backend will ask exactly ONE clear question per turn. Do not list every field at once. Execute when you have enough; never invent data.
 
 Be concise, friendly, and helpful. Address the user by their name. Answer in plain language.${roleCapabilityMatrix}${roleActionsSection}${studentClassSection}${knowledgeSection}${documentationSection}${systemDataSection}`;
 }

@@ -23,6 +23,7 @@ export type SlotName =
   | 'maxUses'
   | 'teacherName'
   | 'studentName'
+  | 'schoolName'
 
 const NOTIFICATION_ACTIONS = new Set([
   'send_class_message',
@@ -62,6 +63,7 @@ const ACTION_SLOT_ORDER: Record<string, SlotName[]> = {
   mark_attendance: ['studentName'],
   create_class: ['className'],
   create_department: ['departmentName'],
+  generate_license: ['schoolName'],
 };
 
 const DEFAULT_REGISTRATION_MAX_USES = 50;
@@ -102,6 +104,12 @@ function parseMaxUsesAnswer(text: string): number | undefined {
   if (!match) return undefined;
   const n = parseInt(match[0], 10);
   return n > 0 ? n : undefined;
+}
+
+function isMeaningfulSchoolNameAnswer(text: string): boolean {
+  const normalized = text.trim().toLowerCase();
+  if (normalized.length < 2) return false;
+  return !/^(come on|waiting|wait|ok|okay|yes|y|confirm|proceed|do it|go ahead|please)$/i.test(normalized);
 }
 
 function parseNotifyScopeAnswer(text: string): 'department' | 'school' | 'class' | undefined {
@@ -310,6 +318,15 @@ export function applySlotAnswer(
       break;
     case 'studentName':
       next.studentName = answer.trim();
+      break;
+    case 'schoolName':
+      if (isMeaningfulSchoolNameAnswer(answer)) {
+        next.schoolName = answer
+          .replace(/^(?:the\s+)?(?:another\s+)?school\s+(?:called|named)\s+/i, '')
+          .replace(/^(?:the\s+)?(?:another\s+)?school\s+/i, '')
+          .replace(/^(?:named|called)\s+/i, '')
+          .trim();
+      }
       break;
     case 'targetRole': {
       const roleVal = parseTargetRoleAnswer(answer);
@@ -554,6 +571,11 @@ export async function buildSlotQuestion(
       return 'Which teacher should be assigned? (Full name)';
     case 'studentName':
       return 'Which student? (Full name)';
+    case 'schoolName':
+      if (action === 'generate_license') {
+        return 'Which school should the license be generated for? Reply with the school name, for example **Mwihoko**.';
+      }
+      return 'Which school? Reply with the school name.';
     case 'targetRole':
       if (user.role === UserRole.HOD) {
         return (
