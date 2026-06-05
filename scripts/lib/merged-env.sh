@@ -53,6 +53,7 @@ is_weak_production_secret() {
   local lower="${val,,}"
   [[ "$lower" == *change-me* ]] && return 0
   [[ "$lower" == *qr-secret-dev* ]] && return 0
+  [[ "$lower" == *default-license-secret* ]] && return 0
   return 1
 }
 

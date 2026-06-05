@@ -114,9 +114,9 @@ bash scripts/restart-api.sh
 
 ---
 
-## 4. JWT / API crash loop
+## 4. Startup secret / API crash loop
 
-### Symptom: Logs show `JWT_SECRET must be … 64+ chars`
+### Symptom: Logs show `JWT_SECRET`, `JWT_REFRESH_SECRET`, `QR_SECRET`, or `LICENSE_SECRET` must be 64+ chars
 
 ```bash
 bash scripts/set-production-env.sh
@@ -361,8 +361,8 @@ npx prisma studio
 
 | File | Purpose | In git? |
 |------|---------|--------|
-| `packages/backend/.env` | JWT, DATABASE_URL, PORT | **No** |
-| `secrets/providers.env` | AI, AT, SMTP, M-Pesa keys | **No** |
+| `packages/backend/.env` | JWT/refresh/QR/license secrets, DATABASE_URL, PORT | **No** |
+| `secrets/providers.env` | AI, AT, SMTP, M-Pesa keys; optional secret overrides | **No** |
 | `secrets/providers.env.example` | Template | Yes |
 
 **Load order:** `.env` → `.env.secrets` → `providers.env` (later wins).
@@ -388,6 +388,7 @@ bash scripts/restart-api.sh
 - Never commit real keys
 - Never paste shell commands into `.env` files
 - Only `# comments` and `KEY="value"` lines
+- Production requires distinct 64+ char `JWT_SECRET`, `JWT_REFRESH_SECRET`, `QR_SECRET`, and `LICENSE_SECRET` values
 
 ---
 
@@ -416,7 +417,7 @@ bash scripts/deploy-production.sh
 2. `git reset --hard origin/main`
 3. `npm ci` + build all packages — **exits here if build fails; PM2 unchanged**
 4. `prisma migrate deploy`
-5. `pre-deploy-check.sh` (nginx `-t`, SSL, REDIS_URL, dist, JWT)
+5. `pre-deploy-check.sh` (nginx `-t`, SSL, REDIS_URL, dist, startup secrets)
 6. PM2 delete + start (only after build OK)
 7. Remove nginx `sites-enabled/*.bak`, then `nginx -t` before reload
 8. `post-deploy-verify.sh` (health, dist, PM2 online)
@@ -557,7 +558,7 @@ cd /var/www/sams && git pull origin main
 |---------|---------|
 | Site down / 502 | §2 |
 | PM2 empty | §3 |
-| JWT crash | §4 |
+| Startup secret / JWT / license crash | §4 |
 | Redis errors | §5 |
 | Migration failed | §6 |
 | Photo upload 413 | §7 |

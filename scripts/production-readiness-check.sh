@@ -66,6 +66,7 @@ fi
 JWT="$(read_merged_env JWT_SECRET)"
 JWT_REFRESH="$(read_merged_env JWT_REFRESH_SECRET)"
 QR="$(read_merged_env QR_SECRET)"
+LICENSE="$(read_merged_env LICENSE_SECRET)"
 DB="$(read_merged_env DATABASE_URL)"
 
 if is_weak_production_secret "$JWT"; then
@@ -82,6 +83,11 @@ if is_weak_production_secret "$QR"; then
   fail "QR_SECRET missing or <64 chars — run: bash scripts/set-production-env.sh"
 else
   pass "QR_SECRET ok (64+ chars)"
+fi
+if is_weak_production_secret "$LICENSE"; then
+  fail "LICENSE_SECRET missing or <64 chars — run: bash scripts/set-production-env.sh"
+else
+  pass "LICENSE_SECRET ok (64+ chars)"
 fi
 [[ -n "$DB" ]] && pass "DATABASE_URL set" || fail "DATABASE_URL missing"
 

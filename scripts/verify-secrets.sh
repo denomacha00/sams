@@ -31,6 +31,8 @@ mask_line() {
     | sed -E 's/(MPESA_(CONSUMER_)?SECRET=).*/\1***masked***/' \
     | sed -E 's/(MPESA_PASSKEY=).*/\1***masked***/' \
     | sed -E 's/(JWT_(REFRESH_)?SECRET=).*/\1***masked***/' \
+    | sed -E 's/(QR_SECRET=).*/\1***masked***/' \
+    | sed -E 's/(LICENSE_SECRET=).*/\1***masked***/' \
     | sed -E 's/(SUPER_ADMIN_PASSWORD=).*/\1***masked***/' \
     | sed -E 's/(CONVERSATION_MASTER_KEY=).*/\1***masked***/'
 }
@@ -196,8 +198,10 @@ fi
 
 JWT_VAL="$(read_merged_env JWT_SECRET)"
 JWT_REFRESH="$(read_merged_env JWT_REFRESH_SECRET)"
+QR_VAL="$(read_merged_env QR_SECRET)"
+LICENSE_VAL="$(read_merged_env LICENSE_SECRET)"
 echo ""
-echo "--- JWT / QR (production startup) ---"
+echo "--- JWT / QR / License (production startup) ---"
 if [[ "$NODE_ENV" == "production" ]]; then
   if is_weak_production_secret "$JWT_VAL"; then
     echo "FAIL JWT_SECRET missing or <64 chars — run: bash scripts/set-production-env.sh"
@@ -211,8 +215,20 @@ if [[ "$NODE_ENV" == "production" ]]; then
   else
     echo "OK   JWT_REFRESH_SECRET ok (64+ chars)"
   fi
+  if is_weak_production_secret "$QR_VAL"; then
+    echo "FAIL QR_SECRET missing or <64 chars — run: bash scripts/set-production-env.sh"
+    ERR=1
+  else
+    echo "OK   QR_SECRET ok (64+ chars)"
+  fi
+  if is_weak_production_secret "$LICENSE_VAL"; then
+    echo "FAIL LICENSE_SECRET missing or <64 chars — run: bash scripts/set-production-env.sh"
+    ERR=1
+  else
+    echo "OK   LICENSE_SECRET ok (64+ chars)"
+  fi
 else
-  echo "INFO JWT length checks skipped (NODE_ENV=$NODE_ENV)"
+  echo "INFO JWT/QR/license length checks skipped (NODE_ENV=$NODE_ENV)"
 fi
 
 BIO_KEY="$(read_merged_env BIOMETRIC_MASTER_KEY)"
@@ -277,9 +293,9 @@ fi
 echo ""
 echo "==> Configured provider lines (masked, all sources):"
 {
-  grep -E '^(OPENAI_|VISION_MODEL=|CONVERSATION_MASTER_KEY=|AT_|SMTP_|MPESA_CONSUMER_|MPESA_PASSKEY=)' "$ENV_FILE" 2>/dev/null || true
+  grep -E '^(OPENAI_|VISION_MODEL=|CONVERSATION_MASTER_KEY=|AT_|SMTP_|MPESA_CONSUMER_|MPESA_PASSKEY=|JWT_|QR_SECRET=|LICENSE_SECRET=)' "$ENV_FILE" 2>/dev/null || true
   while IFS= read -r f; do
-    [[ -f "$f" ]] && grep -E '^(OPENAI_|VISION_MODEL=|CONVERSATION_MASTER_KEY=|AT_|SMTP_|MPESA_CONSUMER_|MPESA_PASSKEY=)' "$f" 2>/dev/null || true
+    [[ -f "$f" ]] && grep -E '^(OPENAI_|VISION_MODEL=|CONVERSATION_MASTER_KEY=|AT_|SMTP_|MPESA_CONSUMER_|MPESA_PASSKEY=|JWT_|QR_SECRET=|LICENSE_SECRET=)' "$f" 2>/dev/null || true
   done < <(merged_env_secrets_paths)
 } | mask_line | sort -u || echo "    (no matching lines)"
 

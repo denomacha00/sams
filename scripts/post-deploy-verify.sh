@@ -204,6 +204,9 @@ fi
 if [[ -f "$ROOT/packages/backend/.env" ]]; then
   pass "packages/backend/.env exists"
   JWT_MERGED="$(read_merged_env JWT_SECRET)"
+  JWT_REFRESH_MERGED="$(read_merged_env JWT_REFRESH_SECRET)"
+  QR_MERGED="$(read_merged_env QR_SECRET)"
+  LICENSE_MERGED="$(read_merged_env LICENSE_SECRET)"
   NODE_ENV_MERGED="$(read_merged_env NODE_ENV)"
   NODE_ENV_MERGED="${NODE_ENV_MERGED:-production}"
   if is_weak_production_secret "$JWT_MERGED"; then
@@ -214,6 +217,33 @@ if [[ -f "$ROOT/packages/backend/.env" ]]; then
     fi
   else
     pass "JWT_SECRET ok (64+ chars, merged env)"
+  fi
+  if is_weak_production_secret "$JWT_REFRESH_MERGED"; then
+    if [[ "$NODE_ENV_MERGED" == "production" ]]; then
+      fail "JWT_REFRESH_SECRET weak (<64 chars) — API crash-loop risk; run: bash scripts/set-production-env.sh"
+    else
+      warn "JWT_REFRESH_SECRET weak (<64 chars) — run set-production-env before NODE_ENV=production"
+    fi
+  else
+    pass "JWT_REFRESH_SECRET ok (64+ chars, merged env)"
+  fi
+  if is_weak_production_secret "$QR_MERGED"; then
+    if [[ "$NODE_ENV_MERGED" == "production" ]]; then
+      fail "QR_SECRET weak (<64 chars) — QR validation risk; run: bash scripts/set-production-env.sh"
+    else
+      warn "QR_SECRET weak (<64 chars) — run set-production-env before NODE_ENV=production"
+    fi
+  else
+    pass "QR_SECRET ok (64+ chars, merged env)"
+  fi
+  if is_weak_production_secret "$LICENSE_MERGED"; then
+    if [[ "$NODE_ENV_MERGED" == "production" ]]; then
+      fail "LICENSE_SECRET weak (<64 chars) — license generation risk; run: bash scripts/set-production-env.sh"
+    else
+      warn "LICENSE_SECRET weak (<64 chars) — run set-production-env before NODE_ENV=production"
+    fi
+  else
+    pass "LICENSE_SECRET ok (64+ chars, merged env)"
   fi
   [[ -n "$(read_merged_env DATABASE_URL)" ]] && pass "DATABASE_URL set" || fail "DATABASE_URL missing"
 else

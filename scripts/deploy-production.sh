@@ -148,8 +148,29 @@ source "$ROOT/scripts/lib/merged-env.sh"
 MERGED_ENV_ROOT="$ROOT"
 MERGED_ENV_FILE="$ENV_FILE"
 JWT_VAL="$(read_merged_env JWT_SECRET)"
+JWT_REFRESH_VAL="$(read_merged_env JWT_REFRESH_SECRET)"
+QR_VAL="$(read_merged_env QR_SECRET)"
+LICENSE_VAL="$(read_merged_env LICENSE_SECRET)"
 if is_weak_production_secret "$JWT_VAL"; then
   echo "ERROR: JWT_SECRET missing or shorter than 64 chars — API will crash-loop in production." >&2
+  echo "       Run: bash scripts/set-production-env.sh" >&2
+  echo "       Then re-run: bash scripts/deploy-production.sh" >&2
+  exit 1
+fi
+if is_weak_production_secret "$JWT_REFRESH_VAL"; then
+  echo "ERROR: JWT_REFRESH_SECRET missing or shorter than 64 chars — API will crash-loop in production." >&2
+  echo "       Run: bash scripts/set-production-env.sh" >&2
+  echo "       Then re-run: bash scripts/deploy-production.sh" >&2
+  exit 1
+fi
+if is_weak_production_secret "$QR_VAL"; then
+  echo "ERROR: QR_SECRET missing or shorter than 64 chars — QR validation will fail in production." >&2
+  echo "       Run: bash scripts/set-production-env.sh" >&2
+  echo "       Then re-run: bash scripts/deploy-production.sh" >&2
+  exit 1
+fi
+if is_weak_production_secret "$LICENSE_VAL"; then
+  echo "ERROR: LICENSE_SECRET missing or shorter than 64 chars — license generation will fail in production." >&2
   echo "       Run: bash scripts/set-production-env.sh" >&2
   echo "       Then re-run: bash scripts/deploy-production.sh" >&2
   exit 1

@@ -32,6 +32,18 @@ if is_weak_production_secret "$(read_merged_env JWT_SECRET)"; then
   echo "ERROR: JWT_SECRET missing or <64 chars — run: bash scripts/set-production-env.sh" >&2
   exit 1
 fi
+if is_weak_production_secret "$(read_merged_env JWT_REFRESH_SECRET)"; then
+  echo "ERROR: JWT_REFRESH_SECRET missing or <64 chars — run: bash scripts/set-production-env.sh" >&2
+  exit 1
+fi
+if is_weak_production_secret "$(read_merged_env QR_SECRET)"; then
+  echo "ERROR: QR_SECRET missing or <64 chars — run: bash scripts/set-production-env.sh" >&2
+  exit 1
+fi
+if is_weak_production_secret "$(read_merged_env LICENSE_SECRET)"; then
+  echo "ERROR: LICENSE_SECRET missing or <64 chars — run: bash scripts/set-production-env.sh" >&2
+  exit 1
+fi
 
 if [[ ! -f "$ROOT/packages/backend/dist/index.js" ]]; then
   echo "ERROR: Missing packages/backend/dist/index.js — run deploy build first" >&2

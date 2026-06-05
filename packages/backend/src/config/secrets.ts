@@ -20,6 +20,7 @@ export function validateProductionSecrets(): void {
     ['JWT_SECRET', process.env.JWT_SECRET],
     ['JWT_REFRESH_SECRET', process.env.JWT_REFRESH_SECRET],
     ['QR_SECRET', process.env.QR_SECRET],
+    ['LICENSE_SECRET', process.env.LICENSE_SECRET],
   ];
 
   for (const [name, value] of required) {
@@ -44,12 +45,12 @@ export function getQrSecret(): string {
 }
 
 export function getLicenseSecret(): string {
-  const secret = process.env.LICENSE_SECRET || process.env.JWT_SECRET;
+  const secret = process.env.LICENSE_SECRET;
   if (secret && !isPlaceholder(secret)) return secret;
 
   if (isProductionEnv()) {
-    throw new Error('[STARTUP] LICENSE_SECRET (or JWT_SECRET) must be configured in production');
+    throw new Error('[STARTUP] LICENSE_SECRET must be configured in production');
   }
 
-  return secret ?? 'default-license-secret';
+  return process.env.JWT_SECRET ?? 'default-license-secret';
 }
