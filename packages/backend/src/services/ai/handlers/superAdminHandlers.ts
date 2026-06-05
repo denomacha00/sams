@@ -7,7 +7,9 @@ const VALID_PLAN_TIERS = ['TRIAL', 'BASIC', 'PROFESSIONAL', 'ENTERPRISE'] as con
 
 function extractSchoolName(text: string): string {
   return text
-    .replace(/^(the|school|named|called)\s+/i, '')
+    .replace(/^(?:the\s+)?(?:another\s+)?school\s+(?:called|named)\s+/i, '')
+    .replace(/^(?:the\s+)?(?:another\s+)?school\s+/i, '')
+    .replace(/^(?:named|called)\s+/i, '')
     .replace(/\s*(please|now|immediately|asap)\s*$/i, '')
     .trim();
 }
@@ -105,7 +107,16 @@ const generateLicenseHandler: ActionHandler = async (params, scope) => {
   const expiresAt = new Date();
   expiresAt.setDate(expiresAt.getDate() + daysValid);
 
-  const secret = getLicenseSecret();
+  let secret: string;
+  try {
+    secret = getLicenseSecret();
+  } catch {
+    return {
+      answer:
+        'License generation is not configured on the server yet. Set **LICENSE_SECRET** in `/var/www/sams/.env`, restart `sams-api`, then ask me again.',
+    };
+  }
+
   const rawKey = encodeLicenseKey(
     { schoolName, planTier: planTier as any, expiresAt },
     secret,
@@ -116,12 +127,16 @@ const generateLicenseHandler: ActionHandler = async (params, scope) => {
     data: { keyHash, planTier: planTier as any, schoolName, expiresAt },
   });
 
-  await auditService.log({
-    eventType: 'LICENSE_ACTIVATION',
-    actorId: scope.userId,
-    actorRole: scope.role,
-    resourceSnapshot: { action: 'LICENSE_GENERATED_VIA_AI', schoolName, planTier },
-  });
+  try {
+    await auditService.log({
+      eventType: 'LICENSE_ACTIVATION',
+      actorId: scope.userId,
+      actorRole: scope.role,
+      resourceSnapshot: { action: 'LICENSE_GENERATED_VIA_AI', schoolName, planTier },
+    });
+  } catch (err) {
+    console.error('[AI SuperAdmin] License generated but audit logging failed:', err);
+  }
 
   return {
     answer: `✅ License generated!\n\n**Key:** \`${rawKey}\`\n\n• School: ${schoolName}\n• Plan: ${planTier}\n• Expires: ${expiresAt.toLocaleDateString()}\n\n⚠️ Store this key securely.`,
@@ -311,10 +326,10 @@ export const superAdminActions: ActionDefinition[] = [
     description: 'Generate a new license key for a school',
     destructive: false,
     patterns: [
-      /generate\s+(?:a\s+)?(?:license|key)\s+(?:for\s+)?(.+)/i,
-      /create\s+(?:a\s+)?(?:license|key)\s+(?:for\s+)?(.+)/i,
-      /new\s+license\s+(?:for\s+)?(.+)/i,
-      /new\s+(?:license|key)\s+(.+)/i,
+      /generate\s+(?:a\s+)?(?:(?:trial|basic|professional|enterprise)\s+)?(?:license|key)\s+(?:for\s+)?(.+)/i,
+      /create\s+(?:a\s+)?(?:(?:trial|basic|professional|enterprise)\s+)?(?:license|key)\s+(?:for\s+)?(.+)/i,
+      /new\s+(?:(?:trial|basic|professional|enterprise)\s+)?license\s+(?:for\s+)?(.+)/i,
+      /new\s+(?:(?:trial|basic|professional|enterprise)\s+)?(?:license|key)\s+(.+)/i,
     ],
     extractParams: (question: string, match: RegExpMatchArray | null) => {
       const remainder = match && match[1] ? match[1].trim() : '';

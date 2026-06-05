@@ -9,6 +9,34 @@ vi.mock('../../passwordResetService', () => ({
   resetUserPasswordBySuperAdmin: (...args: unknown[]) => resetUserPasswordByAdmin(...args),
 }));
 
+describe('generate_license action', () => {
+  it('extracts natural school names like "another school called mwihoko"', () => {
+    const actionDef = findAction(UserRole.SUPER_ADMIN, 'generate_license')!;
+    const params = actionDef.extractParams(
+      'generate license for another school called mwihoko',
+      [
+        'generate license for another school called mwihoko',
+        'another school called mwihoko',
+      ],
+    );
+
+    expect(params).toMatchObject({ schoolName: 'mwihoko', planTier: 'BASIC' });
+  });
+
+  it('extracts requested plan tiers for license generation', () => {
+    const actionDef = findAction(UserRole.SUPER_ADMIN, 'generate_license')!;
+    const params = actionDef.extractParams(
+      'generate professional license for school called Green Valley',
+      [
+        'generate professional license for school called Green Valley',
+        'school called Green Valley',
+      ],
+    );
+
+    expect(params).toMatchObject({ schoolName: 'Green Valley', planTier: 'PROFESSIONAL' });
+  });
+});
+
 describe('reset_user_password handler', () => {
   beforeEach(() => {
     vi.clearAllMocks();
