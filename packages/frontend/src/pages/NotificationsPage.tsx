@@ -54,6 +54,15 @@ function formatRole(role: string | null): string {
   return map[role] ?? role;
 }
 
+function initials(name: string): string {
+  return name
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((part) => part[0]?.toUpperCase() ?? '')
+    .join('') || 'S';
+}
+
 function formatDateTime(dateStr: string): string {
   const d = new Date(dateStr);
   const now = new Date();
@@ -493,48 +502,62 @@ const NotificationsPage: React.FC = () => {
     const canReply = !isSentFolder && isClassRep && notif.senderRole === 'TEACHER' && !!notif.senderId;
     const recipientCount = isSentFolder ? (notif as SentNotification).recipientCount : undefined;
 
+    const unread = !isSentFolder && !notif.read;
+    const pathLabel = isSentFolder
+      ? `You → ${notif.targetScopeLabel ?? 'Recipients'}`
+      : `${senderDisplay} → You`;
+
     return (
-      <div key={notif.id} onClick={() => !isSentFolder && !notif.read && markAsRead(notif.id)}
-        className={`p-4 rounded-xl border transition-all ${isSentFolder ? '' : 'cursor-pointer'} backdrop-blur-sm ${
-          !isSentFolder && !notif.read ? 'surface-card border-indigo-200 bg-indigo-50/40 hover:border-indigo-500/50' : 'surface-card border-line'
-        }`}>
-        <div className="flex items-start justify-between gap-3">
-          <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-2 flex-wrap">
-              {!isSentFolder && !notif.read && <div className="w-2 h-2 rounded-full bg-indigo-400 flex-shrink-0" />}
-              <h3 className={`text-sm font-semibold ${!isSentFolder && !notif.read ? 'text-ink' : 'text-ink-muted'}`}>{notif.title}</h3>
-              {notif.updatedAt && <span className="text-xs text-orange-400/70 italic">edited</span>}
-              {notif.targetScopeLabel && (isSentFolder || isTeacher || isHOD) && (
-                <span className="text-xs px-2 py-0.5 rounded-full bg-indigo-500/15 text-brand border border-indigo-500/20">
-                  {isSentFolder ? `To: ${notif.targetScopeLabel}` : notif.targetScopeLabel}
-                </span>
-              )}
+      <div
+        key={notif.id}
+        onClick={() => unread && markAsRead(notif.id)}
+        className={`group rounded-2xl border p-4 transition-all ${isSentFolder ? '' : 'cursor-pointer'} ${
+          unread
+            ? 'border-indigo-500/35 bg-indigo-500/10 shadow-card-soft-hover'
+            : 'border-line bg-surface shadow-card-soft hover:border-indigo-500/25'
+        }`}
+      >
+        <div className={`flex items-start gap-3 ${isSentFolder ? 'flex-row-reverse' : ''}`}>
+          <div className={`w-10 h-10 rounded-2xl flex items-center justify-center text-xs font-bold shrink-0 ${
+            isSentFolder ? 'bg-indigo-600 text-white' : 'bg-surface-elevated text-ink border border-line'
+          }`}>
+            {isSentFolder ? 'ME' : initials(senderDisplay)}
+          </div>
+
+          <div className={`flex-1 min-w-0 ${isSentFolder ? 'text-right' : ''}`}>
+            <div className={`flex items-center gap-2 flex-wrap ${isSentFolder ? 'justify-end' : ''}`}>
+              {unread && <div className="w-2 h-2 rounded-full bg-indigo-400 flex-shrink-0" />}
+              <h3 className="text-sm font-semibold text-ink truncate max-w-full">{notif.title || 'Message'}</h3>
+              {notif.updatedAt && <span className="text-xs text-amber-400/80 italic">edited</span>}
               {recipientCount != null && (
                 <span className="text-xs px-2 py-0.5 rounded-full bg-surface-elevated text-ink-muted border border-line">
                   {recipientCount} recipient{recipientCount !== 1 ? 's' : ''}
                 </span>
               )}
             </div>
-            <p className={`text-sm mt-1.5 ${!isSentFolder && !notif.read ? 'text-ink-muted' : 'text-ink-subtle'}`}>{notif.message}</p>
 
-            <div className="flex items-center gap-2 mt-2 flex-wrap">
-              <div className="flex items-center gap-1.5">
-                <div className="w-5 h-5 rounded-full bg-indigo-600 flex items-center justify-center text-[10px] font-bold text-ink flex-shrink-0">
-                  {senderDisplay.charAt(0).toUpperCase()}
-                </div>
-                <span className="text-xs text-ink-muted font-medium">
-                  {isSentFolder ? 'You' : `From ${senderDisplay}`}
+            <div className={`mt-1 flex items-center gap-2 flex-wrap text-xs text-ink-subtle ${isSentFolder ? 'justify-end' : ''}`}>
+              <span>{pathLabel}</span>
+              {roleDisplay && !isSentFolder && <span className="px-1.5 py-0.5 rounded-full bg-white/5 border border-white/5">{roleDisplay}</span>}
+              <span>·</span>
+              <span>{formatDateTime(notif.createdAt)}</span>
+              {notif.updatedAt && <span>· edited {formatDateTime(notif.updatedAt)}</span>}
+            </div>
+
+            {notif.targetScopeLabel && (isSentFolder || isTeacher || isHOD) && (
+              <div className={`mt-2 ${isSentFolder ? 'flex justify-end' : ''}`}>
+                <span className="inline-flex text-xs px-2 py-0.5 rounded-full bg-indigo-500/15 text-indigo-200 border border-indigo-500/20">
+                  {isSentFolder ? `Sent to ${notif.targetScopeLabel}` : notif.targetScopeLabel}
                 </span>
-                {roleDisplay && !isSentFolder && (
-                  <span className="text-xs px-1.5 py-0.5 rounded-full bg-white/10 text-ink-subtle border border-white/5">{roleDisplay}</span>
-                )}
               </div>
-              <span className="text-ink-muted text-xs">·</span>
-              <span className="text-xs text-ink-subtle">{formatDateTime(notif.createdAt)}</span>
-              {notif.updatedAt && (
-                <><span className="text-ink-muted text-xs">·</span>
-                <span className="text-xs text-orange-400/60">edited {formatDateTime(notif.updatedAt)}</span></>
-              )}
+            )}
+
+            <div className={`mt-3 rounded-2xl px-4 py-3 border ${
+              isSentFolder
+                ? 'ml-auto max-w-[92%] bg-indigo-600/18 border-indigo-500/25 text-indigo-50'
+                : 'max-w-[92%] bg-surface-muted border-line text-ink-muted'
+            }`}>
+              <p className="text-sm leading-relaxed whitespace-pre-wrap">{notif.message}</p>
             </div>
           </div>
 
@@ -584,13 +607,13 @@ const NotificationsPage: React.FC = () => {
   };
 
   return (
-    <div className="page-shell p-6">
-      <div className="max-w-4xl mx-auto">
+    <div className="page-shell p-4 sm:p-6">
+      <div className="max-w-6xl mx-auto">
         {/* Header */}
-        <div className="flex items-center justify-between mb-8">
+        <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 mb-6">
           <div>
             <h1 className="text-2xl font-bold text-ink flex items-center gap-3">
-              Messages
+              Message Center
               {unreadCount > 0 && folder === 'inbox' && (
                 <span className="inline-flex items-center justify-center px-2 py-0.5 rounded-full text-xs font-bold bg-indigo-600 text-white min-w-[1.5rem]">
                   {unreadCount}
@@ -599,13 +622,11 @@ const NotificationsPage: React.FC = () => {
             </h1>
             <p className="text-ink-muted text-sm mt-1">
               {isStudent
-                ? 'Read-only — replies are only available to class representatives'
-                : folder === 'inbox'
-                  ? 'Messages you received'
-                  : 'Messages you sent'}
+                ? 'Follow school messages. Class representatives can reply to class teachers.'
+                : 'Inbox, sent messages, and class/department broadcasts in one clean path.'}
             </p>
           </div>
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-3 flex-wrap">
             {canSend && (
               <div className="flex rounded-xl border border-line overflow-hidden">
                 <button
@@ -642,15 +663,23 @@ const NotificationsPage: React.FC = () => {
         </div>
 
         {isStudent && (
-          <div className="mb-6 p-4 rounded-xl surface-card border-line text-sm text-ink-muted">
-            You can read messages from your teachers, HOD, and school admin here. Only class representatives can reply to their teachers.
+          <div className="mb-6 p-4 rounded-2xl border border-line bg-surface shadow-card-soft text-sm text-ink-muted">
+            You can read messages from teachers, HODs, and school admin here. If you are the class representative, replies go only to the teacher who messaged your class.
           </div>
         )}
 
         {/* Send Form */}
         {showSendForm && canSend && (
-          <div className="mb-8 surface-card p-6">
-            <h2 className="text-lg font-semibold text-ink mb-4">Send Notification</h2>
+          <div className="mb-8 surface-card p-6 shadow-card-soft">
+            <div className="flex items-start justify-between gap-4 mb-5">
+              <div>
+                <h2 className="text-lg font-semibold text-ink">Compose message</h2>
+                <p className="text-xs text-ink-subtle mt-1">Choose the audience path first, then write the message.</p>
+              </div>
+              <span className="text-xs px-2.5 py-1 rounded-full border border-indigo-500/25 bg-indigo-500/10 text-indigo-200">
+                {channels.includes('sms') ? 'In-App + SMS' : 'In-App'}
+              </span>
+            </div>
             {sendSuccess && (
               <div className="mb-4 p-3 bg-indigo-500/20 border border-indigo-400/30 rounded-xl">
                 <p className="text-sm text-indigo-300 text-center">
@@ -664,8 +693,8 @@ const NotificationsPage: React.FC = () => {
               </div>
             )}
             {isHOD && hodScopeError && (
-              <div className="mb-4 p-3 bg-orange-500/20 border border-orange-500/30 rounded-xl">
-                <p className="text-sm text-orange-400 text-center">{hodScopeError}</p>
+              <div className="mb-4 p-3 bg-amber-500/10 border border-amber-500/25 rounded-xl">
+                <p className="text-sm text-amber-300 text-center">{hodScopeError}</p>
               </div>
             )}
             <form onSubmit={handleSend} className="space-y-4">
@@ -814,7 +843,7 @@ const NotificationsPage: React.FC = () => {
             <p className="text-ink-muted">{folder === 'inbox' ? 'No messages in your inbox' : 'No sent messages yet'}</p>
           </div>
         ) : (
-          <div className="space-y-3">
+          <div className="rounded-3xl border border-line bg-surface/70 p-3 sm:p-4 shadow-card-soft space-y-3">
             {displayList.map((notif) => renderMessageCard(notif, folder === 'sent'))}
           </div>
         )}

@@ -1,7 +1,61 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useCallback, useState, useRef, useEffect } from 'react';
 import apiClient from '../services/apiClient';
 import { FACE_API_MODELS_URI } from '../constants/faceApi';
 import { useAuthStore } from '../store/authStore';
+import { getApiErrorMessage } from '../lib/apiError';
+
+interface FaceApiLike {
+  nets: {
+    tinyFaceDetector: { loadFromUri: (uri: string) => Promise<void> };
+    faceLandmark68Net: { loadFromUri: (uri: string) => Promise<void> };
+    faceRecognitionNet: { loadFromUri: (uri: string) => Promise<void> };
+  };
+  TinyFaceDetectorOptions: new () => unknown;
+  detectSingleFace: (
+    input: HTMLVideoElement,
+    options: unknown,
+  ) => {
+    withFaceLandmarks: () => {
+      withFaceDescriptor: () => Promise<{ descriptor: Float32Array } | null>;
+    };
+  };
+}
+
+function getFaceApi(): FaceApiLike | null {
+  return (window as Window & { faceapi?: FaceApiLike }).faceapi ?? null;
+}
+
+function isSecureCameraContext(): boolean {
+  const { protocol, hostname } = window.location;
+  return protocol === 'https:' || hostname === 'localhost' || hostname === '127.0.0.1';
+}
+
+function waitForVideoElement(
+  ref: React.RefObject<HTMLVideoElement>,
+  timeoutMs = 3000,
+): Promise<HTMLVideoElement> {
+  return new Promise((resolve, reject) => {
+    const started = Date.now();
+    const tick = () => {
+      if (ref.current) {
+        resolve(ref.current);
+        return;
+      }
+      if (Date.now() - started >= timeoutMs) {
+        reject(new Error('Camera preview not mounted'));
+        return;
+      }
+      requestAnimationFrame(tick);
+    };
+    tick();
+  });
+}
+
+async function waitForVideoReady(video: HTMLVideoElement): Promise<void> {
+  video.muted = true;
+  video.setAttribute('playsinline', 'true');
+  await video.play();
+}
 
 const BiometricEnrollPage: React.FC = () => {
   const user = useAuthStore((s) => s.user);
@@ -10,6 +64,7 @@ const BiometricEnrollPage: React.FC = () => {
   const streamRef = useRef<MediaStream | null>(null);
   const [modelsLoaded, setModelsLoaded] = useState(false);
   const [cameraActive, setCameraActive] = useState(false);
+  const [cameraStarting, setCameraStarting] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
@@ -22,8 +77,9 @@ const BiometricEnrollPage: React.FC = () => {
     const checkAccess = async () => {
       try {
         await apiClient.get('/biometric/templates/check-access');
-      } catch (err: any) {
-        if (err.response?.status === 403) {
+      } catch (err: unknown) {
+        const status = (err as { response?: { status?: number } })?.response?.status;
+        if (status === 403) {
           setFeatureGated(true);
         }
       }
@@ -35,8 +91,7 @@ const BiometricEnrollPage: React.FC = () => {
   useEffect(() => {
     const loadModels = async () => {
       try {
-        // @ts-ignore - face-api loaded via script tag or dynamic import
-        const faceapi = (window as any).faceapi;
+        const faceapi = getFaceApi();
         if (!faceapi) {
           setError('Face detection library not loaded. Please refresh the page.');
           return;
@@ -54,31 +109,61 @@ const BiometricEnrollPage: React.FC = () => {
     loadModels();
   }, []);
 
-  const startCamera = async () => {
+  const startCamera = useCallback(async () => {
+    if (cameraStarting) return;
     setError(null);
+
+    if (!isSecureCameraContext()) {
+      setError('Camera requires HTTPS. Open SAMS using https:// on your school URL (not http://).');
+      return;
+    }
+
+    if (!navigator.mediaDevices?.getUserMedia) {
+      setError('Camera is not supported in this browser. Try Chrome on Android or Safari on iPhone.');
+      return;
+    }
+
+    setCameraStarting(true);
+    setCameraActive(true);
     try {
+      const video = await waitForVideoElement(videoRef);
       const stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: 'user', width: 640, height: 480 },
+        video: {
+          facingMode: { ideal: 'user' },
+          width: { ideal: 1280 },
+          height: { ideal: 720 },
+        },
+        audio: false,
       });
       streamRef.current = stream;
-      if (videoRef.current) {
-        videoRef.current.srcObject = stream;
-        await videoRef.current.play();
-        setCameraActive(true);
-        setStep('blink');
+      video.srcObject = stream;
+      await waitForVideoReady(video);
+      setStep('blink');
+    } catch (err: unknown) {
+      const name = err instanceof DOMException ? err.name : '';
+      if (name === 'NotAllowedError' || name === 'PermissionDeniedError') {
+        setError('Camera access denied. Allow camera permission in browser settings, then refresh.');
+      } else if (name === 'NotFoundError' || name === 'DevicesNotFoundError') {
+        setError('No camera found on this device.');
+      } else {
+        setError('Could not start camera. Tap Start Camera to try again.');
       }
-    } catch {
-      setError('Camera access denied. Please allow camera permissions.');
+      streamRef.current?.getTracks().forEach((t) => t.stop());
+      streamRef.current = null;
+      setCameraActive(false);
+    } finally {
+      setCameraStarting(false);
     }
-  };
+  }, [cameraStarting]);
 
-  const stopCamera = () => {
+  const stopCamera = useCallback(() => {
     if (streamRef.current) {
       streamRef.current.getTracks().forEach((t) => t.stop());
       streamRef.current = null;
     }
     setCameraActive(false);
-  };
+    setCameraStarting(false);
+  }, []);
 
   const handleBlinkCheck = () => {
     // Simplified liveness check - in production, detect actual blink via eye aspect ratio
@@ -92,8 +177,7 @@ const BiometricEnrollPage: React.FC = () => {
     setError(null);
 
     try {
-      // @ts-ignore
-      const faceapi = (window as any).faceapi;
+      const faceapi = getFaceApi();
       if (!faceapi) throw new Error('Face API not available');
 
       const detection = await faceapi
@@ -116,8 +200,8 @@ const BiometricEnrollPage: React.FC = () => {
 
       setSuccess(true);
       stopCamera();
-    } catch (err: any) {
-      setError(err.response?.data?.error || 'Enrollment failed. Please try again.');
+    } catch (err: unknown) {
+      setError(getApiErrorMessage(err, 'Enrollment failed. Please try again.'));
     } finally {
       setLoading(false);
     }
@@ -125,15 +209,15 @@ const BiometricEnrollPage: React.FC = () => {
 
   useEffect(() => {
     return () => stopCamera();
-  }, []);
+  }, [stopCamera]);
 
   if (featureGated) {
     return (
       <div className="page-shell p-6">
         <div className="max-w-lg mx-auto">
           <div className="surface-card rounded-2xl p-8 text-center">
-            <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-orange-500/20 border border-orange-500/30 mb-4">
-              <svg className="w-8 h-8 text-orange-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-amber-500/10 border border-amber-500/25 mb-4">
+              <svg className="w-8 h-8 text-amber-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
               </svg>
             </div>
@@ -153,7 +237,10 @@ const BiometricEnrollPage: React.FC = () => {
         {/* Header */}
         <div className="mb-8">
           <h1 className="text-2xl font-bold text-ink">Biometric Enrollment</h1>
-          <p className="text-ink-muted text-sm mt-1">Register your face for biometric attendance</p>
+          <p className="text-ink-muted text-sm mt-1">
+            Register your face once. During class, your teacher or HOD scans your face on their device
+            and SAMS identifies you automatically for attendance.
+          </p>
         </div>
 
         {success && (
@@ -164,7 +251,9 @@ const BiometricEnrollPage: React.FC = () => {
               </svg>
             </div>
             <p className="text-indigo-200 font-medium text-lg">Enrollment Complete</p>
-            <p className="text-ink-muted text-sm mt-1">Your face has been registered for biometric attendance.</p>
+            <p className="text-ink-muted text-sm mt-1">
+              Your face is now saved securely. Teachers/HODs can use Face Scan to mark you present when you are in class.
+            </p>
           </div>
         )}
 
@@ -196,13 +285,14 @@ const BiometricEnrollPage: React.FC = () => {
                 </svg>
               </div>
               <p className="text-ink-muted mb-6">
-                We'll capture your face for biometric attendance. Make sure you're in a well-lit area.
+                We&apos;ll capture your face for attendance matching. Use good lighting and look straight at the camera.
               </p>
               <button
                 onClick={startCamera}
-                className="btn-primary py-3 px-8 hover:scale-[1.02] active:scale-[0.98] transition-all duration-200"
+                disabled={cameraStarting}
+                className="btn-primary py-3 px-8 hover:scale-[1.02] active:scale-[0.98] transition-all duration-200 disabled:opacity-50"
               >
-                Start Camera
+                {cameraStarting ? 'Opening Camera...' : 'Start Camera'}
               </button>
             </div>
           )}
@@ -229,7 +319,7 @@ const BiometricEnrollPage: React.FC = () => {
                   <p className="text-ink-muted text-sm mb-4">Please blink your eyes, then press the button below.</p>
                   <button
                     onClick={handleBlinkCheck}
-                    className="bg-orange-500/20 border border-orange-500/30 text-orange-400 font-semibold py-2.5 px-6 rounded-xl hover:bg-orange-500/30 transition-all duration-200"
+                    className="bg-amber-500/10 border border-amber-500/25 text-amber-300 font-semibold py-2.5 px-6 rounded-xl hover:bg-amber-500/15 transition-all duration-200"
                   >
                     I Blinked
                   </button>

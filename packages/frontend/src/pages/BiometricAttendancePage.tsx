@@ -2,9 +2,7 @@ import React, { useCallback, useState, useRef, useEffect } from 'react';
 import apiClient from '../services/apiClient';
 import { FACE_API_MODELS_URI } from '../constants/faceApi';
 import { getTemplatesForClass } from '../services/offlineStore';
-import { saveAttendanceRecord } from '../services/offlineStore';
 import { useAuthStore } from '../store/authStore';
-import { AttendanceStatus } from '@sams/shared';
 import { getApiErrorMessage } from '../lib/apiError';
 
 interface MatchResult {
@@ -265,24 +263,7 @@ const BiometricAttendancePage: React.FC = () => {
           );
         }
       } else {
-        // Offline: save to IndexedDB for later sync
-        await saveAttendanceRecord({
-          id: crypto.randomUUID(),
-          sessionId: '',
-          studentId: user?.id || '',
-          status: AttendanceStatus.PRESENT,
-          method: 'OFFLINE_BIOMETRIC',
-          scannedAt: new Date().toISOString(),
-          synced: false,
-        });
-        setSubmitted(true);
-        setMatchResult({
-          studentId: user?.id || '',
-          studentName: user?.fullName || 'You',
-          confidence: 1,
-        });
-        setError('Saved offline. Will sync when connected.');
-        stopCamera();
+        setError('Face attendance requires internet so SAMS can match the student against enrolled templates securely. Reconnect and try again.');
       }
     } catch (err: unknown) {
       setError(getApiErrorMessage(err, 'Biometric verification failed.'));
@@ -316,8 +297,8 @@ const BiometricAttendancePage: React.FC = () => {
         <div className="mb-8">
           <h1 className="text-2xl font-bold text-ink">Scan student face</h1>
           <p className="text-ink-muted text-sm mt-1">
-            Scan student face on this device. Students do not use their phones for face check-in (they
-            scan QR on their own phone). Login fingerprint stays on each user&apos;s own device.
+            Scan the student&apos;s enrolled face on this device. SAMS compares it with the face the student registered
+            and marks the matched student present. Students still use QR on their own phone for self check-in.
           </p>
         </div>
 

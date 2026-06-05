@@ -4,7 +4,7 @@
 
 @layer base {
   :root {
-    /* SAMS strict palette: canvas, surface, text, indigo attendance CTA */
+    /* SAMS strict palette: dark canvas, indigo actions, warm accent for small highlights */
     --color-bg: #0f172a;
     --color-surface: #1e293b;
     --color-surface-muted: #1a1a1a;
@@ -17,9 +17,9 @@
     --color-brand: #4f46e5;
     --color-brand-hover: #4338ca;
     --color-brand-light: #1e1b4b;
-    --color-accent-orange: #4f46e5;
-    --color-accent-orange-hover: #4338ca;
-    --color-accent-orange-light: #1e1b4b;
+    --color-accent-orange: #f59e0b;
+    --color-accent-orange-hover: #d97706;
+    --color-accent-orange-light: #451a03;
     --color-accent-blue: #4f46e5;
     --color-accent-blue-hover: #4338ca;
     --color-accent-blue-light: #1e1b4b;
@@ -72,8 +72,8 @@
 
   /* Dashboard: flat cards with left accent — not chat-bubble tiles */
   .dash-card {
-    @apply relative flex flex-col gap-2 rounded-xl border border-line bg-surface p-4 shadow-card
-      hover:-translate-y-0.5 hover:border-line-strong hover:shadow-card-hover transition-all duration-200;
+    @apply relative flex flex-col gap-2 rounded-xl border border-line bg-surface p-4 shadow-card-soft
+      hover:-translate-y-0.5 hover:border-indigo-500/35 hover:shadow-card-soft-hover transition-all duration-200;
   }
 
   .dash-card-primary {
@@ -89,7 +89,7 @@
   }
 
   .dash-card-icon-primary {
-    @apply text-indigo-300 border border-indigo-500/30 bg-indigo-500/10;
+    @apply text-amber-300 border border-amber-500/25 bg-amber-500/10;
   }
 
   .dash-card-icon-secondary {
@@ -97,8 +97,8 @@
   }
 
   .dash-stat {
-    @apply flex items-center gap-4 rounded-xl border border-line bg-surface px-4 py-3 shadow-card
-      hover:border-line-strong hover:shadow-card-hover transition-all duration-200 cursor-default;
+    @apply flex items-center gap-4 rounded-xl border border-line bg-surface px-4 py-3 shadow-card-soft
+      hover:border-indigo-500/30 hover:shadow-card-soft-hover transition-all duration-200 cursor-default;
   }
 
   .dash-stat-accent-orange {
@@ -273,26 +273,22 @@
     color: rgb(79 70 229) !important;
   }
 
-  .text-yellow-300, .text-yellow-400, .text-amber-300, .text-amber-400 {
-    color: rgb(148 163 184) !important;
-  }
-
-  /* Tailwind orange-* reads yellow on dark UI — map to slate/indigo */
+  .text-yellow-300, .text-yellow-400, .text-amber-300, .text-amber-400,
   .text-orange-300, .text-orange-400, .text-orange-500 {
-    color: rgb(148 163 184) !important;
+    color: rgb(245 158 11) !important;
   }
 
   .hover\:text-orange-400:hover {
-    color: rgb(203 213 225) !important;
+    color: rgb(251 191 36) !important;
   }
 
   .border-orange-400, .hover\:border-orange-400:hover,
   .border-orange-500\/20, .border-orange-500\/30, .border-orange-500\/40, .border-orange-500\/50 {
-    border-color: rgb(100 116 139 / 0.4) !important;
+    border-color: rgb(245 158 11 / 0.28) !important;
   }
 
   .bg-orange-500\/10, .bg-orange-500\/20, .bg-orange-950\/50 {
-    background-color: rgb(51 65 85 / 0.45) !important;
+    background-color: rgb(245 158 11 / 0.08) !important;
   }
 
   .border-teal-500\/20, .border-teal-500\/30, .border-teal-500\/40,
@@ -303,7 +299,7 @@
   }
 
   .border-yellow-500\/20, .border-yellow-500\/30, .border-amber-500\/20, .border-amber-500\/30 {
-    border-color: rgb(100 116 139 / 0.35) !important;
+    border-color: rgb(245 158 11 / 0.28) !important;
   }
 
   .bg-teal-500\/10, .bg-teal-500\/20, .bg-cyan-500\/10, .bg-cyan-500\/20,
@@ -314,7 +310,7 @@
   }
 
   .bg-yellow-500\/10, .bg-yellow-500\/20, .bg-amber-500\/10, .bg-amber-500\/20 {
-    background-color: rgb(51 65 85 / 0.4) !important;
+    background-color: rgb(245 158 11 / 0.08) !important;
   }
 
   .from-teal-500, .from-cyan-500, .from-purple-500, .from-pink-500,

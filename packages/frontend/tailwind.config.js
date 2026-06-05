@@ -73,6 +73,8 @@ export default {
       boxShadow: {
         card: '0 1px 3px 0 rgb(0 0 0 / 0.35), 0 1px 2px -1px rgb(0 0 0 / 0.25)',
         'card-hover': '0 8px 24px 0 rgb(0 0 0 / 0.45)',
+        'card-soft': '0 10px 28px -22px rgb(15 23 42 / 0.95), 0 1px 0 rgb(255 255 255 / 0.03) inset',
+        'card-soft-hover': '0 18px 40px -26px rgb(79 70 229 / 0.55), 0 1px 0 rgb(255 255 255 / 0.04) inset',
       },
     },
   },

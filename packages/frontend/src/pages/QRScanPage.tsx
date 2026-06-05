@@ -34,6 +34,19 @@ function waitForJsQR(timeoutMs: number): Promise<boolean> {
   });
 }
 
+function decodeQrSessionId(qrToken: string): string | null {
+  try {
+    const payload = qrToken.split('.')[1];
+    if (!payload) return null;
+    const normalized = payload.replace(/-/g, '+').replace(/_/g, '/');
+    const padded = normalized.padEnd(Math.ceil(normalized.length / 4) * 4, '=');
+    const decoded = JSON.parse(atob(padded)) as { sessionId?: unknown };
+    return typeof decoded.sessionId === 'string' ? decoded.sessionId : null;
+  } catch {
+    return null;
+  }
+}
+
 function isSecureCameraContext(): boolean {
   if (typeof window === 'undefined') return true;
   const { protocol, hostname } = window.location;
@@ -158,9 +171,13 @@ const QRScanPage: React.FC = () => {
         await apiClient.post('/attendance/qr', { qrToken, gpsCoords });
         setSuccess(true);
       } else {
+        const sessionId = decodeQrSessionId(qrToken);
+        if (!sessionId) {
+          throw new Error('Could not read the session from this QR code. Please reconnect and scan again.');
+        }
         await saveAttendanceRecord({
           id: crypto.randomUUID(),
-          sessionId: '',
+          sessionId,
           studentId: user?.id || '',
           status: AttendanceStatus.PRESENT,
           method: 'OFFLINE_QR',
