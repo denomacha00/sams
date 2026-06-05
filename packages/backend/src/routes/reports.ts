@@ -321,8 +321,11 @@ reportsRouter.get('/export', requirePermission('view:reports'), async (req: Requ
     res.setHeader('Content-Disposition', `attachment; filename="report.${extension}"`);
     res.send(buffer);
   } catch (err) {
-    if (err instanceof AppError) throw err;
-    throw new AppError(500, 'INTERNAL_ERROR', 'Failed to export report');
+    if (err instanceof AppError) {
+      res.status(err.statusCode).json({ error: err.message, code: err.code });
+      return;
+    }
+    res.status(500).json({ error: 'Failed to export report', code: 'INTERNAL_ERROR' });
   }
 });
 
@@ -352,74 +355,21 @@ reportsRouter.get('/:reportId/export', requirePermission('view:reports'), async 
   const format = formatParam as 'pdf' | 'excel';
 
   try {
-    const { role, sub: userId, classId: userClassId, departmentId: userDeptId } = req.user;
     const dateRange = parseDateRange(req.query as Record<string, unknown>);
     const reportId = req.params.reportId as string;
     const parts = reportId.split(':');
-    const type = parts[0];
+    const type = parts[0] as 'student' | 'class' | 'department' | 'school';
     const targetId = parts.length > 1 ? parts.slice(1).join(':') : undefined;
 
-    // Enforce role-based scope on export
-    if (role === UserRole.STUDENT) {
-      // Students can only export their own student report
-      if (type !== 'student' || targetId !== userId) {
-        res.status(403).json({ error: 'Forbidden', code: 'FORBIDDEN', message: 'Students can only export their own report' });
-        return;
-      }
+    if (!['student', 'class', 'department', 'school'].includes(type)) {
+      throw new AppError(400, 'VALIDATION_ERROR', 'Invalid report type');
     }
 
-    if (role === UserRole.TEACHER) {
-      // Teachers can export student reports for students in their class, or their class report
-      if (type === 'student' && targetId) {
-        const student = await prisma.user.findUnique({
-          where: { id: targetId },
-          select: { classId: true, schoolId: true },
-        });
-        if (!student || student.schoolId !== req.schoolId || student.classId !== userClassId) {
-          res.status(403).json({ error: 'Forbidden', code: 'FORBIDDEN', message: 'Teachers can only export reports for students in their assigned class' });
-          return;
-        }
-      } else if (type === 'class') {
-        if (targetId !== userClassId) {
-          res.status(403).json({ error: 'Forbidden', code: 'FORBIDDEN', message: 'Teachers can only export reports for their assigned class' });
-          return;
-        }
-      } else if (type === 'department' || type === 'school') {
-        res.status(403).json({ error: 'Forbidden', code: 'FORBIDDEN', message: 'Teachers cannot export department or school reports' });
-        return;
-      }
+    if (type !== 'school' && !targetId) {
+      throw new AppError(400, 'VALIDATION_ERROR', 'Report targetId is required');
     }
 
-    if (role === UserRole.HOD) {
-      // HODs can export student/class reports within their department, or their department report
-      if (type === 'student' && targetId) {
-        const student = await prisma.user.findUnique({
-          where: { id: targetId },
-          select: { departmentId: true, schoolId: true },
-        });
-        if (!student || student.schoolId !== req.schoolId || student.departmentId !== userDeptId) {
-          res.status(403).json({ error: 'Forbidden', code: 'FORBIDDEN', message: 'HODs can only export reports for students in their department' });
-          return;
-        }
-      } else if (type === 'class' && targetId) {
-        const classData = await prisma.class.findUnique({
-          where: { id: targetId },
-          select: { departmentId: true, schoolId: true },
-        });
-        if (!classData || classData.schoolId !== req.schoolId || classData.departmentId !== userDeptId) {
-          res.status(403).json({ error: 'Forbidden', code: 'FORBIDDEN', message: 'HODs can only export reports for classes in their department' });
-          return;
-        }
-      } else if (type === 'department') {
-        if (targetId !== userDeptId) {
-          res.status(403).json({ error: 'Forbidden', code: 'FORBIDDEN', message: 'HODs can only export reports for their own department' });
-          return;
-        }
-      } else if (type === 'school') {
-        res.status(403).json({ error: 'Forbidden', code: 'FORBIDDEN', message: 'HODs cannot export school-wide reports' });
-        return;
-      }
-    }
+    await assertReportScope(req, type, targetId);
 
     // Reconstruct reportId with the authenticated user's schoolId for security
     const secureReportId = targetId
@@ -435,7 +385,10 @@ reportsRouter.get('/:reportId/export', requirePermission('view:reports'), async 
     res.setHeader('Content-Disposition', `attachment; filename="report.${extension}"`);
     res.send(buffer);
   } catch (err) {
-    if (err instanceof AppError) throw err;
-    throw new AppError(500, 'INTERNAL_ERROR', 'Failed to export report');
+    if (err instanceof AppError) {
+      res.status(err.statusCode).json({ error: err.message, code: err.code });
+      return;
+    }
+    res.status(500).json({ error: 'Failed to export report', code: 'INTERNAL_ERROR' });
   }
 });

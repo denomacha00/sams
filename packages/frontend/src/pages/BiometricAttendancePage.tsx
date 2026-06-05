@@ -279,9 +279,14 @@ const BiometricAttendancePage: React.FC = () => {
   if (featureGated) {
     return (
       <div className="page-shell p-6">
-        <div className="max-w-lg mx-auto surface-card p-6 text-center">
-          <h1 className="text-xl font-bold text-ink mb-2">Biometric attendance unavailable</h1>
-          <p className="text-ink-muted text-sm">
+        <div className="max-w-xl mx-auto surface-card p-7 text-center border border-line">
+          <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-xl bg-amber-500/10 border border-amber-500/25 text-amber-300">
+            <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.6} d="M12 9v3.75m0 3.75h.008v.008H12V16.5zm8.25-4.5a8.25 8.25 0 11-16.5 0 8.25 8.25 0 0116.5 0z" />
+            </svg>
+          </div>
+          <h1 className="text-xl font-semibold text-ink mb-2">Biometric attendance unavailable</h1>
+          <p className="text-ink-muted text-sm leading-6">
             Biometric scanning requires a Professional or Enterprise plan. Upgrade the school license
             in the Super Admin portal, then reload this page.
           </p>
@@ -292,14 +297,23 @@ const BiometricAttendancePage: React.FC = () => {
 
   return (
     <div className="page-shell p-6">
-      <div className="max-w-lg mx-auto">
+      <div className="max-w-3xl mx-auto">
         {/* Header */}
-        <div className="mb-8">
-          <h1 className="text-2xl font-bold text-ink">Scan student face</h1>
-          <p className="text-ink-muted text-sm mt-1">
-            Scan the student&apos;s enrolled face on this device. SAMS compares it with the face the student registered
-            and marks the matched student present. Students still use QR on their own phone for self check-in.
-          </p>
+        <div className="mb-6 surface-card border border-line p-6">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-ink-subtle mb-2">Teacher device</p>
+              <h1 className="text-2xl font-semibold text-ink">Biometric attendance</h1>
+              <p className="text-ink-muted text-sm mt-2 leading-6 max-w-2xl">
+                Use a teacher or HOD device to identify enrolled students and mark attendance for the active session.
+                Students should enroll once, then continue using QR or link attendance when self check-in is required.
+              </p>
+            </div>
+            <div className="rounded-xl border border-line bg-surface-muted px-3 py-2 text-left sm:text-right">
+              <p className="text-[11px] uppercase tracking-wide text-ink-subtle">Templates</p>
+              <p className="text-sm font-semibold text-ink">{templates.length} available</p>
+            </div>
+          </div>
         </div>
 
         {error && (
@@ -308,11 +322,11 @@ const BiometricAttendancePage: React.FC = () => {
           </div>
         )}
 
-        <div className="surface-card p-6">
+        <div className="surface-card border border-line p-6">
           {!modelsLoaded && !error && (
             <div className="text-center py-8">
               <div className="flex items-center justify-center gap-3">
-                <svg className="animate-spin h-5 w-5 text-indigo-400" viewBox="0 0 24 24">
+                <svg className="animate-spin h-5 w-5 text-brand" viewBox="0 0 24 24">
                   <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
                   <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
                 </svg>
@@ -322,27 +336,27 @@ const BiometricAttendancePage: React.FC = () => {
           )}
 
           {modelsLoaded && !sessionId && !submitted && (
-            <p className="text-orange-400/90 text-sm text-center mb-4">
-              Start an attendance session before using face scan.
-            </p>
+            <div className="mb-4 rounded-xl border border-amber-500/25 bg-amber-500/10 px-4 py-3 text-sm text-amber-200">
+              Start an attendance session before using biometric scanning.
+            </div>
           )}
 
           {modelsLoaded && !cameraActive && !submitted && (
             <div className="text-center py-8">
-              <div className="inline-flex items-center justify-center w-20 h-20 rounded-2xl input-field mb-4">
-                <svg className="w-10 h-10 text-brand" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <div className="inline-flex items-center justify-center w-20 h-20 rounded-2xl bg-surface-muted border border-line mb-4">
+                <svg className="w-10 h-10 text-ink-muted" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
                 </svg>
               </div>
               <p className="text-ink-muted mb-6">
-                Point the camera at the student&apos;s face. You hold the device; attendance is recorded
-                for the matched student.
+                Keep the device steady, ask the student to face the camera, then scan. Attendance is recorded
+                only after a confident match.
               </p>
               <button
                 onClick={startCamera}
                 disabled={!sessionId || cameraStarting}
-                className="btn-primary py-3 px-8 hover:scale-[1.02] active:scale-[0.98] transition-all duration-200 disabled:opacity-50"
+                className="btn-primary py-3 px-8 transition-colors disabled:opacity-50"
               >
                 {cameraStarting ? 'Opening camera...' : 'Open camera'}
               </button>
@@ -351,7 +365,7 @@ const BiometricAttendancePage: React.FC = () => {
 
           {cameraActive && (
             <div>
-              <div className="relative rounded-2xl overflow-hidden mb-4">
+              <div className="relative rounded-2xl overflow-hidden mb-4 border border-line bg-black/20">
                 <video
                   ref={videoRef}
                   className="w-full rounded-2xl"
@@ -360,14 +374,14 @@ const BiometricAttendancePage: React.FC = () => {
                 />
                 {/* Face outline overlay */}
                 <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                  <div className="w-48 h-60 border-2 border-indigo-400/50 rounded-full" />
+                  <div className="w-48 h-60 rounded-full border-2 border-white/60 shadow-[0_0_0_9999px_rgba(15,23,42,0.25)]" />
                 </div>
               </div>
 
               <button
                 onClick={detectAndMatch}
                 disabled={loading}
-                className="w-full btn-primary py-3 px-4 hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200"
+                className="w-full btn-primary py-3 px-4 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
               >
                 {loading ? (
                   <span className="flex items-center justify-center gap-2">
@@ -384,7 +398,7 @@ const BiometricAttendancePage: React.FC = () => {
 
               <button
                 onClick={stopCamera}
-                className="mt-3 w-full btn-secondary py-2.5 px-4 transition-all duration-200"
+                className="mt-3 w-full btn-secondary py-2.5 px-4 transition-colors"
               >
                 Cancel
               </button>
@@ -393,12 +407,12 @@ const BiometricAttendancePage: React.FC = () => {
 
           {submitted && matchResult && (
             <div className="text-center py-8">
-              <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-indigo-500/30 mb-4">
-                <svg className="w-8 h-8 text-indigo-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-emerald-500/10 border border-emerald-500/25 mb-4">
+                <svg className="w-8 h-8 text-emerald-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                 </svg>
               </div>
-              <p className="text-lg font-medium text-white">Student marked present</p>
+              <p className="text-lg font-semibold text-ink">Student marked present</p>
               <p className="text-ink-muted mt-1">{matchResult.studentName}</p>
               <p className="text-xs text-ink-subtle mt-1">
                 Confidence: {(matchResult.confidence * 100).toFixed(1)}%
@@ -409,7 +423,7 @@ const BiometricAttendancePage: React.FC = () => {
                   setMatchResult(null);
                   void startCamera();
                 }}
-                className="mt-6 btn-primary py-3 px-8 hover:scale-[1.02] active:scale-[0.98] transition-all duration-200"
+                className="mt-6 btn-primary py-3 px-8 transition-colors"
               >
                 Next Student
               </button>

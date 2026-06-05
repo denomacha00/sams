@@ -34,6 +34,18 @@ const ProfilePage: React.FC = () => {
 
   const clearMessages = () => { setSuccess(null); setError(null); };
 
+  useEffect(() => {
+    return () => {
+      if (cropImage) URL.revokeObjectURL(cropImage);
+    };
+  }, [cropImage]);
+
+  const resetCrop = () => {
+    setCropImage(null);
+    setCropScale(1);
+    setCropPosition({ x: 0, y: 0 });
+  };
+
   const isStudent = user?.role === UserRole.STUDENT;
   const canEditName = !isStudent; // Only teachers/admins/HOD can edit their name
 
@@ -79,6 +91,12 @@ const ProfilePage: React.FC = () => {
     if (!file) return;
     if (file.size > 5 * 1024 * 1024) {
       setError('Image must be less than 5MB');
+      e.target.value = '';
+      return;
+    }
+    if (!file.type.startsWith('image/')) {
+      setError('Please choose an image file');
+      e.target.value = '';
       return;
     }
     clearMessages();
@@ -86,6 +104,7 @@ const ProfilePage: React.FC = () => {
     setCropImage(url);
     setCropScale(1);
     setCropPosition({ x: 0, y: 0 });
+    e.target.value = '';
   };
 
   // Handle crop drag
@@ -133,7 +152,8 @@ const ProfilePage: React.FC = () => {
       const canvas = document.createElement('canvas');
       canvas.width = 400;
       canvas.height = 400;
-      const ctx = canvas.getContext('2d')!;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) throw new Error('Canvas is not available');
       const img = cropImgRef.current;
 
       const size = 200 / cropScale;
@@ -147,8 +167,12 @@ const ProfilePage: React.FC = () => {
       );
 
       // Convert to blob
-      const blob = await new Promise<Blob>((resolve) =>
-        canvas.toBlob((b) => resolve(b!), 'image/jpeg', 0.9)
+      const blob = await new Promise<Blob>((resolve, reject) =>
+        canvas.toBlob(
+          (b) => (b ? resolve(b) : reject(new Error('Could not prepare profile picture'))),
+          'image/jpeg',
+          0.9,
+        ),
       );
 
       const formData = new FormData();
@@ -161,7 +185,7 @@ const ProfilePage: React.FC = () => {
         avatarUrl: data.avatarUrl,
         avatarVersion: Date.now(),
       });
-      setCropImage(null);
+      resetCrop();
       setSuccess('Profile picture updated!');
     } catch (err: unknown) {
       const status = (err as { response?: { status?: number } }).response?.status;
@@ -230,7 +254,7 @@ const ProfilePage: React.FC = () => {
             {/* Actions */}
             <div className="flex gap-3 mt-5">
               <button
-                onClick={() => { setCropImage(null); setCropScale(1); setCropPosition({ x: 0, y: 0 }); }}
+                onClick={resetCrop}
                 className="flex-1 btn-secondary py-2.5 rounded-xl hover:bg-white/20 transition-all"
               >
                 Cancel

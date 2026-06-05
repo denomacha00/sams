@@ -6,6 +6,7 @@ import { licenseService } from './licenseService';
 import { AppError } from '../middleware/errors';
 import { assertPhoneAvailableInSchool, onboardPhoneForSms, optionalPhoneForStorage } from './phoneOnboardingService';
 import { buildRegistrationLinkUrl } from '../lib/registrationLinkUrl';
+import { resolveTeacherClassId } from '../lib/teacherScope';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -109,36 +110,51 @@ export class RegistrationLinkService {
         throw new AppError(403, 'FORBIDDEN', 'Teacher account not found');
       }
       departmentId = teacher.departmentId ?? departmentId;
-      classId = teacher.classId ?? classId;
+      classId = (await resolveTeacherClassId(creatorId, teacher.classId ?? classId)) ?? undefined;
       if (!classId) {
         throw new AppError(400, 'CLASS_REQUIRED', 'Teachers must be assigned to a class before generating student registration links');
       }
     }
 
-    // TEACHER links must have a departmentId — teachers belong to a department
-    if (targetRole === UserRole.TEACHER && !departmentId) {
-      throw new AppError(400, 'DEPARTMENT_REQUIRED', 'A department must be selected for teacher registration links');
+    if (creatorRole === UserRole.HOD && !departmentId) {
+      throw new AppError(403, 'FORBIDDEN', 'HOD must be assigned to a department');
     }
 
-    // HOD + STUDENT: require classId and validate department ownership
-    if (creatorRole === UserRole.HOD && targetRole === UserRole.STUDENT) {
-      if (!classId) {
-        throw new AppError(400, 'CLASS_REQUIRED', 'A class must be selected for student registration links');
-      }
-
-      // Validate that the classId belongs to the HOD's department
+    if (classId) {
       const classRecord = await prisma.class.findUnique({
         where: { id: classId },
-        select: { departmentId: true },
+        select: { schoolId: true, departmentId: true },
       });
 
-      if (!classRecord) {
-        throw new AppError(400, 'CLASS_REQUIRED', 'The specified class does not exist');
+      if (!classRecord || classRecord.schoolId !== schoolId) {
+        throw new AppError(400, 'CLASS_REQUIRED', 'The specified class does not exist in your school');
       }
 
-      if (classRecord.departmentId !== departmentId) {
-        throw new AppError(403, 'FORBIDDEN', 'Class does not belong to your department');
+      if (departmentId && classRecord.departmentId !== departmentId) {
+        throw new AppError(403, 'FORBIDDEN', 'Class does not belong to the selected department');
       }
+
+      departmentId = classRecord.departmentId;
+    }
+
+    if (departmentId) {
+      const department = await prisma.department.findUnique({
+        where: { id: departmentId },
+        select: { schoolId: true },
+      });
+
+      if (!department || department.schoolId !== schoolId) {
+        throw new AppError(400, 'DEPARTMENT_REQUIRED', 'The specified department does not exist in your school');
+      }
+    }
+
+    if (targetRole === UserRole.STUDENT && !classId) {
+      throw new AppError(400, 'CLASS_REQUIRED', 'A class must be selected for student registration links');
+    }
+
+    // TEACHER and HOD links must have a department assignment.
+    if ((targetRole === UserRole.TEACHER || targetRole === UserRole.HOD) && !departmentId) {
+      throw new AppError(400, 'DEPARTMENT_REQUIRED', 'A department must be selected for staff registration links');
     }
 
     // Clamp expiryDays
@@ -242,9 +258,35 @@ export class RegistrationLinkService {
       await licenseService.checkStudentLimit(link.schoolId);
     }
 
-    // Teachers must have a department (from the link)
-    if (link.targetRole === UserRole.TEACHER && !(link as any).departmentId) {
-      throw new AppError(400, 'DEPARTMENT_REQUIRED', 'This registration link is missing department information. Please contact your HOD.');
+    if (link.classId) {
+      const classRecord = await prisma.class.findUnique({
+        where: { id: link.classId },
+        select: { schoolId: true, departmentId: true },
+      });
+      if (!classRecord || classRecord.schoolId !== link.schoolId) {
+        throw new AppError(410, 'LINK_INVALID', 'This registration link is no longer valid. Please request a new link.');
+      }
+      if (link.departmentId && classRecord.departmentId !== link.departmentId) {
+        throw new AppError(410, 'LINK_INVALID', 'This registration link is no longer valid. Please request a new link.');
+      }
+    }
+
+    if (link.departmentId) {
+      const department = await prisma.department.findUnique({
+        where: { id: link.departmentId },
+        select: { schoolId: true },
+      });
+      if (!department || department.schoolId !== link.schoolId) {
+        throw new AppError(410, 'LINK_INVALID', 'This registration link is no longer valid. Please request a new link.');
+      }
+    }
+
+    if (link.targetRole === UserRole.STUDENT && !link.classId) {
+      throw new AppError(400, 'CLASS_REQUIRED', 'This registration link is missing class information. Please request a new link.');
+    }
+
+    if ((link.targetRole === UserRole.TEACHER || link.targetRole === UserRole.HOD) && !link.departmentId) {
+      throw new AppError(400, 'DEPARTMENT_REQUIRED', 'This registration link is missing department information. Please request a new link.');
     }
 
     // Hash the provided password

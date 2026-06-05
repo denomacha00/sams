@@ -16,17 +16,41 @@ import { resolveTeacherClassId } from '../lib/teacherScope';
 
 // ─── Avatar Upload Config ─────────────────────────────────────────────────────
 
+const AVATAR_MAX_BYTES = 5 * 1024 * 1024;
+const AVATAR_MIME_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp', 'image/gif']);
+
 const upload = multer({
   storage: multer.memoryStorage(),
-  limits: { fileSize: 5 * 1024 * 1024 }, // 5MB max
+  limits: { fileSize: AVATAR_MAX_BYTES, files: 1 },
   fileFilter: (_req, file, cb) => {
-    if (file.mimetype.startsWith('image/')) {
+    if (AVATAR_MIME_TYPES.has(file.mimetype)) {
       cb(null, true);
     } else {
-      cb(new Error('Only image files are allowed'));
+      cb(new AppError(400, 'INVALID_IMAGE', 'Only JPEG, PNG, WebP, or GIF images are allowed'));
     }
   },
 });
+
+function uploadAvatar(req: Request, res: Response, next: NextFunction): void {
+  upload.single('avatar')(req, res, (err: unknown) => {
+    if (!err) {
+      next();
+      return;
+    }
+
+    if (err instanceof multer.MulterError && err.code === 'LIMIT_FILE_SIZE') {
+      next(new AppError(413, 'FILE_TOO_LARGE', 'Profile picture must be 5MB or smaller'));
+      return;
+    }
+
+    if (err instanceof AppError) {
+      next(err);
+      return;
+    }
+
+    next(new AppError(400, 'INVALID_IMAGE', 'Invalid profile picture upload'));
+  });
+}
 
 // ─── Validation Schemas ───────────────────────────────────────────────────────
 
@@ -242,7 +266,7 @@ usersRouter.post('/me/password', async (req: Request, res: Response, next: NextF
  * POST /api/v1/users/me/avatar
  * Upload and resize profile picture (200x200 JPEG).
  */
-usersRouter.post('/me/avatar', upload.single('avatar'), async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+usersRouter.post('/me/avatar', uploadAvatar, async (req: Request, res: Response, next: NextFunction): Promise<void> => {
   try {
     if (!req.file) {
       throw new AppError(400, 'NO_FILE', 'No image file provided');
@@ -253,25 +277,33 @@ usersRouter.post('/me/avatar', upload.single('avatar'), async (req: Request, res
       fs.mkdirSync(AVATARS_DIR, { recursive: true });
     }
 
-    // Resize to 200x200 and convert to JPEG
+    // Resize to 200x200 and convert to JPEG. Sharp verifies the actual file bytes,
+    // so spoofed image MIME types fail here instead of being persisted.
     const filename = `${req.user.sub}.jpg`;
     const filepath = path.join(AVATARS_DIR, filename);
 
-    await sharp(req.file.buffer)
+    await sharp(req.file.buffer, { failOn: 'error' })
+      .rotate()
       .resize(200, 200, { fit: 'cover', position: 'center' })
       .jpeg({ quality: 85 })
       .toFile(filepath);
 
-    // Save URL to database
-    const avatarUrl = avatarPublicUrl(req.user.sub);
+    // Store a cache-busting URL so other signed-in devices pick up replacements
+    // after /users/me refreshes, even though the avatar filename is stable.
+    const avatarUrl = `${avatarPublicUrl(req.user.sub)}?v=${Date.now()}`;
     await prisma.user.update({
-      where: { id: req.user.sub },
+      where: { id: req.user.sub, schoolId: req.schoolId },
       data: { avatarUrl },
     });
 
+    res.setHeader('Cache-Control', 'no-store');
     res.status(200).json({ avatarUrl });
   } catch (err) {
-    next(err instanceof AppError ? err : new AppError(500, 'INTERNAL_ERROR', 'Failed to upload avatar'));
+    if (err instanceof AppError) {
+      next(err);
+      return;
+    }
+    next(new AppError(400, 'INVALID_IMAGE', 'Profile picture could not be processed'));
   }
 });
 
@@ -613,16 +645,16 @@ registrationLinksRouter.post('/', async (req: Request, res: Response, next: Next
 registrationLinksRouter.get('/:token', async (req: Request, res: Response, next: NextFunction): Promise<void> => {
   try {
     const link = await registrationLinkService.resolveLink(req.params.token as string);
-    
+
     // Fetch school and class names for the frontend display
     const school = await prisma.school.findUnique({
       where: { id: link.schoolId },
       select: { name: true, schoolCode: true },
     });
-    
+
     let className: string | undefined;
     let departmentName: string | undefined;
-    
+
     if (link.classId) {
       const classRecord = await prisma.class.findUnique({
         where: { id: link.classId },
@@ -637,7 +669,7 @@ registrationLinksRouter.get('/:token', async (req: Request, res: Response, next:
       });
       departmentName = dept?.name ?? undefined;
     }
-    
+
     res.status(200).json({
       ...link,
       schoolName: school?.name,
