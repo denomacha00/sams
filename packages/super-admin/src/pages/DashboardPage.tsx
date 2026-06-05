@@ -25,6 +25,63 @@ interface SystemStatus {
   checks: { database: boolean; redis: boolean };
 }
 
+interface StatCardProps {
+  label: string;
+  value: React.ReactNode;
+  detail: string;
+  tone?: 'indigo' | 'blue' | 'orange';
+}
+
+const toneStyles = {
+  indigo: {
+    border: 'border-l-indigo-500',
+    icon: 'bg-indigo-500/10 border-indigo-500/30 text-indigo-300',
+    value: 'text-white',
+  },
+  blue: {
+    border: 'border-l-blue-500',
+    icon: 'bg-blue-500/10 border-blue-500/30 text-blue-300',
+    value: 'text-blue-300',
+  },
+  orange: {
+    border: 'border-l-amber-500',
+    icon: 'bg-amber-500/10 border-amber-500/30 text-amber-300',
+    value: 'text-amber-300',
+  },
+};
+
+const StatCard: React.FC<StatCardProps> = ({ label, value, detail, tone = 'indigo' }) => {
+  const styles = toneStyles[tone];
+  return (
+    <div className={`rounded-2xl border border-gray-700/80 border-l-4 ${styles.border} bg-gray-800/80 p-5 shadow-lg shadow-black/10 transition-all hover:-translate-y-0.5 hover:border-indigo-500/40`}>
+      <div className="flex items-start justify-between gap-4">
+        <div className="min-w-0">
+          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-gray-400">{label}</p>
+          <p className={`mt-3 text-3xl font-bold tabular-nums ${styles.value}`}>{value}</p>
+        </div>
+        <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border ${styles.icon}`}>
+          <span className="h-2.5 w-2.5 rounded-full bg-current" />
+        </div>
+      </div>
+      <p className="mt-3 text-sm text-gray-500">{detail}</p>
+    </div>
+  );
+};
+
+const SectionCard: React.FC<{ title: string; subtitle?: string; children: React.ReactNode }> = ({
+  title,
+  subtitle,
+  children,
+}) => (
+  <section className="rounded-2xl border border-gray-700/80 bg-gray-800/80 p-6 shadow-lg shadow-black/10">
+    <div className="mb-5 flex flex-col gap-1 border-b border-gray-700/80 pb-4">
+      <h2 className="text-lg font-semibold tracking-tight text-white">{title}</h2>
+      {subtitle && <p className="text-sm text-gray-400">{subtitle}</p>}
+    </div>
+    {children}
+  </section>
+);
+
 const DashboardPage: React.FC = () => {
   const [analytics, setAnalytics] = useState<Analytics | null>(null);
   const [revenue, setRevenue] = useState<{ totalRevenue: number; byPlanTier: RevenueByTier[] }>({
@@ -59,118 +116,142 @@ const DashboardPage: React.FC = () => {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <div className="text-gray-400 text-lg">Loading dashboard...</div>
+      <div className="flex min-h-[18rem] items-center justify-center">
+        <div className="rounded-2xl border border-gray-700 bg-gray-800 px-5 py-4 text-sm text-gray-300 shadow-lg">
+          Loading dashboard…
+        </div>
       </div>
     );
   }
 
-  const activeSchools = analytics
-    ? analytics.totalSchools - analytics.suspendedSchools
-    : 0;
+  const activeSchools = analytics ? analytics.totalSchools - analytics.suspendedSchools : 0;
+  const totalSchools = analytics?.totalSchools ?? 0;
+  const totalUsers = analytics?.totalUsers ?? 0;
+  const expiredSchools = analytics?.expiredSchools ?? 0;
+  const activeSessions = analytics?.activeSessions ?? 0;
+  const maxPlanCount = Math.max(1, ...(analytics?.schoolsByPlan ?? []).map((plan) => plan.count));
+  const maxRevenue = Math.max(1, ...revenue.byPlanTier.map((tier) => tier.totalAmount));
 
   return (
     <div className="space-y-8">
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-        <h1 className="text-2xl font-bold text-white">Dashboard</h1>
-        {systemStatus && (
-          <Link
-            to="/settings"
-            className={`inline-flex items-center gap-2 px-3 py-1.5 text-sm rounded-lg border transition-colors ${
-              systemStatus.status === 'ok'
-                ? 'bg-green-900/30 border-green-700 text-green-300 hover:bg-green-900/50'
-                : 'bg-indigo-900/30 border-indigo-700 text-indigo-300 hover:bg-indigo-900/50'
-            }`}
-          >
-            <span
-              className={`w-2 h-2 rounded-full ${
-                systemStatus.status === 'ok' ? 'bg-green-400' : 'bg-indigo-400'
+      <div className="rounded-3xl border border-gray-700/80 bg-gradient-to-br from-gray-800 via-gray-800 to-indigo-950/40 p-7 shadow-xl shadow-black/20">
+        <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-indigo-300">Super Admin</p>
+            <h1 className="mt-2 text-3xl font-bold tracking-tight text-white">Platform dashboard</h1>
+            <p className="mt-2 max-w-2xl text-sm leading-6 text-gray-400">
+              Monitor school health, license risk, revenue, and live system readiness from one control surface.
+            </p>
+          </div>
+
+          {systemStatus && (
+            <Link
+              to="/settings"
+              className={`inline-flex w-fit items-center gap-2 rounded-xl border px-4 py-2 text-sm font-medium transition-colors ${
+                systemStatus.status === 'ok'
+                  ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-300 hover:bg-emerald-500/15'
+                  : 'border-amber-500/30 bg-amber-500/10 text-amber-300 hover:bg-amber-500/15'
               }`}
-            />
-            {systemStatus.status === 'ok' ? 'Platform healthy' : 'Platform degraded'}
-            <span className="text-xs opacity-75">
-              DB {systemStatus.checks.database ? '✓' : '✗'} · Redis{' '}
-              {systemStatus.checks.redis ? '✓' : '✗'}
-            </span>
-          </Link>
-        )}
+            >
+              <span
+                className={`h-2.5 w-2.5 rounded-full ${
+                  systemStatus.status === 'ok' ? 'bg-emerald-400' : 'bg-amber-400'
+                }`}
+              />
+              {systemStatus.status === 'ok' ? 'Platform healthy' : 'Platform degraded'}
+              <span className="text-xs opacity-75">
+                DB {systemStatus.checks.database ? '✓' : '✗'} · Redis {systemStatus.checks.redis ? '✓' : '✗'}
+              </span>
+            </Link>
+          )}
+        </div>
       </div>
 
       {apiError && (
-        <div className="bg-red-900/50 border border-red-500 text-red-200 px-4 py-3 rounded-lg text-sm">
+        <div className="rounded-2xl border border-red-500/40 bg-red-950/50 px-4 py-3 text-sm text-red-200">
           {apiError}
         </div>
       )}
 
-      {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        <div className="bg-gray-800 rounded-lg p-6 border border-gray-700">
-          <p className="text-gray-400 text-sm">Total Schools</p>
-          <p className="text-3xl font-bold text-white mt-1">{analytics?.totalSchools ?? 0}</p>
-          <p className="text-xs text-gray-500 mt-1">
-            {activeSchools} active · {analytics?.suspendedSchools ?? 0} suspended
-          </p>
-        </div>
-        <div className="bg-gray-800 rounded-lg p-6 border border-gray-700">
-          <p className="text-gray-400 text-sm">Total Users</p>
-          <p className="text-3xl font-bold text-white mt-1">{analytics?.totalUsers ?? 0}</p>
-          <p className="text-xs text-gray-500 mt-1">
-            {analytics?.totalStudents ?? 0} students · {analytics?.totalTeachers ?? 0} teachers
-          </p>
-        </div>
-        <div className="bg-gray-800 rounded-lg p-6 border border-gray-700">
-          <p className="text-gray-400 text-sm">License Status</p>
-          <p className="text-3xl font-bold text-indigo-300 mt-1">{analytics?.expiredSchools ?? 0}</p>
-          <p className="text-xs text-gray-500 mt-1">schools with expired licenses</p>
-        </div>
-        <div className="bg-gray-800 rounded-lg p-6 border border-gray-700">
-          <p className="text-gray-400 text-sm">Total Revenue</p>
-          <p className="text-3xl font-bold text-blue-400 mt-1">
-            KES {revenue.totalRevenue.toLocaleString()}
-          </p>
-          <p className="text-xs text-gray-500 mt-1">
-            {analytics?.activeSessions ?? 0} active attendance sessions
-          </p>
-        </div>
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
+        <StatCard
+          label="Total schools"
+          value={totalSchools.toLocaleString()}
+          detail={`${activeSchools.toLocaleString()} active · ${(analytics?.suspendedSchools ?? 0).toLocaleString()} suspended`}
+        />
+        <StatCard
+          label="Total users"
+          value={totalUsers.toLocaleString()}
+          detail={`${(analytics?.totalStudents ?? 0).toLocaleString()} students · ${(analytics?.totalTeachers ?? 0).toLocaleString()} teachers`}
+        />
+        <StatCard
+          label="License risk"
+          value={expiredSchools.toLocaleString()}
+          detail="schools with expired licenses"
+          tone={expiredSchools > 0 ? 'orange' : 'indigo'}
+        />
+        <StatCard
+          label="Total revenue"
+          value={`KES ${revenue.totalRevenue.toLocaleString()}`}
+          detail={`${activeSessions.toLocaleString()} active attendance sessions`}
+          tone="blue"
+        />
       </div>
 
-      {/* Plan Distribution */}
-      <div className="bg-gray-800 rounded-lg p-6 border border-gray-700">
-        <h2 className="text-lg font-semibold text-white mb-4">Plan Distribution</h2>
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          {(analytics?.schoolsByPlan ?? []).map(({ planTier, count }) => (
-            <div key={planTier} className="text-center">
-              <p className="text-2xl font-bold text-white">{count}</p>
-              <p className="text-sm text-gray-400">{planTier}</p>
-            </div>
-          ))}
-          {(analytics?.schoolsByPlan ?? []).length === 0 && (
-            <p className="text-gray-500 col-span-4 text-center">No schools yet</p>
-          )}
-        </div>
-      </div>
+      <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
+        <SectionCard title="Plan distribution" subtitle="Current school count by subscription tier">
+          <div className="space-y-4">
+            {(analytics?.schoolsByPlan ?? []).map(({ planTier, count }) => {
+              const width = `${Math.max(6, Math.round((count / maxPlanCount) * 100))}%`;
+              return (
+                <div key={planTier} className="rounded-xl border border-gray-700 bg-gray-900/45 p-4">
+                  <div className="flex items-center justify-between gap-4">
+                    <span className="text-sm font-medium text-gray-200">{planTier}</span>
+                    <span className="text-lg font-bold tabular-nums text-white">{count.toLocaleString()}</span>
+                  </div>
+                  <div className="mt-3 h-2 overflow-hidden rounded-full bg-gray-700/70">
+                    <div className="h-full rounded-full bg-indigo-500" style={{ width }} />
+                  </div>
+                </div>
+              );
+            })}
+            {(analytics?.schoolsByPlan ?? []).length === 0 && (
+              <p className="rounded-xl border border-dashed border-gray-700 py-8 text-center text-sm text-gray-500">
+                No schools yet
+              </p>
+            )}
+          </div>
+        </SectionCard>
 
-      {/* Revenue by Plan Tier */}
-      <div className="bg-gray-800 rounded-lg p-6 border border-gray-700">
-        <h2 className="text-lg font-semibold text-white mb-4">Revenue by Plan</h2>
-        <div className="space-y-3">
-          {revenue.byPlanTier.map((r) => (
-            <div key={r.planTier} className="flex items-center justify-between">
-              <span className="text-gray-300">{r.planTier}</span>
-              <div className="text-right">
-                <span className="text-white font-medium">
-                  KES {r.totalAmount.toLocaleString()}
-                </span>
-                <span className="text-gray-500 text-sm ml-2">({r.paymentCount} payments)</span>
-              </div>
-            </div>
-          ))}
-          {revenue.byPlanTier.length === 0 && (
-            <p className="text-gray-500 text-center">No payments recorded yet</p>
-          )}
-        </div>
+        <SectionCard title="Revenue by plan" subtitle="Payment volume and value by license tier">
+          <div className="space-y-4">
+            {revenue.byPlanTier.map((tier) => {
+              const width = `${Math.max(6, Math.round((tier.totalAmount / maxRevenue) * 100))}%`;
+              return (
+                <div key={tier.planTier} className="rounded-xl border border-gray-700 bg-gray-900/45 p-4">
+                  <div className="flex items-start justify-between gap-4">
+                    <div>
+                      <p className="text-sm font-medium text-gray-200">{tier.planTier}</p>
+                      <p className="mt-1 text-xs text-gray-500">{tier.paymentCount.toLocaleString()} payments</p>
+                    </div>
+                    <span className="text-right text-sm font-semibold text-blue-300">
+                      KES {tier.totalAmount.toLocaleString()}
+                    </span>
+                  </div>
+                  <div className="mt-3 h-2 overflow-hidden rounded-full bg-gray-700/70">
+                    <div className="h-full rounded-full bg-blue-500" style={{ width }} />
+                  </div>
+                </div>
+              );
+            })}
+            {revenue.byPlanTier.length === 0 && (
+              <p className="rounded-xl border border-dashed border-gray-700 py-8 text-center text-sm text-gray-500">
+                No payments recorded yet
+              </p>
+            )}
+          </div>
+        </SectionCard>
       </div>
-
     </div>
   );
 };
