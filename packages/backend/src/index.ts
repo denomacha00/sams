@@ -1,11 +1,11 @@
-import './config/loadEnv';
+﻿import './config/loadEnv';
 import express from 'express';
 import { createServer } from 'http';
 import { validateProductionSecrets } from './config/secrets';
 import { isSmsConfigured } from './config/africasTalking';
 import { isEmailConfigured } from './config/email';
 import { prisma } from './lib/prisma';
-import { redis } from './lib/redis';
+import { ensureRedisConnected, redis } from './lib/redis';
 import { setApiReady } from './apiState';
 
 const app = express();
@@ -14,10 +14,10 @@ const httpServer = createServer(app);
 const PORT = process.env.PORT ?? 3001;
 
 async function connectDependencies(): Promise<void> {
-  await redis.connect();
+  await ensureRedisConnected();
   await prisma.$connect();
   setApiReady(true);
-  console.log('[SAMS] Database and Redis connected — API ready');
+  console.log('[SAMS] Database and Redis connected â€” API ready');
 
   const { getNotificationService } = await import('./services/notificationService');
   getNotificationService();
@@ -34,14 +34,14 @@ async function connectDependencies(): Promise<void> {
   const { isConversationMemoryEnabled } = await import('./services/ai/roleActionsPrompt');
   if (!isConversationMemoryEnabled()) {
     console.warn(
-      '[STARTUP] Encrypted conversation memory disabled — set CONVERSATION_MASTER_KEY (32+ chars).',
+      '[STARTUP] Encrypted conversation memory disabled â€” set CONVERSATION_MASTER_KEY (32+ chars).',
     );
   }
 
   const { isModelProviderMismatch } = await import('./services/ai/aiProviderConfig');
   if (!hasPrimaryAIKey()) {
     console.warn(
-      '[STARTUP] AI chat disabled — set OPENAI_API_KEY in secrets/providers.env (not .env.example placeholders).',
+      '[STARTUP] AI chat disabled â€” set OPENAI_API_KEY in secrets/providers.env (not .env.example placeholders).',
     );
   } else {
     const configuredModel = process.env.OPENAI_MODEL?.trim();
@@ -52,15 +52,15 @@ async function connectDependencies(): Promise<void> {
     }
     if (isModelProviderMismatch()) {
       console.warn(
-        `[STARTUP] OPENAI_MODEL=${configuredModel} is not valid for Groq — set OPENAI_MODEL=llama-3.3-70b-versatile or use OpenRouter as primary.`,
+        `[STARTUP] OPENAI_MODEL=${configuredModel} is not valid for Groq â€” set OPENAI_MODEL=llama-3.3-70b-versatile or use OpenRouter as primary.`,
       );
     }
   }
   if (!isSmsConfigured()) {
-    console.warn('[STARTUP] SMS disabled — set AT_API_KEY and AT_USERNAME in .env to enable Africa\'s Talking.');
+    console.warn('[STARTUP] SMS disabled â€” set AT_API_KEY and AT_USERNAME in .env to enable Africa\'s Talking.');
   }
   if (!isEmailConfigured()) {
-    console.warn('[STARTUP] Email disabled — set SMTP_USER and SMTP_PASS in .env to enable SMTP.');
+    console.warn('[STARTUP] Email disabled â€” set SMTP_USER and SMTP_PASS in .env to enable SMTP.');
   }
 
   const { startQRRefreshJob } = await import('./jobs/qrRefresh');
@@ -81,7 +81,7 @@ export async function boot(): Promise<void> {
     console.log(`[SAMS] Binding port ${PORT}...`);
     await new Promise<void>((resolve, reject) => {
       httpServer.listen(PORT, () => {
-        console.log(`[SAMS] Bound port ${PORT} — accepting connections`);
+        console.log(`[SAMS] Bound port ${PORT} â€” accepting connections`);
         console.log(`[SAMS] API listening on port ${PORT}`);
         resolve();
       });
@@ -138,7 +138,7 @@ async function shutdown(signal: string): Promise<void> {
 process.on('SIGTERM', () => void shutdown('SIGTERM'));
 process.on('SIGINT', () => void shutdown('SIGINT'));
 
-// Keep PM2 alive on stray async errors — route handlers should use asyncHandler + errorHandler.
+// Keep PM2 alive on stray async errors â€” route handlers should use asyncHandler + errorHandler.
 process.on('unhandledRejection', (reason) => {
   console.error('[SAMS] Unhandled promise rejection (process kept alive):', reason);
 });
@@ -149,3 +149,4 @@ export { getIo as io } from './registerApplication';
 if (require.main === module) {
   void boot();
 }
+
