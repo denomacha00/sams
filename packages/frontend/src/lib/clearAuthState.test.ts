@@ -78,7 +78,7 @@ describe('clearAuthState', () => {
     forceAuthRedirect('session_expired');
 
     expect(useAuthStore.getState().isAuthenticated).toBe(false);
-    expect(replace).toHaveBeenCalledWith(null, '', '/login');
+    expect(replace).not.toHaveBeenCalled();
     expect(window.location.replace).not.toHaveBeenCalled();
   });
 
