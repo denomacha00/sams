@@ -4,6 +4,7 @@ import helmet from 'helmet';
 import cors from 'cors';
 import rateLimit from 'express-rate-limit';
 import { createId } from '@paralleldrive/cuid2';
+import { createRateLimitStore, getClientIp, skipOperationalProbe } from '../lib/rateLimitStore';
 
 // ─── Augment Express Request to include `id` ─────────────────────────────────
 
@@ -17,21 +18,17 @@ declare global {
 }
 
 // ─── Global Rate Limiter ──────────────────────────────────────────────────────
-// 200 requests per minute per IP, in-memory store (no Redis dependency).
+// 200 requests per minute per IP. Production uses Redis so limits stay shared
+// if PM2 runs more than one worker.
 
 export const globalRateLimiter = rateLimit({
   windowMs: 60 * 1000, // 1 minute
   max: 200,
+  store: createRateLimitStore('rl:global:'),
+  passOnStoreError: true,
   standardHeaders: true,  // Return rate limit info in `RateLimit-*` headers
   legacyHeaders: false,
-  keyGenerator: (req: Request) => {
-    // Prefer the real IP forwarded by NGINX over the socket address
-    const forwarded = req.headers['x-forwarded-for'];
-    if (typeof forwarded === 'string') {
-      return forwarded.split(',')[0].trim();
-    }
-    return req.ip ?? 'unknown';
-  },
+  keyGenerator: getClientIp,
   handler: (req: Request, res: Response) => {
     const requestId = req.id ?? createId();
     res.status(429).json({
@@ -40,7 +37,7 @@ export const globalRateLimiter = rateLimit({
       requestId,
     });
   },
-  skip: () => false,
+  skip: skipOperationalProbe,
 });
 
 // ─── Request-ID Middleware ────────────────────────────────────────────────────
@@ -71,6 +68,13 @@ function httpsRedirect(req: Request, res: Response, next: NextFunction): void {
 // ─── applyGlobalMiddleware ────────────────────────────────────────────────────
 
 export function applyGlobalMiddleware(app: Express): void {
+  if (process.env.TRUST_PROXY_HOPS) {
+    const hops = Number.parseInt(process.env.TRUST_PROXY_HOPS, 10);
+    if (Number.isFinite(hops) && hops > 0) app.set('trust proxy', hops);
+  } else if (process.env.NODE_ENV === 'production') {
+    app.set('trust proxy', 'loopback');
+  }
+
   // 1. Security headers
   app.use(helmet());
 
@@ -103,6 +107,6 @@ export function applyGlobalMiddleware(app: Express): void {
   // 5. Request-ID injection
   app.use(requestIdMiddleware);
 
-  // 6. Global rate limiter (in-memory, 200 req/min/IP)
+  // 6. Global rate limiter (200 req/min/IP)
   app.use(globalRateLimiter);
 }

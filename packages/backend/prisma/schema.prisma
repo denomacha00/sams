@@ -104,6 +104,10 @@ model School {
   notifications     Notification[]
   conversationThreads ConversationThread[]
   conversationRecords ConversationRecord[]
+
+  @@index([isSuspended])
+  @@index([licenseExpiresAt])
+  @@index([createdAt])
 }
 
 model User {
@@ -150,6 +154,10 @@ model User {
   @@unique([schoolId, admissionNumber])
   @@unique([schoolId, phone])
   @@index([schoolId, role])
+  @@index([role])
+  @@index([schoolId, classId, role])
+  @@index([schoolId, departmentId, role])
+  @@index([schoolId, isLocked])
 }
 
 model RefreshToken {
@@ -195,6 +203,8 @@ model Class {
   registrationLinks RegistrationLink[]
 
   @@unique([schoolId, name])
+  @@index([schoolId, departmentId])
+  @@index([classTeacherId])
 }
 
 model TimetableEntry {
@@ -217,6 +227,10 @@ model TimetableEntry {
 
   @@index([schoolId, teacherId, dayOfWeek])
   @@index([schoolId, classId, dayOfWeek])
+  @@index([schoolId, teacherId, dayOfWeek, startTime])
+  @@index([schoolId, classId, dayOfWeek, startTime])
+  @@index([teacherId, classId])
+  @@index([classId, teacherId])
 }
 
 model AttendanceSession {
@@ -246,6 +260,10 @@ model AttendanceSession {
 
   @@index([schoolId, classId, isActive])
   @@index([schoolId, teacherId, isActive])
+  @@index([schoolId, startedAt])
+  @@index([schoolId, classId, startedAt])
+  @@index([schoolId, teacherId, startedAt])
+  @@index([timetableEntryId, isActive])
 }
 
 model AttendanceRecord {
@@ -266,6 +284,9 @@ model AttendanceRecord {
   @@unique([sessionId, studentId])
   @@index([schoolId, studentId])
   @@index([sessionId])
+  @@index([schoolId, scannedAt])
+  @@index([schoolId, studentId, scannedAt])
+  @@index([schoolId, status, scannedAt])
 }
 
 model RegistrationLink {
@@ -285,6 +306,10 @@ model RegistrationLink {
   createdAt    DateTime    @default(now())
 
   @@index([schoolId])
+  @@index([schoolId, createdById])
+  @@index([schoolId, classId])
+  @@index([schoolId, departmentId])
+  @@index([expiresAt])
 }
 
 model BiometricTemplate {
@@ -297,6 +322,8 @@ model BiometricTemplate {
   authTag       Bytes // AES-256-GCM authentication tag
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
+
+  @@index([schoolId])
 }
 
 model RiskScore {
@@ -312,6 +339,8 @@ model RiskScore {
   computedAt       DateTime  @default(now())
 
   @@index([schoolId, riskLevel])
+  @@index([schoolId, score])
+  @@index([schoolId, computedAt])
 }
 
 model AuditLog {
@@ -345,6 +374,9 @@ model Payment {
   completedAt        DateTime?
 
   @@index([schoolId])
+  @@index([status])
+  @@index([schoolId, status, initiatedAt])
+  @@index([schoolId, initiatedAt])
 }
 
 
@@ -370,9 +402,12 @@ model Notification {
   school School @relation(fields: [schoolId], references: [id])
 
   @@index([userId, read])
+  @@index([userId, read, createdAt])
   @@index([schoolId])
+  @@index([schoolId, createdAt])
   @@index([batchId])
   @@index([senderId])
+  @@index([senderId, createdAt])
 }
 
 // ─── AI Knowledge Base ────────────────────────────────────────────────────────
@@ -391,8 +426,10 @@ model AIKnowledge {
   updatedAt    DateTime @updatedAt
 
   @@index([schoolId])
+  @@index([schoolId, createdAt])
   @@index([schoolId, departmentId])
   @@index([schoolId, classId])
+  @@index([createdById])
 }
 
 // ─── Conversation Memory ──────────────────────────────────────────────────────

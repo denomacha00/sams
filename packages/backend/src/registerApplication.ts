@@ -64,12 +64,51 @@ function isPublicPath(path: string, method?: string): boolean {
 }
 
 let io: SocketIOServer | null = null;
+const PROCESS_STARTED_AT = new Date();
 
 export function getIo(): SocketIOServer {
   if (!io) {
     throw new Error('[SAMS] Socket.io not initialized');
   }
   return io;
+}
+
+function runtimeSnapshot() {
+  const memory = process.memoryUsage();
+  return {
+    pid: process.pid,
+    startedAt: PROCESS_STARTED_AT.toISOString(),
+    uptimeSeconds: Math.round(process.uptime()),
+    memory: {
+      rssBytes: memory.rss,
+      heapTotalBytes: memory.heapTotal,
+      heapUsedBytes: memory.heapUsed,
+      externalBytes: memory.external,
+    },
+  };
+}
+
+function prometheusMetrics(): string {
+  const memory = process.memoryUsage();
+  const ready = isApiReady() ? 1 : 0;
+  return [
+    '# HELP sams_api_ready Whether the SAMS API has connected dependencies.',
+    '# TYPE sams_api_ready gauge',
+    `sams_api_ready ${ready}`,
+    '# HELP sams_api_uptime_seconds Process uptime in seconds.',
+    '# TYPE sams_api_uptime_seconds counter',
+    `sams_api_uptime_seconds ${process.uptime().toFixed(0)}`,
+    '# HELP sams_api_memory_rss_bytes Resident set size in bytes.',
+    '# TYPE sams_api_memory_rss_bytes gauge',
+    `sams_api_memory_rss_bytes ${memory.rss}`,
+    '# HELP sams_api_memory_heap_used_bytes V8 heap used in bytes.',
+    '# TYPE sams_api_memory_heap_used_bytes gauge',
+    `sams_api_memory_heap_used_bytes ${memory.heapUsed}`,
+    '# HELP sams_api_process_start_time_seconds Unix timestamp when the process started.',
+    '# TYPE sams_api_process_start_time_seconds gauge',
+    `sams_api_process_start_time_seconds ${Math.floor(PROCESS_STARTED_AT.getTime() / 1000)}`,
+    '',
+  ].join('\n');
 }
 
 /** Mount routes, sockets, and full /health after HTTP listen (heavy imports stay out of index.ts). */
@@ -117,12 +156,36 @@ export function registerApplication(app: express.Express, httpServer: HttpServer
   registerSocketServer(io);
   setupAttendanceSocket(io);
 
+  app.get('/health/live', (_req, res) => {
+    res.status(200).json({
+      status: 'alive',
+      timestamp: new Date().toISOString(),
+      runtime: runtimeSnapshot(),
+    });
+  });
+
+  app.get('/health/ready', (_req, res) => {
+    const ready = isApiReady();
+    res.status(ready ? 200 : 503).json({
+      status: ready ? 'ready' : 'starting',
+      timestamp: new Date().toISOString(),
+      checks: { apiReady: ready },
+      runtime: runtimeSnapshot(),
+    });
+  });
+
+  app.get('/metrics', (_req, res) => {
+    res.setHeader('Content-Type', 'text/plain; version=0.0.4; charset=utf-8');
+    res.send(prometheusMetrics());
+  });
+
   app.get('/health', async (_req, res) => {
     if (!isApiReady()) {
       res.status(503).json({
         status: 'starting',
         timestamp: new Date().toISOString(),
         checks: { database: false, redis: false },
+        runtime: runtimeSnapshot(),
       });
       return;
     }
@@ -163,6 +226,7 @@ export function registerApplication(app: express.Express, httpServer: HttpServer
       status: ready ? 'ok' : 'degraded',
       timestamp: new Date().toISOString(),
       checks: { database: dbOk, redis: redisOk },
+      runtime: runtimeSnapshot(),
       ai: {
         ...aiSummary,
         ...(aiProbe ? { probe: aiProbe } : {}),

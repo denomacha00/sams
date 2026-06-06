@@ -9,6 +9,9 @@ function resolveRedisUrl(): string {
 export const redis = new Redis(resolveRedisUrl(), {
   lazyConnect: true,
   maxRetriesPerRequest: 3,
+  connectTimeout: 5000,
+  commandTimeout: 5000,
+  retryStrategy: (times) => Math.min(times * 250, 3000),
 });
 
 redis.on('connect', () => console.log('[Redis] Connected'));

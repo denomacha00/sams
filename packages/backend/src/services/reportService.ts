@@ -1,5 +1,6 @@
 import PDFDocument from 'pdfkit';
 import ExcelJS from 'exceljs';
+import type { Prisma } from '@prisma/client';
 import { prisma } from '../lib/prisma';
 import { AppError } from '../middleware/errors';
 
@@ -46,6 +47,63 @@ export interface SchoolReportData {
 
 // ─── Report Service ───────────────────────────────────────────────────────────
 
+type AttendanceStatusKey = 'PRESENT' | 'LATE' | 'EXCUSED' | 'ABSENT';
+type StatusCounts = Partial<Record<AttendanceStatusKey, number>>;
+type StudentSeed = { id: string; fullName: string; classId?: string | null };
+type ClassSeed = { id: string; name: string; departmentId?: string | null };
+
+function withDateRange<T extends object>(
+  where: T,
+  field: 'scannedAt' | 'startedAt',
+  dateRange?: DateRange,
+): T {
+  if (!dateRange) return where;
+  return {
+    ...where,
+    [field]: {
+      gte: dateRange.from,
+      lte: dateRange.to,
+    },
+  } as T;
+}
+
+function sumStatusCounts(counts: StatusCounts): number {
+  return (counts.PRESENT ?? 0) + (counts.LATE ?? 0) + (counts.EXCUSED ?? 0) + (counts.ABSENT ?? 0);
+}
+
+function buildStudentReport(student: StudentSeed, counts: StatusCounts, totalSessions: number): StudentReportData {
+  const totalPresent = counts.PRESENT ?? 0;
+  const totalLate = counts.LATE ?? 0;
+  const totalExcused = counts.EXCUSED ?? 0;
+  const totalExpected = totalSessions > 0 ? totalSessions : sumStatusCounts(counts);
+  const attendancePercentage = totalExpected > 0
+    ? Math.round((totalPresent / totalExpected) * 100 * 100) / 100
+    : 0;
+
+  return {
+    studentId: student.id,
+    studentName: student.fullName,
+    totalSessions: totalExpected,
+    totalExpected,
+    totalPresent,
+    totalLate,
+    totalExcused,
+    totalAbsent: Math.max(0, totalExpected - totalPresent - totalLate - totalExcused),
+    attendancePercentage,
+  };
+}
+
+function averageAttendance(
+  reports: Array<{ attendancePercentage?: number; averageAttendancePercentage?: number }>,
+): number {
+  if (reports.length === 0) return 0;
+  const total = reports.reduce(
+    (sum, report) => sum + (report.attendancePercentage ?? report.averageAttendancePercentage ?? 0),
+    0,
+  );
+  return Math.round((total / reports.length) * 100) / 100;
+}
+
 export class ReportService {
   /**
    * Get attendance report for a single student.
@@ -53,10 +111,22 @@ export class ReportService {
    * Requirements: 10.1, 10.5, 10.7
    */
   async getStudentReport(schoolId: string, studentId: string, dateRange?: DateRange): Promise<StudentReportData> {
-    const student = await prisma.user.findUnique({
-      where: { id: studentId },
-      select: { id: true, fullName: true, schoolId: true, classId: true },
-    });
+    const recordWhere = withDateRange<Prisma.AttendanceRecordWhereInput>({
+      studentId,
+      schoolId,
+    }, 'scannedAt', dateRange);
+
+    const [student, statusRows] = await Promise.all([
+      prisma.user.findUnique({
+        where: { id: studentId },
+        select: { id: true, fullName: true, schoolId: true, classId: true },
+      }),
+      prisma.attendanceRecord.groupBy({
+        by: ['status'],
+        where: recordWhere,
+        _count: { _all: true },
+      }),
+    ]);
 
     if (!student) {
       throw new AppError(404, 'STUDENT_NOT_FOUND', 'Student not found');
@@ -66,45 +136,28 @@ export class ReportService {
       throw new AppError(403, 'FORBIDDEN', 'Access to this resource is not allowed');
     }
 
-    const recordWhere: Record<string, unknown> = {
-      studentId,
-      schoolId,
-    };
-
-    if (dateRange) {
-      recordWhere.scannedAt = {
-        gte: dateRange.from,
-        lte: dateRange.to,
-      };
-    }
-
-    const records: any[] = await prisma.attendanceRecord.findMany({ where: recordWhere });
-
-    // Count total expected sessions for this student in the date range
-    const sessionWhere: Record<string, unknown> = { schoolId };
-    if (dateRange) {
-      sessionWhere.startedAt = {
-        gte: dateRange.from,
-        lte: dateRange.to,
-      };
+    const counts: StatusCounts = {};
+    for (const row of statusRows) {
+      counts[row.status as AttendanceStatusKey] = row._count._all;
     }
 
     let totalSessions = 0;
     if (student.classId) {
+      const sessionWhere = withDateRange<Prisma.AttendanceSessionWhereInput>({
+        schoolId,
+        classId: student.classId,
+      }, 'startedAt', dateRange);
       totalSessions = await prisma.attendanceSession.count({
-        where: {
-          ...sessionWhere,
-          classId: student.classId,
-        },
+        where: sessionWhere,
       });
     }
 
     // totalExpected is the number of sessions the student should have attended
-    const totalExpected = totalSessions > 0 ? totalSessions : records.length;
+    const totalExpected = totalSessions > 0 ? totalSessions : sumStatusCounts(counts);
 
-    const totalPresent = records.filter((r) => r.status === 'PRESENT').length;
-    const totalLate = records.filter((r) => r.status === 'LATE').length;
-    const totalExcused = records.filter((r) => r.status === 'EXCUSED').length;
+    const totalPresent = counts.PRESENT ?? 0;
+    const totalLate = counts.LATE ?? 0;
+    const totalExcused = counts.EXCUSED ?? 0;
     const totalAbsent = totalExpected - totalPresent - totalLate - totalExcused;
 
     // Attendance percentage = (totalPresent / totalExpected) * 100, rounded to 2 dp
@@ -145,40 +198,18 @@ export class ReportService {
       throw new AppError(403, 'FORBIDDEN', 'Access to this resource is not allowed');
     }
 
-    // Count total sessions for this class in the date range
-    const sessionWhere: Record<string, unknown> = { schoolId, classId };
-    if (dateRange) {
-      sessionWhere.startedAt = {
-        gte: dateRange.from,
-        lte: dateRange.to,
-      };
-    }
-    const totalSessions = await prisma.attendanceSession.count({ where: sessionWhere });
+    const reports = await this._buildClassReports(
+      schoolId,
+      [{ id: classData.id, name: classData.name }],
+      dateRange,
+    );
 
-    // Get all students in this class
-    const students = await prisma.user.findMany({
-      where: { schoolId, classId, role: 'STUDENT' },
-      select: { id: true },
-    });
-
-    const studentReports: StudentReportData[] = [];
-    for (const student of students) {
-      const report = await this.getStudentReport(schoolId, student.id, dateRange);
-      studentReports.push(report);
-    }
-
-    const averageAttendancePercentage = studentReports.length > 0
-      ? Math.round(
-          (studentReports.reduce((sum, r) => sum + r.attendancePercentage, 0) / studentReports.length) * 100,
-        ) / 100
-      : 0;
-
-    return {
+    return reports[0] ?? {
       classId,
       className: classData.name,
-      totalSessions,
-      students: studentReports,
-      averageAttendancePercentage,
+      totalSessions: 0,
+      students: [],
+      averageAttendancePercentage: 0,
     };
   }
 
@@ -201,29 +232,19 @@ export class ReportService {
       throw new AppError(403, 'FORBIDDEN', 'Access to this resource is not allowed');
     }
 
-    // Get all classes in this department
     const classes = await prisma.class.findMany({
       where: { schoolId, departmentId },
-      select: { id: true },
+      select: { id: true, name: true },
+      orderBy: { name: 'asc' },
     });
 
-    const classReports: ClassReportData[] = [];
-    for (const cls of classes) {
-      const report = await this.getClassReport(schoolId, cls.id, dateRange);
-      classReports.push(report);
-    }
-
-    const averageAttendancePercentage = classReports.length > 0
-      ? Math.round(
-          (classReports.reduce((sum, r) => sum + r.averageAttendancePercentage, 0) / classReports.length) * 100,
-        ) / 100
-      : 0;
+    const classReports = await this._buildClassReports(schoolId, classes, dateRange);
 
     return {
       departmentId,
       departmentName: department.name,
       classes: classReports,
-      averageAttendancePercentage,
+      averageAttendancePercentage: averageAttendance(classReports),
     };
   }
 
@@ -242,30 +263,122 @@ export class ReportService {
       throw new AppError(404, 'SCHOOL_NOT_FOUND', 'School not found');
     }
 
-    // Get all departments in this school
-    const departments = await prisma.department.findMany({
-      where: { schoolId },
-      select: { id: true },
-    });
+    const [departments, classes] = await Promise.all([
+      prisma.department.findMany({
+        where: { schoolId },
+        select: { id: true, name: true },
+        orderBy: { name: 'asc' },
+      }),
+      prisma.class.findMany({
+        where: { schoolId },
+        select: { id: true, name: true, departmentId: true },
+        orderBy: [{ departmentId: 'asc' }, { name: 'asc' }],
+      }),
+    ]);
 
-    const departmentReports: DepartmentReportData[] = [];
-    for (const dept of departments) {
-      const report = await this.getDepartmentReport(schoolId, dept.id, dateRange);
-      departmentReports.push(report);
+    const allClassReports = await this._buildClassReports(schoolId, classes, dateRange);
+    const classReportById = new Map(allClassReports.map((report) => [report.classId, report]));
+    const reportsByDepartment = new Map<string, ClassReportData[]>();
+    for (const cls of classes) {
+      const report = classReportById.get(cls.id);
+      if (!report) continue;
+      const reports = reportsByDepartment.get(cls.departmentId) ?? [];
+      reports.push(report);
+      reportsByDepartment.set(cls.departmentId, reports);
     }
 
-    const averageAttendancePercentage = departmentReports.length > 0
-      ? Math.round(
-          (departmentReports.reduce((sum, r) => sum + r.averageAttendancePercentage, 0) / departmentReports.length) * 100,
-        ) / 100
-      : 0;
+    const departmentReports = departments.map((dept) => {
+      const classReports = reportsByDepartment.get(dept.id) ?? [];
+      return {
+        departmentId: dept.id,
+        departmentName: dept.name,
+        classes: classReports,
+        averageAttendancePercentage: averageAttendance(classReports),
+      };
+    });
 
     return {
       schoolId,
       schoolName: school.name,
       departments: departmentReports,
-      averageAttendancePercentage,
+      averageAttendancePercentage: averageAttendance(departmentReports),
     };
+  }
+
+  private async _buildClassReports(
+    schoolId: string,
+    classes: ClassSeed[],
+    dateRange?: DateRange,
+  ): Promise<ClassReportData[]> {
+    if (classes.length === 0) return [];
+
+    const classIds = classes.map((cls) => cls.id);
+    const sessionWhere = withDateRange<Prisma.AttendanceSessionWhereInput>({
+      schoolId,
+      classId: { in: classIds },
+    }, 'startedAt', dateRange);
+
+    const [sessionRows, students] = await Promise.all([
+      prisma.attendanceSession.groupBy({
+        by: ['classId'],
+        where: sessionWhere,
+        _count: { _all: true },
+      }),
+      prisma.user.findMany({
+        where: { schoolId, classId: { in: classIds }, role: 'STUDENT' },
+        select: { id: true, fullName: true, classId: true },
+        orderBy: [{ classId: 'asc' }, { fullName: 'asc' }],
+      }),
+    ]);
+
+    const sessionCountByClass = new Map<string, number>(
+      sessionRows.map((row) => [row.classId, row._count._all]),
+    );
+
+    const studentsByClass = new Map<string, StudentSeed[]>();
+    const studentIds: string[] = [];
+    for (const student of students) {
+      if (!student.classId) continue;
+      studentIds.push(student.id);
+      const rows = studentsByClass.get(student.classId) ?? [];
+      rows.push(student);
+      studentsByClass.set(student.classId, rows);
+    }
+
+    const countsByStudent = new Map<string, StatusCounts>();
+    if (studentIds.length > 0) {
+      const recordWhere = withDateRange<Prisma.AttendanceRecordWhereInput>({
+        schoolId,
+        studentId: { in: studentIds },
+      }, 'scannedAt', dateRange);
+
+      const recordRows = await prisma.attendanceRecord.groupBy({
+        by: ['studentId', 'status'],
+        where: recordWhere,
+        _count: { _all: true },
+      });
+
+      for (const row of recordRows) {
+        const counts = countsByStudent.get(row.studentId) ?? {};
+        counts[row.status as AttendanceStatusKey] = row._count._all;
+        countsByStudent.set(row.studentId, counts);
+      }
+    }
+
+    return classes.map((cls) => {
+      const totalSessions = sessionCountByClass.get(cls.id) ?? 0;
+      const studentReports = (studentsByClass.get(cls.id) ?? []).map((student) =>
+        buildStudentReport(student, countsByStudent.get(student.id) ?? {}, totalSessions),
+      );
+
+      return {
+        classId: cls.id,
+        className: cls.name,
+        totalSessions,
+        students: studentReports,
+        averageAttendancePercentage: averageAttendance(studentReports),
+      };
+    });
   }
 
   /**

@@ -1,6 +1,11 @@
 const path = require('path');
 
 const root = __dirname;
+const requestedInstances = process.env.PM2_INSTANCES || '1';
+const instances = /^\d+$/.test(requestedInstances)
+  ? Number(requestedInstances)
+  : requestedInstances;
+const execMode = process.env.PM2_EXEC_MODE || (String(requestedInstances) === '1' ? 'fork' : 'cluster');
 
 module.exports = {
   apps: [
@@ -8,8 +13,9 @@ module.exports = {
       name: 'sams-api',
       script: path.join(root, 'packages/backend/bin/pm2-start.js'),
       cwd: root,
-      instances: 1,
-      exec_mode: 'fork',
+      instances,
+      exec_mode: execMode,
+      instance_var: 'SAMS_INSTANCE_ID',
       autorestart: true,
       watch: false,
       max_memory_restart: '512M',

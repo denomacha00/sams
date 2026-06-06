@@ -65,6 +65,20 @@ else
 fi
 
 # Health API — retry until HTTP 200 (503 = still starting or DB/Redis down)
+LIVE_CODE="$(curl -sS -o /dev/null -w '%{http_code}' --max-time 5 "${API}/health/live" 2>/dev/null || echo 000)"
+if [[ "$LIVE_CODE" == "200" ]]; then
+  pass "GET /health/live"
+else
+  warn "GET /health/live HTTP ${LIVE_CODE} (stale backend or process not listening)"
+fi
+
+READY_CODE="$(curl -sS -o /dev/null -w '%{http_code}' --max-time 5 "${API}/health/ready" 2>/dev/null || echo 000)"
+if [[ "$READY_CODE" == "200" ]]; then
+  pass "GET /health/ready"
+else
+  warn "GET /health/ready HTTP ${READY_CODE} (API may still be connecting dependencies)"
+fi
+
 HEALTH=""
 if wait_for_health_200 "$API" 30 2; then
   HEALTH="$(curl -sS --max-time 5 "${API}/health" 2>/dev/null || true)"

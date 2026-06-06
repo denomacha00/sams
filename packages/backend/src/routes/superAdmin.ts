@@ -1,12 +1,12 @@
 import { Router, type Request, type Response, type NextFunction } from 'express';
 import { z } from 'zod';
 import { createHash } from 'crypto';
-import Redis from 'ioredis';
 import { PlanTier } from '@sams/shared';
 import { encodeLicenseKey } from '@sams/shared';
 import { getLicenseSecret } from '../config/secrets';
 import { getSmtpConfig, isEmailConfigured } from '../config/email';
 import { prisma } from '../lib/prisma';
+import { redis } from '../lib/redis';
 import { licenseService } from '../services/licenseService';
 import { auditService } from '../services/auditService';
 import { requirePermission } from '../middleware/rbac';
@@ -229,14 +229,7 @@ superAdminRouter.get('/system-status', async (_req: Request, res: Response): Pro
   }
 
   try {
-    const redis = new Redis(process.env.REDIS_URL ?? 'redis://localhost:6379', {
-      lazyConnect: true,
-      maxRetriesPerRequest: 1,
-      connectTimeout: 3000,
-    });
-    await redis.connect();
     redisOk = (await redis.ping()) === 'PONG';
-    await redis.quit();
   } catch {
     redisOk = false;
   }

@@ -53,7 +53,7 @@ export class RiskService {
     const gradeWeight = 50;
 
     // Pattern risk (P) — based on recent consecutive absences
-    const patternWeight = await this._computePatternRisk(studentId);
+    const patternWeight = await this._computePatternRisk(studentId, schoolId);
 
     // Composite score
     const score = Math.round((attendanceWeight * 0.4 + gradeWeight * 0.4 + patternWeight * 0.2) * 100) / 100;
@@ -201,10 +201,10 @@ export class RiskService {
    * Compute pattern risk based on consecutive recent absences.
    * 0 consecutive = 0, 1 = 20, 2 = 40, 3 = 60, 4 = 80, 5+ = 100
    */
-  private async _computePatternRisk(studentId: string): Promise<number> {
+  private async _computePatternRisk(studentId: string, schoolId: string): Promise<number> {
     // Get last 10 attendance records ordered by date
     const recentRecords = await prisma.attendanceRecord.findMany({
-      where: { studentId },
+      where: { studentId, schoolId },
       orderBy: { scannedAt: 'desc' },
       take: 10,
       select: { status: true },
