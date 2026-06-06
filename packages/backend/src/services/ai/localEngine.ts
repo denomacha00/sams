@@ -682,8 +682,16 @@ async function handleGenerateTimetable(
 ): Promise<AIQueryResult> {
   const schoolId = scope.schoolId;
   const startTime = Date.now();
+  const hodDepartmentId = scope.role === UserRole.HOD ? scope.departmentId : undefined;
 
   console.log(`[Timetable] Starting ${remake ? 'REMAKE' : 'generation'} for school ${schoolId}`);
+
+  if (scope.role === UserRole.HOD && !hodDepartmentId) {
+    return {
+      answer: 'Your HOD account is not linked to a department yet, so I cannot generate a timetable. Ask the school admin to assign your department first.',
+      intent: 'generate_timetable',
+    };
+  }
 
   // Determine target: whole school or specific class
   const requestedClassName = extractClassName(question);
@@ -697,6 +705,7 @@ async function handleGenerateTimetable(
     const found = await prisma.class.findFirst({
       where: {
         schoolId,
+        ...(hodDepartmentId ? { departmentId: hodDepartmentId } : {}),
         name: { contains: requestedClassName, mode: 'insensitive' },
       },
       select: { id: true, name: true, departmentId: true },
@@ -704,7 +713,10 @@ async function handleGenerateTimetable(
 
     if (!found) {
       const availableClasses = await prisma.class.findMany({
-        where: { schoolId },
+        where: {
+          schoolId,
+          ...(hodDepartmentId ? { departmentId: hodDepartmentId } : {}),
+        },
         select: { name: true },
         take: 15,
       });
@@ -719,14 +731,21 @@ async function handleGenerateTimetable(
   } else if (wholeSchool) {
     // Whole school
     targetClasses = await prisma.class.findMany({
-      where: { schoolId },
+      where: {
+        schoolId,
+        ...(hodDepartmentId ? { departmentId: hodDepartmentId } : {}),
+      },
       select: { id: true, name: true, departmentId: true },
       orderBy: { name: 'asc' },
     });
   } else if (scope.classId) {
     // User's own class
     const found = await prisma.class.findFirst({
-      where: { id: scope.classId, schoolId },
+      where: {
+        id: scope.classId,
+        schoolId,
+        ...(hodDepartmentId ? { departmentId: hodDepartmentId } : {}),
+      },
       select: { id: true, name: true, departmentId: true },
     });
     if (found) targetClasses = [found];
@@ -742,7 +761,10 @@ async function handleGenerateTimetable(
   const targetClassIds = targetClasses.map((c) => c.id);
 
   const subjectRows = await prisma.timetableEntry.findMany({
-    where: { schoolId },
+    where: {
+      schoolId,
+      ...(hodDepartmentId ? { class: { departmentId: hodDepartmentId } } : {}),
+    },
     select: {
       subject: true,
       class: { select: { departmentId: true } },
@@ -776,7 +798,11 @@ async function handleGenerateTimetable(
 
   // Get all timetable-capable staff in the school.
   const teachers: TeacherInfo[] = await prisma.user.findMany({
-    where: { schoolId, role: { in: [UserRole.TEACHER, UserRole.HOD] } },
+    where: {
+      schoolId,
+      role: { in: [UserRole.TEACHER, UserRole.HOD] },
+      ...(hodDepartmentId ? { departmentId: hodDepartmentId } : {}),
+    },
     select: { id: true, fullName: true, departmentId: true },
   });
 
@@ -789,10 +815,10 @@ async function handleGenerateTimetable(
 
   // If remake, delete existing entries first
   if (remake) {
-    const deleteWhere: { schoolId: string; classId?: { in: string[] } } = { schoolId };
-    if (!wholeSchool) {
-      deleteWhere.classId = { in: targetClassIds };
-    }
+    const deleteWhere: { schoolId: string; classId: { in: string[] } } = {
+      schoolId,
+      classId: { in: targetClassIds },
+    };
     const deleted = await prisma.timetableEntry.deleteMany({ where: deleteWhere });
     console.log(`[Timetable] Deleted ${deleted.count} existing entries (remake mode)`);
   } else {
@@ -839,8 +865,10 @@ async function handleGenerateTimetable(
   console.log(`[Timetable] Created ${result.count} entries in ${elapsed}s (${skipped} slots skipped)`);
 
   // Build summary
-  const scope_label = wholeSchool
-    ? 'the whole school'
+  const scope_label = hodDepartmentId && wholeSchool
+    ? 'your department'
+    : wholeSchool
+      ? 'the whole school'
     : targetClasses.length === 1
       ? targetClasses[0].name
       : `${targetClasses.length} classes`;

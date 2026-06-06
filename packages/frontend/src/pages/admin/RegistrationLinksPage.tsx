@@ -30,6 +30,7 @@ interface Department {
 interface ClassItem {
   id: string;
   name: string;
+  canManageClassRep?: boolean;
 }
 
 const RegistrationLinksPage: React.FC = () => {
@@ -97,14 +98,13 @@ const RegistrationLinksPage: React.FC = () => {
     }
   };
 
-  // Fetch classes in the teacher's department
+  // Fetch only classes the teacher can manage for student registration links.
   const fetchTeacherClasses = async () => {
     setLoadingClasses(true);
     try {
-      if (user?.departmentId) {
-        const { data } = await apiClient.get(`/departments/${user.departmentId}/classes`);
-        setTeacherClasses(Array.isArray(data) ? data : []);
-      }
+      const { data } = await apiClient.get('/users/teaching-classes');
+      const classes = Array.isArray(data) ? data : [];
+      setTeacherClasses(classes.filter((c: ClassItem) => c.canManageClassRep));
     } catch (err) {
       console.error('Failed to fetch teacher classes:', err);
       setTeacherClasses([]);
@@ -214,8 +214,7 @@ const RegistrationLinksPage: React.FC = () => {
   // Determine if the generate button should be disabled
   const isGenerateDisabled = () => {
     if (submitting) return true;
-    // Teacher: must be in a department and pick a class
-    if (isTeacher && !user?.departmentId) return true;
+    // Teacher: must pick a class they manage
     if (isTeacher && !selectedClass) return true;
     if (isTeacher && teacherClasses.length === 0) return true;
     // HOD creating student link needs a class
@@ -360,14 +359,14 @@ const RegistrationLinksPage: React.FC = () => {
               {/* Teacher: pick a class from their department */}
               {isTeacher && (
                 <div>
-                  {!user?.departmentId ? (
+                  {teacherClasses.length === 0 && !loadingClasses ? (
                     <div className="w-full px-4 py-3 rounded-xl bg-orange-500/10 border border-orange-500/20 text-orange-400 text-sm">
-                      <p className="font-semibold mb-1">Department not assigned</p>
-                      <p className="text-xs text-orange-400/80">You need to be assigned to a department before generating student registration links. Please contact your School Admin.</p>
+                      <p className="font-semibold mb-1">No managed class assigned</p>
+                      <p className="text-xs text-orange-400/80">Only assigned class teachers can generate student registration links. Ask your HOD or School Admin to assign you as a class teacher.</p>
                     </div>
                   ) : (
                     <>
-                      <p className="text-xs text-indigo-400 mb-3">Generating a student registration link for your department</p>
+                      <p className="text-xs text-indigo-400 mb-3">Generating a student registration link for a class you manage</p>
                       <label className="block text-sm text-ink-muted mb-1">Class *</label>
                       {loadingClasses ? (
                         <div className="w-full px-4 py-2.5 rounded-xl bg-surface-muted border border-line text-ink-muted text-sm">
@@ -375,7 +374,7 @@ const RegistrationLinksPage: React.FC = () => {
                         </div>
                       ) : teacherClasses.length === 0 ? (
                         <div className="w-full px-4 py-2.5 rounded-xl bg-orange-500/10 border border-orange-500/20 text-orange-400 text-sm">
-                          No classes in your department yet. Ask your HOD to create classes first.
+                          No classes are assigned to you for registration links.
                         </div>
                       ) : (
                         <select

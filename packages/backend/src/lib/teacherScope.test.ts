@@ -57,13 +57,23 @@ describe('resolveTeacherClassId', () => {
     expect(id).toBeNull();
   });
 
-  it('returns managed classes without timetable-only classes', async () => {
+  it('returns live managed classes and ignores stale JWT hints', async () => {
     (prisma.class.findMany as ReturnType<typeof vi.fn>).mockResolvedValue([{ id: 'managed-1' }]);
     (prisma.user.findUnique as ReturnType<typeof vi.fn>).mockResolvedValue({ classId: 'managed-2' });
 
-    const ids = await resolveTeacherManagedClassIds('teacher-1', 'managed-2');
+    const ids = await resolveTeacherManagedClassIds('teacher-1', 'stale-jwt-class');
 
     expect(ids).toEqual(['managed-1', 'managed-2']);
+  });
+
+  it('does not include stale JWT hints in teaching visibility', async () => {
+    (prisma.class.findMany as ReturnType<typeof vi.fn>).mockResolvedValue([]);
+    (prisma.user.findUnique as ReturnType<typeof vi.fn>).mockResolvedValue({ classId: null });
+    (prisma.timetableEntry.findMany as ReturnType<typeof vi.fn>).mockResolvedValue([]);
+
+    const ids = await resolveTeacherTeachingClassIds('teacher-1', 'stale-jwt-class');
+
+    expect(ids).toEqual([]);
   });
 
   it('includes timetable classes for teaching visibility', async () => {

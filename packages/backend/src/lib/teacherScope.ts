@@ -30,11 +30,11 @@ export async function resolveTeacherClassId(
 
 /**
  * Classes where this teacher can manage class-rep style actions.
- * This intentionally excludes timetable-only classes.
+ * This intentionally excludes timetable-only classes and JWT hints.
  */
 export async function resolveTeacherManagedClassIds(
   userId: string,
-  classIdHint?: string | null,
+  _classIdHint?: string | null,
 ): Promise<string[]> {
   const classIds: string[] = [];
 
@@ -50,13 +50,12 @@ export async function resolveTeacherManagedClassIds(
     select: { classId: true },
   });
   pushUnique(classIds, user?.classId);
-  pushUnique(classIds, classIdHint);
 
   return classIds;
 }
 
 /**
- * All classes visible to a teacher: managed classes plus timetable teaching assignments.
+ * All classes visible to a teacher: live managed classes plus timetable teaching assignments.
  */
 export async function resolveTeacherTeachingClassIds(
   userId: string,

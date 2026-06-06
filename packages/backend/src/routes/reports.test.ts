@@ -12,6 +12,10 @@ vi.mock('../lib/prisma', () => ({
     class: {
       findUnique: vi.fn(),
       findFirst: vi.fn(),
+      findMany: vi.fn(),
+    },
+    timetableEntry: {
+      findMany: vi.fn(),
     },
   },
 }));
@@ -85,6 +89,8 @@ describe('Report Routes - Role-Based Scope Enforcement', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     (prisma.class.findFirst as ReturnType<typeof vi.fn>).mockResolvedValue(null);
+    (prisma.class.findMany as ReturnType<typeof vi.fn>).mockResolvedValue([]);
+    (prisma.timetableEntry.findMany as ReturnType<typeof vi.fn>).mockResolvedValue([]);
     (prisma.user.findUnique as ReturnType<typeof vi.fn>).mockResolvedValue({ classId: null });
   });
 
@@ -104,14 +110,18 @@ describe('Report Routes - Role-Based Scope Enforcement', () => {
     });
 
     it('should allow a teacher to view a student report in their class', async () => {
-      (prisma.user.findUnique as any).mockResolvedValue({ classId: 'class-1', schoolId: 'school-1' });
+      (prisma.user.findUnique as any)
+        .mockResolvedValueOnce({ classId: 'class-1' })
+        .mockResolvedValueOnce({ classId: 'class-1', schoolId: 'school-1' });
       const app = createTestApp({ sub: 'teacher-1', schoolId: 'school-1', role: UserRole.TEACHER, classId: 'class-1' });
       const res = await request(app).get('/reports/student/student-1');
       expect(res.status).toBe(200);
     });
 
     it('should deny a teacher from viewing a student report outside their class', async () => {
-      (prisma.user.findUnique as any).mockResolvedValue({ classId: 'class-2', schoolId: 'school-1' });
+      (prisma.user.findUnique as any)
+        .mockResolvedValueOnce({ classId: 'class-1' })
+        .mockResolvedValueOnce({ classId: 'class-2', schoolId: 'school-1' });
       const app = createTestApp({ sub: 'teacher-1', schoolId: 'school-1', role: UserRole.TEACHER, classId: 'class-1' });
       const res = await request(app).get('/reports/student/student-1');
       expect(res.status).toBe(403);

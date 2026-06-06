@@ -2,7 +2,7 @@ import { createId } from '@paralleldrive/cuid2';
 import { type AccessTokenPayload, UserRole } from '@sams/shared';
 import { prisma } from '../lib/prisma';
 import { AppError } from '../middleware/errors';
-import { resolveTeacherTeachingClassIds } from '../lib/teacherScope';
+import { resolveTeacherClassId, resolveTeacherTeachingClassIds } from '../lib/teacherScope';
 
 // ─── Interfaces ───────────────────────────────────────────────────────────────
 
@@ -108,7 +108,7 @@ export class KnowledgeService {
    * Create a knowledge entry with role-based scope assignment.
    * - SCHOOL_ADMIN: schoolId=user.schoolId, departmentId=null, classId=null
    * - HOD: schoolId=user.schoolId, departmentId=user.departmentId, classId=null
-   * - TEACHER: schoolId=user.schoolId, departmentId=user.departmentId, classId=user.classId
+   * - TEACHER: schoolId=user.schoolId, class-level scope from live class-teacher assignment
    * - STUDENT: throws 403
    */
   async create(user: AccessTokenPayload, input: CreateKnowledgeInput): Promise<KnowledgeEntryResponse> {
@@ -131,10 +131,21 @@ export class KnowledgeService {
         departmentId = user.departmentId ?? null;
         classId = null;
         break;
-      case UserRole.TEACHER:
-        departmentId = user.departmentId ?? null;
-        classId = user.classId ?? null;
+      case UserRole.TEACHER: {
+        classId = await resolveTeacherClassId(user.sub);
+        if (!classId) {
+          throw new AppError(403, 'FORBIDDEN', 'Teachers must be assigned as class teacher before creating class knowledge entries');
+        }
+        const cls = await prisma.class.findFirst({
+          where: { id: classId, schoolId: user.schoolId },
+          select: { departmentId: true },
+        });
+        if (!cls) {
+          throw new AppError(403, 'FORBIDDEN', 'Teacher class is not linked to this school');
+        }
+        departmentId = cls.departmentId;
         break;
+      }
     }
 
     const entry = await prisma.aIKnowledge.create({
@@ -286,19 +297,15 @@ export class KnowledgeService {
    * Returns 404 if not found or belongs to a different school.
    */
   async getById(user: AccessTokenPayload, entryId: string): Promise<KnowledgeEntryResponse> {
-    const entry = await prisma.aIKnowledge.findUnique({
-      where: { id: entryId },
+    const scopeFilter = await this.buildScopeFilter(user);
+    const entry = await prisma.aIKnowledge.findFirst({
+      where: { ...scopeFilter, id: entryId },
       include: {
         createdBy: { select: { fullName: true, role: true } },
       },
     });
 
     if (!entry) {
-      throw new AppError(404, 'NOT_FOUND', 'Knowledge entry not found');
-    }
-
-    // Cross-school: return 404 to avoid leaking existence
-    if (entry.schoolId !== user.schoolId) {
       throw new AppError(404, 'NOT_FOUND', 'Knowledge entry not found');
     }
 

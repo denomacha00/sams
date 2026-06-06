@@ -42,8 +42,30 @@ function formatClassChoices(classes: Array<{ name: string }>): string {
 
 // ─── Handlers ─────────────────────────────────────────────────────────────────
 
+function schemaDayOfWeek(date: Date): number {
+  const jsDay = date.getDay();
+  return jsDay === 0 ? 6 : jsDay - 1;
+}
+
+function timeToMinutes(value: string): number {
+  const [hours, minutes] = value.split(':').map(Number);
+  return (hours * 60) + minutes;
+}
+
+function isCurrentTimetableSlot(
+  entry: { startTime: string; endTime: string },
+  currentMinutes: number,
+): boolean {
+  const toleranceMinutes = 30;
+  return (
+    currentMinutes >= timeToMinutes(entry.startTime) - toleranceMinutes &&
+    currentMinutes <= timeToMinutes(entry.endTime) + toleranceMinutes
+  );
+}
+
 const startSessionHandler: ActionHandler = async (params, scope) => {
-  const { prisma } = await import('../../../index');
+  const { prisma } = await import('../../../lib/prisma');
+  const { sessionService } = await import('../../sessionService');
 
   const subject = params.subject as string | undefined;
   const classes = await listTeacherClasses(scope);
@@ -58,24 +80,47 @@ const startSessionHandler: ActionHandler = async (params, scope) => {
     };
   }
 
-  const session = await prisma.attendanceSession.create({
-    data: {
+  const now = new Date();
+  const currentMinutes = (now.getHours() * 60) + now.getMinutes();
+  const timetableEntries = await prisma.timetableEntry.findMany({
+    where: {
       schoolId: scope.schoolId,
-      classId: selectedClass.id,
       teacherId: scope.userId,
-      subject: subject || 'General',
-      isActive: true,
+      classId: selectedClass.id,
+      dayOfWeek: schemaDayOfWeek(now),
     },
+    select: { id: true, subject: true, startTime: true, endTime: true },
+    orderBy: { startTime: 'asc' },
   });
 
+  const currentEntry = timetableEntries.find((entry) =>
+    isCurrentTimetableSlot(entry, currentMinutes),
+  );
+
+  if (!currentEntry) {
+    return {
+      answer:
+        `I found ${selectedClass.name}, but there is no current timetable slot for this class. Start sessions only during the scheduled period, or ask your HOD to update the timetable.`,
+    };
+  }
+
+  const session = await sessionService.startSession(
+    scope.userId,
+    scope.schoolId,
+    currentEntry.id,
+    undefined,
+    { requireGps: false },
+  );
+
   return {
-    answer: `✅ Attendance session started for "${subject || 'General'}".`,
+    answer: `✅ Attendance session started for "${subject || currentEntry.subject}".`,
     data: { sessionId: session.id, classId: selectedClass.id },
   };
 };
 
 const endSessionHandler: ActionHandler = async (_params, scope) => {
-  const { prisma } = await import('../../../index');
+  const { prisma } = await import('../../../lib/prisma');
+  const { sessionService } = await import('../../sessionService');
 
   const activeSession = await prisma.attendanceSession.findFirst({
     where: { teacherId: scope.userId, isActive: true },
@@ -83,10 +128,7 @@ const endSessionHandler: ActionHandler = async (_params, scope) => {
 
   if (!activeSession) return { answer: 'No active session found.' };
 
-  await prisma.attendanceSession.update({
-    where: { id: activeSession.id },
-    data: { isActive: false, endedAt: new Date() },
-  });
+  await sessionService.endSession(activeSession.id, scope.userId);
 
   return {
     answer: `✅ Session "${activeSession.subject}" ended.`,
