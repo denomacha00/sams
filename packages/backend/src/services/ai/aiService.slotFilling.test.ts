@@ -64,10 +64,13 @@ vi.mock('../scopedNotificationSend', () => ({
 
 vi.mock('../../lib/teacherScope', () => ({
   resolveTeacherClassId: vi.fn().mockResolvedValue('class-1'),
+  resolveTeacherManagedClassIds: vi.fn().mockResolvedValue(['class-1']),
+  resolveTeacherTeachingClassIds: vi.fn().mockResolvedValue(['class-1']),
 }));
 
 import { actionIntentDetector } from './actionIntentDetector';
 import { AIService } from '../aiService';
+import { prisma } from '../../lib/prisma';
 
 describe('AIService multi-turn notification flow', () => {
   const service = new AIService();
@@ -126,6 +129,9 @@ describe('AIService multi-turn notification flow', () => {
 
   it('teacher send_class_message: yes without confirmAction still executes', async () => {
     vi.mocked(actionIntentDetector.detect).mockResolvedValue({ isAction: false });
+    vi.mocked(prisma.class.findMany).mockResolvedValueOnce([
+      { id: 'class-1', name: 'Form 1A' },
+    ] as any);
     const teacherUser = {
       sub: 'teacher-1',
       role: UserRole.TEACHER,

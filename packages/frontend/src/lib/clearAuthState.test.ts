@@ -78,7 +78,20 @@ describe('clearAuthState', () => {
     forceAuthRedirect('session_expired');
 
     expect(useAuthStore.getState().isAuthenticated).toBe(false);
-    expect(replace).toHaveBeenCalledWith(null, '', '/login?reason=session_expired');
+    expect(replace).toHaveBeenCalledWith(null, '', '/login');
     expect(window.location.replace).not.toHaveBeenCalled();
+  });
+
+  it('forceAuthRedirect preserves suspended reason', () => {
+    const replace = vi.fn();
+    vi.stubGlobal('window', {
+      location: { pathname: '/login', search: '', replace: vi.fn() },
+      history: { replaceState: replace },
+    });
+
+    forceAuthRedirect('school_suspended');
+
+    expect(replace).toHaveBeenCalledWith(null, '', '/login?reason=school_suspended');
+    expect(session.get(SESSION_SUSPENDED_FLAG)).toBe('1');
   });
 });

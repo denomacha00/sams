@@ -4,6 +4,7 @@ import { useAuthStore } from '../store/authStore';
 import apiClient from '../services/apiClient';
 import { UserRole } from '@sams/shared';
 import { FACE_API_MODELS_URI } from '../constants/faceApi';
+import { base64ToBuffer, bufferToBase64 } from '../lib/webauthnEncoding';
 
 interface SentNotification {
   id: string;
@@ -145,11 +146,11 @@ const SettingsPage: React.FC = () => {
     clearMessages();
     try {
       const { data: options } = await apiClient.post('/auth/webauthn/register/options', {});
-      const challenge = Uint8Array.from(atob(options.challenge), (c) => c.charCodeAt(0));
-      const userId = Uint8Array.from(atob(options.user.id), (c) => c.charCodeAt(0));
+      const challenge = base64ToBuffer(options.challenge);
+      const userId = base64ToBuffer(options.user.id);
       const excludeCredentials = (options.excludeCredentials || []).map((cred: any) => ({
         ...cred,
-        id: Uint8Array.from(atob(cred.id), (c) => c.charCodeAt(0)),
+        id: base64ToBuffer(cred.id),
       }));
 
       const credential = (await navigator.credentials.create({
@@ -167,12 +168,11 @@ const SettingsPage: React.FC = () => {
 
       if (!credential) { setError('Registration cancelled.'); setFingerprintLoading(false); return; }
       const response = credential.response as AuthenticatorAttestationResponse;
-      const toBase64 = (buffer: ArrayBuffer) => btoa(String.fromCharCode(...new Uint8Array(buffer)));
 
       await apiClient.post('/auth/webauthn/register/verify', {
         credentialId: credential.id,
-        publicKey: toBase64(response.getPublicKey?.() || response.attestationObject),
-        clientDataJSON: toBase64(response.clientDataJSON),
+        publicKey: bufferToBase64(response.getPublicKey?.() || response.attestationObject),
+        clientDataJSON: bufferToBase64(response.clientDataJSON),
         transports: (response as any).getTransports?.() || ['internal'],
       });
       setFingerprintRegistered(true);

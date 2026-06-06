@@ -23,6 +23,11 @@ const extendLicenseSchema = z.object({
   newExpiry: z.string().datetime(),
 });
 
+const updateSchoolPlanSchema = z.object({
+  planTier: z.nativeEnum(PlanTier),
+  newExpiry: z.string().datetime().optional(),
+});
+
 // ─── Host Restriction Middleware ──────────────────────────────────────────────
 // Requirement 2.4, 15.1: Super Admin panel is accessible only via super.smart-managment.com.
 // In development/testing, the SUPER_ADMIN_HOST env var can override the allowed host.
@@ -449,6 +454,65 @@ superAdminRouter.post('/schools/:id/extend', async (req: Request, res: Response)
     message: 'License extended successfully',
     schoolId,
     newExpiresAt: newExpiry.toISOString(),
+  });
+});
+
+// POST /super/schools/:id/plan - Change plan tier, optionally with a new expiry.
+superAdminRouter.post('/schools/:id/plan', async (req: Request, res: Response): Promise<void> => {
+  const schoolId = req.params.id as string;
+
+  const parsed = updateSchoolPlanSchema.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({
+      error: 'Validation failed',
+      code: 'VALIDATION_ERROR',
+      details: parsed.error.flatten().fieldErrors,
+    });
+    return;
+  }
+
+  const school = await prisma.school.findUnique({ where: { id: schoolId } });
+  if (!school) {
+    res.status(404).json({ error: 'School not found', code: 'NOT_FOUND' });
+    return;
+  }
+
+  const updated = await prisma.school.update({
+    where: { id: schoolId },
+    data: {
+      planTier: parsed.data.planTier,
+      ...(parsed.data.newExpiry ? { licenseExpiresAt: new Date(parsed.data.newExpiry) } : {}),
+      isReadOnly: false,
+    },
+    select: {
+      id: true,
+      name: true,
+      planTier: true,
+      licenseExpiresAt: true,
+      isReadOnly: true,
+    },
+  });
+
+  await auditService.log({
+    eventType: 'LICENSE_ACTIVATION',
+    actorId: undefined,
+    actorRole: req.user?.role,
+    schoolId,
+    resourceSnapshot: {
+      action: 'SCHOOL_PLAN_CHANGED',
+      schoolId,
+      schoolName: school.name,
+      previousPlanTier: school.planTier,
+      planTier: updated.planTier,
+      previousLicenseExpiresAt: school.licenseExpiresAt.toISOString(),
+      licenseExpiresAt: updated.licenseExpiresAt.toISOString(),
+      changedAt: new Date().toISOString(),
+    },
+  });
+
+  res.json({
+    message: 'School plan updated successfully',
+    school: updated,
   });
 });
 

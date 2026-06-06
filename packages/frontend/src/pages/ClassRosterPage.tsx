@@ -11,6 +11,8 @@ interface Student {
   admissionNumber?: string;
   isClassRep: boolean;
   classId?: string;
+  className?: string | null;
+  canManageClassRep?: boolean;
 }
 
 const ClassRosterPage: React.FC = () => {
@@ -24,6 +26,13 @@ const ClassRosterPage: React.FC = () => {
   const isViewer = user?.role === UserRole.HOD || user?.role === UserRole.SCHOOL_ADMIN;
   const canAccess = isTeacher || isViewer;
   const canAssign = isTeacher;
+  const groupedStudents = students.reduce<Record<string, Student[]>>((groups, student) => {
+    const key = student.className || 'Unassigned class';
+    groups[key] = groups[key] ?? [];
+    groups[key].push(student);
+    return groups;
+  }, {});
+  const hasManageableStudents = students.some((student) => student.canManageClassRep);
 
   const fetchRoster = async () => {
     setLoading(true);
@@ -44,7 +53,7 @@ const ClassRosterPage: React.FC = () => {
   }, [canAccess]);
 
   const toggleClassRep = async (student: Student) => {
-    if (!canAssign) return;
+    if (!canAssign || !student.canManageClassRep) return;
     setUpdatingId(student.id);
     try {
       await apiClient.patch(`/users/${student.id}/class-rep`, { isClassRep: !student.isClassRep });
@@ -79,13 +88,13 @@ const ClassRosterPage: React.FC = () => {
       <main className="max-w-3xl mx-auto px-6 py-8">
         <p className="text-sm text-ink-muted mb-6">
           {canAssign
-            ? 'As class teacher, assign one student as class rep. They can reply to your messages in the Messages inbox.'
+            ? 'View students in every class you teach. Class-rep actions are only enabled for classes where you are the assigned class teacher.'
             : 'View-only list of class representatives. Only the class teacher can assign or remove a rep.'}
         </p>
 
-        {isTeacher && !user?.classId && (
+        {isTeacher && students.length > 0 && !hasManageableStudents && (
           <div className="mb-6 p-4 rounded-xl bg-orange-500/10 border border-orange-500/20 text-orange-400 text-sm">
-            You are not assigned to a class yet. Ask your HOD or school admin to assign you as class teacher.
+            You can view these taught classes, but class-rep assignment is disabled until your HOD or school admin assigns you as class teacher.
           </div>
         )}
 
@@ -99,8 +108,17 @@ const ClassRosterPage: React.FC = () => {
           ) : students.length === 0 ? (
             <p className="p-8 text-center text-ink-muted">No students found for your class scope.</p>
           ) : (
-            <ul className="divide-y divide-white/5">
-              {students.map((s) => (
+            <div className="divide-y divide-white/10">
+              {Object.entries(groupedStudents).map(([className, classStudents]) => (
+                <section key={className}>
+                  <div className="flex items-center justify-between gap-3 px-6 py-3 bg-white/5">
+                    <span className="text-sm font-semibold text-ink">{className}</span>
+                    <span className="text-xs text-ink-muted">
+                      {classStudents.length} student{classStudents.length !== 1 ? 's' : ''}
+                    </span>
+                  </div>
+                  <ul className="divide-y divide-white/5">
+                    {classStudents.map((s) => (
                 <li key={s.id} className="flex items-center justify-between gap-4 px-6 py-4 hover:bg-white/5">
                   <div>
                     <p className="text-white font-medium">{s.fullName}</p>
@@ -116,7 +134,8 @@ const ClassRosterPage: React.FC = () => {
                   {canAssign ? (
                     <button
                       type="button"
-                      disabled={updatingId === s.id || !user?.classId}
+                      disabled={updatingId === s.id || !s.canManageClassRep}
+                      title={!s.canManageClassRep ? 'Only the assigned class teacher can manage this class rep' : undefined}
                       onClick={() => toggleClassRep(s)}
                       className={`px-4 py-2 rounded-xl text-sm font-semibold transition-all disabled:opacity-50 ${
                         s.isClassRep
@@ -132,8 +151,11 @@ const ClassRosterPage: React.FC = () => {
                     </span>
                   )}
                 </li>
+                    ))}
+                  </ul>
+                </section>
               ))}
-            </ul>
+            </div>
           )}
         </div>
       </main>

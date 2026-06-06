@@ -2,6 +2,7 @@ import { createId } from '@paralleldrive/cuid2';
 import { type AccessTokenPayload, UserRole } from '@sams/shared';
 import { prisma } from '../lib/prisma';
 import { AppError } from '../middleware/errors';
+import { resolveTeacherTeachingClassIds } from '../lib/teacherScope';
 
 // ─── Interfaces ───────────────────────────────────────────────────────────────
 
@@ -256,7 +257,7 @@ export class KnowledgeService {
     page: number,
     pageSize: number,
   ): Promise<PaginatedKnowledgeResponse> {
-    const where = this.buildScopeFilter(user);
+    const where = await this.buildScopeFilter(user);
 
     const [entries, total] = await Promise.all([
       prisma.aIKnowledge.findMany({
@@ -314,7 +315,7 @@ export class KnowledgeService {
   async getForAIContext(
     user: AccessTokenPayload,
   ): Promise<Array<{ title: string; content: string; category: string }>> {
-    const where = this.buildAIScopeFilter(user);
+    const where = await this.buildScopeFilter(user);
 
     const entries = await prisma.aIKnowledge.findMany({
       where,
@@ -346,7 +347,20 @@ export class KnowledgeService {
   /**
    * Build Prisma where clause for list operations based on user role.
    */
-  private buildScopeFilter(user: AccessTokenPayload) {
+  async listAll(user: AccessTokenPayload): Promise<KnowledgeEntryResponse[]> {
+    const where = await this.buildScopeFilter(user);
+    const entries = await prisma.aIKnowledge.findMany({
+      where,
+      include: {
+        createdBy: { select: { fullName: true, role: true } },
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    return entries.map((entry) => this.toResponse(entry));
+  }
+
+  private async buildScopeFilter(user: AccessTokenPayload) {
     const baseFilter: { schoolId: string; OR?: Array<Record<string, unknown>> } = {
       schoolId: user.schoolId,
     };
@@ -363,51 +377,22 @@ export class KnowledgeService {
         ];
         break;
       case UserRole.TEACHER:
-      case UserRole.STUDENT:
-        // School-wide + department + class entries (students read via AI, not this list API)
+      case UserRole.STUDENT: {
+        const classIds =
+          user.role === UserRole.TEACHER
+            ? await resolveTeacherTeachingClassIds(user.sub, user.classId)
+            : user.classId
+              ? [user.classId]
+              : [];
         baseFilter.OR = [
           { departmentId: null, classId: null },
           { departmentId: user.departmentId, classId: null },
-          { classId: user.classId },
+          ...(classIds.length ? [{ classId: { in: classIds } }] : []),
         ];
         break;
+      }
       default:
         baseFilter.OR = [{ departmentId: null, classId: null }];
-        break;
-    }
-
-    return baseFilter;
-  }
-
-  /**
-   * Build Prisma where clause for AI context retrieval based on user role.
-   */
-  private buildAIScopeFilter(user: AccessTokenPayload) {
-    const baseFilter: { schoolId: string; OR?: Array<Record<string, unknown>> } = {
-      schoolId: user.schoolId,
-    };
-
-    switch (user.role) {
-      case UserRole.SCHOOL_ADMIN:
-        // All entries in the school
-        break;
-      case UserRole.HOD:
-        // School-wide + department entries
-        baseFilter.OR = [
-          { departmentId: null, classId: null },
-          { departmentId: user.departmentId },
-        ];
-        break;
-      case UserRole.TEACHER:
-      case UserRole.STUDENT:
-        // School-wide + department + class entries
-        baseFilter.OR = [
-          { departmentId: null, classId: null },
-          { departmentId: user.departmentId, classId: null },
-          { classId: user.classId },
-        ];
-        break;
-      default:
         break;
     }
 

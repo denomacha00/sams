@@ -261,6 +261,18 @@ function maskPhone(phone: string): string {
   return `***${digits.slice(-4)}`;
 }
 
+function resolveWebAuthnRpId(req: Request): string {
+  const origin = req.get('origin');
+  if (origin) {
+    try {
+      return new URL(origin).hostname;
+    } catch {
+      // Fall back below.
+    }
+  }
+  return req.hostname;
+}
+
 /**
  * POST /api/v1/auth/resend-login-otp
  * Resend login OTP using an existing challenge (no password re-entry).
@@ -853,7 +865,10 @@ authRouter.post('/reset-password', async (req: Request, res: Response): Promise<
  */
 authRouter.post('/webauthn/register/options', authenticate, async (req: Request, res: Response): Promise<void> => {
   try {
-    const options = await webauthnService.generateRegistrationOptions(req.user.sub);
+    const options = await webauthnService.generateRegistrationOptions(
+      req.user.sub,
+      resolveWebAuthnRpId(req),
+    );
     res.status(200).json(options);
   } catch (err: any) {
     if (err.statusCode) {
@@ -901,7 +916,10 @@ authRouter.post('/webauthn/register/verify', authenticate, async (req: Request, 
  */
 authRouter.post('/webauthn/authenticate/options', async (req: Request, res: Response): Promise<void> => {
   try {
-    const options = await webauthnService.generateAuthenticationOptions();
+    const options = await webauthnService.generateAuthenticationOptions(
+      undefined,
+      resolveWebAuthnRpId(req),
+    );
     res.status(200).json(options);
   } catch (err: any) {
     if (err.statusCode) {

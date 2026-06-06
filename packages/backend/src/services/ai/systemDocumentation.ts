@@ -24,12 +24,11 @@ const DEVELOPER_BOOK_PATHS = [
     join(__dirname, '..', '..', '..', '..', '..', 'docs/SAMS-DEVELOPER-OPS-BOOK-DENIS.md'),
 ];
 
-const DEFAULT_MAX_CHARS = 8_000;
-const SUPER_ADMIN_MAX_CHARS = 12_000;
-const SUPER_ADMIN_RUNBOOK_MAX_CHARS = 12_000;
-const SUPER_ADMIN_DEVBOOK_MAX_CHARS = 28_000;
-const SUPER_ADMIN_PLATFORM_DOC_MAX_CHARS = 8_000;
-const SUPER_ADMIN_TOTAL_MAX_CHARS = 48_000;
+const DEFAULT_MAX_CHARS = 6_000;
+const SUPER_ADMIN_RUNBOOK_MAX_CHARS = 5_000;
+const SUPER_ADMIN_DEVBOOK_MAX_CHARS = 7_000;
+const SUPER_ADMIN_PLATFORM_DOC_MAX_CHARS = 5_000;
+const SUPER_ADMIN_TOTAL_MAX_CHARS = 18_000;
 
 function loadFullDocumentation(): string {
   if (cachedFullDoc !== null) return cachedFullDoc;

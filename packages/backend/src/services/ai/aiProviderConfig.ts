@@ -277,7 +277,7 @@ export function formatProviderError(...errors: unknown[]): string {
     return 'The AI provider quota is exhausted. Update billing or switch OPENAI_BASE_URL / OPENAI_FALLBACK_KEY on the server.';
   }
   if (lower.includes('context_length') || lower.includes('maximum context') || lower.includes('token limit')) {
-    return 'That message is too long for the AI model. Shorten your question or start a new conversation thread.';
+    return 'The AI context was too large for the configured model after loading SAMS docs/history. The server trims this automatically; try again, or ask a shorter follow-up.';
   }
   if (/\b403\b/.test(lower) || lower.includes('forbidden') || lower.includes('permission denied')) {
     return 'The AI provider rejected this request (403). Check OPENAI_API_KEY permissions and OPENAI_BASE_URL on the server.';

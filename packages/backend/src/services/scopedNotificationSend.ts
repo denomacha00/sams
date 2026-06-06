@@ -6,7 +6,7 @@ import {
 } from '../lib/hodScope';
 import { prisma } from '../lib/prisma';
 import { getSocketIO } from '../lib/socket';
-import { resolveTeacherClassId } from '../lib/teacherScope';
+import { resolveTeacherTeachingClassIds } from '../lib/teacherScope';
 
 const NOTIFICATION_INSERT_CHUNK = 500;
 const SMS_MAX_RECIPIENTS = 25;
@@ -70,13 +70,17 @@ export async function sendScopedNotification(
     throw new ScopedNotificationError(400, 'VALIDATION_ERROR', 'At least one channel is required');
   }
 
-  const teacherClassId =
+  const teacherClassIds =
     effectiveSender.role === UserRole.TEACHER
-      ? await resolveTeacherClassId(effectiveSender.sub, effectiveSender.classId)
-      : null;
+      ? await resolveTeacherTeachingClassIds(effectiveSender.sub, effectiveSender.classId)
+      : [];
 
-  if (effectiveSender.role === UserRole.TEACHER && scope === 'class' && !targetId && teacherClassId) {
-    targetId = teacherClassId;
+  if (effectiveSender.role === UserRole.TEACHER && scope === 'class' && !targetId) {
+    if (teacherClassIds.length === 1) {
+      targetId = teacherClassIds[0];
+    } else if (teacherClassIds.length > 1) {
+      throw new ScopedNotificationError(400, 'VALIDATION_ERROR', 'Choose one of your taught classes');
+    }
   }
 
   if (effectiveSender.role === UserRole.HOD) {
@@ -137,16 +141,16 @@ export async function sendScopedNotification(
     }
   } else if (effectiveSender.role === UserRole.TEACHER) {
     if (scope !== 'class') {
-      throw new ScopedNotificationError(403, 'FORBIDDEN', 'Teachers can only send to their class');
+      throw new ScopedNotificationError(403, 'FORBIDDEN', 'Teachers can only send to classes they teach');
     }
-    if (!teacherClassId) {
-      throw new ScopedNotificationError(403, 'FORBIDDEN', 'You are not assigned to a class');
+    if (teacherClassIds.length === 0) {
+      throw new ScopedNotificationError(403, 'FORBIDDEN', 'You are not assigned to any taught class');
     }
-    if (targetId !== teacherClassId) {
+    if (!targetId || !teacherClassIds.includes(targetId)) {
       throw new ScopedNotificationError(
         403,
         'FORBIDDEN',
-        'Teachers can only send notifications to their own class',
+        'Teachers can only send notifications to classes they teach',
       );
     }
     if (targetRole && targetRole !== 'STUDENT') {

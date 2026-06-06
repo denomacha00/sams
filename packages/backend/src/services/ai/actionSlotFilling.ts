@@ -4,7 +4,10 @@ import {
   HOD_DEPARTMENT_UNLINKED_MESSAGE,
 } from '../../lib/hodScope';
 import { prisma } from '../../lib/prisma';
-import { resolveTeacherClassId } from '../../lib/teacherScope';
+import {
+  resolveTeacherManagedClassIds,
+  resolveTeacherTeachingClassIds,
+} from '../../lib/teacherScope';
 import { findAction } from './roleActionRegistry';
 import type { PendingAction } from './aiTypes';
 
@@ -42,6 +45,12 @@ const DESTRUCTIVE_CONFIRM_ACTIONS = new Set([
 ]);
 
 function getActionSlotOrder(user: AccessTokenPayload, action: string): SlotName[] {
+  if (user.role === UserRole.TEACHER && action === 'send_class_message') {
+    return ['classId', 'message'];
+  }
+  if (user.role === UserRole.TEACHER && action === 'start_session') {
+    return ['classId'];
+  }
   if (user.role === UserRole.HOD && action === 'send_department_notification') {
     return ['message'];
   }
@@ -133,6 +142,29 @@ async function listDepartmentClasses(
   });
 }
 
+async function listTeacherClasses(
+  user: AccessTokenPayload,
+  mode: 'managed' | 'teaching',
+): Promise<Array<{ id: string; name: string }>> {
+  const classIds =
+    mode === 'managed'
+      ? await resolveTeacherManagedClassIds(user.sub, user.classId)
+      : await resolveTeacherTeachingClassIds(user.sub, user.classId);
+
+  if (classIds.length === 0) return [];
+
+  return prisma.class.findMany({
+    where: { schoolId: user.schoolId, id: { in: classIds } },
+    select: { id: true, name: true },
+    orderBy: { name: 'asc' },
+  });
+}
+
+function findClassByName<T extends { name: string }>(classes: T[], name: string): T | undefined {
+  const normalized = name.trim().toLowerCase();
+  return classes.find((cls) => cls.name.toLowerCase().includes(normalized));
+}
+
 async function listSchoolDepartments(schoolId: string): Promise<Array<{ id: string; name: string }>> {
   return prisma.department.findMany({
     where: { schoolId },
@@ -204,10 +236,19 @@ export async function resolveActionParams(
 ): Promise<Record<string, unknown>> {
   const resolved = { ...params };
 
-  if (user.role === UserRole.TEACHER && action === 'send_class_message') {
+  if (
+    user.role === UserRole.TEACHER &&
+    (action === 'send_class_message' || action === 'start_session')
+  ) {
     if (!resolved.classId) {
-      const classId = await resolveTeacherClassId(user.sub, user.classId);
-      if (classId) resolved.classId = classId;
+      const classes = await listTeacherClasses(user, 'teaching');
+      if (resolved.className) {
+        const cls = findClassByName(classes, String(resolved.className));
+        if (cls) resolved.classId = cls.id;
+      }
+      if (!resolved.classId && classes.length === 1) {
+        resolved.classId = classes[0].id;
+      }
     }
   }
 
@@ -215,8 +256,14 @@ export async function resolveActionParams(
     if (user.role === UserRole.TEACHER) {
       if (!resolved.targetRole) resolved.targetRole = 'STUDENT';
       if (!resolved.classId) {
-        const classId = await resolveTeacherClassId(user.sub, user.classId);
-        if (classId) resolved.classId = classId;
+        const classes = await listTeacherClasses(user, 'managed');
+        if (resolved.className) {
+          const cls = findClassByName(classes, String(resolved.className));
+          if (cls) resolved.classId = cls.id;
+        }
+        if (!resolved.classId && classes.length === 1) {
+          resolved.classId = classes[0].id;
+        }
       }
     }
     if (user.role === UserRole.HOD && !resolved.departmentId && user.departmentId) {
@@ -246,9 +293,20 @@ export async function resolveActionParams(
   }
 
   if (resolved.className && !resolved.classId && user.schoolId) {
-    const deptId =
-      user.role === UserRole.HOD ? user.departmentId : undefined;
-    const cls = await resolveClassByName(user.schoolId, deptId, String(resolved.className));
+    const teacherMode =
+      user.role === UserRole.TEACHER && action === 'create_registration_link'
+        ? 'managed'
+        : user.role === UserRole.TEACHER &&
+            (action === 'send_class_message' || action === 'start_session')
+          ? 'teaching'
+          : null;
+    const cls = teacherMode
+      ? findClassByName(await listTeacherClasses(user, teacherMode), String(resolved.className))
+      : await resolveClassByName(
+          user.schoolId,
+          user.role === UserRole.HOD ? user.departmentId : undefined,
+          String(resolved.className),
+        );
     if (cls) {
       resolved.classId = cls.id;
       resolved.className = cls.name;
@@ -447,6 +505,11 @@ export async function getNextMissingSlot(
         const target = String(resolved.targetRole ?? '').toUpperCase();
         if (target !== 'STUDENT') continue;
       } else if (
+        user.role === UserRole.TEACHER &&
+        (action === 'send_class_message' || action === 'start_session')
+      ) {
+        // Teacher class actions use managed/timetable-aware class lists below.
+      } else if (
         resolved.notifyScope !== 'class' &&
         action !== 'send_class_notification'
       ) {
@@ -454,24 +517,34 @@ export async function getNextMissingSlot(
       }
       if (isFilled(resolved.classId)) continue;
 
-      const deptId =
-        user.role === UserRole.HOD || user.role === UserRole.TEACHER
-          ? user.departmentId
-          : action === 'create_registration_link' && isFilled(resolved.departmentId)
-            ? String(resolved.departmentId)
-            : undefined;
-      if (!deptId && user.role === UserRole.HOD && action === 'create_registration_link') {
-        return slot;
-      }
-      if (!deptId && user.role === UserRole.HOD) return slot;
+      let classes: Array<{ id: string; name: string }>;
+      if (user.role === UserRole.TEACHER && action === 'create_registration_link') {
+        classes = await listTeacherClasses(user, 'managed');
+      } else if (
+        user.role === UserRole.TEACHER &&
+        (action === 'send_class_message' || action === 'start_session')
+      ) {
+        classes = await listTeacherClasses(user, 'teaching');
+      } else {
+        const deptId =
+          user.role === UserRole.HOD
+            ? user.departmentId
+            : action === 'create_registration_link' && isFilled(resolved.departmentId)
+              ? String(resolved.departmentId)
+              : undefined;
+        if (!deptId && user.role === UserRole.HOD && action === 'create_registration_link') {
+          return slot;
+        }
+        if (!deptId && user.role === UserRole.HOD) return slot;
 
-      const classes = deptId
-        ? await listDepartmentClasses(user.schoolId, deptId)
-        : await prisma.class.findMany({
-            where: { schoolId: user.schoolId },
-            select: { id: true, name: true },
-            orderBy: { name: 'asc' },
-          });
+        classes = deptId
+          ? await listDepartmentClasses(user.schoolId, deptId)
+          : await prisma.class.findMany({
+              where: { schoolId: user.schoolId },
+              select: { id: true, name: true },
+              orderBy: { name: 'asc' },
+            });
+      }
 
       if (classes.length === 1) {
         resolved.classId = classes[0].id;
@@ -530,19 +603,34 @@ export async function buildSlotQuestion(
     case 'message':
       return 'What is the message text you want to send?';
     case 'classId': {
+      const teacherMode =
+        user.role === UserRole.TEACHER && action === 'create_registration_link'
+          ? 'managed'
+          : user.role === UserRole.TEACHER &&
+              (action === 'send_class_message' || action === 'start_session')
+            ? 'teaching'
+            : null;
       const deptId =
         user.role === UserRole.HOD
           ? user.departmentId
           : undefined;
-      const classes = deptId
-        ? await listDepartmentClasses(user.schoolId, deptId!)
-        : await prisma.class.findMany({
-            where: { schoolId: user.schoolId },
-            select: { id: true, name: true },
-            orderBy: { name: 'asc' },
-            take: 30,
-          });
+      const classes = teacherMode
+        ? await listTeacherClasses(user, teacherMode)
+        : deptId
+          ? await listDepartmentClasses(user.schoolId, deptId!)
+          : await prisma.class.findMany({
+              where: { schoolId: user.schoolId },
+              select: { id: true, name: true },
+              orderBy: { name: 'asc' },
+              take: 30,
+            });
       if (classes.length === 0) {
+        if (teacherMode === 'managed') {
+          return 'No managed classes are linked to your teacher account yet. Ask your HOD or School Admin to assign you as class teacher first.';
+        }
+        if (teacherMode === 'teaching') {
+          return 'No taught classes are linked to your timetable yet. Ask your HOD or School Admin to update the timetable first.';
+        }
         if (action === 'create_registration_link') {
           return 'Which class is this registration link for? (No classes found in your department.)';
         }
@@ -551,6 +639,9 @@ export async function buildSlotQuestion(
       const names = classes.map((c) => `**${c.name}**`).join(', ');
       if (action === 'create_registration_link') {
         return `Which class should the new student join? Reply with one of: ${names}`;
+      }
+      if (action === 'start_session') {
+        return `Which class should this attendance session be for? Reply with one of: ${names}`;
       }
       return `Which class should receive this? Reply with one of: ${names}`;
     }

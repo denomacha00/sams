@@ -6,13 +6,18 @@ import { AVATARS_DIR, avatarPublicUrl } from '../config/uploads';
 import multer from 'multer';
 import sharp from 'sharp';
 import { UserRole } from '@sams/shared';
+import type { Prisma } from '@prisma/client';
 import { requirePermission } from '../middleware/rbac';
 import { userService } from '../services/userService';
 import { registrationLinkService } from '../services/registrationLinkService';
 import { prisma } from '../lib/prisma';
 import { AppError } from '../middleware/errors';
 import { assertPhoneAvailableInSchool, onboardPhoneForSms, optionalPhoneForStorage } from '../services/phoneOnboardingService';
-import { resolveTeacherClassId } from '../lib/teacherScope';
+import {
+  resolveTeacherClassId,
+  resolveTeacherManagedClassIds,
+  resolveTeacherTeachingClassIds,
+} from '../lib/teacherScope';
 
 // ─── Avatar Upload Config ─────────────────────────────────────────────────────
 
@@ -344,39 +349,122 @@ usersRouter.get('/', requirePermission('manage:users'), async (req: Request, res
 const classRepSchema = z.object({ isClassRep: z.boolean() });
 
 /**
+ * GET /api/v1/users/teaching-classes
+ * Teacher-visible classes: class-teacher assignments plus timetable teaching assignments.
+ */
+usersRouter.get('/teaching-classes', async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+  try {
+    if (req.user.role !== UserRole.TEACHER) {
+      throw new AppError(403, 'FORBIDDEN', 'Only teachers can view their teaching classes');
+    }
+
+    const classIds = await resolveTeacherTeachingClassIds(req.user.sub, req.user.classId);
+    if (classIds.length === 0) {
+      res.status(200).json([]);
+      return;
+    }
+
+    const manageableClassIds = new Set(
+      await resolveTeacherManagedClassIds(req.user.sub, req.user.classId),
+    );
+    const classes = await prisma.class.findMany({
+      where: {
+        schoolId: req.schoolId,
+        id: { in: classIds },
+      },
+      select: {
+        id: true,
+        name: true,
+        departmentId: true,
+        classTeacherId: true,
+      },
+      orderBy: { name: 'asc' },
+    });
+
+    res.status(200).json(
+      classes.map((cls) => ({
+        id: cls.id,
+        name: cls.name,
+        departmentId: cls.departmentId,
+        canManageClassRep: manageableClassIds.has(cls.id),
+      })),
+    );
+  } catch (err) {
+    next(err instanceof AppError ? err : new AppError(500, 'INTERNAL_ERROR', 'Failed to load teaching classes'));
+  }
+});
+
+/**
  * GET /api/v1/users/class-roster
- * Teachers: students in assigned class. HOD: students in department (optional classId query).
+ * Teachers: students in classes they teach. HOD: students in department (optional classId query).
  */
 usersRouter.get('/class-roster', async (req: Request, res: Response, next: NextFunction): Promise<void> => {
   try {
     const role = req.user.role;
-    const filters: { role?: UserRole; departmentId?: string; classId?: string } = {
+    const where: Prisma.UserWhereInput = {
+      schoolId: req.schoolId,
       role: UserRole.STUDENT,
     };
+    let manageableClassIds = new Set<string>();
 
     if (role === UserRole.TEACHER) {
-      const teacherClassId = await resolveTeacherClassId(req.user.sub, req.user.classId);
-      if (!teacherClassId) {
+      const [teachingClassIds, managedClassIds] = await Promise.all([
+        resolveTeacherTeachingClassIds(req.user.sub, req.user.classId),
+        resolveTeacherManagedClassIds(req.user.sub, req.user.classId),
+      ]);
+      if (teachingClassIds.length === 0) {
         res.status(200).json([]);
         return;
       }
-      filters.classId = teacherClassId;
+      where.classId = { in: teachingClassIds };
+      manageableClassIds = new Set(managedClassIds);
     } else if (role === UserRole.HOD) {
       if (!req.user.departmentId) {
         res.status(200).json([]);
         return;
       }
-      filters.departmentId = req.user.departmentId;
-      if (typeof req.query.classId === 'string') filters.classId = req.query.classId;
+      where.OR = [
+        { departmentId: req.user.departmentId },
+        { class: { departmentId: req.user.departmentId } },
+      ];
+      if (typeof req.query.classId === 'string') where.classId = req.query.classId;
     } else if (role === UserRole.SCHOOL_ADMIN) {
-      if (typeof req.query.classId === 'string') filters.classId = req.query.classId;
-      if (typeof req.query.departmentId === 'string') filters.departmentId = req.query.departmentId;
+      if (typeof req.query.classId === 'string') where.classId = req.query.classId;
+      if (typeof req.query.departmentId === 'string') {
+        where.OR = [
+          { departmentId: req.query.departmentId },
+          { class: { departmentId: req.query.departmentId } },
+        ];
+      }
     } else {
       throw new AppError(403, 'FORBIDDEN', 'Only teachers, HODs, and school admins can view class roster');
     }
 
-    const users = await userService.listUsers(req.schoolId, filters);
-    res.status(200).json(users);
+    const users = await prisma.user.findMany({
+      where,
+      select: {
+        id: true,
+        fullName: true,
+        username: true,
+        email: true,
+        phone: true,
+        admissionNumber: true,
+        classId: true,
+        departmentId: true,
+        isClassRep: true,
+        isLocked: true,
+        class: { select: { id: true, name: true } },
+      },
+      orderBy: { fullName: 'asc' },
+    });
+
+    res.status(200).json(
+      users.map((user) => ({
+        ...user,
+        className: user.class?.name ?? null,
+        canManageClassRep: user.classId ? manageableClassIds.has(user.classId) : false,
+      })),
+    );
   } catch (err) {
     next(err instanceof AppError ? err : new AppError(500, 'INTERNAL_ERROR', 'Failed to load class roster'));
   }
@@ -407,11 +495,12 @@ usersRouter.patch('/:id/class-rep', async (req: Request, res: Response, next: Ne
     }
 
     const target = await userService.getUser(req.schoolId, req.params.id as string);
-
-    if (!req.user.classId) {
+    const manageableClassIds = await resolveTeacherManagedClassIds(req.user.sub, req.user.classId);
+    if (manageableClassIds.length === 0) {
       throw new AppError(403, 'FORBIDDEN', 'You must be assigned as class teacher for a class');
     }
-    if ((target as { classId?: string }).classId !== req.user.classId) {
+    const targetClassId = (target as { classId?: string | null }).classId;
+    if (!targetClassId || !manageableClassIds.includes(targetClassId)) {
       throw new AppError(403, 'FORBIDDEN', 'You can only assign class rep for students in your class');
     }
 

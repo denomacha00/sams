@@ -12,11 +12,11 @@ vi.mock('../../registrationLinkService', () => ({
 }));
 
 vi.mock('../../../lib/teacherScope', () => ({
-  resolveTeacherClassId: vi.fn(),
+  resolveTeacherManagedClassIds: vi.fn(),
 }));
 
 import { registrationLinkService } from '../../registrationLinkService';
-import { resolveTeacherClassId } from '../../../lib/teacherScope';
+import { resolveTeacherManagedClassIds } from '../../../lib/teacherScope';
 
 describe('extractInviteStudentParams', () => {
   it('extracts student name from add student message', () => {
@@ -37,7 +37,7 @@ describe('createRegistrationLinkHandler', () => {
   });
 
   it('generates link for teacher with default class', async () => {
-    vi.mocked(resolveTeacherClassId).mockResolvedValue('class-1');
+    vi.mocked(resolveTeacherManagedClassIds).mockResolvedValue(['class-1']);
     vi.mocked(registrationLinkService.generateLink).mockResolvedValue({
       id: 'link-1',
       token: 'tok-abc',
@@ -76,7 +76,7 @@ describe('createRegistrationLinkHandler', () => {
   it('uses APP_URL when FRONTEND_URL is unset (production VPS)', async () => {
     delete process.env.FRONTEND_URL;
     process.env.APP_URL = 'https://app.smart-managment.com';
-    vi.mocked(resolveTeacherClassId).mockResolvedValue('class-1');
+    vi.mocked(resolveTeacherManagedClassIds).mockResolvedValue(['class-1']);
     vi.mocked(registrationLinkService.generateLink).mockResolvedValue({
       id: 'link-2',
       token: 'prod-tok',

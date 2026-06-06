@@ -149,10 +149,9 @@ const NotificationsPage: React.FC = () => {
       apiClient.get('/users/me').then(({ data }) => {
         if (data.classId) {
           updateUser({ classId: data.classId });
-          setScope('class');
-          setTargetId(data.classId);
-          setTargetRole('STUDENT');
         }
+        setScope('class');
+        setTargetRole('STUDENT');
       }).catch(() => {});
     } else if (user?.role === 'HOD') {
       apiClient.get('/users/me').then(({ data }) => {
@@ -170,16 +169,13 @@ const NotificationsPage: React.FC = () => {
     }
   }, []);
 
-  // Teachers / HOD (when assigned to a class): pre-select class for class-scoped sends
+  // Teachers always send class-scoped messages to students; class choice comes from taught classes.
   useEffect(() => {
-    if ((user?.role === 'TEACHER' || user?.role === 'HOD') && user.classId) {
-      if (user.role === 'TEACHER') {
-        setScope('class');
-        setTargetId(user.classId);
-        setTargetRole('STUDENT');
-      }
+    if (user?.role === 'TEACHER') {
+      setScope('class');
+      setTargetRole('STUDENT');
     }
-  }, [user?.role, user?.classId]);
+  }, [user?.role]);
 
   // HOD: always use JWT/profile department for department-scoped sends (never pick another dept)
   useEffect(() => {
@@ -263,7 +259,18 @@ const NotificationsPage: React.FC = () => {
           })
         );
         setDepartments(deptsWithClasses);
-      } else if ((user?.role === 'HOD' || user?.role === 'TEACHER') && user.departmentId) {
+      } else if (user?.role === 'TEACHER') {
+        const { data } = await apiClient.get('/users/teaching-classes');
+        const taughtClasses = Array.isArray(data) ? data : [];
+        setClasses(taughtClasses);
+        setScope('class');
+        setTargetRole('STUDENT');
+        if (taughtClasses.length === 1) {
+          setTargetId(taughtClasses[0].id);
+        } else if (!taughtClasses.some((c: { id: string }) => c.id === targetId)) {
+          setTargetId('');
+        }
+      } else if (user?.role === 'HOD' && user.departmentId) {
         const { data } = await apiClient.get(`/departments/${user.departmentId}/classes`);
         setClasses(Array.isArray(data) ? data : []);
       }
@@ -704,7 +711,7 @@ const NotificationsPage: React.FC = () => {
                 <select value={scope} onChange={(e) => {
                   const next = e.target.value as Scope;
                   setScope(next);
-                  setTargetRole('ALL');
+                  setTargetRole(user?.role === 'TEACHER' ? 'STUDENT' : 'ALL');
                   setSelectedDepartmentId('');
                   if (user?.role === 'HOD' && next === 'department' && user.departmentId) {
                     setTargetId(user.departmentId);

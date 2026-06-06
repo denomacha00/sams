@@ -36,6 +36,9 @@ interface SchoolDetail extends School {
   }>;
 }
 
+const PLAN_TIERS = ['TRIAL', 'BASIC', 'PROFESSIONAL', 'ENTERPRISE'] as const;
+type PlanTier = typeof PLAN_TIERS[number];
+
 const SchoolsListPage: React.FC = () => {
   const [schools, setSchools] = useState<School[]>([]);
   const [loading, setLoading] = useState(true);
@@ -43,6 +46,14 @@ const SchoolsListPage: React.FC = () => {
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [extendModal, setExtendModal] = useState<{ schoolId: string; schoolName: string } | null>(null);
   const [newExpiry, setNewExpiry] = useState('');
+  const [planModal, setPlanModal] = useState<{
+    schoolId: string;
+    schoolName: string;
+    currentPlan: string;
+    currentExpiry: string;
+  } | null>(null);
+  const [selectedPlan, setSelectedPlan] = useState<PlanTier>('BASIC');
+  const [planExpiry, setPlanExpiry] = useState('');
   const [detailModal, setDetailModal] = useState<SchoolDetail | null>(null);
   const [detailLoading, setDetailLoading] = useState<string | null>(null);
   const [search, setSearch] = useState('');
@@ -128,6 +139,26 @@ const SchoolsListPage: React.FC = () => {
       await fetchSchools();
     } catch (err) {
       console.error('Failed to extend license:', err);
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  const handleChangePlan = async () => {
+    if (!planModal) return;
+    setActionLoading(planModal.schoolId);
+    try {
+      await apiClient.post(`/super/schools/${planModal.schoolId}/plan`, {
+        planTier: selectedPlan,
+        ...(planExpiry ? { newExpiry: new Date(planExpiry).toISOString() } : {}),
+      });
+      setPlanModal(null);
+      setSelectedPlan('BASIC');
+      setPlanExpiry('');
+      await fetchSchools();
+    } catch (err) {
+      console.error('Failed to update plan:', err);
+      alert(getSuperAdminApiError(err, 'Failed to update school plan.'));
     } finally {
       setActionLoading(null);
     }
@@ -255,6 +286,26 @@ const SchoolsListPage: React.FC = () => {
                       Extend
                     </button>
                     <button
+                      onClick={() => {
+                        setPlanModal({
+                          schoolId: school.id,
+                          schoolName: school.name,
+                          currentPlan: school.planTier,
+                          currentExpiry: school.licenseExpiresAt,
+                        });
+                        setSelectedPlan(
+                          PLAN_TIERS.includes(school.planTier as PlanTier)
+                            ? (school.planTier as PlanTier)
+                            : 'BASIC',
+                        );
+                        setPlanExpiry(school.licenseExpiresAt.split('T')[0] || '');
+                      }}
+                      disabled={actionLoading === school.id}
+                      className="px-3 py-1 text-xs bg-indigo-700 hover:bg-indigo-600 disabled:opacity-50 text-white rounded transition-colors"
+                    >
+                      Plan
+                    </button>
+                    <button
                       onClick={() => handleDelete(school.id, school.name)}
                       disabled={actionLoading === school.id}
                       className="px-3 py-1 text-xs bg-red-900 hover:bg-red-800 disabled:opacity-50 text-red-200 rounded transition-colors border border-red-700"
@@ -355,6 +406,71 @@ const SchoolsListPage: React.FC = () => {
               <p className="text-xs text-gray-500">
                 Created {new Date(detailModal.createdAt).toLocaleString()}
               </p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Change Plan Modal */}
+      {planModal && (
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50">
+          <div className="bg-gray-800 rounded-lg p-6 w-full max-w-md border border-gray-700">
+            <h3 className="text-lg font-semibold text-white mb-2">
+              Change Plan - {planModal.schoolName}
+            </h3>
+            <p className="text-xs text-gray-400 mb-4">
+              Current plan: {planModal.currentPlan}
+            </p>
+            <div className="space-y-4">
+              <div>
+                <label htmlFor="selectedPlan" className="block text-sm font-medium text-gray-300 mb-1">
+                  Plan Tier
+                </label>
+                <select
+                  id="selectedPlan"
+                  value={selectedPlan}
+                  onChange={(e) => setSelectedPlan(e.target.value as PlanTier)}
+                  className="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  {PLAN_TIERS.map((tier) => (
+                    <option key={tier} value={tier}>
+                      {tier}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label htmlFor="planExpiry" className="block text-sm font-medium text-gray-300 mb-1">
+                  License Expiry
+                </label>
+                <input
+                  id="planExpiry"
+                  type="date"
+                  value={planExpiry}
+                  onChange={(e) => setPlanExpiry(e.target.value)}
+                  className="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  min={new Date().toISOString().split('T')[0]}
+                />
+              </div>
+            </div>
+            <div className="flex gap-3 justify-end mt-6">
+              <button
+                onClick={() => {
+                  setPlanModal(null);
+                  setSelectedPlan('BASIC');
+                  setPlanExpiry('');
+                }}
+                className="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleChangePlan}
+                disabled={actionLoading === planModal.schoolId}
+                className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white rounded-lg transition-colors"
+              >
+                Update Plan
+              </button>
             </div>
           </div>
         </div>

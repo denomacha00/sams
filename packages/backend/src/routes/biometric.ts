@@ -7,7 +7,7 @@ import { licenseService } from '../services/licenseService';
 import { biometricService } from '../services/biometricService';
 import { attendanceService } from '../services/attendanceService';
 import { prisma } from '../lib/prisma';
-import { resolveTeacherClassId } from '../lib/teacherScope';
+import { resolveTeacherClassId, resolveTeacherTeachingClassIds } from '../lib/teacherScope';
 import { AppError } from '../middleware/errors';
 
 // ─── Validation Schemas ───────────────────────────────────────────────────────
@@ -43,9 +43,9 @@ async function assertCanAccessBiometricClass(req: Request, classId: string): Pro
   }
 
   if (req.user.role === UserRole.TEACHER) {
-    const teacherClassId = await resolveTeacherClassId(req.user.sub, req.user.classId);
-    if (teacherClassId !== classId) {
-      throw new AppError(403, 'FORBIDDEN', 'Teachers can only access biometric data for their assigned class');
+    const teacherClassIds = await resolveTeacherTeachingClassIds(req.user.sub, req.user.classId);
+    if (!teacherClassIds.includes(classId)) {
+      throw new AppError(403, 'FORBIDDEN', 'Teachers can only access biometric data for classes they teach');
     }
     return;
   }
@@ -79,9 +79,9 @@ async function assertCanEnrollTarget(req: Request, studentId: string): Promise<v
   }
 
   if (req.user.role === UserRole.TEACHER) {
-    const teacherClassId = await resolveTeacherClassId(req.user.sub, req.user.classId);
-    if (!teacherClassId || target.classId !== teacherClassId) {
-      throw new AppError(403, 'FORBIDDEN', 'Teachers can only enroll students in their assigned class');
+    const teacherClassIds = await resolveTeacherTeachingClassIds(req.user.sub, req.user.classId);
+    if (!target.classId || !teacherClassIds.includes(target.classId)) {
+      throw new AppError(403, 'FORBIDDEN', 'Teachers can only enroll students in classes they teach');
     }
     return;
   }
@@ -144,19 +144,28 @@ biometricRouter.post(
     }
 
     try {
-      let classId =
-        parsed.data.classId ??
-        (await resolveTeacherClassId(req.user.sub, req.user.classId));
-      if (!classId && parsed.data.sessionId) {
+      let sessionId = parsed.data.sessionId;
+      let classId = parsed.data.classId;
+
+      if (sessionId) {
         const session = await prisma.attendanceSession.findUnique({
-          where: { id: parsed.data.sessionId },
+          where: { id: sessionId },
           select: { classId: true, schoolId: true, teacherId: true, isActive: true },
         });
-        if (!session || session.schoolId !== req.schoolId || !session.isActive || session.teacherId !== req.user.sub) {
+        if (!session || session.schoolId !== req.schoolId || !session.isActive) {
           throw new AppError(400, 'NO_ACTIVE_SESSION', 'Start an attendance session before scanning faces');
+        }
+        if (req.user.role === UserRole.TEACHER && session.teacherId !== req.user.sub) {
+          throw new AppError(403, 'FORBIDDEN', 'Teachers can only scan biometric attendance for their own sessions');
+        }
+        if (classId && classId !== session.classId) {
+          throw new AppError(400, 'CLASS_SESSION_MISMATCH', 'Selected class does not match the active attendance session');
         }
         classId = session.classId;
       }
+
+      classId = classId ?? (await resolveTeacherClassId(req.user.sub, req.user.classId));
+
       if (!classId) {
         throw new AppError(400, 'NO_CLASS', 'No class assigned for biometric attendance');
       }
@@ -180,7 +189,6 @@ biometricRouter.post(
         return;
       }
 
-      let sessionId = parsed.data.sessionId;
       if (!sessionId) {
         const activeSession = await prisma.attendanceSession.findFirst({
           where: {

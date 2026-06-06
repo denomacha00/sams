@@ -30,6 +30,10 @@ export interface AuthenticationOptions {
 
 const challengeStore = new Map<string, { challenge: string; expiresAt: number }>();
 
+function toBase64Url(value: string): string {
+  return value.replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
+}
+
 function storeChallenge(key: string, challenge: string): void {
   // Challenges expire after 5 minutes
   challengeStore.set(key, { challenge, expiresAt: Date.now() + 5 * 60 * 1000 });
@@ -55,12 +59,15 @@ setInterval(() => {
 
 export class WebAuthnService {
   private rpName = 'SAMS';
-  private rpId = process.env.WEBAUTHN_RP_ID || 'localhost';
+
+  private resolveRpId(rpId?: string): string {
+    return process.env.WEBAUTHN_RP_ID?.trim() || rpId || 'localhost';
+  }
 
   /**
    * Generate registration options for a teacher to register their fingerprint.
    */
-  async generateRegistrationOptions(userId: string): Promise<RegistrationOptions> {
+  async generateRegistrationOptions(userId: string, rpId?: string): Promise<RegistrationOptions> {
     const user = await prisma.user.findUnique({
       where: { id: userId },
       select: { id: true, fullName: true, email: true, username: true, role: true },
@@ -81,7 +88,7 @@ export class WebAuthnService {
 
     return {
       challenge,
-      rp: { name: this.rpName, id: this.rpId },
+      rp: { name: this.rpName, id: this.resolveRpId(rpId) },
       user: {
         id: Buffer.from(userId).toString('base64'),
         name: user.email || user.username || user.fullName,
@@ -161,10 +168,9 @@ export class WebAuthnService {
    * Generate authentication options (for login without specifying user first).
    * Returns all credentials for discoverable login, or specific user's credentials.
    */
-  async generateAuthenticationOptions(userId?: string): Promise<AuthenticationOptions> {
+  async generateAuthenticationOptions(userId?: string, rpId?: string): Promise<AuthenticationOptions> {
     const challenge = crypto.randomBytes(32).toString('base64');
-    const challengeKey = userId ? `auth:${userId}` : `auth:discoverable:${challenge.slice(0, 8)}`;
-    storeChallenge(challengeKey, challenge);
+    storeChallenge(`auth:${toBase64Url(challenge)}`, challenge);
 
     let allowCredentials: Array<{ id: string; type: 'public-key'; transports?: string[] }> = [];
 
@@ -183,7 +189,7 @@ export class WebAuthnService {
 
     return {
       challenge,
-      rpId: this.rpId,
+      rpId: this.resolveRpId(rpId),
       allowCredentials,
       userVerification: 'preferred',
       timeout: 60000,
@@ -231,6 +237,11 @@ export class WebAuthnService {
 
     if (clientData.type !== 'webauthn.get') {
       throw new AppError(400, 'INVALID_RESPONSE', 'Invalid client data type');
+    }
+
+    const storedChallenge = getAndDeleteChallenge(`auth:${clientData.challenge}`);
+    if (!storedChallenge || toBase64Url(storedChallenge) !== clientData.challenge) {
+      throw new AppError(400, 'CHALLENGE_MISMATCH', 'Authentication challenge verification failed');
     }
 
     // Verify authenticator data - extract sign count (bytes 33-36)

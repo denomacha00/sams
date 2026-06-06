@@ -10,20 +10,12 @@ interface Student {
   email: string | null;
   phone: string | null;
   isLocked: boolean;
+  classId?: string | null;
+  className?: string | null;
 }
 
 const ClassStudentsPage: React.FC = () => {
   const user = useAuthStore((s) => s.user);
-  const updateUser = useAuthStore((s) => s.updateUser);
-
-  useEffect(() => {
-    if (user?.role !== 'TEACHER') return;
-    apiClient.get('/users/me').then(({ data }) => {
-      if (data.classId && data.classId !== user?.classId) {
-        updateUser({ classId: data.classId });
-      }
-    }).catch(() => {});
-  }, [user?.role, user?.classId, updateUser]);
   const [students, setStudents] = useState<Student[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
@@ -35,12 +27,12 @@ const ClassStudentsPage: React.FC = () => {
         const list = Array.isArray(data) ? data : [];
         setStudents(list);
         if (list.length === 0) {
-          setError('You are not assigned to a class, or your class has no students yet. Contact your HOD.');
+          setError('No students found in classes you teach yet. Check your timetable or class assignment with your HOD.');
         }
       })
       .catch((err: any) => setError(err.response?.data?.error || 'Failed to load students'))
       .finally(() => setLoading(false));
-  }, [user?.classId]);
+  }, []);
 
   const filtered = students.filter((s) => {
     if (!searchQuery.trim()) return true;
@@ -53,6 +45,14 @@ const ClassStudentsPage: React.FC = () => {
     );
   });
 
+  const groupedStudents = filtered.reduce<Record<string, Student[]>>((groups, student) => {
+    const key = student.className || 'Unassigned class';
+    groups[key] = groups[key] ?? [];
+    groups[key].push(student);
+    return groups;
+  }, {});
+  const classCount = new Set(students.map((s) => s.classId || s.className || 'unassigned')).size;
+
   return (
     <div className="page-shell">
       <header className="inner-page-header">
@@ -64,7 +64,7 @@ const ClassStudentsPage: React.FC = () => {
               </svg>
             </div>
             <div>
-              <h1 className="text-lg font-bold text-ink">My Class Students</h1>
+              <h1 className="text-lg font-bold text-ink">My Students</h1>
               <p className="text-xs text-ink-muted">{user?.fullName}</p>
             </div>
           </div>
@@ -78,7 +78,9 @@ const ClassStudentsPage: React.FC = () => {
         <div className="mb-6 flex items-center justify-between">
           <div>
             <h2 className="text-2xl font-bold text-ink">Students</h2>
-            <p className="text-ink-muted text-sm mt-1">{students.length} student{students.length !== 1 ? 's' : ''} in your class</p>
+            <p className="text-ink-muted text-sm mt-1">
+              {students.length} student{students.length !== 1 ? 's' : ''} across {classCount} taught class{classCount !== 1 ? 'es' : ''}
+            </p>
           </div>
         </div>
 
@@ -114,7 +116,7 @@ const ClassStudentsPage: React.FC = () => {
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />
             </svg>
             <p className="text-ink-muted">
-              {searchQuery ? `No students found matching "${searchQuery}"` : 'No students in your class yet.'}
+              {searchQuery ? `No students found matching "${searchQuery}"` : 'No students found in classes you teach yet.'}
             </p>
           </div>
         ) : (
@@ -130,7 +132,19 @@ const ClassStudentsPage: React.FC = () => {
                 </tr>
               </thead>
               <tbody>
-                {filtered.map((s) => (
+                {Object.entries(groupedStudents).map(([className, classStudents]) => (
+                  <React.Fragment key={className}>
+                    <tr className="bg-white/5 border-b border-white/10">
+                      <td colSpan={5} className="px-6 py-3">
+                        <div className="flex items-center justify-between gap-3">
+                          <span className="text-sm font-semibold text-ink">{className}</span>
+                          <span className="text-xs text-ink-muted">
+                            {classStudents.length} student{classStudents.length !== 1 ? 's' : ''}
+                          </span>
+                        </div>
+                      </td>
+                    </tr>
+                    {classStudents.map((s) => (
                   <tr key={s.id} className="border-b border-white/5 hover:bg-white/5 transition-colors">
                     <td className="px-6 py-4">
                       <div className="flex items-center gap-3">
@@ -149,6 +163,8 @@ const ClassStudentsPage: React.FC = () => {
                       </span>
                     </td>
                   </tr>
+                    ))}
+                  </React.Fragment>
                 ))}
               </tbody>
             </table>

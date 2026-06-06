@@ -22,7 +22,42 @@ const updateKnowledgeSchema = z.object({
 
 export const knowledgeRouter = Router();
 
-// All routes require 'manage:knowledge' permission (blocks students)
+function csvEscape(value: unknown): string {
+  const normalized = value instanceof Date ? value.toISOString() : String(value ?? '');
+  return `"${normalized.replace(/"/g, '""')}"`;
+}
+
+/**
+ * GET /api/v1/knowledge/export
+ * Export scoped knowledge entries as CSV. Read-only export is available to all roles.
+ */
+knowledgeRouter.get('/export', requirePermission('view:reports'), async (req: Request, res: Response): Promise<void> => {
+  try {
+    const entries = await knowledgeService.listAll(req.user);
+    const rows = [
+      ['Title', 'Category', 'Scope', 'Creator', 'Creator Role', 'Created At', 'Updated At', 'Content'],
+      ...entries.map((entry) => [
+        entry.title,
+        entry.category,
+        entry.scopeLevel,
+        entry.creatorName,
+        entry.creatorRole,
+        entry.createdAt,
+        entry.updatedAt,
+        entry.content,
+      ]),
+    ];
+    const csv = rows.map((row) => row.map(csvEscape).join(',')).join('\n');
+    res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+    res.setHeader('Content-Disposition', 'attachment; filename="sams-knowledge-export.csv"');
+    res.send(csv);
+  } catch (err) {
+    if (err instanceof AppError) throw err;
+    throw new AppError(500, 'INTERNAL_ERROR', 'Failed to export knowledge entries');
+  }
+});
+
+// Management routes require 'manage:knowledge' permission (blocks students from edits)
 knowledgeRouter.use(requirePermission('manage:knowledge'));
 
 /**

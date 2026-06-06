@@ -54,6 +54,11 @@ async function deleteKnowledgeEntry(id: string): Promise<void> {
   await apiClient.delete(`/knowledge/${id}`);
 }
 
+async function exportKnowledgeEntries(): Promise<Blob> {
+  const { data } = await apiClient.get('/knowledge/export', { responseType: 'blob' });
+  return data;
+}
+
 // ─── Scope Badge Component ───────────────────────────────────────────────────
 
 const ScopeBadge: React.FC<{ scope: 'school' | 'department' | 'class' }> = ({ scope }) => {
@@ -276,6 +281,7 @@ const KnowledgeManagementPage: React.FC = () => {
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [total, setTotal] = useState(0);
+  const [exporting, setExporting] = useState(false);
   const pageSize = 20;
 
   // Modal state
@@ -366,6 +372,26 @@ const KnowledgeManagementPage: React.FC = () => {
     }
   };
 
+  const handleExport = async () => {
+    setExporting(true);
+    setError('');
+    try {
+      const blob = await exportKnowledgeEntries();
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `sams-knowledge-${new Date().toISOString().slice(0, 10)}.csv`;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(url);
+    } catch (err: any) {
+      setError(err?.response?.data?.message || 'Failed to export knowledge entries');
+    } finally {
+      setExporting(false);
+    }
+  };
+
   const formatDate = (dateStr: string) => {
     return new Date(dateStr).toLocaleDateString('en-US', {
       year: 'numeric',
@@ -406,15 +432,27 @@ const KnowledgeManagementPage: React.FC = () => {
             <h2 className="text-3xl font-bold text-ink mb-1">Knowledge Base</h2>
             <p className="text-ink-muted">{total} {total === 1 ? 'entry' : 'entries'} available</p>
           </div>
-          <button
-            onClick={handleCreate}
-            className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-medium text-ink bg-gradient-to-r from-indigo-500 to-indigo-700 hover:from-indigo-600 hover:to-indigo-700 shadow-lg shadow-indigo-500/20 transition-all hover:scale-[1.02]"
-          >
-            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-            </svg>
-            Add Entry
-          </button>
+          <div className="flex items-center gap-3">
+            <button
+              onClick={handleExport}
+              disabled={exporting}
+              className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium text-ink-muted border border-line hover:bg-white/10 hover:text-ink disabled:opacity-50 transition-all"
+            >
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1M8 12l4 4m0 0l4-4m-4 4V4" />
+              </svg>
+              {exporting ? 'Exporting...' : 'Export CSV'}
+            </button>
+            <button
+              onClick={handleCreate}
+              className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-medium text-ink bg-gradient-to-r from-indigo-500 to-indigo-700 hover:from-indigo-600 hover:to-indigo-700 shadow-lg shadow-indigo-500/20 transition-all hover:scale-[1.02]"
+            >
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+              </svg>
+              Add Entry
+            </button>
+          </div>
         </div>
 
         {/* Role scope guide */}

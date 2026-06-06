@@ -6,7 +6,7 @@ import { licenseService } from './licenseService';
 import { AppError } from '../middleware/errors';
 import { assertPhoneAvailableInSchool, onboardPhoneForSms, optionalPhoneForStorage } from './phoneOnboardingService';
 import { buildRegistrationLinkUrl } from '../lib/registrationLinkUrl';
-import { resolveTeacherClassId } from '../lib/teacherScope';
+import { resolveTeacherManagedClassIds } from '../lib/teacherScope';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -110,7 +110,13 @@ export class RegistrationLinkService {
         throw new AppError(403, 'FORBIDDEN', 'Teacher account not found');
       }
       departmentId = teacher.departmentId ?? departmentId;
-      classId = (await resolveTeacherClassId(creatorId, teacher.classId ?? classId)) ?? undefined;
+      const managedClassIds = await resolveTeacherManagedClassIds(creatorId, teacher.classId);
+      if (classId && !managedClassIds.includes(classId)) {
+        throw new AppError(403, 'FORBIDDEN', 'Teachers can only generate student registration links for classes they manage');
+      }
+      if (!classId && managedClassIds.length === 1) {
+        classId = managedClassIds[0];
+      }
       if (!classId) {
         throw new AppError(400, 'CLASS_REQUIRED', 'Teachers must be assigned to a class before generating student registration links');
       }

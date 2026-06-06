@@ -1,6 +1,6 @@
 import { UserRole } from '@sams/shared';
 import type { ActionHandler, ActionResult, ActionScope } from '../roleActionRegistry';
-import { resolveTeacherClassId } from '../../../lib/teacherScope';
+import { resolveTeacherManagedClassIds } from '../../../lib/teacherScope';
 import { registrationLinkService } from '../../registrationLinkService';
 
 /** Regex patterns for inviting students via registration link (not direct user create). */
@@ -82,7 +82,17 @@ export const createRegistrationLinkHandler: ActionHandler = async (
       };
     }
 
-    classId = classId ?? (await resolveTeacherClassId(scope.userId, scope.classId)) ?? undefined;
+    const managedClassIds = await resolveTeacherManagedClassIds(scope.userId, scope.classId);
+    if (classId && !managedClassIds.includes(classId)) {
+      return {
+        answer:
+          'You can only generate student registration links for classes you manage as class teacher. ' +
+          'Use **Registration Links** (`/admin/links`) after your HOD or School Admin assigns the class to you.',
+      };
+    }
+    if (!classId && managedClassIds.length === 1) {
+      classId = managedClassIds[0];
+    }
     if (!classId) {
       return {
         answer:

@@ -625,9 +625,9 @@ function getQuickActionGroups(role?: UserRole): QuickActionGroup[] {
         {
           title: 'Attendance',
           actions: [
-            { to: '/sessions', label: 'Sign In Students', subtitle: 'Start session & QR', icon: ICONS.qr, variant: 'signin' },
-            { to: '/attendance', label: 'Mark Attendance', subtitle: 'Manual roll call', icon: ICONS.clipboard, variant: 'attendance' },
-            { to: '/biometric/attendance', label: 'Face Scan', subtitle: 'Biometric check-in', icon: ICONS.check, variant: 'attendance' },
+            { to: '/sessions', label: 'QR / Link Session', subtitle: 'Start session and share check-in link', icon: ICONS.qr, variant: 'signin' },
+            { to: '/attendance', label: 'Manual Attendance', subtitle: 'Roll call and corrections', icon: ICONS.clipboard, variant: 'attendance' },
+            { to: '/biometric/attendance', label: 'Face/Biometric Scan', subtitle: 'Camera sign-in for enrolled students', icon: ICONS.check, variant: 'attendance' },
           ],
         },
         {
@@ -923,14 +923,15 @@ interface TeacherStudentPreview {
   fullName: string;
   admissionNumber?: string | null;
   isClassRep?: boolean;
+  classId?: string | null;
+  className?: string | null;
 }
 
 const TeacherClassPanel: React.FC<{ classId?: string; attendanceRate?: string }> = ({
-  classId,
   attendanceRate,
 }) => {
   const [students, setStudents] = useState<TeacherStudentPreview[]>([]);
-  const [className, setClassName] = useState<string | null>(null);
+  const [classSummary, setClassSummary] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -939,26 +940,24 @@ const TeacherClassPanel: React.FC<{ classId?: string; attendanceRate?: string }>
     async function load() {
       setLoading(true);
       try {
-        if (!classId) {
-          if (!cancelled) {
-            setStudents([]);
-            setClassName(null);
-          }
-          return;
-        }
-
-        const [rosterRes, classesRes] = await Promise.allSettled([
-          apiClient.get('/users/class-roster'),
-          apiClient.get('/classes'),
-        ]);
-
-        if (!cancelled && rosterRes.status === 'fulfilled') {
-          setStudents(Array.isArray(rosterRes.value.data) ? rosterRes.value.data : []);
-        }
-        if (!cancelled && classesRes.status === 'fulfilled') {
-          const classes = Array.isArray(classesRes.value.data) ? classesRes.value.data : [];
-          const match = classes.find((c: { id: string; name?: string }) => c.id === classId);
-          setClassName(match?.name ?? null);
+        const { data } = await apiClient.get('/users/class-roster');
+        if (!cancelled) {
+          const roster = Array.isArray(data) ? data : [];
+          const classNames = Array.from(
+            new Set(
+              roster
+                .map((student: TeacherStudentPreview) => student.className)
+                .filter((name: string | null | undefined): name is string => !!name),
+            ),
+          );
+          setStudents(roster);
+          setClassSummary(
+            classNames.length === 0
+              ? null
+              : classNames.length === 1
+                ? classNames[0]
+                : `${classNames.length} taught classes`,
+          );
         }
       } catch {
         // Non-critical widget
@@ -971,24 +970,7 @@ const TeacherClassPanel: React.FC<{ classId?: string; attendanceRate?: string }>
     return () => {
       cancelled = true;
     };
-  }, [classId]);
-
-  if (!classId) {
-    return (
-      <div
-        className="surface-panel alert-warning min-h-[280px]"
-        style={{ animation: 'fadeInUp 0.5s ease-out 0.7s forwards', opacity: 0 }}
-      >
-        <h3 className="dash-section-title text-indigo-300 mb-2">No class assigned</h3>
-        <p className="text-sm text-ink-muted mb-4">
-          You must be assigned as class teacher before you can see students. Ask your HOD or school admin to assign your class in user management.
-        </p>
-        <Link to="/profile" className="text-sm text-brand hover:text-brand-hover">
-          View profile →
-        </Link>
-      </div>
-    );
-  }
+  }, []);
 
   const preview = students.slice(0, 5);
 
@@ -1005,8 +987,8 @@ const TeacherClassPanel: React.FC<{ classId?: string; attendanceRate?: string }>
             </svg>
           </div>
           <div>
-            <h3 className="dash-section-title">My Class</h3>
-            {className && <p className="text-xs text-ink-muted">{className}</p>}
+            <h3 className="dash-section-title">My Taught Classes</h3>
+            {classSummary && <p className="text-xs text-ink-muted">{classSummary}</p>}
           </div>
         </div>
         <span className="text-sm font-semibold text-indigo-400">
@@ -1027,7 +1009,7 @@ const TeacherClassPanel: React.FC<{ classId?: string; attendanceRate?: string }>
       </div>
 
       <div className="surface-muted-row mb-4">
-        <span className="text-sm text-ink-muted">Class attendance rate</span>
+        <span className="text-sm text-ink-muted">Attendance rate</span>
         <span className="text-sm font-semibold text-indigo-400">{attendanceRate ?? '—'}</span>
       </div>
 
@@ -1038,7 +1020,7 @@ const TeacherClassPanel: React.FC<{ classId?: string; attendanceRate?: string }>
           ))}
         </div>
       ) : preview.length === 0 ? (
-        <p className="text-sm text-ink-subtle text-center py-4">No students in this class yet.</p>
+        <p className="text-sm text-ink-subtle text-center py-4">No students found in classes you teach yet.</p>
       ) : (
         <ul className="space-y-2">
           {preview.map((s) => (
@@ -1047,9 +1029,9 @@ const TeacherClassPanel: React.FC<{ classId?: string; attendanceRate?: string }>
               className="surface-muted-row"
             >
               <span className="text-sm text-ink">{s.fullName}</span>
-              {s.isClassRep && (
-                <span className="text-xs text-brand font-medium">Class rep</span>
-              )}
+              <span className="text-xs text-ink-muted">
+                {s.className || (s.isClassRep ? 'Class rep' : '')}
+              </span>
             </li>
           ))}
           {students.length > preview.length && (
@@ -1331,19 +1313,39 @@ const DashboardPage: React.FC = () => {
               </p>
               {user?.role === UserRole.TEACHER && !user?.classId && (
                 <p className="mt-3 text-sm text-ink-muted max-w-lg">
-                  No class is assigned to your account yet — student lists and class stats stay empty until an admin assigns you as class teacher.
+                  Taught classes come from timetable and class-teacher assignments. If a class is missing, ask your HOD to update the timetable.
                 </p>
               )}
               {(user?.role === UserRole.TEACHER || user?.role === UserRole.HOD) && (
-                <Link
-                  to="/sessions"
-                  className="mt-4 inline-flex items-center justify-center gap-2 btn-primary py-3 px-6 text-sm w-full sm:w-auto"
-                >
-                  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={ICONS.qr} />
-                  </svg>
-                  Sign In Students
-                </Link>
+                <div className="mt-4 flex flex-col sm:flex-row gap-2">
+                  <Link
+                    to="/sessions"
+                    className="inline-flex items-center justify-center gap-2 btn-primary py-3 px-5 text-sm w-full sm:w-auto"
+                  >
+                    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={ICONS.qr} />
+                    </svg>
+                    QR Session
+                  </Link>
+                  <Link
+                    to="/attendance"
+                    className="inline-flex items-center justify-center gap-2 btn-attendance py-3 px-5 text-sm w-full sm:w-auto"
+                  >
+                    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={ICONS.clipboard} />
+                    </svg>
+                    Manual
+                  </Link>
+                  <Link
+                    to="/biometric/attendance"
+                    className="inline-flex items-center justify-center gap-2 btn-attendance py-3 px-5 text-sm w-full sm:w-auto"
+                  >
+                    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={ICONS.check} />
+                    </svg>
+                    Face/Bio
+                  </Link>
+                </div>
               )}
               {user?.role === UserRole.STUDENT && (
                 <Link

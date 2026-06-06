@@ -1,7 +1,44 @@
-import type { ActionDefinition, ActionHandler } from '../roleActionRegistry';
+import type { ActionDefinition, ActionHandler, ActionScope } from '../roleActionRegistry';
 import { listSchoolAdminHandler } from '../../../lib/schoolAdminLookup';
 import { SCHOOL_ADMIN_QUERY_PATTERNS } from '../studentContextQuery';
 import { createRegistrationLinkActionDef } from './registrationLinkAction';
+
+async function listTeacherClasses(scope: ActionScope): Promise<Array<{ id: string; name: string }>> {
+  const { prisma } = await import('../../../lib/prisma');
+  const { resolveTeacherTeachingClassIds } = await import('../../../lib/teacherScope');
+  const classIds = await resolveTeacherTeachingClassIds(scope.userId, scope.classId);
+
+  if (classIds.length === 0) return [];
+
+  return prisma.class.findMany({
+    where: { schoolId: scope.schoolId, id: { in: classIds } },
+    select: { id: true, name: true },
+    orderBy: { name: 'asc' },
+  });
+}
+
+function pickTeacherClass(
+  classes: Array<{ id: string; name: string }>,
+  params: Record<string, unknown>,
+): { id: string; name: string } | null {
+  const classId = typeof params.classId === 'string' ? params.classId : undefined;
+  if (classId) {
+    const byId = classes.find((cls) => cls.id === classId);
+    if (byId) return byId;
+  }
+
+  const className = typeof params.className === 'string' ? params.className.trim().toLowerCase() : '';
+  if (className) {
+    const byName = classes.find((cls) => cls.name.toLowerCase().includes(className));
+    if (byName) return byName;
+  }
+
+  return classes.length === 1 ? classes[0] : null;
+}
+
+function formatClassChoices(classes: Array<{ name: string }>): string {
+  return classes.map((cls) => `**${cls.name}**`).join(', ');
+}
 
 // ─── Handlers ─────────────────────────────────────────────────────────────────
 
@@ -9,15 +46,22 @@ const startSessionHandler: ActionHandler = async (params, scope) => {
   const { prisma } = await import('../../../index');
 
   const subject = params.subject as string | undefined;
+  const classes = await listTeacherClasses(scope);
+  const selectedClass = pickTeacherClass(classes, params);
 
-  if (!scope.classId) {
-    return { answer: 'Your account is not associated with a class.' };
+  if (classes.length === 0) {
+    return { answer: 'No taught classes are linked to your timetable yet.' };
+  }
+  if (!selectedClass) {
+    return {
+      answer: `Which class should this attendance session be for? Reply with one of: ${formatClassChoices(classes)}`,
+    };
   }
 
   const session = await prisma.attendanceSession.create({
     data: {
       schoolId: scope.schoolId,
-      classId: scope.classId,
+      classId: selectedClass.id,
       teacherId: scope.userId,
       subject: subject || 'General',
       isActive: true,
@@ -26,7 +70,7 @@ const startSessionHandler: ActionHandler = async (params, scope) => {
 
   return {
     answer: `✅ Attendance session started for "${subject || 'General'}".`,
-    data: { sessionId: session.id },
+    data: { sessionId: session.id, classId: selectedClass.id },
   };
 };
 
@@ -68,6 +112,7 @@ const markAttendanceHandler: ActionHandler = async (params, scope) => {
     where: {
       schoolId: scope.schoolId,
       role: 'STUDENT',
+      classId: activeSession.classId,
       fullName: { contains: studentName, mode: 'insensitive' },
     },
   });
@@ -125,8 +170,44 @@ const viewClassRosterHandler: ActionHandler = async (_params, scope) => {
   };
 };
 
+const viewTaughtClassRosterHandler: ActionHandler = async (_params, scope) => {
+  const { prisma } = await import('../../../index');
+  const classes = await listTeacherClasses(scope);
+
+  if (classes.length === 0) {
+    return { answer: 'No taught classes are linked to your timetable yet.' };
+  }
+
+  const classIds = classes.map((cls) => cls.id);
+  const students = await prisma.user.findMany({
+    where: { schoolId: scope.schoolId, classId: { in: classIds }, role: 'STUDENT' },
+    select: { fullName: true, classId: true },
+    orderBy: [{ classId: 'asc' }, { fullName: 'asc' }],
+  });
+
+  if (students.length === 0) {
+    return {
+      answer: 'No students are enrolled in your taught classes yet.',
+      data: { classIds, count: 0 },
+    };
+  }
+
+  const sections = classes
+    .map((cls) => {
+      const rows = students.filter((student) => student.classId === cls.id);
+      if (rows.length === 0) return null;
+      return `**${cls.name}**\n${rows.map((student, i) => `${i + 1}. ${student.fullName}`).join('\n')}`;
+    })
+    .filter(Boolean)
+    .join('\n\n');
+
+  return {
+    answer: `Class roster (${students.length} students)\n\n${sections}`,
+    data: { classIds, count: students.length },
+  };
+};
+
 const sendClassMessageHandler: ActionHandler = async (params, scope) => {
-  const { resolveTeacherClassId } = await import('../../../lib/teacherScope');
   const {
     assertAiNotificationChannels,
     ScopedNotificationError,
@@ -141,9 +222,15 @@ const sendClassMessageHandler: ActionHandler = async (params, scope) => {
     };
   }
 
-  const classId = await resolveTeacherClassId(scope.userId, scope.classId);
-  if (!classId) {
-    return { answer: 'Your account is not associated with a class.' };
+  const classes = await listTeacherClasses(scope);
+  const selectedClass = pickTeacherClass(classes, params);
+  if (classes.length === 0) {
+    return { answer: 'No taught classes are linked to your timetable yet.' };
+  }
+  if (!selectedClass) {
+    return {
+      answer: `Which class should receive this message? Reply with one of: ${formatClassChoices(classes)}`,
+    };
   }
 
   try {
@@ -157,7 +244,7 @@ const sendClassMessageHandler: ActionHandler = async (params, scope) => {
       },
       {
         scope: 'class',
-        targetId: classId,
+        targetId: selectedClass.id,
         targetRole: 'STUDENT',
         title: (params.title as string)?.trim() || 'Class message',
         message,
@@ -171,7 +258,7 @@ const sendClassMessageHandler: ActionHandler = async (params, scope) => {
 
     return {
       answer: `✅ In-app message sent to ${result.recipientCount} student(s) in your class. (SMS is not available via AI — use the Notifications page if your school admin enables SMS.)`,
-      data: { batchId: result.batchId, recipientCount: result.recipientCount, classId },
+      data: { batchId: result.batchId, recipientCount: result.recipientCount, classId: selectedClass.id },
     };
   } catch (err) {
     if (err instanceof ScopedNotificationError) {
@@ -250,7 +337,7 @@ export const teacherActions: ActionDefinition[] = [
     ],
     extractParams: () => ({}),
     descriptionTemplate: () => 'List students in your assigned class.',
-    handler: viewClassRosterHandler,
+    handler: viewTaughtClassRosterHandler,
   },
   {
     action: 'send_class_message',

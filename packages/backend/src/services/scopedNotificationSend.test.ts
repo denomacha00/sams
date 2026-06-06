@@ -1,13 +1,13 @@
 import { describe, expect, it, vi, beforeEach } from 'vitest';
 import { UserRole } from '@sams/shared';
 
-const { prismaMock, resolveTeacherClassIdMock } = vi.hoisted(() => ({
+const { prismaMock, resolveTeacherTeachingClassIdsMock } = vi.hoisted(() => ({
   prismaMock: {
     user: { findMany: vi.fn() },
     class: { findUnique: vi.fn() },
     notification: { createMany: vi.fn() },
   },
-  resolveTeacherClassIdMock: vi.fn(),
+  resolveTeacherTeachingClassIdsMock: vi.fn(),
 }));
 
 vi.mock('../lib/prisma', () => ({ prisma: prismaMock }));
@@ -15,7 +15,7 @@ vi.mock('../lib/socket', () => ({
   getSocketIO: () => ({ to: () => ({ emit: vi.fn() }) }),
 }));
 vi.mock('../lib/teacherScope', () => ({
-  resolveTeacherClassId: resolveTeacherClassIdMock,
+  resolveTeacherTeachingClassIds: resolveTeacherTeachingClassIdsMock,
 }));
 vi.mock('../lib/hodScope', () => ({
   resolveHodDepartmentId: vi.fn(async (user: { departmentId?: string }) => user.departmentId),
@@ -32,6 +32,7 @@ import {
 describe('scopedNotificationSend RBAC', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    resolveTeacherTeachingClassIdsMock.mockResolvedValue(['class-1']);
     prismaMock.user.findMany.mockResolvedValue([{ id: 'u1', phone: null }]);
     prismaMock.notification.createMany.mockResolvedValue({ count: 1 });
   });
@@ -46,7 +47,6 @@ describe('scopedNotificationSend RBAC', () => {
   });
 
   it('allows TEACHER class in-app to own class only', async () => {
-    resolveTeacherClassIdMock.mockResolvedValue('class-1');
     const result = await sendScopedNotification(
       {
         sub: 't1',
@@ -73,23 +73,31 @@ describe('scopedNotificationSend RBAC', () => {
   });
 
   it('denies TEACHER school scope', async () => {
-    resolveTeacherClassIdMock.mockResolvedValue('class-1');
     await expect(
       sendScopedNotification(
         { sub: 't1', role: UserRole.TEACHER, schoolId: 'school-1', classId: 'class-1' },
         { scope: 'school', message: 'hi', channels: ['inapp'] },
       ),
-    ).rejects.toMatchObject({ message: expect.stringContaining('only send to their class') });
+    ).rejects.toMatchObject({ message: expect.stringContaining('classes they teach') });
   });
 
   it('denies TEACHER wrong class id', async () => {
-    resolveTeacherClassIdMock.mockResolvedValue('class-1');
     await expect(
       sendScopedNotification(
         { sub: 't1', role: UserRole.TEACHER, schoolId: 'school-1', classId: 'class-1' },
         { scope: 'class', targetId: 'other-class', message: 'hi', channels: ['inapp'] },
       ),
     ).rejects.toMatchObject({ code: 'FORBIDDEN' });
+  });
+
+  it('requires a class choice when TEACHER teaches multiple classes and targetId is omitted', async () => {
+    resolveTeacherTeachingClassIdsMock.mockResolvedValue(['class-1', 'class-2']);
+    await expect(
+      sendScopedNotification(
+        { sub: 't1', role: UserRole.TEACHER, schoolId: 'school-1', classId: 'class-1' },
+        { scope: 'class', message: 'hi', channels: ['inapp'] },
+      ),
+    ).rejects.toMatchObject({ code: 'VALIDATION_ERROR' });
   });
 
   it('denies HOD school-wide scope', async () => {

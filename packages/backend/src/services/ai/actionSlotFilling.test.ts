@@ -12,6 +12,8 @@ vi.mock('../../lib/prisma', () => ({
 
 vi.mock('../../lib/teacherScope', () => ({
   resolveTeacherClassId: vi.fn().mockResolvedValue('class-teacher-1'),
+  resolveTeacherManagedClassIds: vi.fn().mockResolvedValue(['class-teacher-1']),
+  resolveTeacherTeachingClassIds: vi.fn().mockResolvedValue(['class-teacher-1']),
 }));
 
 import { prisma } from '../../lib/prisma';
@@ -146,7 +148,11 @@ describe('actionSlotFilling', () => {
     expect(params.schoolName).toBeUndefined();
   });
 
-  it('teacher send_class_message only needs message', async () => {
+  it('teacher send_class_message only needs message when one taught class exists', async () => {
+    vi.mocked(prisma.class.findMany).mockResolvedValue([
+      { id: 'class-teacher-1', name: 'Form 1A' },
+    ] as any);
+
     const teacher = {
       sub: 't1',
       role: UserRole.TEACHER,

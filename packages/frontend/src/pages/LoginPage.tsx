@@ -5,6 +5,7 @@ import apiClient from '../services/apiClient';
 import { clearAuthState } from '../lib/clearAuthState';
 import { UserRole } from '@sams/shared';
 import { redirectToSuperAdminPortal } from '../utils/superAdminPortal';
+import { base64ToBuffer, bufferToBase64 } from '../lib/webauthnEncoding';
 
 const LoginPage: React.FC = () => {
   const [identifier, setIdentifier] = useState('');
@@ -19,9 +20,7 @@ const LoginPage: React.FC = () => {
   const authNotice =
     authReason === 'school_suspended'
       ? 'Your school was suspended. If access has been restored, please sign in again.'
-      : authReason === 'session_expired'
-        ? 'Your session ended. Please sign in again.'
-        : null;
+      : null;
   const [otpStep, setOtpStep] = useState(false);
   const [otpChallenge, setOtpChallenge] = useState('');
   const [otpCode, setOtpCode] = useState('');
@@ -57,7 +56,13 @@ const LoginPage: React.FC = () => {
   );
 
   useEffect(() => {
-    if (authReason === 'session_expired' || authReason === 'school_suspended') {
+    if (authReason === 'session_expired') {
+      clearAuthState();
+      window.history.replaceState(null, '', '/login');
+      return;
+    }
+
+    if (authReason === 'school_suspended') {
       clearAuthState({ markSuspended: authReason === 'school_suspended' });
       return;
     }
@@ -101,12 +106,12 @@ const LoginPage: React.FC = () => {
       const { data: options } = await apiClient.post('/auth/webauthn/authenticate/options', {});
 
       // Convert base64 challenge to ArrayBuffer
-      const challenge = Uint8Array.from(atob(options.challenge), (c) => c.charCodeAt(0));
+      const challenge = base64ToBuffer(options.challenge);
 
       // Convert allowCredentials IDs from base64
       const allowCredentials = (options.allowCredentials || []).map((cred: any) => ({
         ...cred,
-        id: Uint8Array.from(atob(cred.id), (c) => c.charCodeAt(0)),
+        id: base64ToBuffer(cred.id),
       }));
 
       // Step 2: Request credential from browser (triggers fingerprint prompt)
@@ -128,16 +133,12 @@ const LoginPage: React.FC = () => {
 
       const response = credential.response as AuthenticatorAssertionResponse;
 
-      // Convert ArrayBuffers to base64 for transport
-      const toBase64 = (buffer: ArrayBuffer) =>
-        btoa(String.fromCharCode(...new Uint8Array(buffer)));
-
       // Step 3: Send assertion to server for verification
       const { data: authResult } = await apiClient.post('/auth/webauthn/authenticate/verify', {
         credentialId: credential.id,
-        authenticatorData: toBase64(response.authenticatorData),
-        clientDataJSON: toBase64(response.clientDataJSON),
-        signature: toBase64(response.signature),
+        authenticatorData: bufferToBase64(response.authenticatorData),
+        clientDataJSON: bufferToBase64(response.clientDataJSON),
+        signature: bufferToBase64(response.signature),
       });
 
       // Step 4: Store tokens and redirect

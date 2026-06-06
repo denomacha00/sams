@@ -394,6 +394,19 @@ interface TimetableSlot {
   endTime: string;
 }
 
+interface ExistingTimetableBooking {
+  classId: string;
+  teacherId: string;
+  subject: string;
+  dayOfWeek: number;
+  startTime: string;
+}
+
+interface SubjectCatalog {
+  byDepartment: Map<string, string[]>;
+  schoolWide: string[];
+}
+
 /**
  * Tracks teacher bookings to prevent conflicts.
  * Key format: `${teacherId}:${dayOfWeek}:${startTime}`
@@ -477,6 +490,39 @@ class ScheduleTracker {
     }
     subjectDayMap.get(day)!.add(subject);
   }
+
+  seed(bookings: ExistingTimetableBooking[]): void {
+    for (const booking of bookings) {
+      this.book(
+        booking.teacherId,
+        booking.classId,
+        booking.dayOfWeek,
+        booking.startTime,
+        booking.subject,
+      );
+    }
+  }
+}
+
+function uniqueSubjects(subjects: string[]): string[] {
+  const seen = new Set<string>();
+  const result: string[] = [];
+
+  for (const subject of subjects) {
+    const trimmed = subject.trim();
+    const key = trimmed.toLowerCase();
+    if (!trimmed || seen.has(key)) continue;
+    seen.add(key);
+    result.push(trimmed);
+  }
+
+  return result;
+}
+
+function getSubjectsForClass(cls: ClassInfo, catalog: SubjectCatalog): string[] {
+  const departmentSubjects = catalog.byDepartment.get(cls.departmentId) ?? [];
+  const subjects = departmentSubjects.length > 0 ? departmentSubjects : catalog.schoolWide;
+  return subjects.length > 0 ? subjects : DEFAULT_SUBJECTS;
 }
 
 
@@ -495,8 +541,11 @@ function generateTimetableSlots(
   schoolId: string,
   classes: ClassInfo[],
   teachers: TeacherInfo[],
+  existingBookings: ExistingTimetableBooking[],
+  subjectCatalog: SubjectCatalog,
 ): { slots: TimetableSlot[]; skipped: number; stats: Record<string, number> } {
   const tracker = new ScheduleTracker();
+  tracker.seed(existingBookings);
   const slots: TimetableSlot[] = [];
   let skipped = 0;
   const stats: Record<string, number> = {};
@@ -528,8 +577,8 @@ function generateTimetableSlots(
       continue;
     }
 
-    // Create a subject rotation for this class
-    const subjects = [...DEFAULT_SUBJECTS];
+    // Create a subject rotation for this class from existing school/department data when available.
+    const subjects = getSubjectsForClass(cls, subjectCatalog);
     let subjectPointer = 0;
 
     for (const day of DAYS) {
@@ -690,9 +739,44 @@ async function handleGenerateTimetable(
     };
   }
 
-  // Get all teachers in the school
+  const targetClassIds = targetClasses.map((c) => c.id);
+
+  const subjectRows = await prisma.timetableEntry.findMany({
+    where: { schoolId },
+    select: {
+      subject: true,
+      class: { select: { departmentId: true } },
+    },
+  });
+
+  const subjectCatalog: SubjectCatalog = {
+    byDepartment: new Map(),
+    schoolWide: uniqueSubjects(subjectRows.map((row) => row.subject)),
+  };
+  for (const row of subjectRows) {
+    const departmentId = row.class.departmentId;
+    const existing = subjectCatalog.byDepartment.get(departmentId) ?? [];
+    existing.push(row.subject);
+    subjectCatalog.byDepartment.set(departmentId, uniqueSubjects(existing));
+  }
+
+  const existingBookings = await prisma.timetableEntry.findMany({
+    where: {
+      schoolId,
+      classId: { notIn: targetClassIds },
+    },
+    select: {
+      classId: true,
+      teacherId: true,
+      subject: true,
+      dayOfWeek: true,
+      startTime: true,
+    },
+  });
+
+  // Get all timetable-capable staff in the school.
   const teachers: TeacherInfo[] = await prisma.user.findMany({
-    where: { schoolId, role: 'TEACHER' },
+    where: { schoolId, role: { in: [UserRole.TEACHER, UserRole.HOD] } },
     select: { id: true, fullName: true, departmentId: true },
   });
 
@@ -707,7 +791,7 @@ async function handleGenerateTimetable(
   if (remake) {
     const deleteWhere: { schoolId: string; classId?: { in: string[] } } = { schoolId };
     if (!wholeSchool) {
-      deleteWhere.classId = { in: targetClasses.map((c) => c.id) };
+      deleteWhere.classId = { in: targetClassIds };
     }
     const deleted = await prisma.timetableEntry.deleteMany({ where: deleteWhere });
     console.log(`[Timetable] Deleted ${deleted.count} existing entries (remake mode)`);
@@ -716,7 +800,7 @@ async function handleGenerateTimetable(
     const existingCount = await prisma.timetableEntry.count({
       where: {
         schoolId,
-        classId: { in: targetClasses.map((c) => c.id) },
+        classId: { in: targetClassIds },
       },
     });
 
@@ -732,7 +816,13 @@ async function handleGenerateTimetable(
 
   // Generate the timetable
   console.log(`[Timetable] Generating for ${targetClasses.length} class(es) with ${teachers.length} teacher(s)`);
-  const { slots, skipped, stats } = generateTimetableSlots(schoolId, targetClasses, teachers);
+  const { slots, skipped, stats } = generateTimetableSlots(
+    schoolId,
+    targetClasses,
+    teachers,
+    existingBookings,
+    subjectCatalog,
+  );
 
   if (slots.length === 0) {
     return {

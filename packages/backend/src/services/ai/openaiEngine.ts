@@ -27,14 +27,55 @@ export interface OpenAIQueryResult {
 
 // ─── System Prompt Builder ────────────────────────────────────────────────────
 
-const MAX_KNOWLEDGE_ENTRIES_IN_PROMPT = 24;
-const MAX_KNOWLEDGE_ENTRY_CHARS = 1_500;
-const MAX_KNOWLEDGE_SECTION_CHARS = 18_000;
+const MAX_KNOWLEDGE_ENTRIES_IN_PROMPT = 12;
+const MAX_KNOWLEDGE_ENTRY_CHARS = 900;
+const MAX_KNOWLEDGE_SECTION_CHARS = 7_000;
+const MAX_CHAT_INPUT_TOKENS = 5_500;
 
 function truncateForPrompt(value: string, maxChars: number): string {
   const trimmed = value.trim();
   if (trimmed.length <= maxChars) return trimmed;
   return `${trimmed.slice(0, maxChars)}…`;
+}
+
+function estimateTokens(text: string): number {
+  return Math.ceil(text.length / 4);
+}
+
+function trimHistoryMessages(
+  history: Array<{ role: 'user' | 'assistant'; content: string }>,
+  availableTokens: number,
+): Array<{ role: 'user' | 'assistant'; content: string }> {
+  if (availableTokens <= 0 || history.length === 0) return [];
+
+  const selected: Array<{ role: 'user' | 'assistant'; content: string }> = [];
+  let used = 0;
+
+  for (let i = history.length - 1; i >= 0; i--) {
+    const item = history[i];
+    const cost = estimateTokens(item.content);
+    if (used + cost > availableTokens) break;
+    used += cost;
+    selected.unshift(item);
+  }
+
+  return selected;
+}
+
+function buildMessagesWithinContext(
+  systemPrompt: string,
+  question: string,
+  history: Array<{ role: 'user' | 'assistant'; content: string }> = [],
+): OpenAI.Chat.Completions.ChatCompletionMessageParam[] {
+  const baseCost = estimateTokens(systemPrompt) + estimateTokens(question) + 600;
+  const availableHistoryTokens = Math.max(0, MAX_CHAT_INPUT_TOKENS - baseCost);
+  const trimmedHistory = trimHistoryMessages(history, availableHistoryTokens);
+
+  return [
+    { role: 'system', content: systemPrompt },
+    ...trimmedHistory,
+    { role: 'user', content: question },
+  ];
 }
 
 /**
@@ -662,10 +703,7 @@ export async function openaiQuery(
   const client = getOpenAIClient();
   const systemPrompt = await buildSystemPrompt(user);
 
-  const messages: OpenAI.Chat.Completions.ChatCompletionMessageParam[] = [
-    { role: 'system', content: systemPrompt },
-    { role: 'user', content: question },
-  ];
+  const messages = buildMessagesWithinContext(systemPrompt, question);
 
   try {
     // Simple chat completion without function calling (works with Groq free tier)
@@ -739,12 +777,7 @@ export async function openaiQueryWithHistory(
   const client = getOpenAIClient();
   const systemPrompt = await buildSystemPrompt(user);
 
-  // Build messages: system + history + current question
-  const messages: OpenAI.Chat.Completions.ChatCompletionMessageParam[] = [
-    { role: 'system', content: systemPrompt },
-    ...history,
-    { role: 'user', content: question },
-  ];
+  const messages = buildMessagesWithinContext(systemPrompt, question, history);
 
   try {
     const response = await client.chat.completions.create({

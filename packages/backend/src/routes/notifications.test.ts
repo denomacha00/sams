@@ -29,12 +29,12 @@ vi.mock('../lib/socket', () => ({
 }));
 
 vi.mock('../lib/teacherScope', () => ({
-  resolveTeacherClassId: vi.fn(),
+  resolveTeacherTeachingClassIds: vi.fn(),
 }));
 
 import { notificationsRouter } from './notifications';
 import { prisma } from '../lib/prisma';
-import { resolveTeacherClassId } from '../lib/teacherScope';
+import { resolveTeacherTeachingClassIds } from '../lib/teacherScope';
 import { AppError } from '../middleware/errors';
 
 function createTestApp(user: {
@@ -66,7 +66,7 @@ function createTestApp(user: {
 describe('POST /notifications/send — teacher scope', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    (resolveTeacherClassId as ReturnType<typeof vi.fn>).mockResolvedValue('class-1');
+    (resolveTeacherTeachingClassIds as ReturnType<typeof vi.fn>).mockResolvedValue(['class-1']);
     (prisma.user.findMany as ReturnType<typeof vi.fn>).mockResolvedValue([
       { id: 'student-1', phone: null },
       { id: 'student-2', phone: null },
@@ -124,7 +124,7 @@ describe('POST /notifications/send — teacher scope', () => {
       });
 
     expect(res.status).toBe(403);
-    expect(res.body.error).toMatch(/own class/i);
+    expect(res.body.error).toMatch(/classes they teach/i);
   });
 
   it('GET /sent returns batches grouped by senderId', async () => {

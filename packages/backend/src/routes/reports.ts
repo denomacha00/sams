@@ -5,7 +5,7 @@ import { requirePermission } from '../middleware/rbac';
 import { reportService } from '../services/reportService';
 import { AppError } from '../middleware/errors';
 import { prisma } from '../lib/prisma';
-import { resolveTeacherClassId } from '../lib/teacherScope';
+import { resolveTeacherTeachingClassIds } from '../lib/teacherScope';
 
 // ─── Validation Schemas ───────────────────────────────────────────────────────
 
@@ -49,16 +49,16 @@ async function assertReportScope(
   }
 
   if (role === UserRole.TEACHER) {
-    const teacherClassId = await resolveTeacherClassId(userId, userClassId);
+    const teacherClassIds = await resolveTeacherTeachingClassIds(userId, userClassId);
     if (type === 'student' && targetId) {
       const student = await prisma.user.findUnique({ where: { id: targetId }, select: { classId: true, schoolId: true } });
-      if (!student || student.schoolId !== req.schoolId || student.classId !== teacherClassId) {
-        throw new AppError(403, 'FORBIDDEN', 'Teachers can only access reports for students in their assigned class');
+      if (!student || student.schoolId !== req.schoolId || !student.classId || !teacherClassIds.includes(student.classId)) {
+        throw new AppError(403, 'FORBIDDEN', 'Teachers can only access reports for students in classes they teach');
       }
       return;
     }
-    if (type === 'class' && targetId === teacherClassId) return;
-    throw new AppError(403, 'FORBIDDEN', 'Teachers can only access their assigned class reports');
+    if (type === 'class' && targetId && teacherClassIds.includes(targetId)) return;
+    throw new AppError(403, 'FORBIDDEN', 'Teachers can only access reports for classes they teach');
   }
 
   if (role === UserRole.HOD) {
@@ -112,8 +112,9 @@ reportsRouter.get('/student/:id', requirePermission('view:reports'), async (req:
       return;
     }
 
-    // Teachers can only view reports for students in their assigned class
+    // Teachers can only view reports for students in classes they teach
     if (role === UserRole.TEACHER) {
+      const teacherClassIds = await resolveTeacherTeachingClassIds(userId, userClassId);
       const student = await prisma.user.findUnique({
         where: { id: targetStudentId },
         select: { classId: true, schoolId: true },
@@ -121,8 +122,8 @@ reportsRouter.get('/student/:id', requirePermission('view:reports'), async (req:
       if (!student || student.schoolId !== req.schoolId) {
         throw new AppError(404, 'STUDENT_NOT_FOUND', 'Student not found');
       }
-      if (student.classId !== userClassId) {
-        res.status(403).json({ error: 'Forbidden', code: 'FORBIDDEN', message: 'Teachers can only view reports for students in their assigned class' });
+      if (!student.classId || !teacherClassIds.includes(student.classId)) {
+        res.status(403).json({ error: 'Forbidden', code: 'FORBIDDEN', message: 'Teachers can only view reports for students in classes they teach' });
         return;
       }
     }
@@ -172,11 +173,11 @@ reportsRouter.get('/class/:classId', requirePermission('view:reports'), async (r
       return;
     }
 
-    // Teachers can only view reports for their assigned class
+    // Teachers can only view reports for classes they teach
     if (role === UserRole.TEACHER) {
-      const teacherClassId = await resolveTeacherClassId(req.user.sub, userClassId);
-      if (!teacherClassId || targetClassId !== teacherClassId) {
-        res.status(403).json({ error: 'Forbidden', code: 'FORBIDDEN', message: 'Teachers can only view reports for their assigned class' });
+      const teacherClassIds = await resolveTeacherTeachingClassIds(req.user.sub, userClassId);
+      if (!teacherClassIds.includes(targetClassId)) {
+        res.status(403).json({ error: 'Forbidden', code: 'FORBIDDEN', message: 'Teachers can only view reports for classes they teach' });
         return;
       }
     }

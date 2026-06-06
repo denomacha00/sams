@@ -34,12 +34,13 @@ function isLoginPath(): boolean {
 /** Clear auth and hard-navigate to login with a user-visible reason (full reload). */
 export function forceAuthRedirect(reason: AuthRedirectReason): void {
   clearAuthState({ markSuspended: reason === 'school_suspended' });
-  const params = new URLSearchParams({ reason });
-  const loginUrl = `/login?${params.toString()}`;
+  const params = reason === 'school_suspended' ? new URLSearchParams({ reason }) : null;
+  const loginUrl = params ? `/login?${params.toString()}` : '/login';
 
   // Already on login: avoid reload loops from stale rehydrate + /users/me 401 handling.
   if (isLoginPath()) {
-    if (window.location.search !== `?${params.toString()}`) {
+    const expectedSearch = params ? `?${params.toString()}` : '';
+    if (window.location.search !== expectedSearch) {
       window.history.replaceState(null, '', loginUrl);
     }
     return;
