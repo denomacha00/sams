@@ -164,7 +164,7 @@ biometricRouter.post(
         classId = session.classId;
       }
 
-      classId = classId ?? (await resolveTeacherClassId(req.user.sub, req.user.classId));
+      classId = classId ?? (await resolveTeacherClassId(req.user.sub, req.user.classId)) ?? undefined;
 
       if (!classId) {
         throw new AppError(400, 'NO_CLASS', 'No class assigned for biometric attendance');
