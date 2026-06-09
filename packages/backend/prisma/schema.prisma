@@ -410,6 +410,23 @@ model Notification {
   @@index([senderId, createdAt])
 }
 
+model NotificationAttachment {
+  id         String   @id @default(cuid())
+  schoolId   String
+  senderId   String
+  batchId    String
+  fileName   String
+  storedName String
+  mimeType   String
+  sizeBytes  Int
+  url        String
+  createdAt  DateTime @default(now())
+
+  @@index([schoolId, batchId])
+  @@index([batchId])
+  @@index([senderId, createdAt])
+}
+
 // ─── AI Knowledge Base ────────────────────────────────────────────────────────
 
 model AIKnowledge {

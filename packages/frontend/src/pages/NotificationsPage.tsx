@@ -19,6 +19,16 @@ interface Notification {
   targetId?: string | null;
   targetRole?: string | null;
   targetScopeLabel?: string | null;
+  attachments?: NotificationAttachment[];
+}
+
+interface NotificationAttachment {
+  id: string;
+  fileName: string;
+  mimeType: string;
+  sizeBytes: number;
+  url: string;
+  createdAt?: string;
 }
 
 interface SentNotification extends Notification {
@@ -74,6 +84,64 @@ function formatDateTime(dateStr: string): string {
   return `${d.toLocaleDateString([], { day: 'numeric', month: 'short', year: 'numeric' })} at ${time}`;
 }
 
+const MAX_ATTACHMENT_FILES = 5;
+const MAX_ATTACHMENT_BYTES = 10 * 1024 * 1024;
+const ATTACHMENT_ACCEPT = [
+  'image/jpeg',
+  'image/png',
+  'image/webp',
+  'image/gif',
+  'application/pdf',
+  'text/plain',
+  '.doc',
+  '.docx',
+  '.xls',
+  '.xlsx',
+  '.ppt',
+  '.pptx',
+].join(',');
+
+function resolveAttachmentUrl(url: string): string {
+  if (url.startsWith('http://') || url.startsWith('https://')) return url;
+  if (url.startsWith('/uploads')) return `${window.location.origin}${url}`;
+  const base = import.meta.env.VITE_API_BASE_URL || '/api/v1';
+  if (base.startsWith('http://') || base.startsWith('https://')) {
+    return `${new URL(base).origin}${url}`;
+  }
+  return `${window.location.origin}${url}`;
+}
+
+function formatFileSize(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+function isImageAttachment(att: NotificationAttachment): boolean {
+  return att.mimeType.startsWith('image/');
+}
+
+function renderLinkedText(text: string): React.ReactNode {
+  const urlRe = /(https?:\/\/[^\s]+|www\.[^\s]+)/gi;
+  const parts = text.split(urlRe);
+  return parts.map((part, index) => {
+    if (!part.match(urlRe)) return <React.Fragment key={index}>{part}</React.Fragment>;
+    const href = part.startsWith('http') ? part : `https://${part}`;
+    return (
+      <a
+        key={index}
+        href={href}
+        target="_blank"
+        rel="noreferrer"
+        onClick={(e) => e.stopPropagation()}
+        className="text-indigo-300 underline underline-offset-2 hover:text-indigo-200"
+      >
+        {part}
+      </a>
+    );
+  });
+}
+
 const NotificationsPage: React.FC = () => {
   const user = useAuthStore((s) => s.user);
   const accessToken = useAuthStore((s) => s.accessToken);
@@ -98,6 +166,7 @@ const NotificationsPage: React.FC = () => {
   const [targetRole, setTargetRole] = useState<TargetRole>('ALL');
   const [title, setTitle] = useState('');
   const [message, setMessage] = useState('');
+  const [selectedAttachments, setSelectedAttachments] = useState<File[]>([]);
   const [sending, setSending] = useState(false);
   const [sendError, setSendError] = useState<string | null>(null);
   const [sendSuccess, setSendSuccess] = useState(false);
@@ -284,6 +353,37 @@ const NotificationsPage: React.FC = () => {
     } catch { /* ignore */ }
   };
 
+  const handleAttachmentSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || []);
+    if (files.length === 0) return;
+
+    const remaining = MAX_ATTACHMENT_FILES - selectedAttachments.length;
+    if (remaining <= 0) {
+      setSendError(`Attach up to ${MAX_ATTACHMENT_FILES} files.`);
+      e.target.value = '';
+      return;
+    }
+
+    const validFiles: File[] = [];
+    for (const file of files.slice(0, remaining)) {
+      if (file.size > MAX_ATTACHMENT_BYTES) {
+        setSendError(`${file.name} is too large. Each attachment must be 10MB or smaller.`);
+        continue;
+      }
+      validFiles.push(file);
+    }
+
+    if (validFiles.length > 0) {
+      setSelectedAttachments((prev) => [...prev, ...validFiles]);
+      setSendError(null);
+    }
+    e.target.value = '';
+  };
+
+  const removeAttachment = (index: number) => {
+    setSelectedAttachments((prev) => prev.filter((_, i) => i !== index));
+  };
+
   const handleSend = async (e: React.FormEvent) => {
     e.preventDefault();
     setSending(true);
@@ -301,16 +401,18 @@ const NotificationsPage: React.FC = () => {
         return;
       }
 
+      const formData = new FormData();
+      formData.append('scope', scope);
+      if (effectiveTargetId) formData.append('targetId', effectiveTargetId);
+      if (targetRole !== 'ALL') formData.append('targetRole', targetRole);
+      if (title.trim()) formData.append('title', title.trim());
+      formData.append('message', message);
+      formData.append('channels', JSON.stringify(notificationChannels));
+      selectedAttachments.forEach((file) => formData.append('attachments', file));
+
       const { data } = await apiClient.post(
         '/notifications/send',
-        {
-          scope,
-          targetId: effectiveTargetId || undefined,
-          targetRole: targetRole === 'ALL' ? undefined : targetRole,
-          title: title.trim() || undefined,
-          message,
-          channels: notificationChannels,
-        },
+        formData,
         { timeout: 90_000 },
       );
 
@@ -326,6 +428,7 @@ const NotificationsPage: React.FC = () => {
       setSendSuccess(true);
       setMessage('');
       setTitle('');
+      setSelectedAttachments([]);
       if (user?.role === 'HOD' && scope === 'department' && user.departmentId) {
         setTargetId(user.departmentId);
       } else if (user?.role !== 'TEACHER') {
@@ -476,6 +579,60 @@ const NotificationsPage: React.FC = () => {
   const displayList = folder === 'inbox' ? notifications : sentMessages;
   const listLoading = folder === 'inbox' ? loading : sentLoading;
 
+  const renderAttachments = (attachments: NotificationAttachment[] | undefined, isSentFolder: boolean) => {
+    if (!attachments || attachments.length === 0) return null;
+
+    return (
+      <div
+        onClick={(e) => e.stopPropagation()}
+        className={`mt-3 grid gap-2 ${isSentFolder ? 'justify-items-end' : ''}`}
+      >
+        {attachments.map((att) => {
+          const href = resolveAttachmentUrl(att.url);
+          if (isImageAttachment(att)) {
+            return (
+              <a
+                key={att.id}
+                href={href}
+                target="_blank"
+                rel="noreferrer"
+                className={`block overflow-hidden rounded-xl border border-line bg-surface-elevated hover:border-indigo-500/40 transition-all ${isSentFolder ? 'ml-auto' : ''}`}
+              >
+                <img
+                  src={href}
+                  alt={att.fileName}
+                  className="max-h-44 w-full max-w-xs object-cover"
+                  loading="lazy"
+                />
+                <div className="px-3 py-2 text-xs text-ink-muted truncate">
+                  {att.fileName} · {formatFileSize(att.sizeBytes)}
+                </div>
+              </a>
+            );
+          }
+
+          return (
+            <a
+              key={att.id}
+              href={href}
+              target="_blank"
+              rel="noreferrer"
+              className={`flex items-center gap-3 rounded-xl border border-line bg-surface-elevated px-3 py-2 text-left hover:border-indigo-500/40 transition-all max-w-full ${isSentFolder ? 'ml-auto' : ''}`}
+            >
+              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-indigo-500/15 text-xs font-bold text-indigo-200">
+                {att.mimeType === 'application/pdf' ? 'PDF' : 'FILE'}
+              </span>
+              <span className="min-w-0">
+                <span className="block truncate text-sm font-medium text-ink">{att.fileName}</span>
+                <span className="block text-xs text-ink-subtle">{formatFileSize(att.sizeBytes)}</span>
+              </span>
+            </a>
+          );
+        })}
+      </div>
+    );
+  };
+
   const renderMessageCard = (notif: Notification, isSentFolder: boolean) => {
     const senderDisplay = truncateName(notif.senderName || (notif.senderId === null ? 'System' : 'Deleted User'));
     const roleDisplay = formatRole(notif.senderRole);
@@ -545,8 +702,9 @@ const NotificationsPage: React.FC = () => {
                 ? 'ml-auto max-w-[92%] bg-indigo-600/18 border-indigo-500/25 text-indigo-50'
                 : 'max-w-[92%] bg-surface-muted border-line text-ink-muted'
             }`}>
-              <p className="text-sm leading-relaxed whitespace-pre-wrap">{notif.message}</p>
+              <p className="text-sm leading-relaxed whitespace-pre-wrap">{renderLinkedText(notif.message)}</p>
             </div>
+            {renderAttachments(notif.attachments, isSentFolder)}
           </div>
 
           <div className="flex items-center gap-1 flex-shrink-0">
@@ -785,6 +943,45 @@ const NotificationsPage: React.FC = () => {
                 <textarea value={message} onChange={(e) => setMessage(e.target.value)} required rows={4}
                   className="w-full input-field placeholder-ink-subtle focus:outline-none focus:ring-2 focus:ring-indigo-500/40 transition-all resize-none"
                   placeholder="Type your message..." />
+              </div>
+
+              {/* Attachments */}
+              <div>
+                <label className="block text-sm font-semibold text-ink-muted mb-1.5">Attachments</label>
+                <div className="rounded-xl border border-dashed border-line bg-surface-muted/60 p-4">
+                  <input
+                    type="file"
+                    multiple
+                    accept={ATTACHMENT_ACCEPT}
+                    onChange={handleAttachmentSelect}
+                    disabled={selectedAttachments.length >= MAX_ATTACHMENT_FILES}
+                    className="block w-full text-sm text-ink-muted file:mr-3 file:rounded-lg file:border-0 file:bg-indigo-600 file:px-3 file:py-2 file:text-sm file:font-semibold file:text-white hover:file:bg-indigo-500 disabled:opacity-60"
+                  />
+                  <p className="mt-2 text-xs text-ink-subtle">
+                    Add images, PDFs, Office documents, or text files. Up to {MAX_ATTACHMENT_FILES} files, 10MB each.
+                  </p>
+                  {selectedAttachments.length > 0 && (
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      {selectedAttachments.map((file, index) => (
+                        <span
+                          key={`${file.name}-${file.size}-${index}`}
+                          className="inline-flex max-w-full items-center gap-2 rounded-lg border border-line bg-surface-elevated px-2.5 py-1.5 text-xs text-ink-muted"
+                        >
+                          <span className="truncate max-w-[14rem]">{file.name}</span>
+                          <span className="text-ink-subtle">{formatFileSize(file.size)}</span>
+                          <button
+                            type="button"
+                            onClick={() => removeAttachment(index)}
+                            className="rounded px-1 text-ink-subtle hover:bg-white/10 hover:text-red-300"
+                            aria-label={`Remove ${file.name}`}
+                          >
+                            x
+                          </button>
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                </div>
               </div>
 
               {/* Channels */}

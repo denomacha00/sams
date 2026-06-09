@@ -1,9 +1,16 @@
 import { Router, type Request, type Response, type NextFunction } from 'express';
 import { z } from 'zod';
 import { createId } from '@paralleldrive/cuid2';
+import fs from 'fs';
+import path from 'path';
+import multer from 'multer';
 import { prisma } from '../lib/prisma';
 import { getSocketIO } from '../lib/socket';
 import { AppError } from '../middleware/errors';
+import {
+  NOTIFICATION_ATTACHMENTS_DIR,
+  notificationAttachmentPublicUrl,
+} from '../config/uploads';
 import {
   ScopedNotificationError,
   sendScopedNotification,
@@ -39,6 +46,195 @@ const testEmailSchema = z.object({
   to: z.string().email(),
   subject: z.string().min(1).max(200).optional(),
 });
+
+const ATTACHMENT_MAX_BYTES = 10 * 1024 * 1024;
+const ATTACHMENT_MAX_FILES = 5;
+const ATTACHMENT_MIME_TYPES = new Map<string, string>([
+  ['image/jpeg', '.jpg'],
+  ['image/png', '.png'],
+  ['image/webp', '.webp'],
+  ['image/gif', '.gif'],
+  ['application/pdf', '.pdf'],
+  ['text/plain', '.txt'],
+  ['application/msword', '.doc'],
+  ['application/vnd.openxmlformats-officedocument.wordprocessingml.document', '.docx'],
+  ['application/vnd.ms-excel', '.xls'],
+  ['application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', '.xlsx'],
+  ['application/vnd.ms-powerpoint', '.ppt'],
+  ['application/vnd.openxmlformats-officedocument.presentationml.presentation', '.pptx'],
+]);
+
+type AttachmentResponse = {
+  id: string;
+  fileName: string;
+  mimeType: string;
+  sizeBytes: number;
+  url: string;
+  createdAt: Date;
+};
+
+const attachmentUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: ATTACHMENT_MAX_BYTES, files: ATTACHMENT_MAX_FILES },
+  fileFilter: (_req, file, cb) => {
+    if (ATTACHMENT_MIME_TYPES.has(file.mimetype)) {
+      cb(null, true);
+      return;
+    }
+    cb(new AppError(400, 'INVALID_ATTACHMENT', 'Only images, PDF, Office documents, and text files are allowed'));
+  },
+});
+
+function uploadNotificationAttachments(req: Request, res: Response, next: NextFunction): void {
+  attachmentUpload.array('attachments', ATTACHMENT_MAX_FILES)(req, res, (err: unknown) => {
+    if (!err) {
+      next();
+      return;
+    }
+
+    if (err instanceof multer.MulterError) {
+      if (err.code === 'LIMIT_FILE_SIZE') {
+        next(new AppError(413, 'FILE_TOO_LARGE', 'Each attachment must be 10MB or smaller'));
+        return;
+      }
+      if (err.code === 'LIMIT_FILE_COUNT') {
+        next(new AppError(400, 'TOO_MANY_FILES', `Attach up to ${ATTACHMENT_MAX_FILES} files`));
+        return;
+      }
+    }
+
+    next(err instanceof AppError ? err : new AppError(400, 'INVALID_ATTACHMENT', 'Invalid attachment upload'));
+  });
+}
+
+function normalizeChannels(value: unknown): unknown {
+  if (Array.isArray(value)) return value;
+  if (typeof value !== 'string') return value;
+
+  const trimmed = value.trim();
+  if (!trimmed) return [];
+  if (trimmed.startsWith('[')) {
+    try {
+      return JSON.parse(trimmed);
+    } catch {
+      return [trimmed];
+    }
+  }
+  return trimmed.split(',').map((item) => item.trim()).filter(Boolean);
+}
+
+function normalizeOptionalString(value: unknown): unknown {
+  return typeof value === 'string' && value.trim() === '' ? undefined : value;
+}
+
+function normalizeSendNotificationBody(body: Record<string, unknown>): Record<string, unknown> {
+  return {
+    ...body,
+    targetId: normalizeOptionalString(body.targetId),
+    targetRole: normalizeOptionalString(body.targetRole),
+    title: normalizeOptionalString(body.title),
+    channels: normalizeChannels(body.channels),
+  };
+}
+
+function uploadedNotificationFiles(req: Request): Express.Multer.File[] {
+  return Array.isArray(req.files) ? (req.files as Express.Multer.File[]) : [];
+}
+
+function safeOriginalName(name: string): string {
+  return path.basename(name).replace(/[^\w.\- ()]/g, '_').slice(0, 160) || 'attachment';
+}
+
+async function saveNotificationAttachments(
+  files: Express.Multer.File[],
+  schoolId: string,
+  senderId: string,
+  batchId: string,
+): Promise<AttachmentResponse[]> {
+  if (files.length === 0) return [];
+
+  const dir = path.join(NOTIFICATION_ATTACHMENTS_DIR, schoolId, batchId);
+  await fs.promises.mkdir(dir, { recursive: true });
+
+  const rows = await Promise.all(
+    files.map(async (file) => {
+      const id = createId();
+      const ext = ATTACHMENT_MIME_TYPES.get(file.mimetype) || path.extname(file.originalname).toLowerCase() || '.bin';
+      const storedName = `${id}${ext}`;
+      const fileName = safeOriginalName(file.originalname);
+      const url = notificationAttachmentPublicUrl(schoolId, batchId, storedName);
+
+      await fs.promises.writeFile(path.join(dir, storedName), file.buffer);
+
+      return {
+        id,
+        schoolId,
+        senderId,
+        batchId,
+        fileName,
+        storedName,
+        mimeType: file.mimetype,
+        sizeBytes: file.size,
+        url,
+      };
+    }),
+  );
+
+  await prisma.notificationAttachment.createMany({ data: rows });
+
+  return rows.map(({ id, fileName, mimeType, sizeBytes, url }) => ({
+    id,
+    fileName,
+    mimeType,
+    sizeBytes,
+    url,
+    createdAt: new Date(),
+  }));
+}
+
+async function loadAttachmentsByBatch(batchIds: string[]): Promise<Map<string, AttachmentResponse[]>> {
+  const uniqueBatchIds = [...new Set(batchIds.filter(Boolean))];
+  if (uniqueBatchIds.length === 0) return new Map();
+
+  const attachments = await prisma.notificationAttachment.findMany({
+    where: { batchId: { in: uniqueBatchIds } },
+    orderBy: { createdAt: 'asc' },
+  });
+
+  const map = new Map<string, AttachmentResponse[]>();
+  for (const a of attachments) {
+    const list = map.get(a.batchId) ?? [];
+    list.push({
+      id: a.id,
+      fileName: a.fileName,
+      mimeType: a.mimeType,
+      sizeBytes: a.sizeBytes,
+      url: a.url,
+      createdAt: a.createdAt,
+    });
+    map.set(a.batchId, list);
+  }
+  return map;
+}
+
+async function deleteAttachmentsForBatch(batchId: string, senderId: string): Promise<void> {
+  const attachments = await prisma.notificationAttachment.findMany({
+    where: { batchId, senderId },
+  });
+
+  await prisma.notificationAttachment.deleteMany({ where: { batchId, senderId } });
+
+  await Promise.all(
+    attachments.map(async (a) => {
+      try {
+        const filePath = path.join(NOTIFICATION_ATTACHMENTS_DIR, a.schoolId, batchId, a.storedName);
+        await fs.promises.unlink(filePath);
+      } catch {
+        // Best effort: DB cleanup matters more than a stale file.
+      }
+    }),
+  );
+}
 
 // ─── Router ───────────────────────────────────────────────────────────────────
 
@@ -232,14 +428,19 @@ notificationsRouter.get('/sent', async (req: Request, res: Response): Promise<vo
       }
     }
 
+    const attachmentMap = await loadAttachmentsByBatch(
+      batches.map((n) => n.batchId ?? n.id).filter(Boolean),
+    );
+
     // For each batch, count recipients
     const enriched = await Promise.all(
       batches.map(async (n) => {
+        const key = n.batchId ?? n.id;
         const recipientCount = n.batchId
           ? await prisma.notification.count({ where: { batchId: n.batchId } })
           : 1;
         const targetScopeLabel = await resolveTargetScopeLabel(n.scope, n.targetId, n.targetRole);
-        return { ...n, recipientCount, targetScopeLabel };
+        return { ...n, recipientCount, targetScopeLabel, attachments: attachmentMap.get(key) ?? [] };
       }),
     );
 
@@ -277,6 +478,9 @@ notificationsRouter.get('/', async (req: Request, res: Response): Promise<void> 
     const senderMap = new Map<string, { name: string; role: string }>(
       senders.map((s) => [s.id, { name: s.fullName, role: s.role }]),
     );
+    const attachmentMap = await loadAttachmentsByBatch(
+      notifications.map((n) => n.batchId ?? n.id).filter(Boolean),
+    );
 
     const enriched = await Promise.all(
       notifications.map(async (n) => {
@@ -296,8 +500,15 @@ notificationsRouter.get('/', async (req: Request, res: Response): Promise<void> 
       }
 
       const targetScopeLabel = await resolveTargetScopeLabel(n.scope, n.targetId, n.targetRole);
+      const attachmentKey = n.batchId ?? n.id;
 
-      return { ...n, senderName, senderRole, targetScopeLabel };
+      return {
+        ...n,
+        senderName,
+        senderRole,
+        targetScopeLabel,
+        attachments: attachmentMap.get(attachmentKey) ?? [],
+      };
     }),
     );
 
@@ -457,11 +668,8 @@ notificationsRouter.delete('/batch/:batchId', async (req: Request, res: Response
       }
     }
 
-    if (isSchoolAdmin) {
-      await prisma.notification.deleteMany({ where: { batchId, senderId: req.user.sub } });
-    } else {
-      await prisma.notification.deleteMany({ where: { batchId, senderId: req.user.sub } });
-    }
+    await prisma.notification.deleteMany({ where: { batchId, senderId: req.user.sub } });
+    await deleteAttachmentsForBatch(batchId, req.user.sub);
 
     res.status(204).send();
   } catch (err) {
@@ -609,9 +817,9 @@ notificationsRouter.post('/reply', async (req: Request, res: Response): Promise<
  *   HOD          → their department / classes within it, any targetRole
  *   TEACHER      → their own class, targetRole=STUDENT only
  */
-notificationsRouter.post('/send', async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+notificationsRouter.post('/send', uploadNotificationAttachments, async (req: Request, res: Response, next: NextFunction): Promise<void> => {
   try {
-    const parsed = sendNotificationSchema.safeParse(req.body);
+    const parsed = sendNotificationSchema.safeParse(normalizeSendNotificationBody(req.body));
     if (!parsed.success) {
       res.status(400).json({ error: 'Validation failed', code: 'VALIDATION_ERROR', details: parsed.error.flatten().fieldErrors });
       return;
@@ -645,10 +853,18 @@ notificationsRouter.post('/send', async (req: Request, res: Response, next: Next
       return;
     }
 
+    const attachments = await saveNotificationAttachments(
+      uploadedNotificationFiles(req),
+      req.schoolId,
+      req.user.sub,
+      result.batchId,
+    );
+
     res.status(200).json({
       success: true,
       recipientCount: result.recipientCount,
       batchId: result.batchId,
+      attachments,
     });
   } catch (err) {
     if (err instanceof ScopedNotificationError) {

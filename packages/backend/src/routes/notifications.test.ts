@@ -9,6 +9,11 @@ vi.mock('../lib/prisma', () => ({
       count: vi.fn(),
       createMany: vi.fn(),
     },
+    notificationAttachment: {
+      findMany: vi.fn(),
+      createMany: vi.fn(),
+      deleteMany: vi.fn(),
+    },
     user: {
       findMany: vi.fn(),
     },
@@ -72,6 +77,9 @@ describe('POST /notifications/send — teacher scope', () => {
       { id: 'student-2', phone: null },
     ]);
     (prisma.notification.createMany as ReturnType<typeof vi.fn>).mockResolvedValue({ count: 2 });
+    (prisma.notificationAttachment.findMany as ReturnType<typeof vi.fn>).mockResolvedValue([]);
+    (prisma.notificationAttachment.createMany as ReturnType<typeof vi.fn>).mockResolvedValue({ count: 1 });
+    (prisma.notificationAttachment.deleteMany as ReturnType<typeof vi.fn>).mockResolvedValue({ count: 1 });
   });
 
   it('allows teacher to send in-app message to their class students', async () => {
@@ -194,6 +202,47 @@ describe('POST /notifications/send — teacher scope', () => {
     expect(prisma.user.findMany).toHaveBeenCalledWith(
       expect.objectContaining({
         where: expect.objectContaining({ classId: 'class-1' }),
+      }),
+    );
+  });
+
+  it('accepts an in-app attachment with a notification', async () => {
+    const request = (await import('supertest')).default;
+    const app = createTestApp({
+      sub: 'teacher-1',
+      schoolId: 'school-1',
+      role: UserRole.TEACHER,
+      classId: 'class-1',
+    });
+
+    const res = await request(app)
+      .post('/notifications/send')
+      .field('scope', 'class')
+      .field('targetId', 'class-1')
+      .field('targetRole', 'STUDENT')
+      .field('message', 'Read the attached assignment')
+      .field('channels', JSON.stringify(['inapp']))
+      .attach('attachments', Buffer.from('%PDF-1.4 test'), {
+        filename: 'assignment.pdf',
+        contentType: 'application/pdf',
+      });
+
+    expect(res.status).toBe(200);
+    expect(res.body.success).toBe(true);
+    expect(res.body.attachments).toHaveLength(1);
+    expect(res.body.attachments[0]).toMatchObject({
+      fileName: 'assignment.pdf',
+      mimeType: 'application/pdf',
+    });
+    expect(prisma.notificationAttachment.createMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.arrayContaining([
+          expect.objectContaining({
+            batchId: res.body.batchId,
+            fileName: 'assignment.pdf',
+            mimeType: 'application/pdf',
+          }),
+        ]),
       }),
     );
   });
