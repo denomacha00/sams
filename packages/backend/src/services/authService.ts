@@ -13,8 +13,8 @@ const ACCESS_TOKEN_EXPIRY = '15m';
 const REFRESH_TOKEN_EXPIRY = '30d';
 const REFRESH_TOKEN_EXPIRY_MS = 30 * 24 * 60 * 60 * 1000; // 30 days in ms
 
-const MAX_FAILED_ATTEMPTS = 5;
-const LOCKOUT_WINDOW_MS = 15 * 60 * 1000; // 15 minutes in ms
+const MAX_FAILED_ATTEMPTS = 15;
+const LOGIN_COOLDOWN_MS = 60 * 1000; // 1 minute in ms
 
 const BCRYPT_ROUNDS = 12;
 const PLATFORM_SCHOOL_CODE = 'SAMS_PLATFORM';
@@ -49,10 +49,10 @@ export class AuthService {
    * 1. Find school by schoolCode
    * 2. Find user by email OR admissionNumber within that school
    * 3. Check isLocked
-   * 4. Enforce 5-attempt / 15-min lockout window
+   * 4. Enforce temporary failed-login cooldown
    * 5. Compare bcrypt password hash
    * 6. On success: generate token pair, store hashed refresh token, log USER_LOGIN, reset failed count
-   * 7. On failure: increment failed count, lock account if threshold reached
+   * 7. On failure: increment failed count and require a short wait at threshold
    *
    * Requirements: 3.1, 3.6, 3.7, 3.8, 19.2, 19.5
    */
@@ -111,11 +111,10 @@ export class AuthService {
     const windowStart = user.failedLoginWindowStart;
     const withinWindow =
       windowStart !== null &&
-      now.getTime() - windowStart.getTime() < LOCKOUT_WINDOW_MS;
+      now.getTime() - windowStart.getTime() < LOGIN_COOLDOWN_MS;
 
     if (withinWindow && user.failedLoginCount >= MAX_FAILED_ATTEMPTS) {
-      await this.lockAccount(user.id);
-      throw new Error('ACCOUNT_LOCKED');
+      throw new Error('LOGIN_COOLDOWN');
     }
 
     if (!passwordVerified) {
@@ -134,8 +133,7 @@ export class AuthService {
         });
 
         if (newCount >= MAX_FAILED_ATTEMPTS) {
-          await this.lockAccount(user.id);
-          throw new Error('ACCOUNT_LOCKED');
+          throw new Error('LOGIN_COOLDOWN');
         }
 
         throw new Error('INVALID_CREDENTIALS');
@@ -209,19 +207,31 @@ export class AuthService {
     return tokenPair;
   }
 
-  /** Find accounts matching identifier. School code is not used for login. */
-  private async findLoginCandidates(_schoolCode: string, identifier: string) {
+  /** Find accounts matching identifier, scoped to school code when supplied. */
+  private async findLoginCandidates(schoolCode: string, identifier: string) {
     const trimmed = identifier.trim();
+    const normalizedSchoolCode = schoolCode.trim().toUpperCase();
+
+    if (normalizedSchoolCode) {
+      const school = await prisma.school.findUnique({
+        where: { schoolCode: normalizedSchoolCode },
+        select: { id: true },
+      });
+      if (!school) return [];
+
+      return prisma.user.findMany({
+        where: {
+          schoolId: school.id,
+          OR: identifierMatchConditions(trimmed),
+        },
+        take: 20,
+      });
+    }
 
     const byUsername = await prisma.user.findFirst({
       where: { username: { equals: trimmed, mode: 'insensitive' } },
     });
     if (byUsername) return [byUsername];
-
-    const byEmail = await prisma.user.findFirst({
-      where: { email: { equals: trimmed, mode: 'insensitive' } },
-    });
-    if (byEmail) return [byEmail];
 
     return prisma.user.findMany({
       where: { OR: identifierMatchConditions(trimmed) },
@@ -370,7 +380,7 @@ export class AuthService {
       // Send in-app notification
       await notificationService.sendInApp(admin.id, {
         title: 'Account Locked',
-        message: `User account "${lockedUserLabel}" has been locked after ${MAX_FAILED_ATTEMPTS} failed login attempts.`,
+        message: `User account "${lockedUserLabel}" has been locked by an administrator.`,
         type: 'ACCOUNT_LOCKED',
       });
 
@@ -379,7 +389,7 @@ export class AuthService {
         await notificationService.sendEmail(
           admin.email,
           'SAMS: User Account Locked',
-          `<p>The account for <strong>${lockedUserLabel}</strong> has been automatically locked after ${MAX_FAILED_ATTEMPTS} consecutive failed login attempts.</p>
+          `<p>The account for <strong>${lockedUserLabel}</strong> has been locked by an administrator.</p>
            <p>Please review and unlock the account if appropriate.</p>`,
         );
       }

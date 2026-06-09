@@ -1,6 +1,8 @@
 /**
  * Register the service worker for offline support.
  */
+let hasReloadedForServiceWorkerUpdate = false;
+
 export function registerServiceWorker(): void {
   if ('serviceWorker' in navigator) {
     window.addEventListener('load', async () => {
@@ -10,12 +12,25 @@ export function registerServiceWorker(): void {
         });
         console.log('[SW] Registered with scope:', registration.scope);
 
+        navigator.serviceWorker.addEventListener('controllerchange', () => {
+          if (hasReloadedForServiceWorkerUpdate) return;
+          hasReloadedForServiceWorkerUpdate = true;
+          window.location.reload();
+        });
+
+        void registration.update();
+        window.setInterval(() => {
+          void registration.update();
+        }, 60 * 60 * 1000);
+
         // Check for updates periodically
         registration.addEventListener('updatefound', () => {
           const newWorker = registration.installing;
           if (newWorker) {
             newWorker.addEventListener('statechange', () => {
-              if (newWorker.state === 'activated') {
+              if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+                newWorker.postMessage({ type: 'SKIP_WAITING' });
+              } else if (newWorker.state === 'activated') {
                 console.log('[SW] New service worker activated');
               }
             });

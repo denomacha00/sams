@@ -195,6 +195,13 @@ export const useAuthStore = create<AuthState>()(
             isAuthenticated: false,
             error: null,
           });
+          clearSuspendedSessionFlags();
+          try {
+            localStorage.removeItem('auth-storage');
+            useAuthStore.persist?.clearStorage?.();
+          } catch {
+            // Storage may be unavailable in private browsing modes.
+          }
         }
       },
 

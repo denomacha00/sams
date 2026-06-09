@@ -34,7 +34,7 @@ interface Department {
 }
 
 type Scope = 'school' | 'department' | 'class';
-type Channel = 'inapp' | 'sms';
+type Channel = 'inapp';
 type TargetRole = 'ALL' | 'TEACHER' | 'STUDENT' | 'HOD';
 
 function truncateName(name: string, maxLen = 50): string {
@@ -98,7 +98,6 @@ const NotificationsPage: React.FC = () => {
   const [targetRole, setTargetRole] = useState<TargetRole>('ALL');
   const [title, setTitle] = useState('');
   const [message, setMessage] = useState('');
-  const [channels, setChannels] = useState<Channel[]>(['inapp']);
   const [sending, setSending] = useState(false);
   const [sendError, setSendError] = useState<string | null>(null);
   const [sendSuccess, setSendSuccess] = useState(false);
@@ -125,13 +124,7 @@ const NotificationsPage: React.FC = () => {
   const isStudent = user?.role === 'STUDENT';
   const isTeacher = user?.role === 'TEACHER';
   const isHOD = user?.role === 'HOD';
-  const canUseSmsChannel = user?.role === 'SCHOOL_ADMIN' || user?.role === 'HOD';
-
-  useEffect(() => {
-    if (!canUseSmsChannel) {
-      setChannels((prev) => (prev.includes('sms') ? prev.filter((c) => c !== 'sms') : prev));
-    }
-  }, [canUseSmsChannel]);
+  const notificationChannels: Channel[] = ['inapp'];
 
   const [departments, setDepartments] = useState<Department[]>([]);
   const [classes, setClasses] = useState<{ id: string; name: string }[]>([]);
@@ -297,14 +290,6 @@ const NotificationsPage: React.FC = () => {
     setSendError(null);
     setSendSuccess(false);
     try {
-      if (!channels.includes('inapp') && channels.includes('sms')) {
-        setSendError(
-          'SMS-only is selected. In-app messages will not appear in SAMS unless you also check In-App. Sandbox SMS only delivers to Africa\'s Talking test numbers.',
-        );
-        setSending(false);
-        return;
-      }
-
       const effectiveTargetId =
         user?.role === 'HOD' && scope === 'department'
           ? user.departmentId ?? targetId
@@ -324,7 +309,7 @@ const NotificationsPage: React.FC = () => {
           targetRole: targetRole === 'ALL' ? undefined : targetRole,
           title: title.trim() || undefined,
           message,
-          channels,
+          channels: notificationChannels,
         },
         { timeout: 90_000 },
       );
@@ -361,10 +346,6 @@ const NotificationsPage: React.FC = () => {
     } finally {
       setSending(false);
     }
-  };
-
-  const toggleChannel = (ch: Channel) => {
-    setChannels((prev) => prev.includes(ch) ? prev.filter((c) => c !== ch) : [...prev, ch]);
   };
 
   const getScopeOptions = (): Scope[] => {
@@ -684,7 +665,7 @@ const NotificationsPage: React.FC = () => {
                 <p className="text-xs text-ink-subtle mt-1">Choose the audience path first, then write the message.</p>
               </div>
               <span className="text-xs px-2.5 py-1 rounded-full border border-indigo-500/25 bg-indigo-500/10 text-indigo-200">
-                {channels.includes('sms') ? 'In-App + SMS' : 'In-App'}
+                In-App
               </span>
             </div>
             {sendSuccess && (
@@ -809,21 +790,21 @@ const NotificationsPage: React.FC = () => {
               {/* Channels */}
               <div>
                 <label className="block text-sm font-semibold text-ink-muted mb-1.5">Send via</label>
-                <div className="flex gap-4">
-                  {(['inapp', 'sms'] as Channel[]).map((ch) => (
-                    <label key={ch} className="flex items-center gap-2 cursor-pointer">
-                      <input type="checkbox" checked={channels.includes(ch)} onChange={() => toggleChannel(ch)}
-                        className="w-4 h-4 rounded border-slate-600 bg-slate-900 text-indigo-500 focus:ring-indigo-500/40" />
-                      <span className="text-sm text-ink-muted">{ch === 'inapp' ? 'In-App' : 'SMS'}</span>
-                    </label>
-                  ))}
+                <div className="flex flex-col gap-2">
+                  <label className="flex items-center gap-2">
+                    <input type="checkbox" checked readOnly disabled
+                      className="w-4 h-4 rounded border-slate-600 bg-slate-900 text-indigo-500 focus:ring-indigo-500/40 disabled:opacity-80" />
+                    <span className="text-sm text-ink-muted">In-App</span>
+                  </label>
+                  <p className="text-xs text-ink-subtle">
+                    SMS is reserved for password reset while provider limits are being upgraded.
+                  </p>
                 </div>
               </div>
 
               <button type="submit" disabled={
                 sending ||
                 !message.trim() ||
-                channels.length === 0 ||
                 (scope !== 'school' && !(isHOD && scope === 'department' ? user?.departmentId : targetId)) ||
                 (isHOD && !!hodScopeError && scope === 'department')
               }

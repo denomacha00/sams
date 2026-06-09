@@ -6,6 +6,7 @@ interface PendingAction {
   action: string;
   params: Record<string, unknown>;
   description: string;
+  awaitingSlot?: string;
 }
 
 interface ChatMessage {
@@ -115,8 +116,8 @@ const SuperAdminAI: React.FC = () => {
     });
     if (data.threadId) setThreadId(data.threadId);
 
-    if (data.requiresConfirmation && data.pendingAction) {
-      appendAssistant(data.answer, data.pendingAction, false);
+    if (data.pendingAction) {
+      appendAssistant(data.answer, data.pendingAction, AI_UNAVAILABLE_INTENTS.has(data.intent));
       return;
     }
 
@@ -169,11 +170,17 @@ const SuperAdminAI: React.FC = () => {
         return;
       }
 
-      if (CONFIRM_RE.test(question) && pendingActionRef.current) {
+      const pending = pendingActionRef.current;
+      if (CONFIRM_RE.test(question) && pending) {
         await runQuery(question, {
           confirmAction: true,
-          pendingAction: pendingActionRef.current,
+          pendingAction: pending,
         });
+        return;
+      }
+
+      if (pending) {
+        await runQuery(question, { pendingAction: pending });
         return;
       }
 

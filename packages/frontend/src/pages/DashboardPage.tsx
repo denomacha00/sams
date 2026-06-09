@@ -601,7 +601,7 @@ function getQuickActionGroups(role?: UserRole): QuickActionGroup[] {
             { to: '/admin/links', label: 'Registration Links', subtitle: 'Main way to onboard students and staff', icon: ICONS.link, variant: 'signin' },
             { to: '/admin/users', label: 'User Management', subtitle: 'Manual add only if someone has no phone for SMS/link signup', icon: ICONS.users },
             { to: '/admin/departments', label: 'Departments', subtitle: 'Organize faculties', icon: ICONS.building },
-            { to: '/admin/users', label: 'Class Reps', subtitle: 'Assign student leaders from User Management', icon: ICONS.users },
+            { to: '/class-roster', label: 'View Class Reps', subtitle: 'See assigned student leaders', icon: ICONS.users },
           ],
         },
         {

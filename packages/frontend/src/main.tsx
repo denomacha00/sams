@@ -94,6 +94,10 @@ ReactDOM.createRoot(document.getElementById('root') as HTMLElement).render(
           <Route path="/attendance" element={<ManualAttendancePage />} />
           <Route path="/biometric/attendance" element={<BiometricAttendancePage />} />
           <Route path="/class/students" element={<ClassStudentsPage />} />
+        </Route>
+
+        {/* Class representatives roster */}
+        <Route element={<AuthGuard allowedRoles={[UserRole.SCHOOL_ADMIN, UserRole.HOD, UserRole.TEACHER]} />}>
           <Route path="/class-roster" element={<ClassRosterPage />} />
         </Route>
 

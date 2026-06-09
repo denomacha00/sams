@@ -104,4 +104,72 @@ describe('authService school suspension', () => {
 
     await expect(authService.generateTokensForUser('user-1')).rejects.toThrow('SCHOOL_SUSPENDED');
   });
+
+  it('uses a temporary cooldown instead of permanently locking after repeated bad passwords', async () => {
+    const passwordHash = await bcrypt.hash('correct-password', 12);
+    vi.mocked(prisma.user.findFirst).mockResolvedValue({
+      id: 'user-1',
+      schoolId: 'school-1',
+      role: 'TEACHER',
+      isLocked: false,
+      failedLoginCount: 14,
+      failedLoginWindowStart: new Date(),
+      passwordHash,
+      departmentId: null,
+      classId: null,
+    } as any);
+    vi.mocked(prisma.school.findUnique).mockResolvedValue({
+      isSuspended: false,
+      schoolCode: 'SCHOOL1',
+    } as any);
+    vi.mocked(prisma.user.update).mockResolvedValue({} as any);
+
+    await expect(
+      authService.validateLoginCredentials('', 'teacher1', 'wrong-password'),
+    ).rejects.toThrow('LOGIN_COOLDOWN');
+
+    expect(prisma.user.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: 'user-1' },
+        data: expect.objectContaining({
+          failedLoginCount: 15,
+        }),
+      }),
+    );
+    expect(prisma.user.update).not.toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ isLocked: true }),
+      }),
+    );
+  });
+
+  it('scopes identifier lookup to school code when one is supplied', async () => {
+    const passwordHash = await bcrypt.hash('password123', 12);
+    vi.mocked(prisma.school.findUnique)
+      .mockResolvedValueOnce({ id: 'school-1' } as any)
+      .mockResolvedValueOnce({ isSuspended: false, schoolCode: 'SCHOOL1' } as any);
+    vi.mocked(prisma.user.findMany).mockResolvedValue([
+      {
+        id: 'user-1',
+        schoolId: 'school-1',
+        role: 'STUDENT',
+        isLocked: false,
+        failedLoginCount: 0,
+        failedLoginWindowStart: null,
+        passwordHash,
+        departmentId: null,
+        classId: null,
+      },
+    ] as any);
+
+    await expect(
+      authService.validateLoginCredentials('school1', 'student@example.com', 'password123'),
+    ).resolves.toMatchObject({ id: 'user-1' });
+
+    expect(prisma.user.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({ schoolId: 'school-1' }),
+      }),
+    );
+  });
 });

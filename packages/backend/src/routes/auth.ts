@@ -79,6 +79,8 @@ function errorCodeToStatus(code: string): number {
       return 401;
     case 'ACCOUNT_LOCKED':
       return 401;
+    case 'LOGIN_COOLDOWN':
+      return 429;
     case 'INVALID_REFRESH_TOKEN':
       return 401;
     case 'REFRESH_TOKEN_EXPIRED':
@@ -96,6 +98,8 @@ function errorCodeToMessage(code: string): string {
   switch (code) {
     case 'ACCOUNT_LOCKED':
       return 'Account is locked';
+    case 'LOGIN_COOLDOWN':
+      return 'Too many failed login attempts. Please wait 1 minute and try again.';
     case 'SCHOOL_SUSPENDED':
       return 'Your school account has been suspended. Please contact your administrator.';
     case 'INVALID_REFRESH_TOKEN':

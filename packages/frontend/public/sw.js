@@ -1,10 +1,7 @@
-const STATIC_CACHE = 'sams-static-v4';
+const STATIC_CACHE = 'sams-static-v5';
 const OFFLINE_QUEUE_STORE = 'offline-request-queue';
 
-const STATIC_ASSETS = [
-  '/',
-  '/index.html',
-];
+const STATIC_ASSETS = [];
 
 // ─── IndexedDB helpers for request queuing ───────────────────────────────────
 
@@ -238,7 +235,12 @@ async function networkFirstApi(request) {
 // ─── Listen for online event to replay queued requests ───────────────────────
 
 self.addEventListener('message', (event) => {
-  if (event.data && event.data.type === 'REPLAY_QUEUE') {
+  if (event.data?.type === 'SKIP_WAITING') {
+    self.skipWaiting();
+    return;
+  }
+
+  if (event.data?.type === 'REPLAY_QUEUE') {
     event.waitUntil(replayQueuedRequests());
   }
 });

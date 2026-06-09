@@ -186,6 +186,25 @@ describe('scopedNotificationSend RBAC', () => {
     expect(result.success).toBe(true);
   });
 
+  it('does not deliver a sender their own outbound notification', async () => {
+    prismaMock.user.findMany.mockResolvedValue([
+      { id: 'a1', phone: null },
+      { id: 'u1', phone: null },
+    ]);
+
+    const result = await sendScopedNotification(
+      { sub: 'a1', role: UserRole.SCHOOL_ADMIN, schoolId: 'school-1' },
+      { scope: 'school', message: 'Holiday', channels: ['inapp'] },
+    );
+
+    expect(result.recipientCount).toBe(1);
+    expect(prismaMock.notification.createMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: [expect.objectContaining({ userId: 'u1', senderId: 'a1' })],
+      }),
+    );
+  });
+
   it('assertAiNotificationChannels blocks SMS', () => {
     expect(() => assertAiNotificationChannels(['sms'])).toThrow(ScopedNotificationError);
   });

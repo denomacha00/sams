@@ -168,10 +168,10 @@ export async function sendScopedNotification(
     }
   }
 
-  const targetUsers = await prisma.user.findMany({
+  const targetUsers = (await prisma.user.findMany({
     where: userFilter,
     select: { id: true, phone: true },
-  });
+  })).filter((u) => u.id !== effectiveSender.sub);
 
   if (targetUsers.length === 0) {
     return {

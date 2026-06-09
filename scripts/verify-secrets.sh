@@ -122,7 +122,7 @@ else
 fi
 
 if [[ -n "$VISION_MODEL" ]]; then
-  if [[ -n "$BASE_URL" && "$BASE_URL" == *groq.com* && "$VISION_MODEL" == *scout* && ! is_real_key "$FALLBACK_KEY" ]]; then
+  if [[ -n "$BASE_URL" && "$BASE_URL" == *groq.com* && "$VISION_MODEL" == *scout* ]] && ! is_real_key "$FALLBACK_KEY"; then
     echo "WARN VISION_MODEL=$VISION_MODEL — Groq-only setup may need OpenRouter for image upload"
   else
     echo "OK   VISION_MODEL=$VISION_MODEL"
