@@ -136,9 +136,11 @@ Native client **`packages/mobile`** (display name **SAMS**) uses the same `/api/
 ### HOD (Head of Department)
 - Manages their department timetable (create/edit entries; school admin can view only)
 - Views department reports and risk scores
+- Creates and edits classes inside their own department
 - Generates registration links for teachers
 - Sends notifications to department or classes within it
 - Can assign class rep on Class Roster for department classes
+- Can start/end attendance sessions and mark attendance for classes in their department when the timetable has a current slot
 
 ### TEACHER
 - Starts attendance sessions
@@ -231,8 +233,9 @@ Native client **`packages/mobile`** (display name **SAMS**) uses the same `/api/
 - Audit logging
 
 ### 5.7 Notifications & Messaging
-- **Inbox / Sent** folders on the Notifications page
-- In-app delivery (real-time via Socket.io) and optional **SMS** channel (School Admin and HOD only)
+- **Alerts / Inbox / Sent / Send** workspace on the Notifications page
+- In-app delivery is the active school notification channel (real-time via Socket.io). SMS is hidden from the frontend notification composer for now and reserved for OTP/password-reset flows until live AT capacity is ready.
+- Attachments are supported for in-app messages: images, PDFs, links/files, with authenticated open/download routes so recipient and sender can access them without public 404s.
 - Email via Nodemailer (password reset, OTP, optional copies)
 - **Send scope:** school, department, or class (role-dependent)
   - **School Admin:** entire school, any department/class, optional role filter
@@ -241,7 +244,7 @@ Native client **`packages/mobile`** (display name **SAMS**) uses the same `/api/
 - **Edit/delete:** only the **original sender** can edit or delete their outbound copy (prevents editing admin/HOD messages via inbox row IDs). Non–school-admins have a **24-hour** edit window; school admins are not limited by that window.
 - **Class rep replies:** students flagged as class rep may reply only to messages where `senderRole` is `TEACHER` (threaded reply API)
 - **HOD** cannot edit messages sent by school admin (must be sender)
-- SMS via Africa's Talking (server env — see [§12](#12-sms-otp--africas-talking)); Super Admin portal has **no** school-level AT settings
+- SMS via Africa's Talking remains server-side only for OTP/password reset/app onboarding modes; Super Admin portal has **no** school-level AT settings
 - Daily cron: low attendance alerts, license expiry reminders, and optional **student morning schedule** in-app reminders (`STUDENT_DAILY_SCHEDULE_REMINDERS`, `APP_TIMEZONE`)
 - **Student daily schedule (zero-cost):** Each school day at 06:00 server cron, active students with a class and timetable slots **today** (per `APP_TIMEZONE`, default `Africa/Nairobi`) receive one in-app notification titled **Today's classes** listing time, subject, and teacher. No SMS or push. Disable with `STUDENT_DAILY_SCHEDULE_REMINDERS=false`.
 
@@ -369,11 +372,12 @@ Never run only `git pull` on the server without a build — that is what causes 
 - `POST /api/v1/auth/reset-password` — Set password from reset token
 - `POST /api/v1/auth/forgot-password-otp` — Send 6-digit reset code
 - `POST /api/v1/auth/reset-password-otp` — Reset password with OTP code
+- `DELETE /api/v1/auth/webauthn/credentials` - Disable fingerprint/passkey sign-in for the current user
 
 ### Health
 - `GET /health` — DB/Redis status, `sms` (configured/sandbox/username), `email`, `otp` flags (no secrets)
 
-### Notifications (SMS admin)
+### SMS admin probes
 - `GET /api/v1/notifications/sms-status` — School admin: AT config status
 - `POST /api/v1/notifications/test-sms` — School admin: send test SMS
 
@@ -407,6 +411,7 @@ Never run only `git pull` on the server without a build — that is what causes 
 - `PUT /api/v1/attendance/:id` — Update record
 - `GET /api/v1/attendance` — List records
 - `POST /api/v1/attendance/sync` — Offline sync
+- `DELETE /api/v1/biometric/me` - Remove the current user's face enrollment
 
 ### Reports
 - `GET /api/v1/reports/student/:id` — Student report
@@ -425,8 +430,11 @@ Never run only `git pull` on the server without a build — that is what causes 
 
 ### Notifications
 - `GET /api/v1/notifications` — Get user notifications
+- `GET /api/v1/notifications/sent` - Get messages sent by the current user
 - `PATCH /api/v1/notifications/:id/read` — Mark as read
-- `POST /api/v1/notifications/send` — Send notification
+- `POST /api/v1/notifications/send` - Send in-app notification/message, optionally with attachments
+- `GET /api/v1/notifications/attachments/:id` - Authenticated attachment open/download for sender or recipient
+- `PUT /api/v1/notifications/:id` / `DELETE /api/v1/notifications/:id` - Edit/delete sender's outbound message copy where policy allows
 
 ### Payments
 - `POST /api/v1/payments/initiate` — Initiate M-Pesa STK Push
@@ -455,7 +463,7 @@ Never run only `git pull` on the server without a build — that is what causes 
 ## 8. AI Assistant
 
 ### Documentation context injection
-- At runtime the backend loads **`DOCUMENTATION.md`** from the repo root (truncated excerpt, ~8–10k chars) and injects it into the OpenAI/Groq system prompt for how-to and feature questions (`systemDocumentation.ts`).
+- At runtime the backend loads **`DOCUMENTATION.md`** from the repo root (truncated excerpt, ~8-10k chars) and injects it into the OpenAI-compatible system prompt for how-to and feature questions (`systemDocumentation.ts`).
 - Keep this file accurate after feature changes; `post-deploy-verify.sh` warns if it is missing on the VPS.
 - Super Admin can also maintain an **AI knowledge base** via the super-admin API for extra school-neutral facts.
 
@@ -473,9 +481,10 @@ Handles SAMS-specific queries via regex pattern matching:
 - System stats (Super Admin)
 - Admin how-to guides
 
-### Groq/OpenRouter Engine (For everything else)
-- Primary (Groq): `OPENAI_API_KEY`, `OPENAI_BASE_URL=https://api.groq.com/openai/v1`, `OPENAI_MODEL=llama-3.3-70b-versatile`
-- Fallback (OpenRouter, optional): `OPENAI_FALLBACK_KEY`, `OPENAI_FALLBACK_URL=https://openrouter.ai/api/v1`, `OPENAI_FALLBACK_MODEL=meta-llama/llama-3.1-8b-instruct:free`
+### OpenRouter/Groq Engine (For everything else)
+- Typical production primary: **OpenRouter** via `OPENAI_API_KEY`, `OPENAI_BASE_URL=https://openrouter.ai/api/v1`, `OPENAI_MODEL=meta-llama/llama-3.3-70b-instruct` (or the approved model set in `secrets/providers.env`).
+- Typical fallback: **Groq** via `OPENAI_FALLBACK_KEY`, `OPENAI_FALLBACK_URL=https://api.groq.com/openai/v1`, `OPENAI_FALLBACK_MODEL=llama-3.3-70b-versatile`.
+- AI actions and conversation memory still depend on provider credits/rate limits; if both providers are out of credits/quota, local DB-backed answers continue but general LLM answers fail gracefully.
 - Do not use decommissioned Groq IDs (`llama3-70b-8192`, etc.); runtime migrates some, but set the model explicitly on the VPS.
 - Verify on server without wiping keys: `bash scripts/verify-secrets.sh`
 - Answers any general knowledge question
@@ -489,6 +498,14 @@ Can execute via natural language:
 - Extend licenses
 - Get school info
 - Get system statistics
+
+### School AI Actions
+School AI is scoped to the logged-in role and school:
+- **School Admin:** school/class/department in-app notifications, user/class/department actions, registration links, password resets, school stats.
+- **HOD:** department/class in-app notifications, department stats, registration links, teacher assignment, department class creation, and department attendance session start/end/manual marking.
+- **Teacher:** class in-app messages, registration links, session start/end, manual attendance marking, and class roster lookups.
+- **Student:** own attendance, timetable, teachers, HOD, department/class info, reminders, and class rep info.
+- Destructive actions require confirmation where configured; AI never bypasses route/service RBAC.
 
 ---
 
@@ -596,7 +613,7 @@ Ensure the same shell user that runs `pm2` uses Node 20 (`which node` → `/usr/
 | `docs/SAMS-DEVELOPER-OPS-BOOK-DENIS.md` | Deep developer & ops book for Denis (architecture, failure modes, commands); auto-injected into Super Admin AI |
 | `scripts/backup-ai-secrets.sh` | Deprecated alias → `backup-secrets.sh` |
 | `scripts/configure-production-at.sh` | Interactive AT production setup (refuses sandbox when `NODE_ENV=production`) |
-| `scripts/production-readiness-check.sh` | Fails on sandbox SMS, weak JWT (under 64 chars), missing biometric key; checks biometric dist routes |
+| `scripts/production-readiness-check.sh` | Fails on weak JWT (under 64 chars) and missing biometric key; sandbox SMS is a warning when all SMS-dependent production features are disabled/app-only |
 
 ### PM2 and environment
 - `packages/backend/bin/pm2-start.js` loads `packages/backend/.env`, then **overlays** gitignored provider secrets (see below).
@@ -640,7 +657,7 @@ bash scripts/restart-api.sh
 
 Keep placeholders in `.env` if you prefer; `providers.env` overrides them at runtime. Keys are **not** in git — recover from provider consoles or `secrets/providers.env.backup.*` after `backup-secrets.sh`.
 
-#### AI (Groq / OpenRouter)
+#### AI (OpenRouter / Groq)
 
 Put `OPENAI_*` and optional `OPENAI_FALLBACK_*` in `secrets/providers.env`. Verify AI only: `bash scripts/verify-secrets.sh --ai-only` (or deprecated `verify-ai-env.sh`). Do not use decommissioned Groq model IDs; see `.env.example`.
 
@@ -685,7 +702,7 @@ chmod 600 secrets/providers.env
 
 # 3) Super Admin: set school plan to Professional or Enterprise
 
-bash scripts/verify-secrets.sh          # must not FAIL on sandbox AT or missing BIOMETRIC_MASTER_KEY
+bash scripts/verify-secrets.sh          # must PASS; missing BIOMETRIC_MASTER_KEY blocks biometric go-live
 bash scripts/go-live.sh                 # or: production-readiness-check + restart-api + post-deploy-verify
 curl -s http://127.0.0.1:3001/health | grep -E '"mode":"production"|"sandbox":false'
 ```
@@ -699,6 +716,20 @@ curl -s http://127.0.0.1:3001/health | grep -E '"mode":"production"|"sandbox":fa
 **NGINX:** HTTPS on `app.*` and `api.*` unchanged; no sandbox-specific proxy rules. Ensure `CORS_ORIGIN` matches your app URL.
 
 **Do not:** commit `secrets/providers.env`, `.env` with real keys, or use `AT_USERNAME=sandbox` when `NODE_ENV=production`.
+
+---
+
+### App-only production mode (current safe mode)
+
+Use this while school notifications should remain in-app only and live SMS capacity/sender approval is not ready yet:
+
+```bash
+cd /var/www/sams
+bash scripts/ready-app-only-production.sh
+bash scripts/post-deploy-verify.sh
+```
+
+Expected `/health`: `sms.sandbox: true` may remain, but `otp.loginEnabled: false`, `otp.passwordResetEnabled: false`, and post-deploy verify reports sandbox SMS as a warning, not a critical failure. Forgot-password self-service via SMS is disabled in this mode; use admin password reset or configure SMTP/live AT before relying on self-service reset.
 
 ---
 
@@ -890,7 +921,7 @@ When `SMS_WELCOME_ON_REGISTER` is not `false`, adding or registering a phone sen
 "otp": { "loginEnabled": false, "passwordResetEnabled": true }
 ```
 
-`mode` is `production`, `sandbox`, or `unconfigured`. For real schools, `/health` must show `"mode":"production"` and `"sandbox":false`. `bash scripts/verify-secrets.sh` **FAIL**s on sandbox AT when `NODE_ENV=production`.
+`mode` is `production`, `sandbox`, or `unconfigured`. For real SMS schools, `/health` must show `"mode":"production"` and `"sandbox":false`. In app-only mode, sandbox SMS is a warning only when all SMS-dependent production features are disabled.
 
 ### Common errors
 

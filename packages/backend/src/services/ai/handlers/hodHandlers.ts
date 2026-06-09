@@ -269,6 +269,45 @@ const addTeacherHandler: ActionHandler = async (params, scope) => {
   };
 };
 
+const createDepartmentClassHandler: ActionHandler = async (params, scope) => {
+  const { prisma } = await import('../../../lib/prisma');
+
+  const className = (params.className as string | undefined)?.trim();
+  const capacityParam = Number(params.capacity);
+  const capacity = Number.isFinite(capacityParam) && capacityParam > 0
+    ? Math.floor(capacityParam)
+    : 50;
+
+  if (!scope.departmentId) {
+    return { answer: HOD_DEPARTMENT_UNLINKED_MESSAGE };
+  }
+
+  if (!className) {
+    return { answer: 'What class name should I create in your department?' };
+  }
+
+  try {
+    const cls = await prisma.class.create({
+      data: {
+        schoolId: scope.schoolId,
+        departmentId: scope.departmentId,
+        name: className,
+        capacity,
+      },
+    });
+
+    return {
+      answer: `Class "${cls.name}" created in your department.`,
+      data: { classId: cls.id, departmentId: scope.departmentId, capacity: cls.capacity },
+    };
+  } catch (err: unknown) {
+    if ((err as { code?: string }).code === 'P2002') {
+      return { answer: `Class "${className}" already exists in this school.` };
+    }
+    throw err;
+  }
+};
+
 const sendClassNotificationHandler: ActionHandler = async (params, scope) => {
   const { prisma } = await import('../../../lib/prisma');
   const {
@@ -503,6 +542,31 @@ export const hodActions: ActionDefinition[] = [
     descriptionTemplate: (params) =>
       `Assign teacher "${params.teacherName}" to your department.`,
     handler: addTeacherHandler,
+  },
+  {
+    action: 'create_class',
+    description: 'Create a class in your department',
+    destructive: false,
+    patterns: [
+      /create\s+(?:a\s+)?class\s+(.+)/i,
+      /add\s+(?:a\s+)?(?:new\s+)?class\s+(.+)/i,
+      /new\s+class\s+(.+)/i,
+    ],
+    extractParams: (_message: string, match: RegExpMatchArray | null) => {
+      const raw = match && match[1] ? match[1].trim() : '';
+      const capacityMatch = raw.match(/\b(?:capacity|cap)\s*(?:of\s*)?(\d+)\b/i);
+      const className = raw
+        .replace(/\b(?:with\s+)?(?:capacity|cap)\s*(?:of\s*)?\d+\b/i, '')
+        .replace(/\s+/g, ' ')
+        .trim();
+      return {
+        className,
+        ...(capacityMatch ? { capacity: Number(capacityMatch[1]) } : {}),
+      };
+    },
+    descriptionTemplate: (params) =>
+      `Create class "${params.className}" in your department.`,
+    handler: createDepartmentClassHandler,
   },
   {
     action: 'view_department_stats',

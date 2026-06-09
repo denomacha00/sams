@@ -264,6 +264,8 @@ bash scripts/restart-api.sh
 - Use explicit commands: `unsuspend school [name]`, `suspend school [name]`
 - Destructive actions need reply **yes**
 - Super Admin only for platform actions
+- School AI actions are role-scoped: HOD/teacher attendance actions only work inside their allowed timetable/session scope, and notification actions are in-app only.
+- If AI answers with provider credit/rate-limit errors, code may be healthy but OpenRouter/Groq quota is exhausted. Local DB-backed attendance/timetable answers continue where available.
 
 ### Symptom: Super Admin AI vs school AI
 
@@ -275,6 +277,18 @@ bash scripts/restart-api.sh
 ---
 
 ## 9. SMS / OTP
+
+### Current safe mode: app-only notifications
+
+If live SMS capacity or sender approval is not ready, keep school notifications in-app only:
+
+```bash
+cd /var/www/sams
+bash scripts/ready-app-only-production.sh
+bash scripts/post-deploy-verify.sh
+```
+
+Expected: post-deploy verify may warn `SMS sandbox in production`, but it should pass critical checks when `OTP_LOGIN_ENABLED=false`, `OTP_PASSWORD_RESET_ENABLED=false`, and SMS notification sending is disabled in the frontend. Forgot-password SMS self-service is disabled in this mode; use admin reset or configure SMTP/live AT.
 
 ### Symptom: SMS not delivered
 
@@ -292,6 +306,7 @@ curl -sS http://127.0.0.1:3001/health | grep -o '"sms":{[^}]*}'
 
 - `OTP_LOGIN_ENABLED=false` (login without SMS)
 - `OTP_PASSWORD_RESET_ENABLED=true` (forgot-password SMS when sender approved)
+- In app-only mode, `ready-app-only-production.sh` sets `OTP_PASSWORD_RESET_ENABLED=false` too.
 
 Until AT approves sender **SAMS**, SMS will fail with `InvalidSenderId` — config can still be correct.
 

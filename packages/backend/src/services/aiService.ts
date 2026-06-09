@@ -304,7 +304,7 @@ export class AIService {
       memoryStatus = 'disabled';
     }
 
-    // Local engine couldn't resolve — try OpenAI/Groq
+    // Local engine couldn't resolve — try the OpenAI-compatible provider chain
     if (!hasPrimaryAIKey()) {
       return {
         answer: getMissingAIKeyMessage(),
@@ -314,7 +314,7 @@ export class AIService {
       };
     }
 
-    // Step 4: Call OpenAI/Groq with conversation history
+    // Step 4: Call the OpenAI-compatible provider chain with conversation history
     try {
       const openaiResult = await openaiQueryWithHistory(user, question, historyMessages);
 

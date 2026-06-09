@@ -237,13 +237,13 @@ export async function sendScopedNotification(
   return { success: true, recipientCount: targetUsers.length, batchId };
 }
 
-/** AI actions may only use in-app channel (SMS remains on Notifications UI for school admins). */
+/** AI actions may only use in-app delivery; SMS is reserved for OTP/password-reset flows for now. */
 export function assertAiNotificationChannels(channels: NotificationChannel[]): void {
   if (channels.includes('sms')) {
     throw new ScopedNotificationError(
       403,
       'FORBIDDEN',
-      'SMS cannot be sent via AI — use the Notifications page for SMS',
+      'SMS cannot be sent via AI. Notifications are in-app only for now.',
     );
   }
   if (!channels.includes('inapp')) {

@@ -814,6 +814,19 @@ Endpoint: `POST /api/v1/ai/query-with-image` (`routes/ai.ts`)
 
 Requires `CONVERSATION_MASTER_KEY` (32+ chars) in `providers.env`. Without it, encrypted thread memory disabled (warn at startup).
 
+### 9.8 School AI role actions
+
+School AI action execution is centralized in `services/ai/roleActionRegistry.ts` and routed through `AIService.executeAction()`, so route/service RBAC is still the final authority.
+
+| Role | Current action surface |
+|------|------------------------|
+| SCHOOL_ADMIN | school/class/department in-app notifications, registration links, user/class/department actions, password reset, school stats |
+| HOD | department/class in-app notifications, department stats, registration links, teacher assignment, department class creation, department attendance session start/end/manual marking |
+| TEACHER | class in-app messages, registration links, session start/end, manual attendance marking, class roster |
+| STUDENT | own attendance/timetable/teachers/HOD/class/department/class-rep info and reminders |
+
+Attendance AI actions must follow timetable/session rules: HODs are scoped to their department classes; teachers are scoped to taught classes. Destructive actions require confirmation where configured.
+
 ---
 
 ## 10. Attendance, biometric, notifications
@@ -833,6 +846,11 @@ Requires `CONVERSATION_MASTER_KEY` (32+ chars) in `providers.env`. Without it, e
 - GPS rejection → location outside school geofence
 - Session not active → teacher must start session first
 - WebSocket disconnect → client falls back to polling
+
+Additional session guards:
+
+- No current timetable slot -> session start is denied; teacher/HOD must use the scheduled class or fix timetable first.
+- HOD session access -> routes and sockets allow only sessions whose class belongs to the HOD department.
 
 ### 10.2 Biometric
 
@@ -860,6 +878,8 @@ In-app notifications work without SMTP. SMS uses Africa's Talking (§11).
 
 ---
 
+**Current app-only mode:** The frontend notification composer is app-only. SMS is reserved for OTP/password-reset/app onboarding flows until live AT capacity is intentionally re-enabled. Notification attachments are stored under `uploads/notifications` and served through authenticated `/api/v1/notifications/attachments/:id`, so sender and recipient can open/download images, PDFs, and files.
+
 ## 11. SMS / Africa's Talking
 
 ### 11.1 Configuration
@@ -876,7 +896,9 @@ File: `packages/backend/src/config/africasTalking.ts`
 
 - `AT_USERNAME=sandbox` → `sms.mode: sandbox` in `/health`
 - Production requires real username + production API key
-- `verify-secrets.sh` **FAIL**s sandbox when `NODE_ENV=production`
+- `verify-secrets.sh` / readiness scripts warn, not fail, on sandbox SMS when app-only mode disables all SMS-dependent production features
+
+**App-only exception:** when `ready-app-only-production.sh` disables all SMS-dependent production features (`OTP_LOGIN_ENABLED=false`, `OTP_PASSWORD_RESET_ENABLED=false`, notification SMS hidden in frontend), readiness scripts warn on sandbox SMS instead of failing critical checks.
 
 ### 11.2 InvalidSenderId
 
@@ -901,12 +923,14 @@ bash scripts/verify-secrets.sh
 
 ### 11.3 Services using SMS
 
-- `notificationService.ts` — bulk/class SMS from UI
-- `otpService.ts` — login/reset OTP
-- `passwordResetService.ts` — forgot password flow
-- `phoneOnboardingService.ts` — phone verification
+- `otpService.ts` - login/reset OTP when enabled
+- `passwordResetService.ts` - forgot password flow when SMS/email reset is enabled
+- `phoneOnboardingService.ts` - phone verification/welcome modes
+- `notificationService.ts` - still has backend SMS primitives, but the frontend notification composer is app-only until live SMS capacity is intentionally re-enabled
 
 ---
+
+Current production note: `notificationService.ts` still has backend SMS primitives, but the frontend notification composer is app-only until live SMS capacity is intentionally re-enabled. OTP/password-reset/app onboarding are the SMS-dependent paths to verify before turning live SMS back on.
 
 ## 12. Frontend & Super Admin builds
 

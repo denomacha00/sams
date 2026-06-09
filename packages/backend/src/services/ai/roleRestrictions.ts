@@ -67,9 +67,9 @@ const ROLE_SCOPE_NOTES: Partial<Record<UserRole, string>> = {
   [UserRole.SUPER_ADMIN]:
     'Full platform access. Can manage schools, licenses, system-wide audit logs, and reset user passwords (temporary password shown once — never read or list passwords).',
   [UserRole.SCHOOL_ADMIN]:
-    'School-wide user, class, and department management; reset passwords for users at your school (temp password once — never read passwords; not other school admins). In-app school/department notifications via chat. No platform license/suspend (Super Admin only). SMS via Notifications UI only.',
+    'School-wide user, class, and department management; reset passwords for users at your school (temp password once — never read passwords; not other school admins). In-app school/department notifications via chat. No platform license/suspend (Super Admin only). SMS is reserved for OTP/password-reset flows while notifications stay app-only.',
   [UserRole.HOD]:
-    'Department teachers, stats, student registration links for department classes, and in-app department/class notifications. Cannot add/remove school users directly, school-wide notify, or manage licenses.',
+    'Department teachers, department class creation, stats, student registration links for department classes, and in-app department/class notifications. Cannot add/remove school users directly, school-wide notify, or manage licenses.',
   [UserRole.TEACHER]:
     'Your assigned class only: attendance sessions, class roster, in-app class messages to students, and student registration links (invite via link — same as Registration Links page; never add users directly). No user management, no department/school notify, no SMS via AI.',
   [UserRole.STUDENT]:

@@ -4,7 +4,7 @@ import { findAction } from '../roleActionRegistry';
 
 const { prismaMock, sessionServiceMock } = vi.hoisted(() => ({
   prismaMock: {
-    class: { findMany: vi.fn() },
+    class: { findMany: vi.fn(), create: vi.fn() },
     timetableEntry: { findMany: vi.fn() },
     attendanceSession: { findMany: vi.fn() },
     user: { findFirst: vi.fn() },
@@ -109,6 +109,11 @@ describe('HOD AI attendance actions', () => {
     ]);
     prismaMock.user.findFirst.mockResolvedValue({ id: 'student-1', fullName: 'Amina Test' });
     prismaMock.attendanceRecord.upsert.mockResolvedValue({});
+    prismaMock.class.create.mockResolvedValue({
+      id: 'class-new',
+      name: 'Form 2B',
+      capacity: 40,
+    });
     sessionServiceMock.startSession.mockResolvedValue({ id: 'session-1' });
     sessionServiceMock.endSession.mockResolvedValue(undefined);
   });
@@ -212,5 +217,25 @@ describe('HOD AI attendance actions', () => {
 
     expect(result.answer).toMatch(/not linked to a department/i);
     expect(sessionServiceMock.startSession).not.toHaveBeenCalled();
+  });
+
+  it('creates a class only inside the HOD department', async () => {
+    const action = findAction(UserRole.HOD, 'create_class');
+
+    const result = await action!.handler({ className: 'Form 2B', capacity: 40 }, scope);
+
+    expect(prismaMock.class.create).toHaveBeenCalledWith({
+      data: {
+        schoolId: 'school-1',
+        departmentId: 'dept-1',
+        name: 'Form 2B',
+        capacity: 40,
+      },
+    });
+    expect(result.data).toEqual({
+      classId: 'class-new',
+      departmentId: 'dept-1',
+      capacity: 40,
+    });
   });
 });

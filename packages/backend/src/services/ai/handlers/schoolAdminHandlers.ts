@@ -124,7 +124,7 @@ const sendSchoolNotificationHandler: ActionHandler = async (params, scope) => {
     }
 
     return {
-      answer: `✅ In-app message sent to ${result.recipientCount} user(s) school-wide. (Use the Notifications page for SMS.)`,
+      answer: `✅ In-app message sent to ${result.recipientCount} user(s) school-wide. Notifications are app-only for now.`,
       data: { batchId: result.batchId, recipientCount: result.recipientCount },
     };
   } catch (err) {
@@ -253,7 +253,7 @@ const sendDepartmentNotificationHandler: ActionHandler = async (params, scope) =
     }
 
     return {
-      answer: `✅ In-app message sent to ${result.recipientCount} user(s) in "${dept.name}". (Use the Notifications page for SMS.)`,
+      answer: `✅ In-app message sent to ${result.recipientCount} user(s) in "${dept.name}". Notifications are app-only for now.`,
       data: { batchId: result.batchId, recipientCount: result.recipientCount, departmentId: dept.id },
     };
   } catch (err) {

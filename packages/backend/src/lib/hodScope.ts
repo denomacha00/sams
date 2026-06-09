@@ -10,6 +10,10 @@ const HOD_DEPARTMENT_SCOPED_ACTIONS = new Set([
   'send_class_notification',
   'add_teacher',
   'view_department_stats',
+  'create_class',
+  'start_session',
+  'end_session',
+  'mark_attendance',
   'create_registration_link',
 ]);
 

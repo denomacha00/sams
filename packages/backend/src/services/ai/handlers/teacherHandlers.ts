@@ -299,7 +299,7 @@ const sendClassMessageHandler: ActionHandler = async (params, scope) => {
     }
 
     return {
-      answer: `✅ In-app message sent to ${result.recipientCount} student(s) in your class. (SMS is not available via AI — use the Notifications page if your school admin enables SMS.)`,
+      answer: `✅ In-app message sent to ${result.recipientCount} student(s) in your class. Notifications are app-only for now.`,
       data: { batchId: result.batchId, recipientCount: result.recipientCount, classId: selectedClass.id },
     };
   } catch (err) {
