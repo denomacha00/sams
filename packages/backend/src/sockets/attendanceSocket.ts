@@ -36,6 +36,46 @@ function getPrisma() {
   return prisma;
 }
 
+async function canAccessSessionRoom(
+  user: AccessTokenPayload,
+  sessionId: string,
+): Promise<{ ok: boolean; reason?: string }> {
+  const prisma = getPrisma();
+  const session = await prisma.attendanceSession.findFirst({
+    where: {
+      id: sessionId,
+      schoolId: user.schoolId,
+    },
+    select: {
+      id: true,
+      teacherId: true,
+      schoolId: true,
+      class: { select: { departmentId: true } },
+    },
+  });
+
+  if (!session) {
+    return { ok: false, reason: 'Session not found' };
+  }
+
+  if (user.role === UserRole.STUDENT) {
+    return { ok: false, reason: 'Students cannot join teacher session rooms' };
+  }
+
+  if (user.role === UserRole.TEACHER && session.teacherId !== user.sub) {
+    return { ok: false, reason: 'You do not own this session' };
+  }
+
+  if (
+    user.role === UserRole.HOD &&
+    (!user.departmentId || session.class.departmentId !== user.departmentId)
+  ) {
+    return { ok: false, reason: 'Session is outside your department' };
+  }
+
+  return { ok: true };
+}
+
 // ─── Setup ────────────────────────────────────────────────────────────────────
 
 /**
@@ -82,25 +122,9 @@ export function setupAttendanceSocket(io: SocketIOServer): void {
       if (!data?.sessionId) return;
 
       try {
-        const prisma = getPrisma();
-
-        // Verify the session exists and belongs to the user's school
-        const session = await prisma.attendanceSession.findFirst({
-          where: {
-            id: data.sessionId,
-            schoolId: user.schoolId,
-          },
-          select: { id: true, teacherId: true, schoolId: true },
-        });
-
-        if (!session) {
-          socket.emit('error', { message: 'Session not found' });
-          return;
-        }
-
-        // For teachers, verify they own the session
-        if (user.role === UserRole.TEACHER && session.teacherId !== user.sub) {
-          socket.emit('error', { message: 'You do not own this session' });
+        const access = await canAccessSessionRoom(user, data.sessionId);
+        if (!access.ok) {
+          socket.emit('error', { message: access.reason ?? 'You cannot join this session' });
           return;
         }
 
@@ -126,8 +150,13 @@ export function setupAttendanceSocket(io: SocketIOServer): void {
 
     // ─── Handle qr:subscribe ────────────────────────────────────────────
     // Subscribe to QR refresh events for a session
-    socket.on('qr:subscribe', (data: { sessionId: string }) => {
+    socket.on('qr:subscribe', async (data: { sessionId: string }) => {
       if (data?.sessionId) {
+        const access = await canAccessSessionRoom(user, data.sessionId);
+        if (!access.ok) {
+          socket.emit('error', { message: access.reason ?? 'You cannot subscribe to this QR session' });
+          return;
+        }
         socket.join(`qr:${data.sessionId}`);
       }
     });

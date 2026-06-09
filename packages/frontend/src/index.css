@@ -4,19 +4,19 @@
 
 @layer base {
   :root {
-    /* SAMS strict palette: dark canvas, indigo actions, warm accent for small highlights */
-    --color-bg: #0f172a;
-    --color-surface: #1e293b;
-    --color-surface-muted: #1a1a1a;
-    --color-surface-elevated: #334155;
-    --color-text: #f5f5f5;
-    --color-text-muted: #94a3b8;
-    --color-text-subtle: #94a3b8;
-    --color-border: #334155;
-    --color-border-strong: #475569;
-    --color-brand: #4f46e5;
-    --color-brand-hover: #4338ca;
-    --color-brand-light: #1e1b4b;
+    /* SAMS work palette: neutral canvas, clear blue actions, warm attendance accent */
+    --color-bg: #0d1117;
+    --color-surface: #151b23;
+    --color-surface-muted: #111827;
+    --color-surface-elevated: #1f2937;
+    --color-text: #f8fafc;
+    --color-text-muted: #9aa4b2;
+    --color-text-subtle: #7f8a99;
+    --color-border: #263241;
+    --color-border-strong: #364557;
+    --color-brand: #2563eb;
+    --color-brand-hover: #1d4ed8;
+    --color-brand-light: #172554;
     --color-accent-orange: #f59e0b;
     --color-accent-orange-hover: #d97706;
     --color-accent-orange-light: #451a03;
@@ -59,33 +59,33 @@
   }
 
   .surface-card {
-    @apply rounded-2xl border border-line bg-surface shadow-card;
+    @apply rounded-lg border border-line bg-surface shadow-card;
   }
 
   .surface-panel {
-    @apply rounded-2xl border border-line bg-surface shadow-card p-6 min-h-[280px];
+    @apply rounded-lg border border-line bg-surface shadow-card p-6 min-h-[280px];
   }
 
   .surface-muted-row {
-    @apply flex items-center justify-between p-3 rounded-xl bg-surface-muted border border-line hover:bg-surface-elevated transition-colors;
+    @apply flex items-center justify-between p-3 rounded-lg bg-surface-muted border border-line hover:bg-surface-elevated transition-colors;
   }
 
   /* Dashboard: flat cards with left accent — not chat-bubble tiles */
   .dash-card {
-    @apply relative flex flex-col gap-2 rounded-xl border border-line bg-surface p-4 shadow-card-soft
-      hover:-translate-y-0.5 hover:border-indigo-500/35 hover:shadow-card-soft-hover transition-all duration-200;
+    @apply relative flex min-h-[5.5rem] flex-col gap-2 rounded-lg border border-line bg-surface p-4 shadow-card-soft
+      hover:border-blue-500/40 hover:bg-surface-elevated hover:shadow-card-soft-hover transition-all duration-200;
   }
 
   .dash-card-primary {
-    @apply border-l-[3px] border-l-accent-orange pl-[calc(1rem-3px)];
+    @apply border-l-[4px] border-l-accent-orange pl-[calc(1rem-4px)];
   }
 
   .dash-card-secondary {
-    @apply border-l-[3px] border-l-indigo-500 pl-[calc(1rem-3px)];
+    @apply border-l-[4px] border-l-brand pl-[calc(1rem-4px)];
   }
 
   .dash-card-icon {
-    @apply w-9 h-9 rounded-lg flex items-center justify-center shrink-0 border border-line bg-surface-muted;
+    @apply w-9 h-9 rounded-md flex items-center justify-center shrink-0 border border-line bg-surface-muted;
   }
 
   .dash-card-icon-primary {
@@ -93,12 +93,12 @@
   }
 
   .dash-card-icon-secondary {
-    @apply text-indigo-300 border-indigo-500/30 bg-indigo-500/10;
+    @apply text-blue-300 border-blue-500/30 bg-blue-500/10;
   }
 
   .dash-stat {
-    @apply flex items-center gap-4 rounded-xl border border-line bg-surface px-4 py-3 shadow-card-soft
-      hover:border-indigo-500/30 hover:shadow-card-soft-hover transition-all duration-200 cursor-default;
+    @apply flex items-center gap-4 rounded-lg border border-line bg-surface px-4 py-3 shadow-card-soft
+      hover:border-blue-500/35 hover:bg-surface-elevated hover:shadow-card-soft-hover transition-all duration-200 cursor-default;
   }
 
   .dash-stat-accent-orange {
@@ -106,7 +106,7 @@
   }
 
   .dash-stat-accent-indigo {
-    @apply border-l-[3px] border-l-indigo-500;
+    @apply border-l-[4px] border-l-brand;
   }
 
   .dash-stat-value {
@@ -158,31 +158,31 @@
   }
 
   .nav-icon-btn {
-    @apply relative w-9 h-9 rounded-lg bg-surface-muted border border-line flex items-center justify-center text-ink-muted hover:bg-surface-elevated hover:border-line-strong hover:text-ink transition-all duration-300;
+    @apply relative w-9 h-9 rounded-md bg-surface-muted border border-line flex items-center justify-center text-ink-muted hover:bg-surface-elevated hover:border-line-strong hover:text-ink transition-all duration-200;
   }
 
   .nav-icon-btn-active {
-    @apply bg-brand-light border-indigo-500/50 text-brand;
+    @apply bg-brand-light border-blue-500/60 text-blue-200;
   }
 
   .btn-primary {
-    @apply bg-indigo-600 text-white font-semibold rounded-xl hover:bg-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/40 disabled:opacity-50 disabled:cursor-not-allowed transition-colors;
+    @apply bg-brand text-white font-semibold rounded-lg hover:bg-brand-hover focus:outline-none focus:ring-2 focus:ring-blue-500/40 disabled:opacity-50 disabled:cursor-not-allowed transition-colors;
   }
 
   .btn-attendance {
-    @apply bg-indigo-600 text-white font-semibold rounded-xl hover:bg-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/40 disabled:opacity-50 disabled:cursor-not-allowed transition-colors;
+    @apply bg-accent-orange text-slate-950 font-semibold rounded-lg hover:bg-accent-orange-hover focus:outline-none focus:ring-2 focus:ring-amber-500/40 disabled:opacity-50 disabled:cursor-not-allowed transition-colors;
   }
 
   .btn-secondary {
-    @apply bg-indigo-600 text-white font-medium rounded-xl border border-indigo-500/50 hover:bg-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/40 disabled:opacity-50 transition-colors;
+    @apply bg-surface-elevated text-ink font-medium rounded-lg border border-line-strong hover:bg-brand hover:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/40 disabled:opacity-50 transition-colors;
   }
 
   .btn-secondary-neutral {
-    @apply bg-surface-elevated text-ink font-medium rounded-xl border border-line-strong hover:bg-surface-muted transition-colors;
+    @apply bg-surface-elevated text-ink font-medium rounded-lg border border-line-strong hover:bg-surface-muted transition-colors;
   }
 
   .input-field {
-    @apply w-full bg-surface-muted border border-line-strong rounded-xl px-4 py-3 text-ink placeholder-ink-subtle focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-500 transition-colors;
+    @apply w-full bg-surface-muted border border-line-strong rounded-lg px-4 py-3 text-ink placeholder-ink-subtle focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500 transition-colors;
   }
 
   .page-title {

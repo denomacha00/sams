@@ -1,6 +1,28 @@
-import { describe, expect, it, vi, beforeEach } from 'vitest';
+import { afterEach, describe, expect, it, vi, beforeEach } from 'vitest';
 import { UserRole } from '@sams/shared';
 import { findAction } from '../roleActionRegistry';
+
+const { prismaMock, sessionServiceMock } = vi.hoisted(() => ({
+  prismaMock: {
+    class: { findMany: vi.fn() },
+    timetableEntry: { findMany: vi.fn() },
+    attendanceSession: { findMany: vi.fn() },
+    user: { findFirst: vi.fn() },
+    attendanceRecord: { upsert: vi.fn() },
+  },
+  sessionServiceMock: {
+    startSession: vi.fn(),
+    endSession: vi.fn(),
+  },
+}));
+
+vi.mock('../../../lib/prisma', () => ({
+  prisma: prismaMock,
+}));
+
+vi.mock('../../sessionService', () => ({
+  sessionService: sessionServiceMock,
+}));
 
 vi.mock('../departmentStatsQuery', () => ({
   fetchDepartmentStats: vi.fn().mockResolvedValue({
@@ -18,6 +40,12 @@ vi.mock('../departmentStatsQuery', () => ({
 describe('view_department_stats handler', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-06-01T08:15:00'));
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
   });
 
   it('returns teacher, student, and class counts for HOD scope', async () => {
@@ -52,5 +80,137 @@ describe('view_department_stats handler', () => {
       { userId: 'hod-1', role: UserRole.HOD, schoolId: 'school-1' },
     );
     expect(result.answer).toMatch(/not linked to a department/i);
+  });
+});
+
+describe('HOD AI attendance actions', () => {
+  const scope = {
+    userId: 'hod-1',
+    role: UserRole.HOD,
+    schoolId: 'school-1',
+    departmentId: 'dept-1',
+  };
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-06-01T08:15:00'));
+    prismaMock.class.findMany.mockResolvedValue([{ id: 'class-1', name: 'Form 1A' }]);
+    prismaMock.timetableEntry.findMany.mockResolvedValue([
+      { id: 'entry-1', subject: 'Math', startTime: '08:00', endTime: '09:00' },
+    ]);
+    prismaMock.attendanceSession.findMany.mockResolvedValue([
+      {
+        id: 'session-1',
+        subject: 'Math',
+        classId: 'class-1',
+        class: { name: 'Form 1A', departmentId: 'dept-1' },
+      },
+    ]);
+    prismaMock.user.findFirst.mockResolvedValue({ id: 'student-1', fullName: 'Amina Test' });
+    prismaMock.attendanceRecord.upsert.mockResolvedValue({});
+    sessionServiceMock.startSession.mockResolvedValue({ id: 'session-1' });
+    sessionServiceMock.endSession.mockResolvedValue(undefined);
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it('starts a department-scoped attendance session through the session service', async () => {
+    const action = findAction(UserRole.HOD, 'start_session');
+
+    const result = await action!.handler({ classId: 'class-1' }, scope);
+
+    expect(prismaMock.timetableEntry.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          schoolId: 'school-1',
+          classId: 'class-1',
+          dayOfWeek: 0,
+          class: { departmentId: 'dept-1' },
+        }),
+      }),
+    );
+    expect(sessionServiceMock.startSession).toHaveBeenCalledWith(
+      'hod-1',
+      'school-1',
+      'entry-1',
+      undefined,
+      {
+        actorRole: UserRole.HOD,
+        actorDepartmentId: 'dept-1',
+        requireGps: false,
+      },
+    );
+    expect(result.data).toEqual({ sessionId: 'session-1', classId: 'class-1' });
+  });
+
+  it('ends only a department-scoped active session', async () => {
+    const action = findAction(UserRole.HOD, 'end_session');
+
+    const result = await action!.handler({ classId: 'class-1' }, scope);
+
+    expect(prismaMock.attendanceSession.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          schoolId: 'school-1',
+          isActive: true,
+          classId: 'class-1',
+          class: { departmentId: 'dept-1' },
+        }),
+      }),
+    );
+    expect(sessionServiceMock.endSession).toHaveBeenCalledWith(
+      'session-1',
+      'hod-1',
+      {
+        actorRole: UserRole.HOD,
+        actorDepartmentId: 'dept-1',
+      },
+    );
+    expect(result.data).toEqual({ sessionId: 'session-1' });
+  });
+
+  it('marks a department student in the selected active session', async () => {
+    const action = findAction(UserRole.HOD, 'mark_attendance');
+
+    const result = await action!.handler(
+      { classId: 'class-1', studentName: 'Amina', status: 'PRESENT' },
+      scope,
+    );
+
+    expect(prismaMock.user.findFirst).toHaveBeenCalledWith({
+      where: {
+        schoolId: 'school-1',
+        role: 'STUDENT',
+        departmentId: 'dept-1',
+        classId: 'class-1',
+        fullName: { contains: 'Amina', mode: 'insensitive' },
+      },
+    });
+    expect(prismaMock.attendanceRecord.upsert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { sessionId_studentId: { sessionId: 'session-1', studentId: 'student-1' } },
+      }),
+    );
+    expect(result.data).toEqual({
+      sessionId: 'session-1',
+      studentId: 'student-1',
+      status: 'PRESENT',
+    });
+  });
+
+  it('blocks attendance actions when HOD has no department', async () => {
+    const action = findAction(UserRole.HOD, 'start_session');
+
+    const result = await action!.handler({}, {
+      userId: 'hod-1',
+      role: UserRole.HOD,
+      schoolId: 'school-1',
+    });
+
+    expect(result.answer).toMatch(/not linked to a department/i);
+    expect(sessionServiceMock.startSession).not.toHaveBeenCalled();
   });
 });
