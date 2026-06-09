@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import apiClient from '../services/apiClient';
 import { saveAttendanceRecord } from '../services/offlineStore';
-import { AttendanceStatus } from '@sams/shared';
+import { AttendanceStatus, UserRole } from '@sams/shared';
 import { useAuthStore } from '../store/authStore';
 import { getApiErrorMessage } from '../lib/apiError';
 
@@ -71,8 +71,12 @@ const ManualAttendancePage: React.FC = () => {
       setLoadingSessions(true);
       setError(null);
       try {
+        const params: Record<string, string | boolean> = { isActive: true };
+        if (user.role === UserRole.TEACHER) {
+          params.teacherId = user.id;
+        }
         const { data } = await apiClient.get('/sessions', {
-          params: { isActive: true, teacherId: user.id },
+          params,
         });
         const list: SessionOption[] = (Array.isArray(data) ? data : [])
           .filter((s: SessionOption) => s.isActive !== false)
@@ -99,7 +103,7 @@ const ManualAttendancePage: React.FC = () => {
       }
     };
     void fetchSessions();
-  }, [user?.id, sessionFromUrl]);
+  }, [user?.id, user?.role, sessionFromUrl]);
 
   useEffect(() => {
     if (!sessionId) {

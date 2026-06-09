@@ -1,4 +1,4 @@
-const STATIC_CACHE = 'sams-static-v5';
+const STATIC_CACHE = 'sams-static-v6';
 const OFFLINE_QUEUE_STORE = 'offline-request-queue';
 
 const STATIC_ASSETS = [];

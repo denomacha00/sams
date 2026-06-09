@@ -50,9 +50,15 @@ interface AttendanceSessionScope {
   schoolId: string;
   classId: string;
   teacherId: string;
+  class: { departmentId: string };
   locationLat: number | null;
   locationLng: number | null;
   locationRadiusM: number;
+}
+
+interface AttendanceActorOptions {
+  actorRole?: UserRole;
+  actorDepartmentId?: string | null;
 }
 
 interface AttendanceStudentScope {
@@ -142,7 +148,10 @@ export class AttendanceService {
     sessionId: string,
     schoolId: string,
     teacherId: string,
+    actor: AttendanceActorOptions = {},
   ): Promise<AttendanceSessionScope> {
+    const actorRole = actor.actorRole ?? UserRole.TEACHER;
+
     const session = await prisma.attendanceSession.findUnique({
       where: { id: sessionId },
       select: {
@@ -150,6 +159,7 @@ export class AttendanceService {
         schoolId: true,
         classId: true,
         teacherId: true,
+        class: { select: { departmentId: true } },
         locationLat: true,
         locationLng: true,
         locationRadiusM: true,
@@ -164,7 +174,15 @@ export class AttendanceService {
       throw new AppError(403, 'FORBIDDEN', 'Session does not belong to your school');
     }
 
-    if (session.teacherId !== teacherId) {
+    const canManage =
+      session.teacherId === teacherId ||
+      (
+        actorRole === UserRole.HOD &&
+        !!actor.actorDepartmentId &&
+        session.class.departmentId === actor.actorDepartmentId
+      );
+
+    if (!canManage) {
       throw new AppError(403, 'FORBIDDEN', 'You do not own this attendance session');
     }
 
@@ -200,10 +218,13 @@ export class AttendanceService {
     expiryMinutes: number = 5,
     requireGps: boolean = true,
     gpsRadiusM: number = 100,
+    actor: AttendanceActorOptions = {},
   ) {
     // 1. Validate session exists, is active, and belongs to the teacher's school
+    const actorRole = actor.actorRole ?? UserRole.TEACHER;
     const session = await prisma.attendanceSession.findUnique({
       where: { id: sessionId },
+      include: { class: { select: { departmentId: true } } },
     });
 
     if (!session) {
@@ -218,7 +239,15 @@ export class AttendanceService {
       throw new AppError(403, 'FORBIDDEN', 'Session does not belong to your school');
     }
 
-    if (session.teacherId !== teacherId) {
+    const canManage =
+      session.teacherId === teacherId ||
+      (
+        actorRole === UserRole.HOD &&
+        !!actor.actorDepartmentId &&
+        session.class.departmentId === actor.actorDepartmentId
+      );
+
+    if (!canManage) {
       throw new AppError(403, 'FORBIDDEN', 'You do not own this attendance session');
     }
 
@@ -458,6 +487,7 @@ export class AttendanceService {
     sessionId: string,
     status: string,
     note?: string,
+    actor: AttendanceActorOptions = {},
   ) {
     // Validate status
     const validStatuses: string[] = [
@@ -484,7 +514,7 @@ export class AttendanceService {
       );
     }
 
-    const session = await this.getOwnedSession(sessionId, schoolId, teacherId);
+    const session = await this.getOwnedSession(sessionId, schoolId, teacherId, actor);
     await this.assertStudentInSession(studentId, schoolId, session);
 
     // Check for existing record (duplicate)
@@ -514,7 +544,7 @@ export class AttendanceService {
       await auditService.log({
         eventType: 'ATTENDANCE_UPDATED',
         actorId: teacherId,
-        actorRole: 'TEACHER',
+        actorRole: actor.actorRole ?? UserRole.TEACHER,
         schoolId,
         resourceSnapshot: {
           recordId: existing.id,
@@ -569,6 +599,7 @@ export class AttendanceService {
     sessionId: string,
     studentId: string,
     confidence: number,
+    actor: AttendanceActorOptions = {},
   ) {
     // Check confidence threshold
     if (confidence < BIOMETRIC_CONFIDENCE_THRESHOLD) {
@@ -579,7 +610,7 @@ export class AttendanceService {
       );
     }
 
-    const session = await this.getOwnedSession(sessionId, schoolId, teacherId);
+    const session = await this.getOwnedSession(sessionId, schoolId, teacherId, actor);
     await this.assertStudentInSession(studentId, schoolId, session);
 
     // Check for existing record
@@ -632,11 +663,25 @@ export class AttendanceService {
     recordId: string,
     status: string,
     note?: string,
+    actor: AttendanceActorOptions = {},
   ) {
     // Fetch record and assert school ownership
     const record = await prisma.attendanceRecord.findUnique({
       where: { id: recordId },
-      include: { session: { select: { id: true, schoolId: true, classId: true, teacherId: true, locationLat: true, locationLng: true, locationRadiusM: true } } },
+      include: {
+        session: {
+          select: {
+            id: true,
+            schoolId: true,
+            classId: true,
+            teacherId: true,
+            class: { select: { departmentId: true } },
+            locationLat: true,
+            locationLng: true,
+            locationRadiusM: true,
+          },
+        },
+      },
     });
 
     if (!record) {
@@ -647,7 +692,16 @@ export class AttendanceService {
       throw new AppError(403, 'FORBIDDEN', 'Record does not belong to this school');
     }
 
-    if (record.session.teacherId !== teacherId) {
+    const actorRole = actor.actorRole ?? UserRole.TEACHER;
+    const canManage =
+      record.session.teacherId === teacherId ||
+      (
+        actorRole === UserRole.HOD &&
+        !!actor.actorDepartmentId &&
+        record.session.class.departmentId === actor.actorDepartmentId
+      );
+
+    if (!canManage) {
       throw new AppError(403, 'FORBIDDEN', 'You do not own this attendance session');
     }
 
@@ -683,7 +737,7 @@ export class AttendanceService {
     await auditService.log({
       eventType: 'ATTENDANCE_UPDATED',
       actorId: teacherId,
-      actorRole: 'TEACHER',
+      actorRole,
       schoolId,
       resourceSnapshot: {
         recordId,
@@ -714,12 +768,13 @@ export class AttendanceService {
     schoolId: string,
     teacherId: string,
     records: OfflineAttendanceRecord[],
+    actor: AttendanceActorOptions = {},
   ): Promise<SyncResult> {
     const synced: string[] = [];
     const conflicts: ConflictResult[] = [];
 
     for (const offlineRecord of records) {
-      const session = await this.getOwnedSession(offlineRecord.sessionId, schoolId, teacherId);
+      const session = await this.getOwnedSession(offlineRecord.sessionId, schoolId, teacherId, actor);
       await this.assertStudentInSession(offlineRecord.studentId, schoolId, session);
 
       const existing = await prisma.attendanceRecord.findUnique({

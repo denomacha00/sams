@@ -9,6 +9,7 @@ export function registerServiceWorker(): void {
       try {
         const registration = await navigator.serviceWorker.register('/sw.js', {
           scope: '/',
+          updateViaCache: 'none',
         });
         console.log('[SW] Registered with scope:', registration.scope);
 
@@ -21,7 +22,7 @@ export function registerServiceWorker(): void {
         void registration.update();
         window.setInterval(() => {
           void registration.update();
-        }, 60 * 60 * 1000);
+        }, 5 * 60 * 1000);
 
         // Check for updates periodically
         registration.addEventListener('updatefound', () => {

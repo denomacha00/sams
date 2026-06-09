@@ -41,7 +41,7 @@ interface SentNotification extends Notification {
   recipientCount: number;
 }
 
-type Folder = 'inbox' | 'sent';
+type Folder = 'alerts' | 'inbox' | 'sent';
 
 interface Department {
   id: string;
@@ -106,16 +106,6 @@ const ATTACHMENT_ACCEPT = [
   '.ppt',
   '.pptx',
 ].join(',');
-
-function resolveAttachmentUrl(url: string): string {
-  if (url.startsWith('http://') || url.startsWith('https://')) return url;
-  if (url.startsWith('/uploads')) return `${window.location.origin}${url}`;
-  const base = import.meta.env.VITE_API_BASE_URL || '/api/v1';
-  if (base.startsWith('http://') || base.startsWith('https://')) {
-    return `${new URL(base).origin}${url}`;
-  }
-  return `${window.location.origin}${url}`;
-}
 
 function attachmentDownloadPath(att: NotificationAttachment, download = false): string {
   const suffix = download ? '?download=1' : '';
@@ -672,9 +662,20 @@ const NotificationsPage: React.FC = () => {
     setOpenedNotification(isSentFolder ? null : { ...notif, read: true });
   };
 
-  const unreadCount = notifications.filter((n) => !n.read).length;
-  const displayList = folder === 'inbox' ? notifications : sentMessages;
-  const listLoading = folder === 'inbox' ? loading : sentLoading;
+  const alertMessages = notifications.filter((n) => n.type !== 'MESSAGE' || !n.senderId);
+  const inboxMessages = notifications.filter((n) => n.type === 'MESSAGE' && !!n.senderId);
+  const inboxUnreadCount = inboxMessages.filter((n) => !n.read).length;
+  const alertsUnreadCount = alertMessages.filter((n) => !n.read).length;
+  const totalUnreadCount = notifications.filter((n) => !n.read).length;
+  const folderUnreadCount =
+    folder === 'alerts' ? alertsUnreadCount :
+    folder === 'inbox' ? inboxUnreadCount :
+    0;
+  const displayList =
+    folder === 'alerts' ? alertMessages :
+    folder === 'inbox' ? inboxMessages :
+    sentMessages;
+  const listLoading = folder === 'sent' ? sentLoading : loading;
 
   const renderAttachments = (attachments: NotificationAttachment[] | undefined, isSentFolder: boolean) => {
     if (!attachments || attachments.length === 0) return null;
@@ -686,8 +687,7 @@ const NotificationsPage: React.FC = () => {
       >
         {attachments.map((att) => {
           const blob = attachmentBlobs[att.id];
-          const directHref = resolveAttachmentUrl(att.url);
-          const href = blob?.url || directHref;
+          const href = blob?.url;
           const loading = blob?.loading && !blob.url;
           const failed = blob?.error && !blob.url;
           if (isImageAttachment(att)) {
@@ -696,33 +696,32 @@ const NotificationsPage: React.FC = () => {
                 key={att.id}
                 className={`block overflow-hidden rounded-xl border border-line bg-surface-elevated hover:border-indigo-500/40 transition-all ${isSentFolder ? 'ml-auto' : ''}`}
               >
-                <a href={href} target="_blank" rel="noreferrer" className="block">
-                  {loading ? (
-                    <div className="flex h-36 w-full max-w-xs items-center justify-center text-xs text-ink-subtle">
-                      Loading image...
-                    </div>
-                  ) : (
+                {loading ? (
+                  <div className="flex h-36 w-full max-w-xs items-center justify-center text-xs text-ink-subtle">
+                    Loading image...
+                  </div>
+                ) : failed || !href ? (
+                  <div className="flex h-36 w-full max-w-xs items-center justify-center px-4 text-center text-xs text-red-300">
+                    Image could not be loaded. Refresh and try again.
+                  </div>
+                ) : (
+                  <a href={href} target="_blank" rel="noreferrer" className="block">
                     <img
                       src={href}
                       alt={att.fileName}
                       className="max-h-56 w-full max-w-xs object-cover"
                       loading="lazy"
                     />
-                  )}
-                </a>
+                  </a>
+                )}
                 <div className="flex items-center justify-between gap-3 px-3 py-2 text-xs text-ink-muted">
-                  {att.fileName} · {formatFileSize(att.sizeBytes)}
-                  {blob?.url && (
-                    <a href={blob.url} download={att.fileName} className="shrink-0 text-indigo-300 hover:text-indigo-200">
+                  <span className="min-w-0 truncate">{att.fileName} - {formatFileSize(att.sizeBytes)}</span>
+                  {href && (
+                    <a href={href} download={att.fileName} className="shrink-0 text-indigo-300 hover:text-indigo-200">
                       Download
                     </a>
                   )}
                 </div>
-                {failed && (
-                  <div className="border-t border-line px-3 py-2 text-xs text-red-300">
-                    Preview failed. <a href={directHref} target="_blank" rel="noreferrer" className="underline">Try direct link</a>
-                  </div>
-                )}
               </div>
             );
           }
@@ -738,21 +737,27 @@ const NotificationsPage: React.FC = () => {
               <span className="min-w-0 flex-1">
                 <span className="block truncate text-sm font-medium text-ink">{att.fileName}</span>
                 <span className="block text-xs text-ink-subtle">
-                  {loading ? 'Loading...' : failed ? 'Could not preview' : formatFileSize(att.sizeBytes)}
+                  {loading ? 'Loading...' : failed ? 'Could not load file' : formatFileSize(att.sizeBytes)}
                 </span>
               </span>
               <span className="flex shrink-0 items-center gap-2 text-xs">
-                <a
-                  href={href}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="rounded-lg border border-line px-2 py-1 text-ink-muted hover:text-ink hover:bg-white/10"
-                >
-                  Open
-                </a>
-                {blob?.url && (
+                {href ? (
                   <a
-                    href={blob.url}
+                    href={href}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="rounded-lg border border-line px-2 py-1 text-ink-muted hover:text-ink hover:bg-white/10"
+                  >
+                    Open
+                  </a>
+                ) : (
+                  <span className="rounded-lg border border-line px-2 py-1 text-ink-subtle">
+                    {failed ? 'Unavailable' : 'Loading'}
+                  </span>
+                )}
+                {href && (
+                  <a
+                    href={href}
                     download={att.fileName}
                     className="rounded-lg bg-indigo-600 px-2 py-1 font-semibold text-white hover:bg-indigo-500"
                   >
@@ -894,9 +899,9 @@ const NotificationsPage: React.FC = () => {
           <div>
             <h1 className="text-2xl font-bold text-ink flex items-center gap-3">
               Message Center
-              {unreadCount > 0 && folder === 'inbox' && (
+              {totalUnreadCount > 0 && (
                 <span className="inline-flex items-center justify-center px-2 py-0.5 rounded-full text-xs font-bold bg-indigo-600 text-white min-w-[1.5rem]">
-                  {unreadCount}
+                  {totalUnreadCount}
                 </span>
               )}
             </h1>
@@ -907,23 +912,29 @@ const NotificationsPage: React.FC = () => {
             </p>
           </div>
           <div className="flex items-center gap-3 flex-wrap">
-            {canSend && (
-              <div className="flex rounded-xl border border-line overflow-hidden">
-                <button
-                  onClick={() => setFolder('inbox')}
-                  className={`px-3 py-2 text-sm transition-all ${folder === 'inbox' ? 'bg-indigo-600 text-white' : 'text-ink-muted hover:text-ink hover:bg-surface-elevated'}`}
-                >
-                  Inbox
-                </button>
+            <div className="flex rounded-xl border border-line overflow-hidden">
+              <button
+                onClick={() => setFolder('alerts')}
+                className={`px-3 py-2 text-sm transition-all ${folder === 'alerts' ? 'bg-indigo-600 text-white' : 'text-ink-muted hover:text-ink hover:bg-surface-elevated'}`}
+              >
+                Alerts{alertsUnreadCount > 0 ? ` (${alertsUnreadCount})` : ''}
+              </button>
+              <button
+                onClick={() => setFolder('inbox')}
+                className={`px-3 py-2 text-sm transition-all ${folder === 'inbox' ? 'bg-indigo-600 text-white' : 'text-ink-muted hover:text-ink hover:bg-surface-elevated'}`}
+              >
+                Inbox{inboxUnreadCount > 0 ? ` (${inboxUnreadCount})` : ''}
+              </button>
+              {canSend && (
                 <button
                   onClick={() => setFolder('sent')}
                   className={`px-3 py-2 text-sm transition-all ${folder === 'sent' ? 'bg-indigo-600 text-white' : 'text-ink-muted hover:text-ink hover:bg-surface-elevated'}`}
                 >
                   Sent
                 </button>
-              </div>
-            )}
-            {folder === 'inbox' && unreadCount > 0 && (
+              )}
+            </div>
+            {folder !== 'sent' && folderUnreadCount > 0 && (
               <button
                 onClick={markAllAsRead}
                 className="px-3 py-2 text-sm text-ink-muted hover:text-ink border border-line rounded-xl hover:bg-surface-elevated transition-all"

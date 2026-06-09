@@ -918,6 +918,21 @@ authRouter.post('/webauthn/register/verify', authenticate, async (req: Request, 
  * POST /api/v1/auth/webauthn/authenticate/options
  * Generate WebAuthn authentication options (no auth required — this is for login).
  */
+/**
+ * DELETE /api/v1/auth/webauthn/credentials
+ * Remove all fingerprint/passkey sign-in credentials for the current user.
+ */
+authRouter.delete('/webauthn/credentials', authenticate, async (req: Request, res: Response): Promise<void> => {
+  try {
+    const result = await prisma.webAuthnCredential.deleteMany({
+      where: { userId: req.user.sub },
+    });
+    res.status(200).json({ success: true, deletedCount: result.count });
+  } catch {
+    res.status(500).json({ error: 'Failed to remove fingerprint sign-in', code: 'INTERNAL_ERROR' });
+  }
+});
+
 authRouter.post('/webauthn/authenticate/options', async (req: Request, res: Response): Promise<void> => {
   try {
     const options = await webauthnService.generateAuthenticationOptions(

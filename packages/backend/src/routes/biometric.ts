@@ -94,6 +94,25 @@ async function assertCanEnrollTarget(req: Request, studentId: string): Promise<v
 export const biometricRouter = Router();
 
 /**
+ * DELETE /api/v1/biometric/me
+ * Remove the current user's face biometric template. This remains available even
+ * if the school later downgrades from biometric access.
+ */
+biometricRouter.delete('/me', authenticate, async (req: Request, res: Response): Promise<void> => {
+  try {
+    const result = await prisma.biometricTemplate.deleteMany({
+      where: {
+        schoolId: req.schoolId,
+        studentId: req.user.sub,
+      },
+    });
+    res.status(200).json({ success: true, deletedCount: result.count });
+  } catch {
+    throw new AppError(500, 'INTERNAL_ERROR', 'Failed to remove biometric profile');
+  }
+});
+
+/**
  * Middleware: Gate all biometric routes behind Pro/Enterprise plan access.
  * Requirements: 7.1, 12.4
  */
@@ -150,13 +169,25 @@ biometricRouter.post(
       if (sessionId) {
         const session = await prisma.attendanceSession.findUnique({
           where: { id: sessionId },
-          select: { classId: true, schoolId: true, teacherId: true, isActive: true },
+          select: {
+            classId: true,
+            schoolId: true,
+            teacherId: true,
+            isActive: true,
+            class: { select: { departmentId: true } },
+          },
         });
         if (!session || session.schoolId !== req.schoolId || !session.isActive) {
           throw new AppError(400, 'NO_ACTIVE_SESSION', 'Start an attendance session before scanning faces');
         }
         if (req.user.role === UserRole.TEACHER && session.teacherId !== req.user.sub) {
           throw new AppError(403, 'FORBIDDEN', 'Teachers can only scan biometric attendance for their own sessions');
+        }
+        if (
+          req.user.role === UserRole.HOD &&
+          (!req.user.departmentId || session.class.departmentId !== req.user.departmentId)
+        ) {
+          throw new AppError(403, 'FORBIDDEN', 'HODs can only scan biometric attendance for their department');
         }
         if (classId && classId !== session.classId) {
           throw new AppError(400, 'CLASS_SESSION_MISMATCH', 'Selected class does not match the active attendance session');
@@ -194,7 +225,7 @@ biometricRouter.post(
           where: {
             schoolId: req.schoolId,
             classId,
-            teacherId: req.user.sub,
+            ...(req.user.role === UserRole.TEACHER ? { teacherId: req.user.sub } : {}),
             isActive: true,
           },
           select: { id: true },
@@ -221,6 +252,7 @@ biometricRouter.post(
         sessionId,
         match.studentId,
         match.confidence,
+        { actorRole: req.user.role, actorDepartmentId: req.user.departmentId },
       );
 
       res.status(201).json({

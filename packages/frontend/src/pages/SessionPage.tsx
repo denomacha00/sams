@@ -5,7 +5,7 @@ import { io, Socket } from 'socket.io-client';
 import type { AxiosError } from 'axios';
 import apiClient from '../services/apiClient';
 import { useAuthStore } from '../store/authStore';
-import { AttendanceStatus } from '@sams/shared';
+import { AttendanceStatus, UserRole } from '@sams/shared';
 import { getApiErrorMessage } from '../lib/apiError';
 import { getTeacherLocation } from '../lib/geolocation';
 
@@ -91,8 +91,12 @@ const SessionPage: React.FC = () => {
     if (!user?.id || activeSession) return;
     const resume = async () => {
       try {
+        const params: Record<string, string | boolean> = { isActive: true };
+        if (user.role === UserRole.TEACHER) {
+          params.teacherId = user.id;
+        }
         const { data } = await apiClient.get('/sessions', {
-          params: { isActive: true, teacherId: user.id },
+          params,
         });
         const list = (Array.isArray(data) ? data : []).filter(
           (s: { isActive?: boolean }) => s.isActive !== false,
@@ -105,7 +109,7 @@ const SessionPage: React.FC = () => {
       }
     };
     void resume();
-  }, [user?.id, activeSession, applySessionFromApi]);
+  }, [user?.id, user?.role, activeSession, applySessionFromApi]);
 
   // Fetch today's timetable entries for this teacher
   useEffect(() => {
@@ -113,12 +117,11 @@ const SessionPage: React.FC = () => {
       try {
         const jsDayOfWeek = new Date().getDay();
         const schemaDayOfWeek = jsDayOfWeek === 0 ? 6 : jsDayOfWeek - 1;
-        const { data } = await apiClient.get('/timetable', {
-          params: {
-            dayOfWeek: schemaDayOfWeek,
-            ...(user?.id ? { teacherId: user.id } : {}),
-          },
-        });
+        const params: Record<string, string | number> = { dayOfWeek: schemaDayOfWeek };
+        if (user?.role === UserRole.TEACHER && user.id) {
+          params.teacherId = user.id;
+        }
+        const { data } = await apiClient.get('/timetable', { params });
         const entries = (Array.isArray(data) ? data : []).map((entry: TimetableEntry) => ({
           ...entry,
           className: entry.className ?? entry.class?.name ?? 'Class',
@@ -129,7 +132,7 @@ const SessionPage: React.FC = () => {
       }
     };
     fetchEntries();
-  }, [user?.id]);
+  }, [user?.id, user?.role]);
 
   // Generate QR code image from token
   useEffect(() => {
@@ -336,8 +339,12 @@ const SessionPage: React.FC = () => {
         );
       } else if (code === 'SESSION_ALREADY_ACTIVE') {
         try {
+          const params: Record<string, string | boolean> = { isActive: true };
+          if (user?.role === UserRole.TEACHER && user.id) {
+            params.teacherId = user.id;
+          }
           const { data: sessions } = await apiClient.get('/sessions', {
-            params: { isActive: true, teacherId: user?.id },
+            params,
           });
           const list = (Array.isArray(sessions) ? sessions : []).filter(
             (s: { isActive?: boolean }) => s.isActive !== false,

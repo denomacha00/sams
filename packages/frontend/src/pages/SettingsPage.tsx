@@ -185,6 +185,21 @@ const SettingsPage: React.FC = () => {
     }
   }, [webauthnAvailable]);
 
+  const handleFingerprintDisable = useCallback(async () => {
+    if (!confirm('Disable fingerprint sign-in for this account? You can register it again later.')) return;
+    setFingerprintLoading(true);
+    clearMessages();
+    try {
+      await apiClient.delete('/auth/webauthn/credentials');
+      setFingerprintRegistered(false);
+      setSuccess('Fingerprint sign-in disabled.');
+    } catch (err: any) {
+      setError(err.response?.data?.error || 'Failed to disable fingerprint sign-in.');
+    } finally {
+      setFingerprintLoading(false);
+    }
+  }, []);
+
   // Face biometric enrollment (students)
   const handleFaceEnroll = useCallback(async () => {
     setBioLoading(true);
@@ -221,6 +236,21 @@ const SettingsPage: React.FC = () => {
       setBioLoading(false);
     }
   }, [user?.id]);
+
+  const handleFaceDisable = useCallback(async () => {
+    if (!confirm('Remove your face enrollment for biometric attendance? You can enroll again later.')) return;
+    setBioLoading(true);
+    clearMessages();
+    try {
+      await apiClient.delete('/biometric/me');
+      setBioEnrolled(false);
+      setSuccess('Face enrollment removed.');
+    } catch (err: any) {
+      setError(err.response?.data?.error || 'Failed to remove face enrollment.');
+    } finally {
+      setBioLoading(false);
+    }
+  }, []);
 
   return (
     <div className="page-shell p-6">
@@ -320,9 +350,21 @@ const SettingsPage: React.FC = () => {
               </div>
             </div>
             {bioEnrolled ? (
-              <div className="flex items-center gap-3 p-3 bg-indigo-500/10 border border-indigo-400/20 rounded-xl">
-                <svg className="w-5 h-5 text-orange-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
-                <p className="text-sm text-indigo-300">Face enrolled. Biometric attendance is active.</p>
+              <div className="space-y-3">
+                <div className="flex items-center gap-3 p-3 bg-indigo-500/10 border border-indigo-400/20 rounded-xl">
+                  <svg className="w-5 h-5 text-orange-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
+                  <p className="text-sm text-indigo-300">Face enrolled. Biometric attendance is active.</p>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  <button onClick={handleFaceEnroll} disabled={bioLoading}
+                    className="btn-secondary font-semibold py-2.5 px-4 disabled:opacity-50">
+                    {bioLoading ? 'Scanning...' : 'Re-enroll face'}
+                  </button>
+                  <button onClick={handleFaceDisable} disabled={bioLoading}
+                    className="border border-red-500/40 text-red-300 rounded-xl py-2.5 px-4 font-semibold hover:bg-red-500/15 disabled:opacity-50">
+                    Disable face
+                  </button>
+                </div>
               </div>
             ) : (
               <div>
@@ -366,9 +408,21 @@ const SettingsPage: React.FC = () => {
               </div>
             )}
             {fingerprintRegistered ? (
-              <div className="flex items-center gap-3 p-3 bg-indigo-500/10 border border-indigo-400/20 rounded-xl">
-                <svg className="w-5 h-5 text-orange-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
-                <p className="text-sm text-indigo-300">Fingerprint registered. Use it on the login page.</p>
+              <div className="space-y-3">
+                <div className="flex items-center gap-3 p-3 bg-indigo-500/10 border border-indigo-400/20 rounded-xl">
+                  <svg className="w-5 h-5 text-orange-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
+                  <p className="text-sm text-indigo-300">Fingerprint registered. Use it on the login page.</p>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  <button onClick={handleFingerprintRegister} disabled={fingerprintLoading}
+                    className="btn-secondary font-semibold py-2.5 px-4 disabled:opacity-50">
+                    {fingerprintLoading ? 'Touch sensor...' : 'Register another'}
+                  </button>
+                  <button onClick={handleFingerprintDisable} disabled={fingerprintLoading}
+                    className="border border-red-500/40 text-red-300 rounded-xl py-2.5 px-4 font-semibold hover:bg-red-500/15 disabled:opacity-50">
+                    Disable fingerprint
+                  </button>
+                </div>
               </div>
             ) : (
               <div>

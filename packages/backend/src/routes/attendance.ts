@@ -120,6 +120,7 @@ attendanceRouter.post('/manual', requirePermission('mark:attendance'), async (re
       parsed.data.sessionId,
       parsed.data.status,
       parsed.data.note,
+      { actorRole: req.user.role, actorDepartmentId: req.user.departmentId },
     );
     res.status(201).json(record);
   } catch (err) {
@@ -150,6 +151,7 @@ attendanceRouter.post('/biometric', requirePermission('mark:attendance'), async 
       parsed.data.sessionId,
       parsed.data.studentId,
       parsed.data.confidence,
+      { actorRole: req.user.role, actorDepartmentId: req.user.departmentId },
     );
     res.status(201).json(record);
   } catch (err) {
@@ -181,6 +183,7 @@ attendanceRouter.post('/link/generate', requirePermission('start:session'), asyn
       parsed.data.expiryMinutes,
       parsed.data.requireGps,
       parsed.data.gpsRadiusM,
+      { actorRole: req.user.role, actorDepartmentId: req.user.departmentId },
     );
     res.status(201).json(result);
   } catch (err) {
@@ -313,6 +316,7 @@ attendanceRouter.put('/:id', requirePermission('mark:attendance'), async (req: R
       req.params.id as string,
       parsed.data.status,
       parsed.data.note,
+      { actorRole: req.user.role, actorDepartmentId: req.user.departmentId },
     );
     res.status(200).json(record);
   } catch (err) {
@@ -338,7 +342,12 @@ attendanceRouter.post('/sync', requirePermission('mark:attendance'), async (req:
   }
 
   try {
-    const result = await attendanceService.syncOfflineRecords(req.schoolId, req.user.sub, parsed.data.records);
+    const result = await attendanceService.syncOfflineRecords(
+      req.schoolId,
+      req.user.sub,
+      parsed.data.records,
+      { actorRole: req.user.role, actorDepartmentId: req.user.departmentId },
+    );
     res.status(200).json(result);
   } catch (err) {
     if (err instanceof AppError) throw err;
@@ -391,6 +400,22 @@ attendanceRouter.get('/', async (req: Request, res: Response): Promise<void> => 
         res.status(200).json([]);
         return;
       }
+
+      if (req.query.sessionId) {
+        const session = await prisma.attendanceSession.findFirst({
+          where: {
+            id: req.query.sessionId as string,
+            schoolId: req.schoolId,
+            class: { departmentId: req.user.departmentId },
+          },
+          select: { id: true },
+        });
+        if (!session) {
+          res.status(200).json([]);
+          return;
+        }
+        where.sessionId = req.query.sessionId;
+      } else {
       const classes = await prisma.class.findMany({
         where: { schoolId: req.schoolId, departmentId: req.user.departmentId },
         select: { id: true },
@@ -410,10 +435,14 @@ attendanceRouter.get('/', async (req: Request, res: Response): Promise<void> => 
         return;
       }
       where.sessionId = { in: sessionIds };
+      }
     }
     // SCHOOL_ADMIN: can filter by studentId, sessionId, status from query params
 
     // Additional filters from query params (non-student roles only)
+    if (req.query.sessionId && req.user.role !== UserRole.TEACHER && req.user.role !== UserRole.HOD) {
+      where.sessionId = req.query.sessionId;
+    }
     if (req.query.studentId && req.user.role !== UserRole.STUDENT) {
       where.studentId = req.query.studentId;
     }

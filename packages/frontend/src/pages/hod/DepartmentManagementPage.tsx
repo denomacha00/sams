@@ -47,6 +47,10 @@ const DepartmentManagementPage: React.FC = () => {
   const [assigning, setAssigning] = useState(false);
   const [assignError, setAssignError] = useState('');
   const [assignSuccess, setAssignSuccess] = useState('');
+  const [newClassName, setNewClassName] = useState('');
+  const [newClassCapacity, setNewClassCapacity] = useState(50);
+  const [addingClass, setAddingClass] = useState(false);
+  const [addClassError, setAddClassError] = useState('');
 
   useEffect(() => {
     if (!user?.departmentId) return;
@@ -105,6 +109,33 @@ const DepartmentManagementPage: React.FC = () => {
     setSelectedTeacherId('');
     setAssignError('');
     setAssignSuccess('');
+  };
+
+  const handleAddClass = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!user?.departmentId) return;
+    if (!newClassName.trim()) {
+      setAddClassError('Class name is required.');
+      return;
+    }
+    setAddingClass(true);
+    setAddClassError('');
+    setAssignSuccess('');
+    try {
+      const { data } = await apiClient.post<ClassWithTeacher>('/classes', {
+        name: newClassName.trim(),
+        capacity: newClassCapacity,
+        departmentId: user.departmentId,
+      });
+      setClasses((prev) => [...prev, { ...data, classTeacherName: data.classTeacherName ?? null }]);
+      setNewClassName('');
+      setNewClassCapacity(50);
+      setAssignSuccess('Class added to your department.');
+    } catch (err: any) {
+      setAddClassError(err?.response?.data?.error || 'Failed to add class.');
+    } finally {
+      setAddingClass(false);
+    }
   };
 
   const filteredStudents = students.filter((s) => {
@@ -210,6 +241,34 @@ const DepartmentManagementPage: React.FC = () => {
         {activeTab === 'classes' && (
           <div className="space-y-3">
             {classesError && <div className="p-3 rounded-xl bg-red-500/10 border border-red-500/20 text-red-300 text-sm">{classesError}</div>}
+            <form onSubmit={handleAddClass} className="rounded-2xl border border-white/10 bg-white/[0.04] p-4">
+              <div className="grid grid-cols-1 md:grid-cols-[1fr_8rem_auto] gap-3">
+                <input
+                  value={newClassName}
+                  onChange={(e) => setNewClassName(e.target.value)}
+                  placeholder="New class name"
+                  className="input-field"
+                  disabled={addingClass}
+                />
+                <input
+                  type="number"
+                  min={1}
+                  value={newClassCapacity}
+                  onChange={(e) => setNewClassCapacity(Math.max(1, Number(e.target.value) || 50))}
+                  className="input-field"
+                  disabled={addingClass}
+                  aria-label="Class capacity"
+                />
+                <button
+                  type="submit"
+                  disabled={addingClass || !newClassName.trim()}
+                  className="px-4 py-2 rounded-xl text-sm font-semibold text-white bg-gradient-to-r from-indigo-500 to-indigo-700 disabled:opacity-50"
+                >
+                  {addingClass ? 'Adding...' : 'Add class'}
+                </button>
+              </div>
+              {addClassError && <p className="mt-2 text-xs text-red-300">{addClassError}</p>}
+            </form>
             {assignError && (
               <div className="p-3 rounded-xl bg-red-500/10 border border-red-500/20 text-red-300 text-sm flex items-center justify-between">
                 <span>{assignError}</span>

@@ -5,6 +5,7 @@ import { FACE_API_MODELS_URI } from '../constants/faceApi';
 import { getTemplatesForClass } from '../services/offlineStore';
 import { useAuthStore } from '../store/authStore';
 import { getApiErrorMessage } from '../lib/apiError';
+import { UserRole } from '@sams/shared';
 
 interface MatchResult {
   studentId: string;
@@ -125,8 +126,12 @@ const BiometricAttendancePage: React.FC = () => {
   useEffect(() => {
     const loadScope = async () => {
       try {
+        const params: Record<string, string | boolean> = { isActive: true };
+        if (user?.role === UserRole.TEACHER && user.id) {
+          params.teacherId = user.id;
+        }
         const { data: sessions } = await apiClient.get('/sessions', {
-          params: { isActive: true, teacherId: user?.id },
+          params,
         });
         const active = Array.isArray(sessions)
           ? sessions.filter((s: { isActive?: boolean }) => s.isActive !== false)
@@ -143,7 +148,7 @@ const BiometricAttendancePage: React.FC = () => {
       }
     };
     void loadScope();
-  }, [user?.id, sessionFromUrl]);
+  }, [user?.id, user?.role, sessionFromUrl]);
 
   // Load cached templates from IndexedDB
   useEffect(() => {

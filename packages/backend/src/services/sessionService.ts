@@ -1,5 +1,6 @@
 import jwt from 'jsonwebtoken';
 import { createId } from '@paralleldrive/cuid2';
+import { UserRole } from '@sams/shared';
 import { prisma } from '../lib/prisma';
 import { AppError } from '../middleware/errors';
 import { getQrSecret } from '../config/secrets';
@@ -19,6 +20,11 @@ export interface QRTokenPayload {
   exp: number;
 }
 
+interface SessionActorOptions {
+  actorRole?: UserRole;
+  actorDepartmentId?: string;
+}
+
 // ─── Session Service ──────────────────────────────────────────────────────────
 
 export class SessionService {
@@ -35,16 +41,24 @@ export class SessionService {
     schoolId: string,
     timetableEntryId: string,
     location: { lat: number; lng: number } | undefined,
-    options: { requireGps?: boolean; locationRadiusM?: number } = {},
+    options: { requireGps?: boolean; locationRadiusM?: number } & SessionActorOptions = {},
   ) {
     const requireGps = options.requireGps ?? true;
     const locationRadiusM = options.locationRadiusM ?? 100;
+    const actorRole = options.actorRole ?? UserRole.TEACHER;
+
+    if (actorRole === UserRole.HOD && !options.actorDepartmentId) {
+      throw new AppError(403, 'HOD_DEPARTMENT_REQUIRED', 'HOD account is not linked to a department');
+    }
+
     // Validate timetable entry belongs to teacher and school
     const timetableEntry = await prisma.timetableEntry.findFirst({
       where: {
         id: timetableEntryId,
-        teacherId,
         schoolId,
+        ...(actorRole === UserRole.HOD
+          ? { class: { departmentId: options.actorDepartmentId } }
+          : { teacherId }),
       },
     });
 
@@ -52,7 +66,9 @@ export class SessionService {
       throw new AppError(
         403,
         'TIMETABLE_NOT_FOUND',
-        'Timetable entry not found or does not belong to this teacher',
+        actorRole === UserRole.HOD
+          ? 'Timetable entry not found in your department'
+          : 'Timetable entry not found or does not belong to this teacher',
       );
     }
 
@@ -99,18 +115,20 @@ export class SessionService {
         timetableEntryId,
         isActive: true,
       },
+      include: { class: { select: { name: true, departmentId: true } } },
     });
 
     if (existingSession) {
       // Same teacher re-opening Sign In Students after refresh — resume instead of 409.
-      if (existingSession.teacherId === teacherId) {
-        const resumed = await prisma.attendanceSession.findUnique({
-          where: { id: existingSession.id },
-          include: { class: { select: { name: true } } },
-        });
-        if (resumed) {
-          return resumed;
-        }
+      const canResume =
+        existingSession.teacherId === teacherId ||
+        (
+          actorRole === UserRole.HOD &&
+          !!options.actorDepartmentId &&
+          existingSession.class.departmentId === options.actorDepartmentId
+        );
+      if (canResume) {
+        return existingSession;
       }
       throw new AppError(
         409,
@@ -161,16 +179,30 @@ export class SessionService {
    * End an active attendance session.
    * Verifies the teacher owns the session before deactivating it.
    */
-  async endSession(sessionId: string, teacherId: string): Promise<void> {
+  async endSession(
+    sessionId: string,
+    teacherId: string,
+    actor: SessionActorOptions = {},
+  ): Promise<void> {
+    const actorRole = actor.actorRole ?? UserRole.TEACHER;
     const session = await prisma.attendanceSession.findUnique({
       where: { id: sessionId },
+      include: { class: { select: { departmentId: true } } },
     });
 
     if (!session) {
       throw new AppError(404, 'SESSION_NOT_FOUND', 'Session not found');
     }
 
-    if (session.teacherId !== teacherId) {
+    const canEnd =
+      session.teacherId === teacherId ||
+      (
+        actorRole === UserRole.HOD &&
+        !!actor.actorDepartmentId &&
+        session.class.departmentId === actor.actorDepartmentId
+      );
+
+    if (!canEnd) {
       throw new AppError(403, 'FORBIDDEN', 'You do not own this session');
     }
 

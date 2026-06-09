@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { UserRole } from '@sams/shared';
 import { SessionService } from './sessionService';
 import { prisma } from '../lib/prisma';
 import { AppError } from '../middleware/errors';
@@ -83,6 +84,66 @@ describe('SessionService.startSession', () => {
       statusCode: 403,
       code: 'TIMETABLE_NOT_FOUND',
     } satisfies Partial<AppError>);
+  });
+
+  it('allows HOD to start a session for a class in their department', async () => {
+    const hodId = 'hod-1';
+    vi.mocked(prisma.timetableEntry.findFirst).mockResolvedValue({
+      ...baseEntry,
+      teacherId: 'teacher-2',
+    } as never);
+    vi.mocked(prisma.attendanceSession.findFirst).mockResolvedValue(null);
+    vi.mocked(prisma.attendanceSession.create).mockResolvedValue({
+      id: 'session-hod',
+      teacherId: hodId,
+      timetableEntryId,
+      class: { name: 'Form 1A' },
+    } as never);
+
+    const session = await service.startSession(
+      hodId,
+      schoolId,
+      timetableEntryId,
+      undefined,
+      {
+        actorRole: UserRole.HOD,
+        actorDepartmentId: 'dept-1',
+        requireGps: false,
+      },
+    );
+
+    expect(prisma.timetableEntry.findFirst).toHaveBeenCalledWith({
+      where: {
+        id: timetableEntryId,
+        schoolId,
+        class: { departmentId: 'dept-1' },
+      },
+    });
+    expect(prisma.attendanceSession.create).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({
+        classId: baseEntry.classId,
+        schoolId,
+        teacherId: hodId,
+        timetableEntryId,
+      }),
+    }));
+    expect(session.id).toBe('session-hod');
+  });
+
+  it('requires HOD accounts to be linked to a department before starting sessions', async () => {
+    await expect(
+      service.startSession(
+        'hod-1',
+        schoolId,
+        timetableEntryId,
+        undefined,
+        { actorRole: UserRole.HOD, requireGps: false },
+      ),
+    ).rejects.toMatchObject({
+      statusCode: 403,
+      code: 'HOD_DEPARTMENT_REQUIRED',
+    });
+    expect(prisma.timetableEntry.findFirst).not.toHaveBeenCalled();
   });
 
   it('throws WRONG_DAY when today does not match the entry', async () => {

@@ -23,6 +23,26 @@ const startSessionSchema = z.object({
 
 export const sessionsRouter = Router();
 
+function assertHodHasDepartment(req: Request): string {
+  if (req.user.role === UserRole.HOD && !req.user.departmentId) {
+    throw new AppError(403, 'HOD_DEPARTMENT_REQUIRED', 'HOD account is not linked to a department');
+  }
+  return req.user.departmentId as string;
+}
+
+function canManageSession(
+  req: Request,
+  session: { teacherId: string; class?: { departmentId?: string | null } | null },
+): boolean {
+  if (req.user.role === UserRole.TEACHER) {
+    return session.teacherId === req.user.sub;
+  }
+  if (req.user.role === UserRole.HOD) {
+    return !!req.user.departmentId && session.class?.departmentId === req.user.departmentId;
+  }
+  return true;
+}
+
 /**
  * POST /api/v1/sessions
  * Start a new attendance session.
@@ -47,6 +67,8 @@ sessionsRouter.post('/', requirePermission('start:session'), async (req: Request
       {
         requireGps: parsed.data.requireGps,
         locationRadiusM: parsed.data.locationRadiusM,
+        actorRole: req.user.role,
+        actorDepartmentId: req.user.departmentId,
       },
     );
     res.status(201).json(formatSessionForClient(session));
@@ -71,8 +93,14 @@ sessionsRouter.get('/', async (req: Request, res: Response): Promise<void> => {
 
     const where: Record<string, unknown> = { schoolId: req.schoolId };
 
-    if (req.user.role === UserRole.TEACHER || req.user.role === UserRole.HOD) {
+    if (req.user.role === UserRole.TEACHER) {
       where.teacherId = req.user.sub;
+    } else if (req.user.role === UserRole.HOD) {
+      const departmentId = assertHodHasDepartment(req);
+      where.class = { departmentId };
+      if (req.query.teacherId) {
+        where.teacherId = req.query.teacherId;
+      }
     }
 
     if (req.query.classId) {
@@ -105,7 +133,7 @@ sessionsRouter.get('/:id', async (req: Request, res: Response): Promise<void> =>
   try {
     const session = await prisma.attendanceSession.findUnique({
       where: { id: req.params.id as string },
-      include: { class: { select: { name: true } } },
+      include: { class: { select: { name: true, departmentId: true } } },
     });
 
     if (!session) {
@@ -124,7 +152,10 @@ sessionsRouter.get('/:id', async (req: Request, res: Response): Promise<void> =>
       return;
     }
 
-    if ((req.user.role === UserRole.TEACHER || req.user.role === UserRole.HOD) && session.teacherId !== req.user.sub) {
+    if (
+      (req.user.role === UserRole.TEACHER || req.user.role === UserRole.HOD) &&
+      !canManageSession(req, session)
+    ) {
       throw new AppError(403, 'FORBIDDEN', 'You do not own this attendance session');
     }
 
@@ -164,12 +195,19 @@ sessionsRouter.get('/:id/qr', async (req: Request, res: Response): Promise<void>
 
     const session = await prisma.attendanceSession.findUnique({
       where: { id: req.params.id as string },
-      select: { schoolId: true, teacherId: true },
+      select: {
+        schoolId: true,
+        teacherId: true,
+        class: { select: { departmentId: true } },
+      },
     });
     if (!session || session.schoolId !== req.schoolId) {
       throw new AppError(404, 'QR_NOT_FOUND', 'No active QR code for this session');
     }
-    if ((req.user.role === UserRole.TEACHER || req.user.role === UserRole.HOD) && session.teacherId !== req.user.sub) {
+    if (
+      (req.user.role === UserRole.TEACHER || req.user.role === UserRole.HOD) &&
+      !canManageSession(req, session)
+    ) {
       throw new AppError(403, 'FORBIDDEN', 'You do not own this attendance session');
     }
 
@@ -192,7 +230,10 @@ sessionsRouter.get('/:id/qr', async (req: Request, res: Response): Promise<void>
  */
 sessionsRouter.post('/:id/end', requirePermission('start:session'), async (req: Request, res: Response): Promise<void> => {
   try {
-    await sessionService.endSession(req.params.id as string, req.user.sub);
+    await sessionService.endSession(req.params.id as string, req.user.sub, {
+      actorRole: req.user.role,
+      actorDepartmentId: req.user.departmentId,
+    });
     res.status(200).json({ message: 'Session ended' });
   } catch (err) {
     if (err instanceof AppError) throw err;
