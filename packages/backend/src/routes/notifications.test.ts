@@ -6,10 +6,12 @@ vi.mock('../lib/prisma', () => ({
   prisma: {
     notification: {
       findMany: vi.fn(),
+      findFirst: vi.fn(),
       count: vi.fn(),
       createMany: vi.fn(),
     },
     notificationAttachment: {
+      findUnique: vi.fn(),
       findMany: vi.fn(),
       createMany: vi.fn(),
       deleteMany: vi.fn(),
@@ -77,6 +79,8 @@ describe('POST /notifications/send — teacher scope', () => {
       { id: 'student-2', phone: null },
     ]);
     (prisma.notification.createMany as ReturnType<typeof vi.fn>).mockResolvedValue({ count: 2 });
+    (prisma.notification.findFirst as ReturnType<typeof vi.fn>).mockResolvedValue(null);
+    (prisma.notificationAttachment.findUnique as ReturnType<typeof vi.fn>).mockResolvedValue(null);
     (prisma.notificationAttachment.findMany as ReturnType<typeof vi.fn>).mockResolvedValue([]);
     (prisma.notificationAttachment.createMany as ReturnType<typeof vi.fn>).mockResolvedValue({ count: 1 });
     (prisma.notificationAttachment.deleteMany as ReturnType<typeof vi.fn>).mockResolvedValue({ count: 1 });
@@ -243,6 +247,46 @@ describe('POST /notifications/send — teacher scope', () => {
             mimeType: 'application/pdf',
           }),
         ]),
+      }),
+    );
+  });
+
+  it('does not expose attachments outside the sender or recipient thread', async () => {
+    const request = (await import('supertest')).default;
+    const app = createTestApp({
+      sub: 'teacher-2',
+      schoolId: 'school-1',
+      role: UserRole.TEACHER,
+      classId: 'class-2',
+    });
+
+    (prisma.notificationAttachment.findUnique as ReturnType<typeof vi.fn>).mockResolvedValue({
+      id: 'att-1',
+      schoolId: 'school-1',
+      senderId: 'teacher-1',
+      batchId: 'batch-a',
+      fileName: 'assignment.pdf',
+      storedName: 'stored.pdf',
+      mimeType: 'application/pdf',
+      sizeBytes: 12,
+      url: '/uploads/notifications/school-1/batch-a/stored.pdf',
+      createdAt: new Date(),
+    });
+    (prisma.notification.findFirst as ReturnType<typeof vi.fn>).mockResolvedValue(null);
+
+    const res = await request(app).get('/notifications/attachments/att-1');
+
+    expect(res.status).toBe(404);
+    expect(res.body.code).toBe('NOT_FOUND');
+    expect(prisma.notification.findFirst).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          batchId: 'batch-a',
+          OR: expect.arrayContaining([
+            { userId: 'teacher-2' },
+            { senderId: 'teacher-2' },
+          ]),
+        }),
       }),
     );
   });

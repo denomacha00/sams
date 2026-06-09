@@ -49,6 +49,8 @@ const SessionPage: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const socketRef = useRef<Socket | null>(null);
+  const qrPanelRef = useRef<HTMLDivElement>(null);
+  const linkPanelRef = useRef<HTMLDivElement>(null);
 
   // Link generation state
   const [linkUrl, setLinkUrl] = useState<string>('');
@@ -508,7 +510,7 @@ const SessionPage: React.FC = () => {
   // Active session view
   return (
     <div className="page-shell p-6">
-      <div className="max-w-2xl mx-auto">
+      <div className="max-w-4xl mx-auto">
         {/* Session header */}
         <div className="flex flex-wrap items-center justify-between gap-3 mb-6">
           <div>
@@ -521,6 +523,12 @@ const SessionPage: React.FC = () => {
               className="btn-attendance py-2 px-4 text-sm font-medium transition-all duration-200"
             >
               Manual roll call
+            </Link>
+            <Link
+              to={`/biometric/attendance?sessionId=${activeSession.id}`}
+              className="btn-secondary py-2 px-4 text-sm font-medium transition-all duration-200"
+            >
+              Face/Bio
             </Link>
             <button
               onClick={endSession}
@@ -538,8 +546,45 @@ const SessionPage: React.FC = () => {
           </div>
         )}
 
+        {/* Check-in methods */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 mb-6">
+          <button
+            type="button"
+            onClick={() => qrPanelRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
+            className="surface-card border border-line p-4 text-left hover:border-indigo-500/40 hover:bg-indigo-500/10 transition-all"
+          >
+            <p className="text-sm font-semibold text-ink">QR scan</p>
+            <p className="mt-1 text-xs text-ink-subtle">Display the rotating code</p>
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              linkPanelRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+              if (!linkUrl || linkTimeRemaining <= 0) void generateLink();
+            }}
+            className="surface-card border border-line p-4 text-left hover:border-indigo-500/40 hover:bg-indigo-500/10 transition-all"
+          >
+            <p className="text-sm font-semibold text-ink">Share link</p>
+            <p className="mt-1 text-xs text-ink-subtle">Copy or share to class group</p>
+          </button>
+          <Link
+            to={`/attendance?sessionId=${activeSession.id}`}
+            className="surface-card border border-line p-4 text-left hover:border-indigo-500/40 hover:bg-indigo-500/10 transition-all"
+          >
+            <p className="text-sm font-semibold text-ink">Manual roll call</p>
+            <p className="mt-1 text-xs text-ink-subtle">Teacher/HOD marks students</p>
+          </Link>
+          <Link
+            to={`/biometric/attendance?sessionId=${activeSession.id}`}
+            className="surface-card border border-line p-4 text-left hover:border-indigo-500/40 hover:bg-indigo-500/10 transition-all"
+          >
+            <p className="text-sm font-semibold text-ink">Face / biometric</p>
+            <p className="mt-1 text-xs text-ink-subtle">Scan enrolled students</p>
+          </Link>
+        </div>
+
         {/* QR Code Display */}
-        <div className="surface-card rounded-2xl p-6 mb-6 text-center">
+        <div ref={qrPanelRef} className="surface-card rounded-2xl p-6 mb-6 text-center scroll-mt-6">
           <h2 className="text-lg font-semibold text-ink mb-4">Scan QR Code</h2>
           {qrDataUrl ? (
             <div className="inline-block p-4 bg-white rounded-2xl shadow-2xl shadow-indigo-500/20">
@@ -558,7 +603,7 @@ const SessionPage: React.FC = () => {
         </div>
 
         {/* Link Generation Panel */}
-        <div className="surface-card rounded-2xl p-6 mb-6">
+        <div ref={linkPanelRef} className="surface-card rounded-2xl p-6 mb-6 scroll-mt-6">
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-lg font-semibold text-ink">Share Attendance Link</h2>
             {linkUrl && linkTimeRemaining > 0 && (

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { io, Socket } from 'socket.io-client';
 import apiClient from '../services/apiClient';
 import { useAuthStore } from '../store/authStore';
@@ -29,6 +29,12 @@ interface NotificationAttachment {
   sizeBytes: number;
   url: string;
   createdAt?: string;
+}
+
+interface AttachmentBlobState {
+  url?: string;
+  loading?: boolean;
+  error?: boolean;
 }
 
 interface SentNotification extends Notification {
@@ -111,6 +117,24 @@ function resolveAttachmentUrl(url: string): string {
   return `${window.location.origin}${url}`;
 }
 
+function attachmentDownloadPath(att: NotificationAttachment, download = false): string {
+  const suffix = download ? '?download=1' : '';
+  return `/notifications/attachments/${encodeURIComponent(att.id)}${suffix}`;
+}
+
+function collectAttachments(messages: Notification[]): NotificationAttachment[] {
+  const seen = new Set<string>();
+  const attachments: NotificationAttachment[] = [];
+  for (const message of messages) {
+    for (const attachment of message.attachments ?? []) {
+      if (seen.has(attachment.id)) continue;
+      seen.add(attachment.id);
+      attachments.push(attachment);
+    }
+  }
+  return attachments;
+}
+
 function formatFileSize(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
@@ -187,6 +211,10 @@ const NotificationsPage: React.FC = () => {
   const [replyMessage, setReplyMessage] = useState('');
   const [replyLoading, setReplyLoading] = useState(false);
   const [replyError, setReplyError] = useState<string | null>(null);
+  const [openedNotification, setOpenedNotification] = useState<Notification | null>(null);
+  const [attachmentBlobs, setAttachmentBlobs] = useState<Record<string, AttachmentBlobState>>({});
+  const attachmentUrlsRef = useRef<Record<string, string>>({});
+  const attachmentLoadingRef = useRef<Set<string>>(new Set());
 
   const canSend = user && ['SCHOOL_ADMIN', 'HOD', 'TEACHER'].includes(user.role);
   const isSchoolAdmin = user?.role === 'SCHOOL_ADMIN';
@@ -306,6 +334,68 @@ const NotificationsPage: React.FC = () => {
   useEffect(() => {
     if (folder === 'sent' && canSend) void fetchSentMessages();
   }, [folder, canSend]);
+
+  const visibleAttachments = useMemo(
+    () => collectAttachments([...notifications, ...sentMessages]),
+    [notifications, sentMessages],
+  );
+
+  useEffect(() => {
+    const visibleIds = new Set(visibleAttachments.map((att) => att.id));
+
+    Object.entries(attachmentUrlsRef.current).forEach(([id, url]) => {
+      if (!visibleIds.has(id)) {
+        URL.revokeObjectURL(url);
+        delete attachmentUrlsRef.current[id];
+        attachmentLoadingRef.current.delete(id);
+      }
+    });
+
+    setAttachmentBlobs((prev) => {
+      const next: Record<string, AttachmentBlobState> = {};
+      for (const id of visibleIds) {
+        if (prev[id]) next[id] = prev[id];
+      }
+      return next;
+    });
+
+    visibleAttachments.forEach((att) => {
+      if (attachmentUrlsRef.current[att.id] || attachmentLoadingRef.current.has(att.id)) return;
+
+      attachmentLoadingRef.current.add(att.id);
+      setAttachmentBlobs((prev) => ({
+        ...prev,
+        [att.id]: { loading: true },
+      }));
+
+      apiClient.get<Blob>(attachmentDownloadPath(att), { responseType: 'blob' })
+        .then(({ data }) => {
+          const objectUrl = URL.createObjectURL(data);
+          attachmentUrlsRef.current[att.id] = objectUrl;
+          setAttachmentBlobs((prev) => ({
+            ...prev,
+            [att.id]: { url: objectUrl, loading: false },
+          }));
+        })
+        .catch(() => {
+          setAttachmentBlobs((prev) => ({
+            ...prev,
+            [att.id]: { loading: false, error: true },
+          }));
+        })
+        .finally(() => {
+          attachmentLoadingRef.current.delete(att.id);
+        });
+    });
+  }, [visibleAttachments]);
+
+  useEffect(() => {
+    return () => {
+      Object.values(attachmentUrlsRef.current).forEach((url) => URL.revokeObjectURL(url));
+      attachmentUrlsRef.current = {};
+      attachmentLoadingRef.current.clear();
+    };
+  }, []);
 
   const fetchScopeData = async () => {
     try {
@@ -575,6 +665,13 @@ const NotificationsPage: React.FC = () => {
     return !!notif.senderId && notif.senderId === user.id;
   };
 
+  const openMessage = (notif: Notification, isSentFolder: boolean) => {
+    if (!isSentFolder && !notif.read) {
+      void markAsRead(notif.id);
+    }
+    setOpenedNotification(isSentFolder ? null : { ...notif, read: true });
+  };
+
   const unreadCount = notifications.filter((n) => !n.read).length;
   const displayList = folder === 'inbox' ? notifications : sentMessages;
   const listLoading = folder === 'inbox' ? loading : sentLoading;
@@ -588,45 +685,82 @@ const NotificationsPage: React.FC = () => {
         className={`mt-3 grid gap-2 ${isSentFolder ? 'justify-items-end' : ''}`}
       >
         {attachments.map((att) => {
-          const href = resolveAttachmentUrl(att.url);
+          const blob = attachmentBlobs[att.id];
+          const directHref = resolveAttachmentUrl(att.url);
+          const href = blob?.url || directHref;
+          const loading = blob?.loading && !blob.url;
+          const failed = blob?.error && !blob.url;
           if (isImageAttachment(att)) {
             return (
-              <a
+              <div
                 key={att.id}
-                href={href}
-                target="_blank"
-                rel="noreferrer"
                 className={`block overflow-hidden rounded-xl border border-line bg-surface-elevated hover:border-indigo-500/40 transition-all ${isSentFolder ? 'ml-auto' : ''}`}
               >
-                <img
-                  src={href}
-                  alt={att.fileName}
-                  className="max-h-44 w-full max-w-xs object-cover"
-                  loading="lazy"
-                />
-                <div className="px-3 py-2 text-xs text-ink-muted truncate">
+                <a href={href} target="_blank" rel="noreferrer" className="block">
+                  {loading ? (
+                    <div className="flex h-36 w-full max-w-xs items-center justify-center text-xs text-ink-subtle">
+                      Loading image...
+                    </div>
+                  ) : (
+                    <img
+                      src={href}
+                      alt={att.fileName}
+                      className="max-h-56 w-full max-w-xs object-cover"
+                      loading="lazy"
+                    />
+                  )}
+                </a>
+                <div className="flex items-center justify-between gap-3 px-3 py-2 text-xs text-ink-muted">
                   {att.fileName} · {formatFileSize(att.sizeBytes)}
+                  {blob?.url && (
+                    <a href={blob.url} download={att.fileName} className="shrink-0 text-indigo-300 hover:text-indigo-200">
+                      Download
+                    </a>
+                  )}
                 </div>
-              </a>
+                {failed && (
+                  <div className="border-t border-line px-3 py-2 text-xs text-red-300">
+                    Preview failed. <a href={directHref} target="_blank" rel="noreferrer" className="underline">Try direct link</a>
+                  </div>
+                )}
+              </div>
             );
           }
 
           return (
-            <a
+            <div
               key={att.id}
-              href={href}
-              target="_blank"
-              rel="noreferrer"
               className={`flex items-center gap-3 rounded-xl border border-line bg-surface-elevated px-3 py-2 text-left hover:border-indigo-500/40 transition-all max-w-full ${isSentFolder ? 'ml-auto' : ''}`}
             >
               <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-indigo-500/15 text-xs font-bold text-indigo-200">
                 {att.mimeType === 'application/pdf' ? 'PDF' : 'FILE'}
               </span>
-              <span className="min-w-0">
+              <span className="min-w-0 flex-1">
                 <span className="block truncate text-sm font-medium text-ink">{att.fileName}</span>
-                <span className="block text-xs text-ink-subtle">{formatFileSize(att.sizeBytes)}</span>
+                <span className="block text-xs text-ink-subtle">
+                  {loading ? 'Loading...' : failed ? 'Could not preview' : formatFileSize(att.sizeBytes)}
+                </span>
               </span>
-            </a>
+              <span className="flex shrink-0 items-center gap-2 text-xs">
+                <a
+                  href={href}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="rounded-lg border border-line px-2 py-1 text-ink-muted hover:text-ink hover:bg-white/10"
+                >
+                  Open
+                </a>
+                {blob?.url && (
+                  <a
+                    href={blob.url}
+                    download={att.fileName}
+                    className="rounded-lg bg-indigo-600 px-2 py-1 font-semibold text-white hover:bg-indigo-500"
+                  >
+                    Download
+                  </a>
+                )}
+              </span>
+            </div>
           );
         })}
       </div>
@@ -655,7 +789,7 @@ const NotificationsPage: React.FC = () => {
     return (
       <div
         key={notif.id}
-        onClick={() => unread && markAsRead(notif.id)}
+        onClick={() => openMessage(notif, isSentFolder)}
         className={`group rounded-2xl border p-4 transition-all ${isSentFolder ? '' : 'cursor-pointer'} ${
           unread
             ? 'border-indigo-500/35 bg-indigo-500/10 shadow-card-soft-hover'
@@ -1033,6 +1167,51 @@ const NotificationsPage: React.FC = () => {
           </div>
         )}
       </div>
+
+      {/* Opened inbox message */}
+      {openedNotification && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setOpenedNotification(null)} />
+          <div className="relative max-h-[88vh] w-full max-w-2xl overflow-y-auto bg-surface border border-line rounded-2xl p-5 shadow-card-hover">
+            <div className="flex items-start justify-between gap-4 mb-4">
+              <div className="min-w-0">
+                <p className="text-xs uppercase tracking-[0.18em] text-ink-subtle mb-1">Inbox</p>
+                <h2 className="text-lg font-semibold text-ink truncate">{openedNotification.title || 'Message'}</h2>
+                <p className="text-xs text-ink-subtle mt-1">
+                  {openedNotification.senderName || 'System'} · {formatDateTime(openedNotification.createdAt)}
+                </p>
+              </div>
+              <button
+                onClick={() => setOpenedNotification(null)}
+                className="rounded-lg border border-line px-3 py-1.5 text-sm text-ink-muted hover:bg-white/10 hover:text-ink"
+              >
+                Close
+              </button>
+            </div>
+
+            <div className="rounded-2xl border border-line bg-surface-muted px-4 py-3 text-sm leading-relaxed text-ink-muted whitespace-pre-wrap">
+              {renderLinkedText(openedNotification.message)}
+            </div>
+            {renderAttachments(openedNotification.attachments, false)}
+
+            {isClassRep && openedNotification.senderRole === 'TEACHER' && openedNotification.senderId && (
+              <div className="mt-5 flex justify-end">
+                <button
+                  onClick={() => {
+                    setReplyingTo(openedNotification);
+                    setReplyMessage('');
+                    setReplyError(null);
+                    setOpenedNotification(null);
+                  }}
+                  className="rounded-xl bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-500"
+                >
+                  Reply to teacher
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Reply Modal (class rep) */}
       {replyingTo && (

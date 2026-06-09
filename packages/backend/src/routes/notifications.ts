@@ -145,6 +145,19 @@ function safeOriginalName(name: string): string {
   return path.basename(name).replace(/[^\w.\- ()]/g, '_').slice(0, 160) || 'attachment';
 }
 
+function safeHeaderFileName(name: string): string {
+  return safeOriginalName(name).replace(/["\\\r\n]/g, '_');
+}
+
+function notificationAttachmentFilePath(schoolId: string, batchId: string, storedName: string): string {
+  const root = path.resolve(NOTIFICATION_ATTACHMENTS_DIR);
+  const filePath = path.resolve(root, schoolId, batchId, storedName);
+  if (!filePath.startsWith(root + path.sep)) {
+    throw new AppError(400, 'INVALID_ATTACHMENT_PATH', 'Invalid attachment path');
+  }
+  return filePath;
+}
+
 async function saveNotificationAttachments(
   files: Express.Multer.File[],
   schoolId: string,
@@ -227,7 +240,7 @@ async function deleteAttachmentsForBatch(batchId: string, senderId: string): Pro
   await Promise.all(
     attachments.map(async (a) => {
       try {
-        const filePath = path.join(NOTIFICATION_ATTACHMENTS_DIR, a.schoolId, batchId, a.storedName);
+        const filePath = notificationAttachmentFilePath(a.schoolId, batchId, a.storedName);
         await fs.promises.unlink(filePath);
       } catch {
         // Best effort: DB cleanup matters more than a stale file.
@@ -401,6 +414,57 @@ notificationsRouter.post('/test-email', async (req: Request, res: Response): Pro
   }
 
   res.status(200).json({ success: true });
+});
+
+/**
+ * GET /api/v1/notifications/attachments/:id
+ * Stream an attachment to a sender or recipient without relying on public /uploads.
+ */
+notificationsRouter.get('/attachments/:id', async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+  try {
+    const attachment = await prisma.notificationAttachment.findUnique({
+      where: { id: String(req.params.id) },
+    });
+
+    if (!attachment || attachment.schoolId !== req.schoolId) {
+      throw new AppError(404, 'NOT_FOUND', 'Attachment not found');
+    }
+
+    const visibleNotification = await prisma.notification.findFirst({
+      where: {
+        schoolId: req.schoolId,
+        batchId: attachment.batchId,
+        OR: [
+          { userId: req.user.sub },
+          { senderId: req.user.sub },
+        ],
+      },
+      select: { id: true },
+    });
+
+    if (!visibleNotification) {
+      throw new AppError(404, 'NOT_FOUND', 'Attachment not found');
+    }
+
+    const filePath = notificationAttachmentFilePath(
+      attachment.schoolId,
+      attachment.batchId,
+      attachment.storedName,
+    );
+    await fs.promises.access(filePath, fs.constants.R_OK);
+
+    const disposition = req.query.download === '1' ? 'attachment' : 'inline';
+    res.setHeader('Content-Type', attachment.mimeType);
+    res.setHeader(
+      'Content-Disposition',
+      `${disposition}; filename="${safeHeaderFileName(attachment.fileName)}"`,
+    );
+    res.sendFile(filePath, (err) => {
+      if (err) next(new AppError(404, 'NOT_FOUND', 'Attachment file not found'));
+    });
+  } catch (err) {
+    next(err instanceof AppError ? err : new AppError(500, 'INTERNAL_ERROR', 'Failed to load attachment'));
+  }
 });
 
 /**

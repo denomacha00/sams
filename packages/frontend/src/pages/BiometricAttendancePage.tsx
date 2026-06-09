@@ -1,4 +1,5 @@
 import React, { useCallback, useState, useRef, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import apiClient from '../services/apiClient';
 import { FACE_API_MODELS_URI } from '../constants/faceApi';
 import { getTemplatesForClass } from '../services/offlineStore';
@@ -66,6 +67,8 @@ async function waitForVideoReady(video: HTMLVideoElement): Promise<void> {
 
 const BiometricAttendancePage: React.FC = () => {
   const user = useAuthStore((s) => s.user);
+  const [searchParams] = useSearchParams();
+  const sessionFromUrl = searchParams.get('sessionId') ?? '';
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const [cameraActive, setCameraActive] = useState(false);
@@ -79,6 +82,10 @@ const BiometricAttendancePage: React.FC = () => {
   const [sessionId, setSessionId] = useState('');
   const [classId, setClassId] = useState<string | null>(null);
   const [featureGated, setFeatureGated] = useState(false);
+
+  useEffect(() => {
+    if (sessionFromUrl) setSessionId(sessionFromUrl);
+  }, [sessionFromUrl]);
 
   useEffect(() => {
     const checkAccess = async () => {
@@ -125,15 +132,18 @@ const BiometricAttendancePage: React.FC = () => {
           ? sessions.filter((s: { isActive?: boolean }) => s.isActive !== false)
           : [];
         if (active.length > 0) {
-          setSessionId(active[0].id);
-          if (active[0].classId) setClassId(active[0].classId);
+          const selected =
+            (sessionFromUrl && active.find((s: { id: string }) => s.id === sessionFromUrl)) ||
+            active[0];
+          setSessionId(selected.id);
+          if (selected.classId) setClassId(selected.classId);
         }
       } catch {
         // ignore
       }
     };
     void loadScope();
-  }, [user?.id]);
+  }, [user?.id, sessionFromUrl]);
 
   // Load cached templates from IndexedDB
   useEffect(() => {
