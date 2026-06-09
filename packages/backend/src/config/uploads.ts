@@ -14,9 +14,10 @@ export function avatarPublicUrl(userId: string): string {
 }
 
 export function notificationAttachmentPublicUrl(
-  schoolId: string,
-  batchId: string,
+  _schoolId: string,
+  _batchId: string,
   filename: string,
 ): string {
-  return `/uploads/notifications/${schoolId}/${batchId}/${filename}`;
+  const id = path.basename(filename, path.extname(filename));
+  return `/api/v1/notifications/attachments/${id}`;
 }

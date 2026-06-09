@@ -1,12 +1,42 @@
-import { describe, expect, it, vi, beforeEach } from 'vitest';
+import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest';
 import { UserRole } from '@sams/shared';
 import { findAction } from '../roleActionRegistry';
 
-const resetUserPasswordByAdmin = vi.fn();
+const { resetUserPasswordByAdmin, prismaMock } = vi.hoisted(() => ({
+  resetUserPasswordByAdmin: vi.fn(),
+  prismaMock: {
+    school: { count: vi.fn() },
+    user: { count: vi.fn() },
+    conversationThread: { count: vi.fn() },
+    attendanceSession: { findMany: vi.fn() },
+    notificationAttachment: { count: vi.fn() },
+  },
+}));
 
 vi.mock('../../passwordResetService', () => ({
   resetUserPasswordByAdmin: (...args: unknown[]) => resetUserPasswordByAdmin(...args),
   resetUserPasswordBySuperAdmin: (...args: unknown[]) => resetUserPasswordByAdmin(...args),
+}));
+
+vi.mock('../../../lib/prisma', () => ({
+  prisma: prismaMock,
+}));
+
+vi.mock('../aiProviderConfig', () => ({
+  getAIHealthSummary: () => ({
+    configured: true,
+    primaryKey: true,
+    fallbackKey: true,
+    baseURL: 'https://openrouter.ai/api/v1',
+    model: 'meta-llama/llama-3.3-70b-instruct',
+    fallbackModel: 'llama-3.3-70b-versatile',
+    modelMismatch: false,
+    secretsFilesHint: 'secrets/providers.env',
+  }),
+}));
+
+vi.mock('../roleActionsPrompt', () => ({
+  isConversationMemoryEnabled: () => true,
 }));
 
 describe('generate_license action', () => {
@@ -104,5 +134,46 @@ describe('reset_user_password handler', () => {
     );
 
     expect(params.mode).toBe('trigger_reset');
+  });
+});
+
+describe('run_system_readiness_check action', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it('reports live platform readiness and stale active sessions', async () => {
+    prismaMock.school.count
+      .mockResolvedValueOnce(3)
+      .mockResolvedValueOnce(1)
+      .mockResolvedValueOnce(0);
+    prismaMock.user.count.mockResolvedValue(120);
+    prismaMock.conversationThread.count.mockResolvedValue(8);
+    prismaMock.notificationAttachment.count.mockResolvedValue(4);
+    prismaMock.attendanceSession.findMany.mockResolvedValue([
+      {
+        id: 'stale-session',
+        subject: 'Math',
+        schoolId: 'school-1',
+        timetableEntry: { dayOfWeek: 0, startTime: '08:00', endTime: '09:00' },
+      },
+    ]);
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-06-01T10:00:00'));
+
+    const actionDef = findAction(UserRole.SUPER_ADMIN, 'run_system_readiness_check')!;
+    const result = await actionDef.handler(
+      {},
+      { userId: 'super-1', role: UserRole.SUPER_ADMIN, schoolId: 'platform' },
+    );
+
+    expect(result.answer).toContain('System readiness check');
+    expect(result.answer).toContain('1 past timetable window');
+    expect(result.data).toMatchObject({ staleActiveSessions: 1, totalUsers: 120 });
+
   });
 });

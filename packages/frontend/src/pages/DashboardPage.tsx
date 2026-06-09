@@ -250,6 +250,51 @@ const QuickActionButton: React.FC<{ action: QuickAction; index: number }> = ({ a
 
 // ─── Role-specific "At a glance" (replaces duplicate timetable on dashboard) ─
 
+const AttendanceWorkflowPanel: React.FC<{ role?: UserRole }> = ({ role }) => {
+  if (role !== UserRole.TEACHER && role !== UserRole.HOD) return null;
+
+  const steps = [
+    { to: '/timetable', label: 'Timetable', detail: 'Current slot', icon: ICONS.calendar },
+    { to: '/sessions', label: 'Start Session', detail: 'QR and link', icon: ICONS.qr },
+    { to: '/attendance', label: 'Manual', detail: 'Roll call', icon: ICONS.clipboard },
+    { to: '/biometric/attendance', label: 'Face/Bio', detail: 'Student scan', icon: ICONS.check },
+    { to: '/reports', label: 'Reports', detail: 'After class', icon: ICONS.chart },
+  ];
+
+  return (
+    <section className="mb-8 surface-panel rounded-2xl p-5">
+      <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <h3 className="text-sm font-semibold text-ink">Attendance workflow</h3>
+          <p className="text-xs text-ink-muted">Timetable-locked sessions with QR, link, manual, and face/biometric paths.</p>
+        </div>
+        <Link to="/sessions" className="btn-primary px-4 py-2 text-sm w-full sm:w-auto text-center">
+          Open Sessions
+        </Link>
+      </div>
+      <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-5">
+        {steps.map((step, index) => (
+          <Link
+            key={step.to}
+            to={step.to}
+            className="group flex items-center gap-3 rounded-xl border border-line bg-surface-muted p-3 hover:border-blue-500/50 hover:bg-surface-elevated transition-colors"
+          >
+            <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-brand-light text-blue-200">
+              <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d={step.icon} />
+              </svg>
+            </span>
+            <span className="min-w-0">
+              <span className="block text-xs font-semibold text-ink">{index + 1}. {step.label}</span>
+              <span className="block truncate text-[11px] text-ink-subtle">{step.detail}</span>
+            </span>
+          </Link>
+        ))}
+      </div>
+    </section>
+  );
+};
+
 function getAtAGlanceTitle(role?: UserRole): string {
   switch (role) {
     case UserRole.STUDENT:
@@ -1377,6 +1422,8 @@ const DashboardPage: React.FC = () => {
           </div>
         </div>
 
+        <AttendanceWorkflowPanel role={user?.role} />
+
         {/* Stats Section */}
         <section className="mb-10">
           <SectionHeader title="Overview" icon={ICONS.chart} />
@@ -1464,7 +1511,7 @@ const DashboardPage: React.FC = () => {
       {/* Footer */}
       <footer className="relative border-t border-line mt-16 py-8">
         <div className="max-w-7xl mx-auto px-6 lg:px-8 text-center">
-          <p className="text-xs text-ink-subtle">© 2025 SAMS · Developed by Denis Macharia</p>
+          <p className="text-xs text-ink-subtle">(c) 2025 SAMS - Developed by Denis Macharia</p>
         </div>
       </footer>
     </div>

@@ -262,6 +262,7 @@ bash scripts/restart-api.sh
 ### Symptom: AI talks but won't execute actions (suspend/unsuspend)
 
 - Use explicit commands: `unsuspend school [name]`, `suspend school [name]`
+- For a safe live overview, ask Super Admin AI: `run system readiness check` or `check system`. It reads database/config signals and does not run shell commands.
 - Destructive actions need reply **yes**
 - Super Admin only for platform actions
 - School AI actions are role-scoped: HOD/teacher attendance actions only work inside their allowed timetable/session scope, and notification actions are in-app only.

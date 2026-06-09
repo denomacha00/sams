@@ -1,7 +1,40 @@
-import { describe, expect, it } from 'vitest';
-import { getAiErrorMessage, isAiVisionFailureIntent, threadRecordsToMessages, buildMemoryNoticeMessage } from './aiChat';
+import { describe, expect, it, beforeEach } from 'vitest';
+import {
+  aiThreadStorageKey,
+  buildMemoryNoticeMessage,
+  getAiErrorMessage,
+  isAiVisionFailureIntent,
+  loadAiThreadId,
+  saveAiThreadId,
+  threadRecordsToMessages,
+} from './aiChat';
+
+const localStorageMock = (() => {
+  let store: Record<string, string> = {};
+  return {
+    clear: () => {
+      store = {};
+    },
+    getItem: (key: string) => store[key] ?? null,
+    removeItem: (key: string) => {
+      delete store[key];
+    },
+    setItem: (key: string, value: string) => {
+      store[key] = value;
+    },
+  };
+})();
+
+Object.defineProperty(globalThis, 'localStorage', {
+  value: localStorageMock,
+  configurable: true,
+});
 
 describe('aiChat', () => {
+  beforeEach(() => {
+    globalThis.localStorage.clear();
+  });
+
   it('prefers server answer from error responses', () => {
     const msg = getAiErrorMessage(
       { response: { status: 500, data: { answer: 'Vision model unavailable' } } },
@@ -42,5 +75,14 @@ describe('aiChat', () => {
     const msg = buildMemoryNoticeMessage('Key rotated');
     expect(msg.isSystemNotice).toBe(true);
     expect(msg.content).toBe('Key rotated');
+  });
+
+  it('scopes remembered thread ids per signed-in account', () => {
+    saveAiThreadId('thread-teacher', { userId: 'teacher-1', schoolId: 'school-1' });
+    saveAiThreadId('thread-student', { userId: 'student-1', schoolId: 'school-1' });
+
+    expect(loadAiThreadId({ userId: 'teacher-1', schoolId: 'school-1' })).toBe('thread-teacher');
+    expect(loadAiThreadId({ userId: 'student-1', schoolId: 'school-1' })).toBe('thread-student');
+    expect(localStorage.getItem(aiThreadStorageKey({ userId: 'teacher-1', schoolId: 'school-1' }))).toBe('thread-teacher');
   });
 });

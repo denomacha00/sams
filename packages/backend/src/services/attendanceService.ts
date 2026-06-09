@@ -4,10 +4,11 @@ import { prisma } from '../lib/prisma';
 import { AppError } from '../middleware/errors';
 import { auditService } from './auditService';
 import { riskService } from './riskService';
-import { broadcastAttendanceNew, broadcastAttendanceUpdated } from '../sockets/attendanceSocket';
+import { broadcastAttendanceNew, broadcastAttendanceUpdated, broadcastSessionEnd } from '../sockets/attendanceSocket';
 import { buildAttendanceEventPayload } from '../lib/attendanceEvent';
 import { getQrSecret } from '../config/secrets';
 import { hasSessionGpsAnchor, hasSubmittedGps, shouldEnforceSessionGps } from '../lib/attendanceGps';
+import { isTimetableWindowExpired, type TimetableWindow } from '../lib/sessionWindow';
 import {
   haversineDistance,
   classifyAttendanceStatus,
@@ -51,6 +52,8 @@ interface AttendanceSessionScope {
   classId: string;
   teacherId: string;
   class: { departmentId: string };
+  isActive?: boolean;
+  timetableEntry?: TimetableWindow | null;
   locationLat: number | null;
   locationLng: number | null;
   locationRadiusM: number;
@@ -73,6 +76,23 @@ interface AttendanceStudentScope {
 // ─── Attendance Service ───────────────────────────────────────────────────────
 
 export class AttendanceService {
+  private async ensureSessionOpen(
+    session: { id: string; isActive: boolean; timetableEntry?: TimetableWindow | null },
+  ): Promise<void> {
+    if (!session.isActive) {
+      throw new AppError(400, 'SESSION_ENDED', 'Attendance session has ended');
+    }
+
+    if (session.timetableEntry && isTimetableWindowExpired(session.timetableEntry)) {
+      await prisma.attendanceSession.update({
+        where: { id: session.id },
+        data: { isActive: false, endedAt: new Date() },
+      });
+      broadcastSessionEnd(session.id);
+      throw new AppError(400, 'SESSION_ENDED', 'Attendance session has ended');
+    }
+  }
+
   private async getStudentForSession(
     studentId: string,
     schoolId: string,
@@ -160,6 +180,10 @@ export class AttendanceService {
         classId: true,
         teacherId: true,
         class: { select: { departmentId: true } },
+        isActive: true,
+        timetableEntry: {
+          select: { dayOfWeek: true, startTime: true, endTime: true },
+        },
         locationLat: true,
         locationLng: true,
         locationRadiusM: true,
@@ -185,6 +209,8 @@ export class AttendanceService {
     if (!canManage) {
       throw new AppError(403, 'FORBIDDEN', 'You do not own this attendance session');
     }
+
+    await this.ensureSessionOpen(session);
 
     return session;
   }
@@ -224,7 +250,10 @@ export class AttendanceService {
     const actorRole = actor.actorRole ?? UserRole.TEACHER;
     const session = await prisma.attendanceSession.findUnique({
       where: { id: sessionId },
-      include: { class: { select: { departmentId: true } } },
+      include: {
+        class: { select: { departmentId: true } },
+        timetableEntry: { select: { dayOfWeek: true, startTime: true, endTime: true } },
+      },
     });
 
     if (!session) {
@@ -250,6 +279,8 @@ export class AttendanceService {
     if (!canManage) {
       throw new AppError(403, 'FORBIDDEN', 'You do not own this attendance session');
     }
+
+    await this.ensureSessionOpen(session);
 
     if (requireGps && !hasSessionGpsAnchor(session)) {
       throw new AppError(
@@ -318,6 +349,9 @@ export class AttendanceService {
     // 3. Fetch session, check isActive
     const session = await prisma.attendanceSession.findUnique({
       where: { id: payload.sessionId },
+      include: {
+        timetableEntry: { select: { dayOfWeek: true, startTime: true, endTime: true } },
+      },
     });
 
     if (!session) {
@@ -331,6 +365,8 @@ export class AttendanceService {
     if (session.schoolId !== schoolId) {
       throw new AppError(403, 'FORBIDDEN', 'Session does not belong to your school');
     }
+
+    await this.ensureSessionOpen(session);
 
     if (session.currentLinkToken !== linkToken) {
       throw new AppError(400, 'LINK_REVOKED', 'This attendance link has been replaced. Ask your teacher for the latest link.');
@@ -414,6 +450,9 @@ export class AttendanceService {
     // 2. Extract sessionId and fetch session
     const session = await prisma.attendanceSession.findUnique({
       where: { id: payload.sessionId },
+      include: {
+        timetableEntry: { select: { dayOfWeek: true, startTime: true, endTime: true } },
+      },
     });
 
     if (!session) {
@@ -423,6 +462,12 @@ export class AttendanceService {
     if (!session.isActive) {
       throw new AppError(400, 'SESSION_ENDED', 'Attendance session has ended');
     }
+
+    if (session.schoolId !== schoolId) {
+      throw new AppError(403, 'FORBIDDEN', 'Session does not belong to your school');
+    }
+
+    await this.ensureSessionOpen(session);
 
     const student = await this.getStudentForSession(studentId, schoolId, session);
 

@@ -176,6 +176,7 @@ Native client **`packages/mobile`** (display name **SAMS**) uses the same `/api/
 
 **QR Code Scanning**
 - Teacher starts a session → QR code generated (JWT, 30s expiry)
+- Sessions are timetable-locked: they can only start in the scheduled slot window and stale active sessions are closed/rejected after the slot grace window.
 - QR refreshes every 30 seconds via cron job
 - Student scans → GPS verified → attendance recorded
 - Real-time broadcast to all connected clients
@@ -399,6 +400,7 @@ Never run only `git pull` on the server without a build — that is what causes 
 - `PUT/DELETE /api/v1/timetable/:id` — Update/delete entry
 
 ### Sessions
+- Session listing and attendance APIs close/reject stale active sessions past the timetable window.
 - `POST /api/v1/sessions` — Start session
 - `GET /api/v1/sessions` — List sessions
 - `GET /api/v1/sessions/:id/qr` — Get current QR token
@@ -485,6 +487,7 @@ Handles SAMS-specific queries via regex pattern matching:
 - Typical production primary: **OpenRouter** via `OPENAI_API_KEY`, `OPENAI_BASE_URL=https://openrouter.ai/api/v1`, `OPENAI_MODEL=meta-llama/llama-3.3-70b-instruct` (or the approved model set in `secrets/providers.env`).
 - Typical fallback: **Groq** via `OPENAI_FALLBACK_KEY`, `OPENAI_FALLBACK_URL=https://api.groq.com/openai/v1`, `OPENAI_FALLBACK_MODEL=llama-3.3-70b-versatile`.
 - AI actions and conversation memory still depend on provider credits/rate limits; if both providers are out of credits/quota, local DB-backed answers continue but general LLM answers fail gracefully.
+- Conversation memory is encrypted server-side and the frontend remembers thread ids per signed-in account, so role/account switching in one browser does not mix chat threads.
 - Do not use decommissioned Groq IDs (`llama3-70b-8192`, etc.); runtime migrates some, but set the model explicitly on the VPS.
 - Verify on server without wiping keys: `bash scripts/verify-secrets.sh`
 - Answers any general knowledge question
@@ -498,6 +501,7 @@ Can execute via natural language:
 - Extend licenses
 - Get school info
 - Get system statistics
+- Run a safe system readiness diagnostic from live database/configuration signals (AI config, memory, active/stale sessions, schools/users/licenses). It does not run arbitrary shell commands.
 
 ### School AI Actions
 School AI is scoped to the logged-in role and school:

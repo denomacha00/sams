@@ -1,6 +1,7 @@
-import React, { useState, useRef, useEffect, useCallback } from 'react';
+import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import apiClient from '../services/apiClient';
 import { useVoiceQuery } from '../hooks/useVoiceQuery';
+import { useAuthStore } from '../store/authStore';
 import {
   buildMemoryNoticeMessage,
   getAiAuthHint,
@@ -55,11 +56,16 @@ export const AISparkleIcon: React.FC<{ className?: string }> = ({ className = 'w
 );
 
 const FloatingAI: React.FC = () => {
+  const user = useAuthStore((s) => s.user);
+  const threadOwner = useMemo(
+    () => user ? { userId: user.id, schoolId: user.schoolId, role: user.role } : null,
+    [user?.id, user?.schoolId, user?.role],
+  );
   const [isOpen, setIsOpen] = useState(false);
   const [messages, setMessages] = useState<Message[]>([WELCOME_MESSAGE]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
-  const [threadId, setThreadId] = useState<string | null>(() => loadAiThreadId());
+  const [threadId, setThreadId] = useState<string | null>(() => loadAiThreadId(threadOwner));
   const [historyLoaded, setHistoryLoaded] = useState(false);
   const pendingActionRef = useRef<PendingAction | null>(null);
   const [selectedImages, setSelectedImages] = useState<File[]>([]);
@@ -78,6 +84,13 @@ const FloatingAI: React.FC = () => {
   ];
 
   const isImageGenRequest = (text: string) => IMAGE_GEN_PATTERNS.some((p) => p.test(text.trim()));
+
+  useEffect(() => {
+    setThreadId(loadAiThreadId(threadOwner));
+    setHistoryLoaded(false);
+    pendingActionRef.current = null;
+    setMessages([WELCOME_MESSAGE]);
+  }, [threadOwner]);
 
   const handleImageSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []);
@@ -166,7 +179,7 @@ const FloatingAI: React.FC = () => {
       });
       if (data.threadId) {
         setThreadId(data.threadId);
-        saveAiThreadId(data.threadId);
+        saveAiThreadId(data.threadId, threadOwner);
       }
       pendingActionRef.current = null;
       setMessages((prev) => [...prev, {
@@ -185,7 +198,7 @@ const FloatingAI: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  }, [threadId]);
+  }, [threadId, threadOwner]);
 
   const submitQuery = useCallback(async (text: string) => {
     if (!text.trim() && selectedImages.length === 0) return;
@@ -247,7 +260,7 @@ const FloatingAI: React.FC = () => {
       });
       if (data.threadId) {
         setThreadId(data.threadId);
-        saveAiThreadId(data.threadId);
+        saveAiThreadId(data.threadId, threadOwner);
       }
       appendMemoryNotice(data.memoryNotice);
 
@@ -283,7 +296,7 @@ const FloatingAI: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  }, [selectedImages, imagePreviews, threadId, appendMemoryNotice]);
+  }, [selectedImages, imagePreviews, threadId, threadOwner, appendMemoryNotice]);
 
   const { isListening, startListening, stopListening } = useVoiceQuery(submitQuery);
 

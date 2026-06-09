@@ -9,8 +9,10 @@ vi.mock('../lib/prisma', () => ({
     timetableEntry: { findFirst: vi.fn() },
     attendanceSession: {
       findFirst: vi.fn(),
+      findMany: vi.fn(),
       findUnique: vi.fn(),
       create: vi.fn(),
+      updateMany: vi.fn(),
     },
   },
 }));
@@ -157,6 +159,42 @@ describe('SessionService.startSession', () => {
     ).rejects.toMatchObject({
       statusCode: 400,
       code: 'WRONG_DAY',
+    });
+  });
+});
+
+describe('SessionService.expireStaleActiveSessions', () => {
+  const service = new SessionService();
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-06-01T10:00:00')); // Monday 10:00
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it('closes active sessions after the timetable window plus grace period', async () => {
+    vi.mocked(prisma.attendanceSession.findMany).mockResolvedValue([
+      {
+        id: 'expired-session',
+        timetableEntry: { dayOfWeek: 0, startTime: '08:00', endTime: '09:00' },
+      },
+      {
+        id: 'current-session',
+        timetableEntry: { dayOfWeek: 0, startTime: '09:30', endTime: '10:30' },
+      },
+    ] as never);
+    vi.mocked(prisma.attendanceSession.updateMany).mockResolvedValue({ count: 1 } as never);
+
+    const expired = await service.expireStaleActiveSessions('school-1');
+
+    expect(expired).toBe(1);
+    expect(prisma.attendanceSession.updateMany).toHaveBeenCalledWith({
+      where: { id: { in: ['expired-session'] }, isActive: true },
+      data: { isActive: false, endedAt: expect.any(Date) },
     });
   });
 });

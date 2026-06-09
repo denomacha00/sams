@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import QRCode from 'qrcode';
 import { io, Socket } from 'socket.io-client';
@@ -24,6 +24,7 @@ interface TimetableEntry {
 
 interface AttendanceRecord {
   id: string;
+  studentId?: string;
   studentName: string;
   status: AttendanceStatus;
   method: string;
@@ -34,10 +35,55 @@ interface ActiveSession {
   id: string;
   subject: string;
   className: string;
+  timetableEntryId?: string;
   qrToken: string;
   startedAt: string;
   locationRadiusM: number;
   records: AttendanceRecord[];
+}
+
+const SESSION_WINDOW_TOLERANCE_MINUTES = 30;
+
+function schemaDayOfWeek(date: Date): number {
+  const jsDay = date.getDay();
+  return jsDay === 0 ? 6 : jsDay - 1;
+}
+
+function timeToMinutes(value: string): number {
+  const [hours, minutes] = value.split(':').map(Number);
+  if (!Number.isFinite(hours) || !Number.isFinite(minutes)) return Number.NaN;
+  return (hours * 60) + minutes;
+}
+
+function formatMinutes(value: number): string {
+  const normalized = Math.max(0, Math.min(23 * 60 + 59, value));
+  const hours = Math.floor(normalized / 60).toString().padStart(2, '0');
+  const minutes = (normalized % 60).toString().padStart(2, '0');
+  return `${hours}:${minutes}`;
+}
+
+function isEntryOpenNow(entry: TimetableEntry, now: Date): boolean {
+  if (schemaDayOfWeek(now) !== entry.dayOfWeek) return false;
+  const current = (now.getHours() * 60) + now.getMinutes();
+  const start = timeToMinutes(entry.startTime);
+  const end = timeToMinutes(entry.endTime);
+  if (!Number.isFinite(start) || !Number.isFinite(end)) return false;
+  return current >= start - SESSION_WINDOW_TOLERANCE_MINUTES &&
+    current <= end + SESSION_WINDOW_TOLERANCE_MINUTES;
+}
+
+function entryWindowLabel(entry: TimetableEntry, now: Date): string {
+  if (isEntryOpenNow(entry, now)) return 'Open now';
+  if (schemaDayOfWeek(now) !== entry.dayOfWeek) return 'Not today';
+
+  const current = (now.getHours() * 60) + now.getMinutes();
+  const start = timeToMinutes(entry.startTime);
+  const end = timeToMinutes(entry.endTime);
+  if (!Number.isFinite(start) || !Number.isFinite(end)) return 'Check timetable';
+  if (current < start - SESSION_WINDOW_TOLERANCE_MINUTES) {
+    return `Opens at ${formatMinutes(start - SESSION_WINDOW_TOLERANCE_MINUTES)}`;
+  }
+  return `Closed after ${formatMinutes(end + SESSION_WINDOW_TOLERANCE_MINUTES)}`;
 }
 
 const SessionPage: React.FC = () => {
@@ -45,9 +91,11 @@ const SessionPage: React.FC = () => {
   const [timetableEntries, setTimetableEntries] = useState<TimetableEntry[]>([]);
   const [selectedEntry, setSelectedEntry] = useState('');
   const [activeSession, setActiveSession] = useState<ActiveSession | null>(null);
+  const [activeSessions, setActiveSessions] = useState<ActiveSession[]>([]);
   const [qrDataUrl, setQrDataUrl] = useState<string>('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [now, setNow] = useState(() => new Date());
   const socketRef = useRef<Socket | null>(null);
   const qrPanelRef = useRef<HTMLDivElement>(null);
   const linkPanelRef = useRef<HTMLDivElement>(null);
@@ -66,24 +114,30 @@ const SessionPage: React.FC = () => {
   const [sessionRequireGps, setSessionRequireGps] = useState<boolean>(false);
   const [sessionRadiusM, setSessionRadiusM] = useState<number>(100);
 
-  const applySessionFromApi = useCallback((data: {
+  const normalizeSessionFromApi = useCallback((data: {
     id: string;
     subject: string;
     className?: string | null;
+    timetableEntryId?: string | null;
     qrToken?: string | null;
     currentQRToken?: string | null;
     startedAt: string;
     locationRadiusM?: number;
-  }) => {
-    setActiveSession({
+    records?: AttendanceRecord[];
+  }): ActiveSession => ({
       id: data.id,
       subject: data.subject,
       className: data.className ?? 'Class',
+      timetableEntryId: data.timetableEntryId ?? undefined,
       qrToken: data.qrToken ?? data.currentQRToken ?? '',
       startedAt: data.startedAt,
       locationRadiusM: data.locationRadiusM || 100,
-      records: [],
-    });
+      records: data.records ?? [],
+    }), []);
+
+  useEffect(() => {
+    const timer = window.setInterval(() => setNow(new Date()), 60_000);
+    return () => window.clearInterval(timer);
   }, []);
 
   // Resume an in-progress session so the page is not blocked after navigation
@@ -102,14 +156,20 @@ const SessionPage: React.FC = () => {
           (s: { isActive?: boolean }) => s.isActive !== false,
         );
         if (list.length > 0) {
-          applySessionFromApi(list[0]);
+          const normalized = list.map(normalizeSessionFromApi);
+          setActiveSessions(normalized);
+          setActiveSession((current) =>
+            current
+              ? normalized.find((session) => session.id === current.id) ?? normalized[0]
+              : normalized[0],
+          );
         }
       } catch {
         // ignore — teacher can start a new session
       }
     };
     void resume();
-  }, [user?.id, user?.role, activeSession, applySessionFromApi]);
+  }, [user?.id, user?.role, activeSession, normalizeSessionFromApi]);
 
   // Fetch today's timetable entries for this teacher
   useEffect(() => {
@@ -133,6 +193,28 @@ const SessionPage: React.FC = () => {
     };
     fetchEntries();
   }, [user?.id, user?.role]);
+
+  const openTimetableEntries = useMemo(
+    () => timetableEntries.filter((entry) => isEntryOpenNow(entry, now)),
+    [timetableEntries, now],
+  );
+
+  const nextTimetableEntry = useMemo(() => {
+    const currentMinutes = (now.getHours() * 60) + now.getMinutes();
+    return timetableEntries
+      .filter((entry) => timeToMinutes(entry.startTime) > currentMinutes)
+      .sort((a, b) => timeToMinutes(a.startTime) - timeToMinutes(b.startTime))[0];
+  }, [timetableEntries, now]);
+
+  useEffect(() => {
+    if (selectedEntry && !openTimetableEntries.some((entry) => entry.id === selectedEntry)) {
+      setSelectedEntry('');
+      return;
+    }
+    if (!selectedEntry && openTimetableEntries.length === 1) {
+      setSelectedEntry(openTimetableEntries[0].id);
+    }
+  }, [openTimetableEntries, selectedEntry]);
 
   // Generate QR code image from token
   useEffect(() => {
@@ -176,6 +258,18 @@ const SessionPage: React.FC = () => {
         }
         return { ...prev, records: [...prev.records, record] };
       });
+      setActiveSessions((prev) =>
+        prev.map((session) => {
+          if (session.id !== activeSession.id) return session;
+          const exists = session.records.find((r) => r.id === record.id);
+          return {
+            ...session,
+            records: exists
+              ? session.records.map((r) => r.id === record.id ? record : r)
+              : [...session.records, record],
+          };
+        }),
+      );
     };
 
     socket.on('attendance:new', handleAttendanceRecord);
@@ -223,6 +317,55 @@ const SessionPage: React.FC = () => {
       setLinkCopied(false);
     }
   }, [activeSession]);
+
+  useEffect(() => {
+    if (!activeSession?.id) return;
+    let cancelled = false;
+
+    const loadExistingRecords = async () => {
+      try {
+        const [sessionRes, recordsRes] = await Promise.all([
+          apiClient.get(`/sessions/${activeSession.id}`),
+          apiClient.get('/attendance', { params: { sessionId: activeSession.id } }),
+        ]);
+        if (cancelled) return;
+
+        const students: Array<{ id: string; fullName: string }> = sessionRes.data.students ?? [];
+        const nameByStudent = new Map(students.map((student) => [student.id, student.fullName]));
+        const records = (Array.isArray(recordsRes.data) ? recordsRes.data : []).map((record: {
+          id: string;
+          studentId: string;
+          status: AttendanceStatus;
+          method: string;
+          scannedAt: string;
+        }): AttendanceRecord => ({
+          id: record.id,
+          studentId: record.studentId,
+          studentName: nameByStudent.get(record.studentId) ?? 'Student',
+          status: record.status,
+          method: record.method,
+          scannedAt: record.scannedAt,
+        }));
+
+        setActiveSession((current) =>
+          current?.id === activeSession.id ? { ...current, records } : current,
+        );
+        setActiveSessions((current) =>
+          current.map((session) =>
+            session.id === activeSession.id ? { ...session, records } : session,
+          ),
+        );
+      } catch {
+        // Live socket updates still continue even if the historical load fails.
+      }
+    };
+
+    void loadExistingRecords();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [activeSession?.id]);
 
   const generateLink = useCallback(async () => {
     if (!activeSession) return;
@@ -327,7 +470,12 @@ const SessionPage: React.FC = () => {
         { timeout: SESSION_START_TIMEOUT_MS },
       );
 
-      applySessionFromApi(data);
+      const normalized = normalizeSessionFromApi(data);
+      setActiveSessions((current) => [
+        normalized,
+        ...current.filter((session) => session.id !== normalized.id),
+      ]);
+      setActiveSession(normalized);
     } catch (err: unknown) {
       const axiosErr = err as AxiosError<{ code?: string }>;
       const code = axiosErr.response?.data?.code;
@@ -354,7 +502,9 @@ const SessionPage: React.FC = () => {
               (s: { timetableEntryId?: string }) => s.timetableEntryId === selectedEntry,
             ) ?? list[0];
           if (match) {
-            applySessionFromApi(match);
+            const normalized = list.map(normalizeSessionFromApi);
+            setActiveSessions(normalized);
+            setActiveSession(normalizeSessionFromApi(match));
             return;
           }
         } catch {
@@ -373,10 +523,13 @@ const SessionPage: React.FC = () => {
 
   const endSession = async () => {
     if (!activeSession) return;
+    const endedSessionId = activeSession.id;
     setLoading(true);
     try {
-      await apiClient.post(`/sessions/${activeSession.id}/end`);
-      setActiveSession(null);
+      await apiClient.post(`/sessions/${endedSessionId}/end`);
+      const remaining = activeSessions.filter((session) => session.id !== endedSessionId);
+      setActiveSessions(remaining);
+      setActiveSession(remaining[0] ?? null);
       setQrDataUrl('');
     } catch (err: unknown) {
       setError(getApiErrorMessage(err, 'Failed to end session'));
@@ -402,11 +555,19 @@ const SessionPage: React.FC = () => {
   if (!activeSession) {
     return (
       <div className="page-shell p-6">
-        <div className="max-w-lg mx-auto">
+        <div className="max-w-6xl mx-auto">
           {/* Header */}
-          <div className="mb-8">
-            <h1 className="text-2xl font-bold text-ink">Start Attendance Session</h1>
-            <p className="text-ink-muted text-sm mt-1">Select a class to begin taking attendance</p>
+          <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-brand">Attendance control</p>
+              <h1 className="text-2xl font-bold text-ink">Start Attendance Session</h1>
+              <p className="text-ink-muted text-sm mt-1">
+                Sessions open from the timetable window. Choose QR, link, manual, or face/biometric after starting.
+              </p>
+            </div>
+            <Link to="/" className="btn-secondary px-4 py-2 text-sm w-full sm:w-auto text-center">
+              Back to dashboard
+            </Link>
           </div>
 
           {error && (
@@ -415,37 +576,52 @@ const SessionPage: React.FC = () => {
             </div>
           )}
 
+          <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_360px]">
           <div className="surface-card rounded-2xl p-6 space-y-5">
             <div>
               <label htmlFor="timetableEntry" className="form-label">
-                Select Class / Subject
+                Current class / subject
               </label>
               <select
                 id="timetableEntry"
                 value={selectedEntry}
                 onChange={(e) => setSelectedEntry(e.target.value)}
-                className="w-full input-field focus:outline-none focus:ring-2 focus:ring-indigo-500/50 transition-all duration-200 appearance-none"
+                disabled={openTimetableEntries.length === 0}
+                className="w-full input-field focus:outline-none focus:ring-2 focus:ring-indigo-500/50 transition-all duration-200 appearance-none disabled:opacity-60"
               >
-                <option value="" className="bg-slate-800">-- Select --</option>
-                {timetableEntries.map((entry) => (
+                <option value="" className="bg-slate-800">
+                  {openTimetableEntries.length === 0 ? 'No class open now' : 'Choose current class'}
+                </option>
+                {openTimetableEntries.map((entry) => (
                   <option key={entry.id} value={entry.id} className="bg-slate-800">
                     {entry.subject} — {entry.className} ({entry.startTime}–{entry.endTime})
                   </option>
                 ))}
               </select>
-              {timetableEntries.length === 0 && (
+              {timetableEntries.length === 0 ? (
                 <p className="text-xs text-ink-muted mt-2">
-                  No classes on your timetable for today. Ask your HOD or admin to add entries, or try again on the scheduled day.
+                  No classes on your timetable today. Ask the HOD/admin to add the timetable entry first.
+                </p>
+              ) : openTimetableEntries.length === 0 ? (
+                <p className="text-xs text-amber-200 mt-2">
+                  No attendance session is open right now.
+                  {nextTimetableEntry
+                    ? ` Next: ${nextTimetableEntry.subject} (${nextTimetableEntry.startTime}-${nextTimetableEntry.endTime}).`
+                    : ' Today\'s scheduled sessions are already outside the allowed window.'}
+                </p>
+              ) : (
+                <p className="text-xs text-ink-muted mt-2">
+                  The selected session will stay live until it is ended or the timetable window expires.
                 </p>
               )}
             </div>
 
             <div className="flex items-center justify-between p-3 bg-surface-muted border border-line rounded-xl">
               <div>
-                <p className="text-sm font-medium text-ink">Require GPS (QR scan)</p>
+                <p className="text-sm font-medium text-ink">Require GPS for QR</p>
                 <p className="text-xs text-ink-muted mt-0.5">
                   {sessionRequireGps
-                    ? 'Students must be within radius of your location when scanning'
+                    ? 'Students must be within your set radius when scanning'
                     : 'No location check for QR — use link GPS toggle separately if needed'}
                 </p>
               </div>
@@ -455,6 +631,7 @@ const SessionPage: React.FC = () => {
                 className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors duration-200 focus:outline-none ${
                   sessionRequireGps ? 'bg-indigo-600' : 'bg-white/20'
                 }`}
+                aria-label="Toggle QR GPS requirement"
               >
                 <span
                   className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform duration-200 ${
@@ -489,25 +666,47 @@ const SessionPage: React.FC = () => {
             <button
               onClick={startSession}
               disabled={!selectedEntry || loading}
-              className="w-full btn-primary font-semibold py-3.5 px-4 rounded-xl shadow-lg shadow-indigo-500/25 hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200"
+              className="w-full btn-primary font-semibold py-3.5 px-4 rounded-xl shadow-lg shadow-indigo-500/25 active:scale-[0.99] disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200"
             >
-              {loading ? (
-                <span className="flex items-center justify-center gap-2">
-                  <svg className="animate-spin h-5 w-5" viewBox="0 0 24 24">
-                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
-                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-                  </svg>
-                  Starting...
-                </span>
-              ) : (
-                'Start Session'
-              )}
+              {loading ? 'Starting...' : 'Start Session'}
             </button>
+          </div>
+
+          <aside className="surface-panel rounded-2xl p-5">
+            <h2 className="text-sm font-semibold text-ink">Today&apos;s timetable</h2>
+            <div className="mt-4 space-y-3">
+              {timetableEntries.length === 0 ? (
+                <p className="text-sm text-ink-subtle">No timetable entries found for today.</p>
+              ) : (
+                timetableEntries.map((entry) => {
+                  const open = isEntryOpenNow(entry, now);
+                  return (
+                    <div key={entry.id} className="rounded-xl border border-line bg-surface-muted p-3">
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0">
+                          <p className="truncate text-sm font-semibold text-ink">{entry.subject}</p>
+                          <p className="truncate text-xs text-ink-muted">{entry.className}</p>
+                        </div>
+                        <span className={`shrink-0 rounded-full px-2 py-1 text-[11px] font-semibold ${
+                          open ? 'bg-emerald-500/15 text-emerald-200' : 'bg-white/10 text-ink-subtle'
+                        }`}>
+                          {entryWindowLabel(entry, now)}
+                        </span>
+                      </div>
+                      <p className="mt-2 text-xs text-ink-subtle">
+                        {entry.startTime}-{entry.endTime}{entry.room ? ` - ${entry.room}` : ''}
+                      </p>
+                    </div>
+                  );
+                })
+              )}
+            </div>
+          </aside>
           </div>
 
           {/* Footer */}
           <p className="text-center text-xs text-ink-subtle mt-8">
-            © 2025 SAMS · Developed by Denis Macharia
+            (c) 2025 SAMS - Developed by Denis Macharia
           </p>
         </div>
       </div>
@@ -517,7 +716,7 @@ const SessionPage: React.FC = () => {
   // Active session view
   return (
     <div className="page-shell p-6">
-      <div className="max-w-4xl mx-auto">
+      <div className="max-w-6xl mx-auto">
         {/* Session header */}
         <div className="flex flex-wrap items-center justify-between gap-3 mb-6">
           <div>
@@ -546,6 +745,34 @@ const SessionPage: React.FC = () => {
             </button>
           </div>
         </div>
+
+        {activeSessions.length > 1 && (
+          <div className="surface-card rounded-2xl p-4 mb-5">
+            <label htmlFor="activeSession" className="form-label">
+              Active session
+            </label>
+            <select
+              id="activeSession"
+              value={activeSession.id}
+              onChange={(e) => {
+                const selected = activeSessions.find((session) => session.id === e.target.value);
+                if (selected) {
+                  setActiveSession(selected);
+                  setLinkUrl('');
+                  setLinkToken('');
+                  setLinkExpiresAt('');
+                }
+              }}
+              className="w-full input-field focus:outline-none focus:ring-2 focus:ring-indigo-500/50 transition-all duration-200 appearance-none"
+            >
+              {activeSessions.map((session) => (
+                <option key={session.id} value={session.id} className="bg-slate-800">
+                  {session.subject} - {session.className}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
 
         {error && (
           <div className="mb-4 p-3 alert-error">
@@ -844,7 +1071,7 @@ const SessionPage: React.FC = () => {
 
         {/* Footer */}
         <p className="text-center text-xs text-ink-subtle mt-8">
-          © 2025 SAMS · Developed by Denis Macharia
+          (c) 2025 SAMS - Developed by Denis Macharia
         </p>
       </div>
     </div>

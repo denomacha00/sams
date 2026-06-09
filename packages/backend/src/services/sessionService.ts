@@ -5,6 +5,7 @@ import { prisma } from '../lib/prisma';
 import { AppError } from '../middleware/errors';
 import { getQrSecret } from '../config/secrets';
 import { broadcastQRRefresh, broadcastSessionEnd } from '../sockets/attendanceSocket';
+import { isTimetableWindowExpired } from '../lib/sessionWindow';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -173,6 +174,44 @@ export class SessionService {
     });
 
     return session;
+  }
+
+  /**
+   * Close active sessions whose timetable window has passed.
+   * This prevents old QR/link sessions from staying live if nobody taps End Session.
+   */
+  async expireStaleActiveSessions(schoolId?: string): Promise<number> {
+    const sessions = await prisma.attendanceSession.findMany({
+      where: {
+        isActive: true,
+        timetableEntryId: { not: null },
+        ...(schoolId ? { schoolId } : {}),
+      },
+      select: {
+        id: true,
+        timetableEntry: {
+          select: { dayOfWeek: true, startTime: true, endTime: true },
+        },
+      },
+    });
+
+    const expiredIds = sessions
+      .filter((session) =>
+        session.timetableEntry
+          ? isTimetableWindowExpired(session.timetableEntry)
+          : false,
+      )
+      .map((session) => session.id);
+
+    if (expiredIds.length === 0) return 0;
+
+    await prisma.attendanceSession.updateMany({
+      where: { id: { in: expiredIds }, isActive: true },
+      data: { isActive: false, endedAt: new Date() },
+    });
+
+    expiredIds.forEach((sessionId) => broadcastSessionEnd(sessionId));
+    return expiredIds.length;
   }
 
   /**

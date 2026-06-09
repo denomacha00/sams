@@ -807,12 +807,14 @@ Endpoint: `POST /api/v1/ai/query-with-image` (`routes/ai.ts`)
 
 | Panel | URL | Scope |
 |-------|-----|-------|
-| Super Admin AI | super.smart-managment.com | All schools, licenses, suspend, system stats |
+| Super Admin AI | super.smart-managment.com | All schools, licenses, suspend, system stats, safe readiness diagnostics |
 | School AI | app.smart-managment.com | Single school; no platform actions |
 
 ### 9.7 Conversation memory
 
 Requires `CONVERSATION_MASTER_KEY` (32+ chars) in `providers.env`. Without it, encrypted thread memory disabled (warn at startup).
+
+Frontend thread ids are stored per signed-in account (`schoolId:userId`) so switching between Super Admin, staff, and student accounts in one browser does not mix conversation memory.
 
 ### 9.8 School AI role actions
 
@@ -850,6 +852,7 @@ Attendance AI actions must follow timetable/session rules: HODs are scoped to th
 Additional session guards:
 
 - No current timetable slot -> session start is denied; teacher/HOD must use the scheduled class or fix timetable first.
+- Stale active sessions past the timetable grace window are closed/rejected by session listing and attendance APIs.
 - HOD session access -> routes and sockets allow only sessions whose class belongs to the HOD department.
 
 ### 10.2 Biometric

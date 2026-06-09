@@ -1,6 +1,7 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useMemo } from 'react';
 import apiClient from '../services/apiClient';
 import { useVoiceQuery } from '../hooks/useVoiceQuery';
+import { useAuthStore } from '../store/authStore';
 import {
   buildMemoryNoticeMessage,
   getAiAuthHint,
@@ -41,10 +42,15 @@ const SUGGESTED_QUESTIONS = [
 const CONFIRM_RE = /^(yes|y|confirm|proceed|ok|do it|go ahead)\.?$/i;
 
 const AIAssistantPage: React.FC = () => {
+  const user = useAuthStore((s) => s.user);
+  const threadOwner = useMemo(
+    () => user ? { userId: user.id, schoolId: user.schoolId, role: user.role } : null,
+    [user?.id, user?.schoolId, user?.role],
+  );
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
-  const [threadId, setThreadId] = useState<string | null>(() => loadAiThreadId());
+  const [threadId, setThreadId] = useState<string | null>(() => loadAiThreadId(threadOwner));
   const [historyLoaded, setHistoryLoaded] = useState(false);
   const pendingActionRef = useRef<PendingAction | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -90,6 +96,13 @@ const AIAssistantPage: React.FC = () => {
     setImagePreviews([]);
   };
 
+  useEffect(() => {
+    setThreadId(loadAiThreadId(threadOwner));
+    setHistoryLoaded(false);
+    pendingActionRef.current = null;
+    setMessages([]);
+  }, [threadOwner]);
+
   // Restore encrypted thread history after refresh.
   useEffect(() => {
     if (!threadId || historyLoaded) return;
@@ -133,9 +146,14 @@ const AIAssistantPage: React.FC = () => {
     try {
       const { data } = await apiClient.post('/ai/query', {
         question: 'yes',
+        threadId,
         confirmAction: true,
         pendingAction: pending,
       });
+      if (data.threadId) {
+        setThreadId(data.threadId);
+        saveAiThreadId(data.threadId, threadOwner);
+      }
       pendingActionRef.current = null;
       setMessages((prev) => [...prev, {
         id: crypto.randomUUID(),
@@ -214,7 +232,7 @@ const AIAssistantPage: React.FC = () => {
       });
       if (data.threadId) {
         setThreadId(data.threadId);
-        saveAiThreadId(data.threadId);
+        saveAiThreadId(data.threadId, threadOwner);
       }
       appendMemoryNotice(data.memoryNotice);
 

@@ -1,5 +1,11 @@
 const AI_THREAD_STORAGE_KEY = 'sams-ai-thread-id';
 
+export interface AiThreadOwner {
+  userId?: string | null;
+  schoolId?: string | null;
+  role?: string | null;
+}
+
 export interface AiThreadRecord {
   id: string;
   message: string;
@@ -59,20 +65,37 @@ export function buildMemoryNoticeMessage(notice: string): AiChatMessage {
 }
 
 /** Persist server thread id so refresh keeps the same encrypted conversation. */
-export function loadAiThreadId(): string | null {
+export function aiThreadStorageKey(owner?: AiThreadOwner | null): string {
+  const userId = owner?.userId?.trim();
+  const schoolId = owner?.schoolId?.trim();
+  if (!userId) return AI_THREAD_STORAGE_KEY;
+  return `${AI_THREAD_STORAGE_KEY}:${schoolId || 'school'}:${userId}`;
+}
+
+export function loadAiThreadId(owner?: AiThreadOwner | null): string | null {
   try {
-    return localStorage.getItem(AI_THREAD_STORAGE_KEY);
+    const scopedKey = aiThreadStorageKey(owner);
+    const scopedValue = localStorage.getItem(scopedKey);
+    if (scopedValue) return scopedValue;
+    if (scopedKey !== AI_THREAD_STORAGE_KEY) {
+      return localStorage.getItem(AI_THREAD_STORAGE_KEY);
+    }
+    return scopedValue;
   } catch {
     return null;
   }
 }
 
-export function saveAiThreadId(threadId: string | null | undefined): void {
+export function saveAiThreadId(
+  threadId: string | null | undefined,
+  owner?: AiThreadOwner | null,
+): void {
   try {
+    const scopedKey = aiThreadStorageKey(owner);
     if (threadId) {
-      localStorage.setItem(AI_THREAD_STORAGE_KEY, threadId);
+      localStorage.setItem(scopedKey, threadId);
     } else {
-      localStorage.removeItem(AI_THREAD_STORAGE_KEY);
+      localStorage.removeItem(scopedKey);
     }
   } catch {
     // private mode / quota — memory still works server-side via latest thread

@@ -287,6 +287,81 @@ const getSystemStatsHandler: ActionHandler = async () => {
 
 // ─── Action Definitions ───────────────────────────────────────────────────────
 
+const runSystemReadinessCheckHandler: ActionHandler = async () => {
+  const { prisma } = await import('../../../lib/prisma');
+  const { getAIHealthSummary } = await import('../aiProviderConfig');
+  const { isConversationMemoryEnabled } = await import('../roleActionsPrompt');
+  const { isTimetableWindowExpired } = await import('../../../lib/sessionWindow');
+
+  const [
+    totalSchools,
+    suspendedSchools,
+    expiredLicenses,
+    totalUsers,
+    totalConversationThreads,
+    activeSessions,
+    attachmentCount,
+  ] = await Promise.all([
+    prisma.school.count(),
+    prisma.school.count({ where: { isSuspended: true } }),
+    prisma.school.count({ where: { licenseExpiresAt: { lt: new Date() } } }),
+    prisma.user.count(),
+    prisma.conversationThread.count(),
+    prisma.attendanceSession.findMany({
+      where: { isActive: true, timetableEntryId: { not: null } },
+      select: {
+        id: true,
+        subject: true,
+        schoolId: true,
+        timetableEntry: { select: { dayOfWeek: true, startTime: true, endTime: true } },
+      },
+      take: 250,
+    }),
+    prisma.notificationAttachment.count(),
+  ]);
+
+  const staleSessions = activeSessions.filter((session) =>
+    session.timetableEntry ? isTimetableWindowExpired(session.timetableEntry) : false,
+  );
+  const ai = getAIHealthSummary();
+  const memoryEnabled = isConversationMemoryEnabled();
+
+  const lines = [
+    'System readiness check',
+    '',
+    `Schools: ${totalSchools} (${suspendedSchools} suspended, ${expiredLicenses} expired licenses)`,
+    `Users: ${totalUsers}`,
+    `Attendance: ${activeSessions.length} active session(s), ${staleSessions.length} past timetable window`,
+    `Notifications: ${attachmentCount} attachment record(s)`,
+    `AI: primary ${ai.primaryKey ? 'configured' : 'missing'}, fallback ${ai.fallbackKey ? 'configured' : 'missing'}, memory ${memoryEnabled ? 'enabled' : 'disabled'}`,
+  ];
+
+  if (ai.modelMismatch) {
+    lines.push(`AI warning: ${ai.model} does not match ${ai.baseURL}.`);
+  }
+  if (staleSessions.length > 0) {
+    lines.push('Attendance warning: stale sessions will be closed when the sessions API next runs; ask staff to refresh Sign In Students.');
+  }
+  if (!memoryEnabled) {
+    lines.push('AI warning: set CONVERSATION_MASTER_KEY (32+ chars) so logged-in chat remembers safely.');
+  }
+
+  return {
+    answer: lines.join('\n'),
+    data: {
+      totalSchools,
+      suspendedSchools,
+      expiredLicenses,
+      totalUsers,
+      totalConversationThreads,
+      activeSessions: activeSessions.length,
+      staleActiveSessions: staleSessions.length,
+      ai,
+      memoryEnabled,
+    },
+  };
+};
+
 export const superAdminActions: ActionDefinition[] = [
   {
     action: 'unsuspend_school',
@@ -420,6 +495,21 @@ export const superAdminActions: ActionDefinition[] = [
     descriptionTemplate: () =>
       `Retrieve system-wide statistics (schools, users, revenue, etc.).`,
     handler: getSystemStatsHandler,
+  },
+  {
+    action: 'run_system_readiness_check',
+    description: 'Run a safe platform readiness diagnostic using live database and AI configuration',
+    destructive: false,
+    patterns: [
+      /(?:run\s+)?(?:system|platform|production|app)\s+(?:readiness|health|diagnostic|diagnostics|check|status)/i,
+      /(?:diagnose|troubleshoot)\s+(?:system|platform|production|app|sams)/i,
+      /is\s+sams\s+ready/i,
+      /check\s+(?:the\s+)?(?:whole\s+)?(?:system|platform|app)/i,
+    ],
+    extractParams: () => ({}),
+    descriptionTemplate: () =>
+      'Run a safe SAMS readiness diagnostic from live database/configuration signals.',
+    handler: runSystemReadinessCheckHandler,
   },
   {
     action: 'reset_user_password',

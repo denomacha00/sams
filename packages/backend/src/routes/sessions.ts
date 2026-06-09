@@ -91,6 +91,8 @@ sessionsRouter.get('/', async (req: Request, res: Response): Promise<void> => {
       return;
     }
 
+    await sessionService.expireStaleActiveSessions(req.schoolId);
+
     const where: Record<string, unknown> = { schoolId: req.schoolId };
 
     if (req.user.role === UserRole.TEACHER) {
