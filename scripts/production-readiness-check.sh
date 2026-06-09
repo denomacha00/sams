@@ -16,7 +16,14 @@ MERGED_ENV_FILE="${ROOT}/packages/backend/.env"
 
 FAIL=0
 pass() { echo "  OK  $1"; }
+warn() { echo "  WARN  $1"; }
 fail() { echo "  FAIL  $1"; FAIL=1; }
+is_truthy_env() {
+  case "${1,,}" in
+    1|true|yes|y|on) return 0 ;;
+    *) return 1 ;;
+  esac
+}
 
 echo "==> SAMS production readiness ($(date -Iseconds))"
 
@@ -31,11 +38,33 @@ fi
 AT_KEY="$(read_merged_env AT_API_KEY)"
 AT_USER="$(read_merged_env AT_USERNAME)"
 AT_USER="${AT_USER:-sandbox}"
+OTP_RESET_ENABLED="$(read_merged_env OTP_PASSWORD_RESET_ENABLED)"
+OTP_RESET_ENABLED="${OTP_RESET_ENABLED:-false}"
+SMS_WELCOME_ON_REGISTER="$(read_merged_env SMS_WELCOME_ON_REGISTER)"
+SMS_WELCOME_ON_REGISTER="${SMS_WELCOME_ON_REGISTER:-false}"
+SMTP_USER="$(read_merged_env SMTP_USER)"
+SMTP_PASS="$(read_merged_env SMTP_PASS)"
+
+SMS_REQUIRED_REASONS=()
+if is_truthy_env "$OTP_RESET_ENABLED" && { [[ -z "$SMTP_USER" ]] || [[ -z "$SMTP_PASS" ]]; }; then
+  SMS_REQUIRED_REASONS+=("password-reset OTP is enabled and SMTP is not configured")
+fi
+if is_truthy_env "$SMS_WELCOME_ON_REGISTER"; then
+  SMS_REQUIRED_REASONS+=("welcome SMS on registration is enabled")
+fi
 
 if [[ -z "$AT_KEY" || "$AT_KEY" == *your-* ]]; then
-  fail "AT_API_KEY not set — configure production Africa's Talking"
+  if [[ "${#SMS_REQUIRED_REASONS[@]}" -gt 0 ]]; then
+    fail "AT_API_KEY not set while SMS is required (${SMS_REQUIRED_REASONS[*]})"
+  else
+    warn "AT_API_KEY not set; OK only while SMS-dependent features stay disabled"
+  fi
 elif [[ "$AT_USER" == "sandbox" ]]; then
-  fail "AT_USERNAME=sandbox — run: bash scripts/configure-production-at.sh (mode 2)"
+  if [[ "${#SMS_REQUIRED_REASONS[@]}" -gt 0 ]]; then
+    fail "AT_USERNAME=sandbox while SMS is required (${SMS_REQUIRED_REASONS[*]}) - run: bash scripts/configure-production-at.sh (mode 2), or bash scripts/ready-app-only-production.sh"
+  else
+    warn "AT_USERNAME=sandbox; notifications are app-only and no enabled production feature currently requires SMS"
+  fi
 else
   pass "Africa's Talking production (username=$AT_USER)"
 fi

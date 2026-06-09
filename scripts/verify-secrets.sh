@@ -53,6 +53,13 @@ is_real_at_key() {
   return 0
 }
 
+is_truthy_env() {
+  case "${1,,}" in
+    1|true|yes|y|on) return 0 ;;
+    *) return 1 ;;
+  esac
+}
+
 is_deprecated_model() {
   local model="$1"
   local d
@@ -166,6 +173,20 @@ AT_USER="$(read_merged_env AT_USERNAME)"
 echo ""
 NODE_ENV="$(read_merged_env NODE_ENV)"
 NODE_ENV="${NODE_ENV:-development}"
+OTP_RESET_ENABLED="$(read_merged_env OTP_PASSWORD_RESET_ENABLED)"
+OTP_RESET_ENABLED="${OTP_RESET_ENABLED:-false}"
+SMS_WELCOME_ON_REGISTER="$(read_merged_env SMS_WELCOME_ON_REGISTER)"
+SMS_WELCOME_ON_REGISTER="${SMS_WELCOME_ON_REGISTER:-false}"
+SMTP_USER="$(read_merged_env SMTP_USER)"
+SMTP_PASS="$(read_merged_env SMTP_PASS)"
+
+SMS_REQUIRED_REASONS=()
+if is_truthy_env "$OTP_RESET_ENABLED" && { [[ -z "$SMTP_USER" ]] || [[ -z "$SMTP_PASS" ]]; }; then
+  SMS_REQUIRED_REASONS+=("password-reset OTP is enabled and SMTP is not configured")
+fi
+if is_truthy_env "$SMS_WELCOME_ON_REGISTER"; then
+  SMS_REQUIRED_REASONS+=("welcome SMS on registration is enabled")
+fi
 
 echo "--- SMS (Africa's Talking) ---"
 if is_real_at_key "$AT_KEY"; then
@@ -173,26 +194,32 @@ if is_real_at_key "$AT_KEY"; then
   if [[ -n "$AT_USER" && "$AT_USER" != "sandbox" ]]; then
     echo "OK   AT_USERNAME=$AT_USER (production)"
   elif [[ "$AT_USER" == "sandbox" ]]; then
-    if [[ "$NODE_ENV" == "production" ]]; then
-      echo "FAIL AT_USERNAME=sandbox — real schools require production AT (run: bash scripts/configure-production-at.sh)"
+    if [[ "$NODE_ENV" == "production" && "${#SMS_REQUIRED_REASONS[@]}" -gt 0 ]]; then
+      echo "FAIL AT_USERNAME=sandbox while SMS is required (${SMS_REQUIRED_REASONS[*]}) - run: bash scripts/configure-production-at.sh, or bash scripts/ready-app-only-production.sh"
       ERR=1
+    elif [[ "$NODE_ENV" == "production" ]]; then
+      echo "WARN AT_USERNAME=sandbox - notifications are app-only and no enabled production feature currently requires SMS"
     else
-      echo "INFO AT_USERNAME=sandbox — sandbox mode (OK for dev only)"
+      echo "INFO AT_USERNAME=sandbox - sandbox mode (OK for dev only)"
     fi
   else
-    if [[ "$NODE_ENV" == "production" ]]; then
-      echo "FAIL AT_USERNAME unset — defaults to sandbox; set live AT username in secrets/providers.env"
+    if [[ "$NODE_ENV" == "production" && "${#SMS_REQUIRED_REASONS[@]}" -gt 0 ]]; then
+      echo "FAIL AT_USERNAME unset while SMS is required (${SMS_REQUIRED_REASONS[*]}) - set live AT username in secrets/providers.env"
       ERR=1
+    elif [[ "$NODE_ENV" == "production" ]]; then
+      echo "WARN AT_USERNAME unset - OK only while SMS-dependent features stay disabled"
     else
-      echo "WARN AT_USERNAME unset — defaulting to sandbox"
+      echo "WARN AT_USERNAME unset - defaulting to sandbox"
     fi
   fi
 else
-  if [[ "$NODE_ENV" == "production" ]]; then
-    echo "FAIL AT_API_KEY missing or placeholder — SMS required for production schools"
+  if [[ "$NODE_ENV" == "production" && "${#SMS_REQUIRED_REASONS[@]}" -gt 0 ]]; then
+    echo "FAIL AT_API_KEY missing or placeholder while SMS is required (${SMS_REQUIRED_REASONS[*]})"
     ERR=1
+  elif [[ "$NODE_ENV" == "production" ]]; then
+    echo "WARN AT_API_KEY missing or placeholder - OK only while SMS-dependent features stay disabled"
   else
-    echo "WARN AT_API_KEY missing or placeholder — SMS/OTP disabled until set in secrets/providers.env"
+    echo "WARN AT_API_KEY missing or placeholder - SMS/OTP disabled until set in secrets/providers.env"
   fi
 fi
 

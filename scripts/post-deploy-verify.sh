@@ -31,6 +31,12 @@ FAIL=0
 pass() { echo "  OK  $1"; }
 warn() { echo "  WARN  $1"; }
 fail() { echo "  FAIL  $1"; FAIL=1; }
+is_truthy_env() {
+  case "${1,,}" in
+    1|true|yes|y|on) return 0 ;;
+    *) return 1 ;;
+  esac
+}
 
 echo "==> SAMS post-deploy verification ($(date -Iseconds))"
 
@@ -123,18 +129,40 @@ if [[ -n "$HEALTH" ]]; then
 
   SMS_SANDBOX="$(echo "$HEALTH" | node -e "try{const h=JSON.parse(require('fs').readFileSync(0,'utf8'));process.stdout.write(h.sms?.sandbox?'1':'0')}catch{process.stdout.write('0')}" 2>/dev/null || echo 0)"
   SMS_MODE="$(echo "$HEALTH" | node -e "try{const h=JSON.parse(require('fs').readFileSync(0,'utf8'));const s=h.sms||{};process.stdout.write(s.mode||(s.sandbox?'sandbox':s.configured?'production':''))}catch{process.stdout.write('')}" 2>/dev/null || echo "")"
-  NODE_ENV_VAL="$(grep -E '^NODE_ENV=' "$ROOT/packages/backend/.env" 2>/dev/null | head -1 | cut -d= -f2- | tr -d '\"' || true)"
-  [[ -z "$NODE_ENV_VAL" && -f "$ROOT/secrets/providers.env" ]] && NODE_ENV_VAL="$(grep -E '^NODE_ENV=' "$ROOT/secrets/providers.env" 2>/dev/null | head -1 | cut -d= -f2- | tr -d '\"' || true)"
+  SMS_CONFIGURED="$(echo "$HEALTH" | node -e "try{const h=JSON.parse(require('fs').readFileSync(0,'utf8'));process.stdout.write(h.sms?.configured?'1':'0')}catch{process.stdout.write('0')}" 2>/dev/null || echo 0)"
+  EMAIL_CONFIGURED="$(echo "$HEALTH" | node -e "try{const h=JSON.parse(require('fs').readFileSync(0,'utf8'));process.stdout.write(h.email?.configured?'1':'0')}catch{process.stdout.write('0')}" 2>/dev/null || echo 0)"
+  OTP_RESET_ENABLED="$(echo "$HEALTH" | node -e "try{const h=JSON.parse(require('fs').readFileSync(0,'utf8'));process.stdout.write(h.otp?.passwordResetEnabled?'1':'0')}catch{process.stdout.write('0')}" 2>/dev/null || echo 0)"
+  SMS_WELCOME_ON_REGISTER="$(read_merged_env SMS_WELCOME_ON_REGISTER)"
+  SMS_WELCOME_ON_REGISTER="${SMS_WELCOME_ON_REGISTER:-false}"
+  NODE_ENV_VAL="$(read_merged_env NODE_ENV)"
+  NODE_ENV_VAL="${NODE_ENV_VAL:-production}"
+
+  SMS_REQUIRED_REASONS=()
+  if [[ "${OTP_RESET_ENABLED:-0}" == "1" && "${EMAIL_CONFIGURED:-0}" != "1" ]]; then
+    SMS_REQUIRED_REASONS+=("password-reset OTP is enabled and email is not configured")
+  fi
+  if is_truthy_env "$SMS_WELCOME_ON_REGISTER"; then
+    SMS_REQUIRED_REASONS+=("welcome SMS on registration is enabled")
+  fi
   if [[ "${NODE_ENV_VAL:-}" == "production" ]]; then
-    if [[ "${SMS_SANDBOX:-0}" == "1" || "${SMS_MODE:-}" == "sandbox" ]]; then
-      fail "SMS sandbox while NODE_ENV=production — run: bash scripts/configure-production-at.sh (mode 2)"
+    if [[ "${#SMS_REQUIRED_REASONS[@]}" -gt 0 ]]; then
+      if [[ "${SMS_CONFIGURED:-0}" != "1" ]]; then
+        fail "SMS is required (${SMS_REQUIRED_REASONS[*]}) but AT is not configured"
+      elif [[ "${SMS_SANDBOX:-0}" == "1" || "${SMS_MODE:-}" == "sandbox" ]]; then
+        fail "SMS sandbox while NODE_ENV=production (${SMS_REQUIRED_REASONS[*]}) - run: bash scripts/configure-production-at.sh (mode 2), or bash scripts/ready-app-only-production.sh to disable SMS-dependent features for now"
+      elif [[ -n "${SMS_MODE:-}" && "${SMS_MODE:-}" != "production" ]]; then
+        fail "SMS mode=${SMS_MODE} while SMS is required (${SMS_REQUIRED_REASONS[*]}) - configure production AT in secrets/providers.env"
+      else
+        pass "SMS mode=production"
+      fi
+    elif [[ "${SMS_SANDBOX:-0}" == "1" || "${SMS_MODE:-}" == "sandbox" ]]; then
+      warn "SMS sandbox in production, but no enabled production feature currently requires SMS; notifications remain in-app only"
     elif [[ -n "${SMS_MODE:-}" && "${SMS_MODE:-}" != "production" ]]; then
-      fail "SMS mode=${SMS_MODE} — expected production (configure AT in secrets/providers.env)"
+      warn "SMS mode=${SMS_MODE}; OK only while SMS-dependent features stay disabled"
     elif [[ "${SMS_MODE:-}" == "production" ]]; then
       pass "SMS mode=production"
     fi
   fi
-
   BIO_DIST="$ROOT/packages/backend/dist/routes/biometric.js"
   if [[ -f "$BIO_DIST" ]]; then
     if grep -q "'/match'" "$BIO_DIST" && grep -q "'/enroll'" "$BIO_DIST"; then
