@@ -30,7 +30,18 @@ export interface OpenAIQueryResult {
 const MAX_KNOWLEDGE_ENTRIES_IN_PROMPT = 12;
 const MAX_KNOWLEDGE_ENTRY_CHARS = 900;
 const MAX_KNOWLEDGE_SECTION_CHARS = 7_000;
-const MAX_CHAT_INPUT_TOKENS = 5_500;
+
+function readBoundedIntEnv(name: string, fallback: number, min: number, max: number): number {
+  const raw = process.env[name];
+  if (!raw) return fallback;
+
+  const parsed = Number.parseInt(raw, 10);
+  if (!Number.isFinite(parsed)) return fallback;
+  return Math.min(max, Math.max(min, parsed));
+}
+
+const MAX_CHAT_INPUT_TOKENS = readBoundedIntEnv('AI_MAX_INPUT_TOKENS', 3_500, 1_000, 8_000);
+const CHAT_MAX_TOKENS = readBoundedIntEnv('AI_MAX_TOKENS', 300, 50, 1_500);
 
 function truncateForPrompt(value: string, maxChars: number): string {
   const trimmed = value.trim();
@@ -711,7 +722,7 @@ export async function openaiQuery(
       model: resolveChatModel(),
       messages,
       temperature: 0.3,
-      max_tokens: 1000,
+      max_tokens: CHAT_MAX_TOKENS,
     });
 
     const answer = response.choices[0]?.message?.content ?? 'I was unable to generate a response. Please try rephrasing your question.';
@@ -731,7 +742,7 @@ export async function openaiQuery(
           model: resolveFallbackChatModel(),
           messages,
           temperature: 0.3,
-          max_tokens: 1000,
+          max_tokens: CHAT_MAX_TOKENS,
         });
 
         const fallbackAnswer = fallbackResponse.choices[0]?.message?.content;
@@ -784,7 +795,7 @@ export async function openaiQueryWithHistory(
       model: resolveChatModel(),
       messages,
       temperature: 0.3,
-      max_tokens: 1000,
+      max_tokens: CHAT_MAX_TOKENS,
     });
 
     const answer = response.choices[0]?.message?.content ?? 'I was unable to generate a response. Please try rephrasing your question.';
@@ -804,7 +815,7 @@ export async function openaiQueryWithHistory(
           model: resolveFallbackChatModel(),
           messages,
           temperature: 0.3,
-          max_tokens: 1000,
+          max_tokens: CHAT_MAX_TOKENS,
         });
 
         const fallbackAnswer = fallbackResponse.choices[0]?.message?.content;
