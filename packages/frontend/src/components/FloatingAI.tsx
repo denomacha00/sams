@@ -168,6 +168,25 @@ const FloatingAI: React.FC = () => {
     });
   }, []);
 
+  const clearConversation = useCallback(async () => {
+    setLoading(true);
+    try {
+      if (threadId) {
+        await apiClient.delete(`/ai/conversations/${threadId}`);
+      }
+    } catch {
+      // Clear the local panel even if the saved thread was already removed.
+    } finally {
+      pendingActionRef.current = null;
+      setThreadId(null);
+      saveAiThreadId(null, threadOwner);
+      clearImages();
+      setMessages([WELCOME_MESSAGE]);
+      setHistoryLoaded(true);
+      setLoading(false);
+    }
+  }, [threadId, threadOwner]);
+
   const confirmPendingAction = useCallback(async (pending: PendingAction) => {
     setLoading(true);
     try {
@@ -220,9 +239,14 @@ const FloatingAI: React.FC = () => {
         const formData = new FormData();
         selectedImages.forEach((file) => formData.append('images', file));
         formData.append('question', text.trim() || 'What is in this image?');
+        if (threadId) formData.append('threadId', threadId);
         clearImages();
 
         const { data } = await apiClient.post('/ai/query-with-image', formData);
+        if (data.threadId) {
+          setThreadId(data.threadId);
+          saveAiThreadId(data.threadId, threadOwner);
+        }
         setMessages((prev) => [...prev, {
           id: crypto.randomUUID(),
           role: 'assistant',
@@ -338,15 +362,26 @@ const FloatingAI: React.FC = () => {
               <p className="text-[10px] text-ink-muted">Powered by AI</p>
             </div>
           </div>
-          <button
-            onClick={() => setIsOpen(false)}
-            className="p-1.5 rounded-lg hover:bg-surface-elevated text-ink-muted hover:text-ink transition-colors"
-            aria-label="Close chat"
-          >
-            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-            </svg>
-          </button>
+          <div className="flex items-center gap-1">
+            <button
+              onClick={() => void clearConversation()}
+              disabled={loading || (!threadId && messages.length <= 1)}
+              className="px-2 py-1 rounded-lg text-[11px] text-ink-muted hover:bg-surface-elevated hover:text-ink disabled:opacity-40 transition-colors"
+              aria-label="Clear AI conversation"
+              title="Clear conversation"
+            >
+              Clear
+            </button>
+            <button
+              onClick={() => setIsOpen(false)}
+              className="p-1.5 rounded-lg hover:bg-surface-elevated text-ink-muted hover:text-ink transition-colors"
+              aria-label="Close chat"
+            >
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
         </div>
 
         {/* Messages */}

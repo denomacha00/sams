@@ -60,11 +60,11 @@ ReactDOM.createRoot(document.getElementById('root') as HTMLElement).render(
         <Route path="/reset-password" element={<ResetPasswordPage />} />
         <Route path="/activate" element={<ActivationPage />} />
         <Route path="/register/:token" element={<RegisterPage />} />
+        <Route path="/attend/:token" element={<LinkAttendancePage />} />
 
         {/* Protected routes — any authenticated user */}
         <Route element={<AuthGuard />}>
           <Route path="/dashboard" element={<DashboardPage />} />
-          <Route path="/attend/:token" element={<LinkAttendancePage />} />
           <Route path="/timetable" element={<TimetableViewPage />} />
           <Route path="/reports" element={<ReportsPage />} />
           <Route path="/ai" element={<AIAssistantPage />} />
@@ -106,6 +106,10 @@ ReactDOM.createRoot(document.getElementById('root') as HTMLElement).render(
           <Route path="/admin" element={<AdminDashboardPage />} />
           <Route path="/admin/users" element={<UserManagementPage />} />
           <Route path="/admin/timetable" element={<TimetablePage />} />
+        </Route>
+
+        {/* Scoped risk dashboard */}
+        <Route element={<AuthGuard allowedRoles={[UserRole.SCHOOL_ADMIN, UserRole.HOD, UserRole.TEACHER]} />}>
           <Route path="/risk-scores" element={<RiskScorePage />} />
         </Route>
 

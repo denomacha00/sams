@@ -257,7 +257,7 @@ const AttendanceWorkflowPanel: React.FC<{ role?: UserRole }> = ({ role }) => {
     { to: '/timetable', label: 'Timetable', detail: 'Current slot', icon: ICONS.calendar },
     { to: '/sessions', label: 'Start Session', detail: 'QR and link', icon: ICONS.qr },
     { to: '/attendance', label: 'Manual', detail: 'Roll call', icon: ICONS.clipboard },
-    { to: '/biometric/attendance', label: 'Face/Bio', detail: 'Student scan', icon: ICONS.check },
+    { to: '/biometric/attendance', label: 'Biometric', detail: 'Face/finger scan', icon: ICONS.check },
     { to: '/reports', label: 'Reports', detail: 'After class', icon: ICONS.chart },
   ];
 
@@ -668,18 +668,19 @@ function getQuickActionGroups(role?: UserRole): QuickActionGroup[] {
     case UserRole.TEACHER:
       return [
         {
+          title: 'Class & Onboarding',
+          actions: [
+            { to: '/admin/links', label: 'Registration Links', subtitle: 'Share signup links first', icon: ICONS.link, variant: 'signin' },
+            { to: '/class/students', label: 'My Students', subtitle: 'Class roster & details', icon: ICONS.users },
+            { to: '/class-roster', label: 'Assign Class Rep', subtitle: 'Pick a class representative', icon: ICONS.users },
+          ],
+        },
+        {
           title: 'Attendance',
           actions: [
             { to: '/sessions', label: 'QR / Link Session', subtitle: 'Start session and share check-in link', icon: ICONS.qr, variant: 'signin' },
             { to: '/attendance', label: 'Manual Attendance', subtitle: 'Roll call and corrections', icon: ICONS.clipboard, variant: 'attendance' },
-            { to: '/biometric/attendance', label: 'Face/Biometric Scan', subtitle: 'Camera sign-in for enrolled students', icon: ICONS.check, variant: 'attendance' },
-          ],
-        },
-        {
-          title: 'My Class',
-          actions: [
-            { to: '/class/students', label: 'My Students', subtitle: 'Class roster & details', icon: ICONS.users },
-            { to: '/class-roster', label: 'Assign Class Rep', subtitle: 'Pick a class representative', icon: ICONS.users },
+            { to: '/biometric/attendance', label: 'Biometric Attendance', subtitle: 'Face or fingerprint student scan', icon: ICONS.check, variant: 'attendance' },
           ],
         },
         {
@@ -687,7 +688,7 @@ function getQuickActionGroups(role?: UserRole): QuickActionGroup[] {
           actions: [
             { to: '/timetable', label: 'My Timetable', subtitle: 'Your weekly schedule', icon: ICONS.calendar },
             { to: '/reports', label: 'View Reports', subtitle: 'Class attendance stats', icon: ICONS.chart },
-            { to: '/admin/links', label: 'Registration Links', subtitle: 'Share signup links', icon: ICONS.link },
+            { to: '/risk-scores', label: 'Risk Scores', subtitle: 'Students who need follow-up', icon: ICONS.warning },
             { to: '/admin/knowledge', label: 'Knowledge Base', subtitle: 'Teaching resources', icon: ICONS.book },
           ],
         },
@@ -726,20 +727,20 @@ function getQuickActionGroups(role?: UserRole): QuickActionGroup[] {
     case UserRole.HOD:
       return [
         {
-          title: 'Attendance',
+          title: 'Department & Onboarding',
           actions: [
-            { to: '/sessions', label: 'Sign In Students', subtitle: 'Department sessions', icon: ICONS.qr, variant: 'signin' },
-            { to: '/attendance', label: 'Mark Attendance', subtitle: 'Override or manual', icon: ICONS.clipboard, variant: 'attendance' },
-            { to: '/biometric/attendance', label: 'Face/Biometric Scan', subtitle: 'Scan enrolled department students', icon: ICONS.check, variant: 'attendance' },
-          ],
-        },
-        {
-          title: 'Department',
-          actions: [
+            { to: '/admin/links', label: 'Registration Links', subtitle: 'Share department signup links', icon: ICONS.link, variant: 'signin' },
             { to: '/hod/department', label: 'Department Management', subtitle: 'Staff & structure', icon: ICONS.building },
             { to: '/admin/users', label: 'Manage Users', subtitle: 'Dept. accounts', icon: ICONS.users },
             { to: '/class-roster', label: 'Class Reps', subtitle: 'Student leaders', icon: ICONS.users },
-            { to: '/admin/links', label: 'Registration Links', subtitle: 'Onboarding links', icon: ICONS.link },
+          ],
+        },
+        {
+          title: 'Attendance',
+          actions: [
+            { to: '/sessions', label: 'Sign In Students', subtitle: 'QR, link, manual, biometric', icon: ICONS.qr, variant: 'signin' },
+            { to: '/attendance', label: 'Mark Attendance', subtitle: 'Override or manual', icon: ICONS.clipboard, variant: 'attendance' },
+            { to: '/biometric/attendance', label: 'Biometric Attendance', subtitle: 'Face or fingerprint student scan', icon: ICONS.check, variant: 'attendance' },
           ],
         },
         {
@@ -1364,32 +1365,35 @@ const DashboardPage: React.FC = () => {
               {(user?.role === UserRole.TEACHER || user?.role === UserRole.HOD) && (
                 <div className="mt-4 flex flex-col sm:flex-row gap-2">
                   <Link
-                    to="/sessions"
+                    to="/admin/links"
                     className="inline-flex items-center justify-center gap-2 btn-primary py-3 px-5 text-sm w-full sm:w-auto"
                   >
                     <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={ICONS.qr} />
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={ICONS.link} />
                     </svg>
-                    QR Session
+                    Registration Links
                   </Link>
-                  <Link
-                    to="/attendance"
-                    className="inline-flex items-center justify-center gap-2 btn-attendance py-3 px-5 text-sm w-full sm:w-auto"
-                  >
-                    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={ICONS.clipboard} />
-                    </svg>
-                    Manual
-                  </Link>
-                  <Link
-                    to="/biometric/attendance"
-                    className="inline-flex items-center justify-center gap-2 btn-attendance py-3 px-5 text-sm w-full sm:w-auto"
-                  >
-                    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={ICONS.check} />
-                    </svg>
-                    Face/Bio
-                  </Link>
+                  {user?.role === UserRole.TEACHER ? (
+                    <Link
+                      to="/class/students"
+                      className="inline-flex items-center justify-center gap-2 btn-secondary py-3 px-5 text-sm w-full sm:w-auto"
+                    >
+                      <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={ICONS.users} />
+                      </svg>
+                      My Students
+                    </Link>
+                  ) : (
+                    <Link
+                      to="/hod/department"
+                      className="inline-flex items-center justify-center gap-2 btn-secondary py-3 px-5 text-sm w-full sm:w-auto"
+                    >
+                      <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={ICONS.building} />
+                      </svg>
+                      Department
+                    </Link>
+                  )}
                 </div>
               )}
               {user?.role === UserRole.STUDENT && (

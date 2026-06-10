@@ -7,6 +7,8 @@ import { attendanceService } from '../services/attendanceService';
 import { prisma } from '../lib/prisma';
 import { getQrSecret } from '../config/secrets';
 import { AppError } from '../middleware/errors';
+import { isTimetableWindowExpired } from '../lib/sessionWindow';
+import { broadcastSessionEnd } from '../sockets/attendanceSocket';
 
 // ─── Validation Schemas ───────────────────────────────────────────────────────
 
@@ -252,6 +254,7 @@ attendanceRouter.get('/link/:token/info', async (req: Request, res: Response): P
       include: {
         class: true,
         teacher: { select: { fullName: true } },
+        timetableEntry: { select: { dayOfWeek: true, startTime: true, endTime: true } },
       },
     });
 
@@ -260,12 +263,22 @@ attendanceRouter.get('/link/:token/info', async (req: Request, res: Response): P
       return;
     }
 
-    if (session.schoolId !== req.schoolId) {
+    if (req.schoolId && session.schoolId !== req.schoolId) {
       res.status(200).json({ valid: false, error: 'INVALID' });
       return;
     }
 
-    if (!session.isActive) {
+    if (
+      !session.isActive ||
+      (session.timetableEntry && isTimetableWindowExpired(session.timetableEntry))
+    ) {
+      if (session.isActive) {
+        await prisma.attendanceSession.update({
+          where: { id: session.id },
+          data: { isActive: false, endedAt: new Date() },
+        });
+        broadcastSessionEnd(session.id);
+      }
       res.status(200).json({ valid: false, error: 'SESSION_ENDED' });
       return;
     }

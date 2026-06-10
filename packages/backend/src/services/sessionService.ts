@@ -26,6 +26,16 @@ interface SessionActorOptions {
   actorDepartmentId?: string;
 }
 
+interface SessionWindowState {
+  id: string;
+  isActive: boolean;
+  timetableEntry?: {
+    dayOfWeek: number;
+    startTime: string;
+    endTime: string;
+  } | null;
+}
+
 // ─── Session Service ──────────────────────────────────────────────────────────
 
 export class SessionService {
@@ -51,6 +61,8 @@ export class SessionService {
     if (actorRole === UserRole.HOD && !options.actorDepartmentId) {
       throw new AppError(403, 'HOD_DEPARTMENT_REQUIRED', 'HOD account is not linked to a department');
     }
+
+    await this.expireStaleActiveSessions(schoolId);
 
     // Validate timetable entry belongs to teacher and school
     const timetableEntry = await prisma.timetableEntry.findFirst({
@@ -277,12 +289,32 @@ export class SessionService {
     return qrToken;
   }
 
+  private async closeIfTimetableExpired(session: SessionWindowState): Promise<boolean> {
+    if (
+      !session.isActive ||
+      !session.timetableEntry ||
+      !isTimetableWindowExpired(session.timetableEntry)
+    ) {
+      return false;
+    }
+
+    await prisma.attendanceSession.update({
+      where: { id: session.id },
+      data: { isActive: false, endedAt: new Date() },
+    });
+    broadcastSessionEnd(session.id);
+    return true;
+  }
+
   /**
    * Refresh the QR code for a session — generates a new token and persists it.
    */
   async refreshQRCode(sessionId: string): Promise<string> {
     const session = await prisma.attendanceSession.findUnique({
       where: { id: sessionId },
+      include: {
+        timetableEntry: { select: { dayOfWeek: true, startTime: true, endTime: true } },
+      },
     });
 
     if (!session) {
@@ -290,6 +322,10 @@ export class SessionService {
     }
 
     if (!session.isActive) {
+      throw new AppError(400, 'SESSION_ENDED', 'Cannot refresh QR for ended session');
+    }
+
+    if (await this.closeIfTimetableExpired(session)) {
       throw new AppError(400, 'SESSION_ENDED', 'Cannot refresh QR for ended session');
     }
 
@@ -316,10 +352,19 @@ export class SessionService {
   async getActiveQR(sessionId: string): Promise<string | null> {
     const session = await prisma.attendanceSession.findUnique({
       where: { id: sessionId },
-      select: { currentQRToken: true, isActive: true },
+      select: {
+        id: true,
+        currentQRToken: true,
+        isActive: true,
+        timetableEntry: { select: { dayOfWeek: true, startTime: true, endTime: true } },
+      },
     });
 
     if (!session || !session.isActive) {
+      return null;
+    }
+
+    if (await this.closeIfTimetableExpired(session)) {
       return null;
     }
 

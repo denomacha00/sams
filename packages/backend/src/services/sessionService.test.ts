@@ -12,6 +12,7 @@ vi.mock('../lib/prisma', () => ({
       findMany: vi.fn(),
       findUnique: vi.fn(),
       create: vi.fn(),
+      update: vi.fn(),
       updateMany: vi.fn(),
     },
   },
@@ -47,6 +48,8 @@ describe('SessionService.startSession', () => {
     vi.clearAllMocks();
     vi.useFakeTimers();
     vi.setSystemTime(new Date('2026-06-01T08:15:00')); // Monday 08:15
+    vi.mocked(prisma.attendanceSession.findMany).mockResolvedValue([] as never);
+    vi.mocked(prisma.attendanceSession.updateMany).mockResolvedValue({ count: 0 } as never);
   });
 
   afterEach(() => {
@@ -194,6 +197,39 @@ describe('SessionService.expireStaleActiveSessions', () => {
     expect(expired).toBe(1);
     expect(prisma.attendanceSession.updateMany).toHaveBeenCalledWith({
       where: { id: { in: ['expired-session'] }, isActive: true },
+      data: { isActive: false, endedAt: expect.any(Date) },
+    });
+  });
+});
+
+describe('SessionService.refreshQRCode', () => {
+  const service = new SessionService();
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-06-01T10:00:00')); // Monday 10:00
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it('ends a stale timetable session instead of refreshing its QR token', async () => {
+    vi.mocked(prisma.attendanceSession.findUnique).mockResolvedValue({
+      id: 'expired-session',
+      isActive: true,
+      timetableEntry: { dayOfWeek: 0, startTime: '08:00', endTime: '09:00' },
+    } as never);
+    vi.mocked(prisma.attendanceSession.update).mockResolvedValue({} as never);
+
+    await expect(service.refreshQRCode('expired-session')).rejects.toMatchObject({
+      statusCode: 400,
+      code: 'SESSION_ENDED',
+    });
+
+    expect(prisma.attendanceSession.update).toHaveBeenCalledWith({
+      where: { id: 'expired-session' },
       data: { isActive: false, endedAt: expect.any(Date) },
     });
   });

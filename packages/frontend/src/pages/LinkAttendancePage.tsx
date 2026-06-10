@@ -24,6 +24,12 @@ interface AttendanceResult {
 
 type PageState = 'loading' | 'info' | 'gps-pending' | 'submitting' | 'success' | 'error';
 
+const PENDING_LINK_ATTENDANCE_PREFIX = 'sams-pending-link-attendance:';
+
+function pendingAttendanceKey(token: string): string {
+  return `${PENDING_LINK_ATTENDANCE_PREFIX}${token}`;
+}
+
 const LinkAttendancePage: React.FC = () => {
   const { token } = useParams<{ token: string }>();
   const navigate = useNavigate();
@@ -38,17 +44,11 @@ const LinkAttendancePage: React.FC = () => {
   const [gpsCoords, setGpsCoords] = useState<{ lat: number; lng: number } | null>(null);
   const [gpsError, setGpsError] = useState<string>('');
   const countdownRef = useRef<ReturnType<typeof setInterval> | null>(null);
-
-  // Redirect to login if not authenticated
-  useEffect(() => {
-    if (!isAuthenticated) {
-      navigate(`/login?redirect=/attend/${token}`, { replace: true });
-    }
-  }, [isAuthenticated, navigate, token]);
+  const autoSubmitAttemptedRef = useRef(false);
 
   // Fetch session info on mount
   useEffect(() => {
-    if (!token || !isAuthenticated) return;
+    if (!token) return;
 
     const fetchInfo = async () => {
       try {
@@ -83,7 +83,7 @@ const LinkAttendancePage: React.FC = () => {
     };
 
     fetchInfo();
-  }, [token, isAuthenticated]);
+  }, [token]);
 
   // Countdown timer
   useEffect(() => {
@@ -157,6 +157,12 @@ const LinkAttendancePage: React.FC = () => {
   const handleMarkAttendance = useCallback(async () => {
     if (!token) return;
 
+    if (!isAuthenticated) {
+      sessionStorage.setItem(pendingAttendanceKey(token), '1');
+      navigate(`/login?redirect=${encodeURIComponent(`/attend/${token}`)}`, { replace: true });
+      return;
+    }
+
     // If GPS is not required, submit with zeroed coords (backend will ignore them)
     if (sessionInfo?.requireGps === false) {
       submitAttendance({ lat: 0, lng: 0 });
@@ -185,9 +191,9 @@ const LinkAttendancePage: React.FC = () => {
     }
 
     submitAttendance(gpsCoords);
-  }, [token, gpsCoords, sessionInfo?.requireGps]);
+  }, [token, gpsCoords, isAuthenticated, navigate, sessionInfo?.requireGps]);
 
-  const submitAttendance = async (coords: { lat: number; lng: number }) => {
+  async function submitAttendance(coords: { lat: number; lng: number }) {
     setPageState('submitting');
     setErrorMessage('');
     setErrorDetail('');
@@ -226,7 +232,17 @@ const LinkAttendancePage: React.FC = () => {
         setErrorDetail(errorMsg || 'Something went wrong. Please try again.');
       }
     }
-  };
+  }
+
+  useEffect(() => {
+    if (!token || !isAuthenticated || pageState !== 'info' || !sessionInfo?.valid) return;
+    if (autoSubmitAttemptedRef.current) return;
+    if (sessionStorage.getItem(pendingAttendanceKey(token)) !== '1') return;
+
+    autoSubmitAttemptedRef.current = true;
+    sessionStorage.removeItem(pendingAttendanceKey(token));
+    void handleMarkAttendance();
+  }, [handleMarkAttendance, isAuthenticated, pageState, sessionInfo?.valid, token]);
 
   // Loading state
   if (pageState === 'loading') {
@@ -407,9 +423,7 @@ const LinkAttendancePage: React.FC = () => {
                 </svg>
                 {pageState === 'gps-pending' ? 'Getting location...' : 'Marking attendance...'}
               </span>
-            ) : (
-              'Mark Attendance'
-            )}
+            ) : isAuthenticated ? 'Mark Attendance' : 'Sign in to mark attendance'}
           </button>
         </div>
 

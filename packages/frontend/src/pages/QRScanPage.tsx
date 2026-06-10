@@ -6,6 +6,8 @@ import { AttendanceStatus } from '@sams/shared';
 import { useAuthStore } from '../store/authStore';
 import { getApiErrorMessage } from '../lib/apiError';
 
+const QR_ATTENDANCE_TIMEOUT_MS = 8_000;
+
 declare global {
   interface Window {
     jsQR?: (
@@ -52,6 +54,17 @@ function isSecureCameraContext(): boolean {
   const { protocol, hostname } = window.location;
   if (protocol === 'https:') return true;
   return hostname === 'localhost' || hostname === '127.0.0.1';
+}
+
+function getApiErrorCode(err: unknown): string {
+  const data = (err as { response?: { data?: { code?: string; error?: string } } }).response?.data;
+  return data?.code || data?.error || '';
+}
+
+function getCurrentPosition(options: PositionOptions): Promise<GeolocationPosition> {
+  return new Promise((resolve, reject) =>
+    navigator.geolocation.getCurrentPosition(resolve, reject, options),
+  );
 }
 
 function waitForVideoElement(
@@ -129,6 +142,7 @@ const QRScanPage: React.FC = () => {
   const [gpsStatus, setGpsStatus] = useState<'idle' | 'acquiring' | 'success' | 'failed'>('idle');
   const streamRef = useRef<MediaStream | null>(null);
   const startingRef = useRef(false);
+  const lastGpsCoordsRef = useRef<{ lat: number; lng: number } | null>(null);
 
   const stopCamera = useCallback(() => {
     scanningRef.current = false;
@@ -143,32 +157,77 @@ const QRScanPage: React.FC = () => {
     setScanning(false);
   }, []);
 
+  useEffect(() => {
+    if (!navigator.geolocation) {
+      setGpsStatus('failed');
+      return;
+    }
+
+    let cancelled = false;
+    void getCurrentPosition({
+      enableHighAccuracy: false,
+      timeout: 3500,
+      maximumAge: 60_000,
+    })
+      .then((pos) => {
+        if (cancelled) return;
+        lastGpsCoordsRef.current = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+        setGpsStatus('success');
+      })
+      .catch(() => {
+        if (!cancelled) setGpsStatus('idle');
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   const handleQRDetected = useCallback(async (qrToken: string) => {
     if (!scanningRef.current) return;
     stopCamera();
     setResult(qrToken);
     setLoading(true);
     setError(null);
-    setGpsStatus('acquiring');
 
     try {
-      let gpsCoords: { lat: number; lng: number } | undefined;
-      if (navigator.geolocation) {
-        try {
-          const pos = await new Promise<GeolocationPosition>((resolve, reject) =>
-            navigator.geolocation.getCurrentPosition(resolve, reject, { timeout: 5000 })
-          );
-          gpsCoords = { lat: pos.coords.latitude, lng: pos.coords.longitude };
-          setGpsStatus('success');
-        } catch {
-          setGpsStatus('failed');
-        }
-      } else {
-        setGpsStatus('failed');
-      }
-
       if (navigator.onLine) {
-        await apiClient.post('/attendance/qr', { qrToken, gpsCoords });
+        try {
+          await apiClient.post(
+            '/attendance/qr',
+            { qrToken, gpsCoords: lastGpsCoordsRef.current ?? { lat: 0, lng: 0 } },
+            { timeout: QR_ATTENDANCE_TIMEOUT_MS },
+          );
+        } catch (err: unknown) {
+          const errorCode = getApiErrorCode(err);
+          if (
+            (errorCode !== 'GPS_REQUIRED' && errorCode !== 'GPS_OUT_OF_RANGE') ||
+            !navigator.geolocation
+          ) {
+            throw err;
+          }
+
+          setGpsStatus('acquiring');
+          let pos: GeolocationPosition;
+          try {
+            pos = await getCurrentPosition({
+              enableHighAccuracy: true,
+              timeout: 5000,
+              maximumAge: 0,
+            });
+          } catch (gpsErr) {
+            setGpsStatus('failed');
+            throw gpsErr;
+          }
+          const gpsCoords = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+          lastGpsCoordsRef.current = gpsCoords;
+          setGpsStatus('success');
+          await apiClient.post(
+            '/attendance/qr',
+            { qrToken, gpsCoords },
+            { timeout: QR_ATTENDANCE_TIMEOUT_MS },
+          );
+        }
         setSuccess(true);
       } else {
         const sessionId = decodeQrSessionId(qrToken);

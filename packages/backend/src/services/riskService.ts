@@ -112,24 +112,15 @@ export class RiskService {
   /**
    * Get risk scores for a school, optionally filtered by department.
    */
-  async getRiskScores(schoolId: string, departmentId?: string): Promise<RiskScoreResult[]> {
+  async getRiskScores(
+    schoolId: string,
+    departmentId?: string,
+    classIds?: string[],
+  ): Promise<RiskScoreResult[]> {
     const where: Record<string, unknown> = { schoolId };
 
-    if (departmentId) {
-      // Get students in the department
-      const students = await prisma.user.findMany({
-        where: { schoolId, departmentId, role: 'STUDENT' },
-        select: { id: true },
-      });
-
-      const studentIds = students.map((s: { id: string }) => s.id);
-
-      const scores = await prisma.riskScore.findMany({
-        where: { schoolId, studentId: { in: studentIds } },
-        orderBy: { score: 'desc' },
-      });
-
-      return scores.map((s: any) => ({
+    const mapScores = (scores: any[]): RiskScoreResult[] =>
+      scores.map((s: any) => ({
         studentId: s.studentId,
         attendanceWeight: s.attendanceWeight,
         gradeWeight: s.gradeWeight,
@@ -138,6 +129,49 @@ export class RiskService {
         riskLevel: s.riskLevel as RiskLevel,
         computedAt: s.computedAt,
       }));
+
+    if (classIds) {
+      if (classIds.length === 0) return [];
+
+      const students = await prisma.user.findMany({
+        where: { schoolId, role: 'STUDENT', classId: { in: classIds } },
+        select: { id: true },
+      });
+
+      const studentIds = students.map((s: { id: string }) => s.id);
+      if (studentIds.length === 0) return [];
+
+      const scores = await prisma.riskScore.findMany({
+        where: { schoolId, studentId: { in: studentIds } },
+        orderBy: { score: 'desc' },
+      });
+
+      return mapScores(scores);
+    }
+
+    if (departmentId) {
+      // Get students in the department
+      const students = await prisma.user.findMany({
+        where: {
+          schoolId,
+          role: 'STUDENT',
+          OR: [
+            { departmentId },
+            { class: { is: { departmentId } } },
+          ],
+        },
+        select: { id: true },
+      });
+
+      const studentIds = students.map((s: { id: string }) => s.id);
+      if (studentIds.length === 0) return [];
+
+      const scores = await prisma.riskScore.findMany({
+        where: { schoolId, studentId: { in: studentIds } },
+        orderBy: { score: 'desc' },
+      });
+
+      return mapScores(scores);
     }
 
     const scores = await prisma.riskScore.findMany({
@@ -145,15 +179,7 @@ export class RiskService {
       orderBy: { score: 'desc' },
     });
 
-    return scores.map((s: any) => ({
-      studentId: s.studentId,
-      attendanceWeight: s.attendanceWeight,
-      gradeWeight: s.gradeWeight,
-      patternWeight: s.patternWeight,
-      score: s.score,
-      riskLevel: s.riskLevel as RiskLevel,
-      computedAt: s.computedAt,
-    }));
+    return mapScores(scores);
   }
 
   // ─── Private Helpers ────────────────────────────────────────────────────────

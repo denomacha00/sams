@@ -42,7 +42,7 @@ export const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
     'start:session',
     'mark:attendance',
   ],
-  TEACHER: ['start:session', 'mark:attendance', 'view:timetable', 'view:reports', 'manage:knowledge'],
+  TEACHER: ['start:session', 'mark:attendance', 'view:timetable', 'view:reports', 'view:risk', 'manage:knowledge'],
   STUDENT: ['view:reports', 'view:timetable'],
 };
 

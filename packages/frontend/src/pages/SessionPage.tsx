@@ -10,6 +10,7 @@ import { getApiErrorMessage } from '../lib/apiError';
 import { getTeacherLocation } from '../lib/geolocation';
 
 const SESSION_START_TIMEOUT_MS = 18_000;
+const ACTIVE_SESSION_REFRESH_MS = 15_000;
 
 interface TimetableEntry {
   id: string;
@@ -140,41 +141,70 @@ const SessionPage: React.FC = () => {
       records: data.records ?? [],
     }), []);
 
+  const refreshActiveSessions = useCallback(async (
+    options: { selectFirst?: boolean; quiet?: boolean } = {},
+  ) => {
+    if (!user?.id) return;
+
+    try {
+      const params: Record<string, string | boolean> = { isActive: true };
+      if (user.role === UserRole.TEACHER) {
+        params.teacherId = user.id;
+      }
+
+      const { data } = await apiClient.get('/sessions', {
+        params,
+        timeout: 10_000,
+      });
+      const normalized = (Array.isArray(data) ? data : [])
+        .filter((s: { isActive?: boolean }) => s.isActive !== false)
+        .map(normalizeSessionFromApi);
+
+      setActiveSessions((previous) =>
+        normalized.map((session) => ({
+          ...session,
+          records: previous.find((known) => known.id === session.id)?.records ?? session.records,
+        })),
+      );
+      if (normalized.length === 0) {
+        setQrDataUrl('');
+      }
+      setActiveSession((current) => {
+        if (normalized.length === 0) {
+          return null;
+        }
+        if (current) {
+          const stillActive = normalized.find((session) => session.id === current.id);
+          if (stillActive) {
+            return { ...stillActive, records: current.records };
+          }
+        }
+        return options.selectFirst ? normalized[0] : current;
+      });
+    } catch (err: unknown) {
+      if (!options.quiet) {
+        setError(getApiErrorMessage(err, 'Could not refresh active sessions'));
+      }
+    }
+  }, [normalizeSessionFromApi, user?.id, user?.role]);
+
   useEffect(() => {
-    const timer = window.setInterval(() => setNow(new Date()), 60_000);
+    const timer = window.setInterval(() => setNow(new Date()), ACTIVE_SESSION_REFRESH_MS);
     return () => window.clearInterval(timer);
   }, []);
 
   // Resume an in-progress session so the page is not blocked after navigation
   useEffect(() => {
-    if (!user?.id || activeSession) return;
-    const resume = async () => {
-      try {
-        const params: Record<string, string | boolean> = { isActive: true };
-        if (user.role === UserRole.TEACHER) {
-          params.teacherId = user.id;
-        }
-        const { data } = await apiClient.get('/sessions', {
-          params,
-        });
-        const list = (Array.isArray(data) ? data : []).filter(
-          (s: { isActive?: boolean }) => s.isActive !== false,
-        );
-        if (list.length > 0) {
-          const normalized = list.map(normalizeSessionFromApi);
-          setActiveSessions(normalized);
-          setActiveSession((current) =>
-            current
-              ? normalized.find((session) => session.id === current.id) ?? normalized[0]
-              : normalized[0],
-          );
-        }
-      } catch {
-        // ignore — teacher can start a new session
-      }
-    };
-    void resume();
-  }, [user?.id, user?.role, activeSession, normalizeSessionFromApi]);
+    void refreshActiveSessions({ selectFirst: true, quiet: true });
+  }, [refreshActiveSessions]);
+
+  useEffect(() => {
+    if (!user?.id) return;
+    const timer = window.setInterval(() => {
+      void refreshActiveSessions({ selectFirst: true, quiet: true });
+    }, ACTIVE_SESSION_REFRESH_MS);
+    return () => window.clearInterval(timer);
+  }, [refreshActiveSessions, user?.id]);
 
   // Fetch today's timetable entries for this teacher
   useEffect(() => {
@@ -738,6 +768,15 @@ const SessionPage: React.FC = () => {
         {/* Session header */}
         <div className="flex flex-wrap items-center justify-between gap-3 mb-6">
           <div>
+            <div className="mb-2 flex flex-wrap items-center gap-2">
+              <span className="inline-flex items-center gap-2 rounded-full border border-red-500/40 bg-red-500/15 px-3 py-1 text-xs font-bold uppercase tracking-[0.14em] text-red-200">
+                <span className="h-2 w-2 rounded-full bg-red-400 animate-pulse" />
+                Live session
+              </span>
+              <span className="text-xs text-ink-subtle">
+                Started {new Date(activeSession.startedAt).toLocaleTimeString()}
+              </span>
+            </div>
             <h1 className="text-2xl font-bold text-ink">{activeSession.subject}</h1>
             <p className="text-ink-muted">{activeSession.className}</p>
           </div>
@@ -752,7 +791,7 @@ const SessionPage: React.FC = () => {
               to={`/biometric/attendance?sessionId=${activeSession.id}`}
               className="btn-secondary py-2 px-4 text-sm font-medium transition-all duration-200"
             >
-              Face/Bio
+              Biometric scan
             </Link>
             <button
               onClick={endSession}
@@ -830,8 +869,8 @@ const SessionPage: React.FC = () => {
             to={`/biometric/attendance?sessionId=${activeSession.id}`}
             className="surface-card border border-line p-4 text-left hover:border-indigo-500/40 hover:bg-indigo-500/10 transition-all"
           >
-            <p className="text-sm font-semibold text-ink">Face / biometric</p>
-            <p className="mt-1 text-xs text-ink-subtle">Scan enrolled students</p>
+            <p className="text-sm font-semibold text-ink">Biometric scan</p>
+            <p className="mt-1 text-xs text-ink-subtle">Fingerprint or face scan</p>
           </Link>
         </div>
 

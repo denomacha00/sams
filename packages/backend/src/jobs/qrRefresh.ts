@@ -14,6 +14,8 @@ let task: cron.ScheduledTask | null = null;
  */
 export async function refreshAllActiveSessionQRCodes(): Promise<void> {
   try {
+    await sessionService.expireStaleActiveSessions();
+
     const activeSessions = await prisma.attendanceSession.findMany({
       where: { isActive: true },
       select: { id: true },

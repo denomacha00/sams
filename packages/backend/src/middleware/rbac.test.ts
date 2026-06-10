@@ -63,12 +63,13 @@ describe('ROLE_PERMISSIONS', () => {
     expect(perms).not.toContain('super:admin');
   });
 
-  it('TEACHER has start:session, mark:attendance, view:timetable, view:reports', () => {
+  it('TEACHER has start:session, mark:attendance, view:timetable, view:reports, view:risk', () => {
     const perms = ROLE_PERMISSIONS[UserRole.TEACHER];
     expect(perms).toContain('start:session');
     expect(perms).toContain('mark:attendance');
     expect(perms).toContain('view:timetable');
     expect(perms).toContain('view:reports');
+    expect(perms).toContain('view:risk');
     expect(perms).not.toContain('manage:users');
   });
 

@@ -33,7 +33,7 @@ const TimetableViewPage: React.FC = () => {
   const [filterDepartmentId, setFilterDepartmentId] = useState('');
   const [filterClassId, setFilterClassId] = useState('');
   const [loading, setLoading] = useState(true);
-  const [viewMode, setViewMode] = useState<'table' | 'grid'>('grid');
+  const [viewMode, setViewMode] = useState<'table' | 'grid'>('table');
   const [selectedEntryId, setSelectedEntryId] = useState<string | null>(null);
 
   useEffect(() => {

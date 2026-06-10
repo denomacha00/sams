@@ -25,6 +25,24 @@ const AI_VISION_FAILURE_INTENTS = new Set(['image_analysis_error', 'ai_not_confi
 const CONFIRM_RE = /^(yes|y|confirm|proceed|ok|do it|go ahead)\.?$/i;
 const SUPER_AI_THREAD_STORAGE_KEY = 'sams-super-admin-ai-thread-id';
 
+function createWelcomeMessage(): ChatMessage {
+  return {
+    id: 'welcome',
+    role: 'assistant',
+    content:
+      'ðŸ‘‹ Hello, Super Admin! I\'m your AI system assistant. I can help you with:\n\n' +
+      'â€¢ **System stats** â€” "how many schools", "total revenue", "platform overview"\n' +
+      'â€¢ **School ops** â€” "school info for X", "suspend school Y", "extend license for Z"\n' +
+      'â€¢ **Password reset** â€” "reset password for user at school CODE" (temp password or OTP)\n' +
+      'â€¢ **Troubleshooting** â€” "why is a school not working", "common problems"\n' +
+      'â€¢ **How-to guides** â€” "how to generate a license", "how to suspend a school"\n' +
+      'â€¢ **Platform docs** â€” architecture and features from DOCUMENTATION.md + Knowledge Base\n\n' +
+      'I use documentation, knowledge base, live stats, and executable actions â€” **not** source code or repository access. I cannot expose API keys or secrets.\n\n' +
+      'Say an action directly â€” destructive actions will ask you to confirm.',
+    timestamp: new Date(),
+  };
+}
+
 function superAiThreadStorageKey(userId?: string): string {
   return userId ? `${SUPER_AI_THREAD_STORAGE_KEY}:${userId}` : SUPER_AI_THREAD_STORAGE_KEY;
 }
@@ -89,6 +107,8 @@ const SuperAdminAI: React.FC = () => {
 
   useEffect(() => {
     setThreadId(loadSuperAiThreadId(user?.id));
+    pendingActionRef.current = null;
+    setMessages([createWelcomeMessage()]);
   }, [user?.id]);
 
   const generateId = () => Math.random().toString(36).substring(2, 10);
@@ -162,6 +182,25 @@ const SuperAdminAI: React.FC = () => {
 
     pendingActionRef.current = null;
     appendAssistant(data.answer, undefined, AI_UNAVAILABLE_INTENTS.has(data.intent));
+  };
+
+  const clearConversation = async () => {
+    setLoading(true);
+    try {
+      if (threadId) {
+        await apiClient.delete(`/ai/conversations/${threadId}`);
+      }
+    } catch {
+      // Still reset the panel if the saved thread was already removed.
+    } finally {
+      pendingActionRef.current = null;
+      setThreadId(undefined);
+      saveSuperAiThreadId(undefined, user?.id);
+      setSelectedImages([]);
+      setImagePreviews([]);
+      setMessages([createWelcomeMessage()]);
+      setLoading(false);
+    }
   };
 
   const handleConfirmAction = async (pending: PendingAction) => {
@@ -296,19 +335,29 @@ const SuperAdminAI: React.FC = () => {
                 <p className="text-purple-200 text-xs">System Administrator Assistant</p>
               </div>
             </div>
-            <button
-              onClick={() => setIsOpen(false)}
-              className="text-purple-200 hover:text-white transition-colors"
-              aria-label="Close AI panel"
-            >
-              <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" viewBox="0 0 20 20" fill="currentColor">
-                <path
-                  fillRule="evenodd"
-                  d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z"
-                  clipRule="evenodd"
-                />
-              </svg>
-            </button>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => void clearConversation()}
+                disabled={loading || (!threadId && messages.length <= 1)}
+                className="text-xs text-purple-100 hover:text-white disabled:opacity-40 transition-colors"
+                aria-label="Clear AI conversation"
+              >
+                Clear
+              </button>
+              <button
+                onClick={() => setIsOpen(false)}
+                className="text-purple-200 hover:text-white transition-colors"
+                aria-label="Close AI panel"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" viewBox="0 0 20 20" fill="currentColor">
+                  <path
+                    fillRule="evenodd"
+                    d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z"
+                    clipRule="evenodd"
+                  />
+                </svg>
+              </button>
+            </div>
           </div>
 
           <div className="flex-1 overflow-y-auto p-4 space-y-4">

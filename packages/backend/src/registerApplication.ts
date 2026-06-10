@@ -54,11 +54,15 @@ const PUBLIC_REGISTRATION_LINK_PATHS = [
   { method: 'POST', pattern: /^\/api\/v1\/registration-links\/[^/]+\/register$/ },
 ];
 
+const PUBLIC_ATTENDANCE_LINK_PATHS = [
+  { method: 'GET', pattern: /^\/api\/v1\/attendance\/link\/[^/]+\/info$/ },
+];
+
 function isPublicPath(path: string, method?: string): boolean {
   if (PUBLIC_PATHS.some((pub) => path === pub || path.startsWith(pub + '/'))) {
     return true;
   }
-  return PUBLIC_REGISTRATION_LINK_PATHS.some(
+  return [...PUBLIC_REGISTRATION_LINK_PATHS, ...PUBLIC_ATTENDANCE_LINK_PATHS].some(
     (p) => (!method || p.method === method) && p.pattern.test(path),
   );
 }
