@@ -106,7 +106,16 @@ interface TimetableInsightEntry {
   class?: { name: string };
 }
 
+interface ActiveSessionReminderSession {
+  id: string;
+  subject: string;
+  className?: string | null;
+  class?: { name?: string | null };
+  startedAt?: string;
+}
+
 const DAY_SHORT = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+const ACTIVE_SESSION_REMINDER_MS = 15_000;
 
 function parseTimeMinutes(time: string): number {
   const [h, m] = time.split(':').map((v) => parseInt(v, 10));
@@ -257,7 +266,7 @@ const AttendanceWorkflowPanel: React.FC<{ role?: UserRole }> = ({ role }) => {
     { to: '/timetable', label: 'Timetable', detail: 'Current slot', icon: ICONS.calendar },
     { to: '/sessions', label: 'Start Session', detail: 'QR and link', icon: ICONS.qr },
     { to: '/attendance', label: 'Manual', detail: 'Roll call', icon: ICONS.clipboard },
-    { to: '/biometric/attendance', label: 'Biometric', detail: 'Face/finger scan', icon: ICONS.check },
+    { to: '/biometric/attendance', label: 'Face Scan', detail: 'Camera match', icon: ICONS.check },
     { to: '/reports', label: 'Reports', detail: 'After class', icon: ICONS.chart },
   ];
 
@@ -266,7 +275,7 @@ const AttendanceWorkflowPanel: React.FC<{ role?: UserRole }> = ({ role }) => {
       <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h3 className="text-sm font-semibold text-ink">Attendance workflow</h3>
-          <p className="text-xs text-ink-muted">Timetable-locked sessions with QR, link, manual, and face/biometric paths.</p>
+          <p className="text-xs text-ink-muted">Timetable-locked sessions with QR, link, manual, and face scan paths.</p>
         </div>
         <Link to="/sessions" className="btn-primary px-4 py-2 text-sm w-full sm:w-auto text-center">
           Open Sessions
@@ -290,6 +299,68 @@ const AttendanceWorkflowPanel: React.FC<{ role?: UserRole }> = ({ role }) => {
             </span>
           </Link>
         ))}
+      </div>
+    </section>
+  );
+};
+
+const ActiveSessionReminder: React.FC<{ role?: UserRole; userId?: string }> = ({ role, userId }) => {
+  const [sessions, setSessions] = useState<ActiveSessionReminderSession[]>([]);
+
+  useEffect(() => {
+    if (!userId || (role !== UserRole.TEACHER && role !== UserRole.HOD)) {
+      setSessions([]);
+      return;
+    }
+
+    let cancelled = false;
+    const load = async () => {
+      try {
+        const params: Record<string, string | boolean> = { isActive: true };
+        if (role === UserRole.TEACHER) params.teacherId = userId;
+        const { data } = await apiClient.get('/sessions', { params });
+        if (!cancelled) {
+          setSessions(Array.isArray(data) ? data.filter((s) => s.isActive !== false) : []);
+        }
+      } catch {
+        if (!cancelled) setSessions([]);
+      }
+    };
+
+    void load();
+    const timer = window.setInterval(load, ACTIVE_SESSION_REMINDER_MS);
+    return () => {
+      cancelled = true;
+      window.clearInterval(timer);
+    };
+  }, [role, userId]);
+
+  if (sessions.length === 0) return null;
+
+  const first = sessions[0];
+  const className = first.className ?? first.class?.name ?? 'Class';
+  const extra = sessions.length > 1 ? ` +${sessions.length - 1} more` : '';
+
+  return (
+    <section className="mb-6 rounded-2xl border border-red-500/40 bg-red-500/12 p-4 shadow-card-soft">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="min-w-0">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="inline-flex items-center gap-2 rounded-full border border-red-400/45 bg-red-500/20 px-3 py-1 text-xs font-bold uppercase tracking-[0.14em] text-red-100">
+              <span className="h-2 w-2 rounded-full bg-red-300 animate-pulse" />
+              Live attendance session
+            </span>
+            <span className="text-xs text-red-100/75">
+              Keep it open until the lesson ends, or end it from Sessions.
+            </span>
+          </div>
+          <p className="mt-2 truncate text-sm font-semibold text-ink">
+            {first.subject} - {className}{extra}
+          </p>
+        </div>
+        <Link to="/sessions" className="btn-attendance px-4 py-2 text-sm text-center">
+          Open / End Session
+        </Link>
       </div>
     </section>
   );
@@ -680,7 +751,7 @@ function getQuickActionGroups(role?: UserRole): QuickActionGroup[] {
           actions: [
             { to: '/sessions', label: 'QR / Link Session', subtitle: 'Start session and share check-in link', icon: ICONS.qr, variant: 'signin' },
             { to: '/attendance', label: 'Manual Attendance', subtitle: 'Roll call and corrections', icon: ICONS.clipboard, variant: 'attendance' },
-            { to: '/biometric/attendance', label: 'Biometric Attendance', subtitle: 'Face or fingerprint student scan', icon: ICONS.check, variant: 'attendance' },
+            { to: '/biometric/attendance', label: 'Face Attendance', subtitle: 'Camera match for enrolled students', icon: ICONS.check, variant: 'attendance' },
           ],
         },
         {
@@ -738,9 +809,9 @@ function getQuickActionGroups(role?: UserRole): QuickActionGroup[] {
         {
           title: 'Attendance',
           actions: [
-            { to: '/sessions', label: 'Sign In Students', subtitle: 'QR, link, manual, biometric', icon: ICONS.qr, variant: 'signin' },
+            { to: '/sessions', label: 'Sign In Students', subtitle: 'QR, link, manual, face scan', icon: ICONS.qr, variant: 'signin' },
             { to: '/attendance', label: 'Mark Attendance', subtitle: 'Override or manual', icon: ICONS.clipboard, variant: 'attendance' },
-            { to: '/biometric/attendance', label: 'Biometric Attendance', subtitle: 'Face or fingerprint student scan', icon: ICONS.check, variant: 'attendance' },
+            { to: '/biometric/attendance', label: 'Face Attendance', subtitle: 'Camera match for enrolled students', icon: ICONS.check, variant: 'attendance' },
           ],
         },
         {
@@ -1336,6 +1407,8 @@ const DashboardPage: React.FC = () => {
 
       {/* Main Content */}
       <main className="relative max-w-7xl mx-auto px-6 lg:px-8 py-10">
+
+        <ActiveSessionReminder role={user?.role} userId={user?.id} />
 
         {/* Welcome Banner */}
         <div className="relative mb-10 surface-card p-8 lg:p-10" style={{ animation: 'fadeInUp 0.5s ease-out forwards' }}>

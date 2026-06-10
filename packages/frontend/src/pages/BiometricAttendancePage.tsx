@@ -228,6 +228,12 @@ const BiometricAttendancePage: React.FC = () => {
     setCameraStarting(false);
   }, []);
 
+  const readyForNextStudent = useCallback(() => {
+    setSubmitted(false);
+    setMatchResult(null);
+    void startCamera();
+  }, [startCamera]);
+
   const detectAndMatch = async () => {
     if (!videoRef.current) return;
     setLoading(true);
@@ -281,7 +287,7 @@ const BiometricAttendancePage: React.FC = () => {
         setError('Face attendance requires internet so SAMS can match the student against enrolled templates securely. Reconnect and try again.');
       }
     } catch (err: unknown) {
-      setError(getApiErrorMessage(err, 'Biometric verification failed.'));
+      setError(getApiErrorMessage(err, 'Face verification failed.'));
     } finally {
       setLoading(false);
     }
@@ -290,6 +296,14 @@ const BiometricAttendancePage: React.FC = () => {
   useEffect(() => {
     return () => stopCamera();
   }, [stopCamera]);
+
+  useEffect(() => {
+    if (!submitted || !matchResult) return;
+    const timer = window.setTimeout(() => {
+      readyForNextStudent();
+    }, 1800);
+    return () => window.clearTimeout(timer);
+  }, [matchResult, readyForNextStudent, submitted]);
 
   if (featureGated) {
     return (
@@ -300,9 +314,9 @@ const BiometricAttendancePage: React.FC = () => {
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.6} d="M12 9v3.75m0 3.75h.008v.008H12V16.5zm8.25-4.5a8.25 8.25 0 11-16.5 0 8.25 8.25 0 0116.5 0z" />
             </svg>
           </div>
-          <h1 className="text-xl font-semibold text-ink mb-2">Biometric attendance unavailable</h1>
+          <h1 className="text-xl font-semibold text-ink mb-2">Face attendance unavailable</h1>
           <p className="text-ink-muted text-sm leading-6">
-            Biometric scanning requires a Professional or Enterprise plan. Upgrade the school license
+            Face attendance requires a Professional or Enterprise plan. Upgrade the school license
             in the Super Admin portal, then reload this page.
           </p>
         </div>
@@ -318,10 +332,10 @@ const BiometricAttendancePage: React.FC = () => {
           <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
             <div>
               <p className="text-xs font-semibold uppercase tracking-[0.18em] text-ink-subtle mb-2">Teacher device</p>
-              <h1 className="text-2xl font-semibold text-ink">Biometric attendance</h1>
+              <h1 className="text-2xl font-semibold text-ink">Face attendance</h1>
               <p className="text-ink-muted text-sm mt-2 leading-6 max-w-2xl">
-                Use a teacher or HOD device to identify enrolled students and mark attendance for the active session.
-                Students should enroll once, then continue using QR or link attendance when self check-in is required.
+                Use a teacher or HOD device camera to identify enrolled students and mark attendance for the active session.
+                Fingerprint or passkey is only for signing in to SAMS; attendance uses face enrollment.
               </p>
             </div>
             <div className="rounded-xl border border-line bg-surface-muted px-3 py-2 text-left sm:text-right">
@@ -352,7 +366,7 @@ const BiometricAttendancePage: React.FC = () => {
 
           {modelsLoaded && !sessionId && !submitted && (
             <div className="mb-4 rounded-xl border border-amber-500/25 bg-amber-500/10 px-4 py-3 text-sm text-amber-200">
-              Start an attendance session before using biometric scanning.
+              Start an attendance session before using face attendance.
             </div>
           )}
 
@@ -432,15 +446,14 @@ const BiometricAttendancePage: React.FC = () => {
               <p className="text-xs text-ink-subtle mt-1">
                 Confidence: {(matchResult.confidence * 100).toFixed(1)}%
               </p>
+              <p className="text-xs text-ink-subtle mt-3">
+                Camera will reopen automatically for the next student.
+              </p>
               <button
-                onClick={() => {
-                  setSubmitted(false);
-                  setMatchResult(null);
-                  void startCamera();
-                }}
+                onClick={readyForNextStudent}
                 className="mt-6 btn-primary py-3 px-8 transition-colors"
               >
-                Next Student
+                Scan next student
               </button>
             </div>
           )}

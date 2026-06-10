@@ -221,9 +221,9 @@ const BiometricEnrollPage: React.FC = () => {
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
               </svg>
             </div>
-            <h2 className="text-xl font-semibold text-ink mb-2">Biometric enrollment unavailable</h2>
+            <h2 className="text-xl font-semibold text-ink mb-2">Face enrollment unavailable</h2>
             <p className="text-ink-muted leading-6">
-              Biometric enrollment requires a Professional or Enterprise plan. Upgrade the school license to use this feature.
+              Face enrollment requires a Professional or Enterprise plan. Upgrade the school license to use this feature.
             </p>
           </div>
         </div>
@@ -237,7 +237,7 @@ const BiometricEnrollPage: React.FC = () => {
         {/* Header */}
         <div className="mb-6 surface-card border border-line p-6">
           <p className="text-xs font-semibold uppercase tracking-[0.18em] text-ink-subtle mb-2">Student setup</p>
-          <h1 className="text-2xl font-semibold text-ink">Biometric enrollment</h1>
+          <h1 className="text-2xl font-semibold text-ink">Face enrollment</h1>
           <p className="text-ink-muted text-sm mt-2 leading-6 max-w-2xl">
             Register a face template once for attendance matching. The encrypted template is used only by authorized
             teachers, HODs, or admins within the school attendance workflow.

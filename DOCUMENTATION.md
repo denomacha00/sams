@@ -36,7 +36,7 @@ SAMS is a multi-school enterprise platform designed for Kenyan educational insti
 ### Key Capabilities
 - QR Code-based attendance with 30-second token rotation
 - GPS-verified attendance (prevents proxy attendance)
-- Biometric (face recognition) attendance
+- Face attendance (biometric face recognition; fingerprint/passkey is account login only)
 - Manual attendance marking by teachers
 - Offline-first with automatic sync when connectivity restores
 - Real-time WebSocket updates across all connected devices
@@ -110,7 +110,7 @@ Native client **`packages/mobile`** (display name **SAMS**) uses the same `/api/
 | Payments | M-Pesa Daraja API (STK Push) |
 | SMS | Africa's Talking |
 | Email | Nodemailer (SMTP) |
-| Biometric | face-api.js + AES-256-GCM encryption |
+| Biometric | face-api.js + AES-256-GCM encryption for face attendance; WebAuthn fingerprint/passkey is login only |
 | Deployment | PM2, NGINX, GitHub Actions CI/CD |
 | Offline | Service Worker, IndexedDB |
 
@@ -144,7 +144,7 @@ Native client **`packages/mobile`** (display name **SAMS**) uses the same `/api/
 
 ### TEACHER
 - Starts attendance sessions
-- Marks attendance (QR, manual, biometric)
+- Marks attendance (QR, manual, face scan)
 - Views class reports
 - Generates registration links for students
 - Sends notifications to class
@@ -188,11 +188,12 @@ Native client **`packages/mobile`** (display name **SAMS**) uses the same `/api/
 - Optional note (max 500 chars)
 - Supports bulk marking
 
-**Biometric (Face Recognition)**
+**Face Attendance (Biometric Face Recognition)**
 - AES-256-GCM encrypted face descriptors
 - Per-school encryption keys (HKDF derived)
 - Euclidean distance matching with confidence threshold
 - Gated to Professional/Enterprise plans
+- Teacher/HOD uses their device camera to scan enrolled students. Fingerprint/passkey is not used for attendance; it is only for account sign-in.
 
 ### 5.2 Offline Support
 - Service Worker caches static assets (cache-first)
@@ -237,7 +238,8 @@ Native client **`packages/mobile`** (display name **SAMS**) uses the same `/api/
 ### 5.7 Notifications & Messaging
 - **Alerts / Inbox / Sent / Send** workspace on the Notifications page
 - In-app delivery is the active school notification channel (real-time via Socket.io). SMS is hidden from the frontend notification composer for now and reserved for OTP/password-reset flows until live AT capacity is ready.
-- Attachments are supported for in-app messages: images, PDFs, links/files, with authenticated open/download routes so recipient and sender can access them without public 404s.
+- Attachments are supported for in-app messages: images, videos, PDFs, Office/text files, and links in message text, with authenticated open/download routes so recipient and sender can access them without public 404s.
+- Super Admin can send official **SAMS update** notifications from the Super Admin portal to all schools or one selected school, with role filters (all users, admins, HODs, teachers, students). These arrive in school Alerts with a distinct platform color/badge and support the same attachment types. Super Admin can edit or delete sent platform update batches.
 - Email via Nodemailer (password reset, OTP, optional copies)
 - **Send scope:** school, department, or class (role-dependent)
   - **School Admin:** entire school, any department/class, optional role filter
@@ -410,7 +412,7 @@ Never run only `git pull` on the server without a build — that is what causes 
 ### Attendance
 - `POST /api/v1/attendance/qr` — QR scan attendance
 - `POST /api/v1/attendance/manual` — Manual marking
-- `POST /api/v1/attendance/biometric` — Biometric attendance
+- `POST /api/v1/attendance/biometric` — Face attendance record after biometric face match
 - `PUT /api/v1/attendance/:id` — Update record
 - `GET /api/v1/attendance` — List records
 - `POST /api/v1/attendance/sync` — Offline sync
@@ -438,6 +440,9 @@ Never run only `git pull` on the server without a build — that is what causes 
 - `POST /api/v1/notifications/send` - Send in-app notification/message, optionally with attachments
 - `GET /api/v1/notifications/attachments/:id` - Authenticated attachment open/download for sender or recipient
 - `PUT /api/v1/notifications/:id` / `DELETE /api/v1/notifications/:id` - Edit/delete sender's outbound message copy where policy allows
+- `GET /api/v1/super/notifications/sent` - Super Admin sent platform updates
+- `POST /api/v1/super/notifications/send` - Super Admin official in-app update to all schools or one school, optionally with attachments
+- `PATCH /api/v1/super/notifications/:id` / `DELETE /api/v1/super/notifications/batch/:batchId` - Super Admin edit/delete platform update batches
 
 ### Payments
 - `POST /api/v1/payments/initiate` — Initiate M-Pesa STK Push
@@ -716,7 +721,7 @@ curl -s http://127.0.0.1:3001/health | grep -E '"mode":"production"|"sandbox":fa
 
 1. **SCHOOL_ADMIN** → Settings → **Send test SMS** to a real Kenyan number (not AT sandbox whitelist only).
 2. **Student** (Pro school) → enroll face (Settings or `/biometric/enroll`).
-3. **Teacher** → start attendance session → **Biometric attendance** → scan enrolled student → attendance recorded.
+3. **Teacher** → start attendance session → **Face attendance** → scan enrolled student → attendance recorded.
 
 **NGINX:** HTTPS on `app.*` and `api.*` unchanged; no sandbox-specific proxy rules. Ensure `CORS_ORIGIN` matches your app URL.
 

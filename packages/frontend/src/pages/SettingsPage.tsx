@@ -229,7 +229,7 @@ const SettingsPage: React.FC = () => {
       const descriptor = Array.from(detection.descriptor as Float32Array);
       await apiClient.post('/biometric/enroll', { descriptor, studentId: user?.id });
       setBioEnrolled(true);
-      setSuccess('Face enrolled for biometric attendance!');
+      setSuccess('Face enrolled for attendance!');
     } catch (err: any) {
       setError(err.response?.data?.error || 'Face enrollment failed.');
     } finally {
@@ -238,7 +238,7 @@ const SettingsPage: React.FC = () => {
   }, [user?.id]);
 
   const handleFaceDisable = useCallback(async () => {
-    if (!confirm('Remove your face enrollment for biometric attendance? You can enroll again later.')) return;
+    if (!confirm('Remove your face enrollment for attendance? You can enroll again later.')) return;
     setBioLoading(true);
     clearMessages();
     try {
@@ -346,14 +346,14 @@ const SettingsPage: React.FC = () => {
               </div>
               <div>
                 <h3 className="text-lg font-semibold text-ink">Face Enrollment</h3>
-                <p className="text-xs text-ink-muted">Register your face for biometric attendance</p>
+                <p className="text-xs text-ink-muted">Register your face for attendance</p>
               </div>
             </div>
             {bioEnrolled ? (
               <div className="space-y-3">
                 <div className="flex items-center gap-3 p-3 bg-indigo-500/10 border border-indigo-400/20 rounded-xl">
                   <svg className="w-5 h-5 text-orange-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
-                  <p className="text-sm text-indigo-300">Face enrolled. Biometric attendance is active.</p>
+                  <p className="text-sm text-indigo-300">Face enrolled. Face attendance is active.</p>
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                   <button onClick={handleFaceEnroll} disabled={bioLoading}
@@ -368,7 +368,7 @@ const SettingsPage: React.FC = () => {
               </div>
             ) : (
               <div>
-                <p className="text-sm text-ink-muted mb-4">Enroll your face so teachers can mark your attendance using biometric scanning.</p>
+                <p className="text-sm text-ink-muted mb-4">Enroll your face so teachers can mark your attendance using face scan.</p>
                 <button onClick={handleFaceEnroll} disabled={bioLoading}
                   className="w-full flex items-center justify-center gap-2 bg-gradient-to-r from-indigo-600 to-indigo-700 text-white font-semibold py-3 px-4 rounded-xl shadow-lg shadow-indigo-500/25 hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50 transition-all">
                   {bioLoading ? (

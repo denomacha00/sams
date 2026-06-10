@@ -251,7 +251,7 @@ const RegisterPage: React.FC = () => {
             <p className="text-indigo-200 font-medium">Registration successful!</p>
             {isStudent ? (
               <div className="mt-4 space-y-3">
-                <p className="text-ink-muted text-sm">Would you like to enroll your face for biometric attendance?</p>
+                <p className="text-ink-muted text-sm">Would you like to enroll your face for attendance?</p>
                 <div className="flex gap-3 justify-center">
                   <button
                     onClick={startBiometricEnroll}
@@ -335,7 +335,7 @@ const RegisterPage: React.FC = () => {
               <div className="text-center py-4">
                 <svg className="w-10 h-10 text-orange-400 mx-auto mb-2" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
                 <p className="text-indigo-200 font-medium">Face enrolled successfully!</p>
-                <p className="text-ink-muted text-sm mt-1">You can now use biometric attendance.</p>
+                <p className="text-ink-muted text-sm mt-1">You can now use face attendance.</p>
                 <button
                   onClick={() => navigate('/login', { replace: true })}
                   className="mt-4 bg-gradient-to-r from-indigo-500 to-indigo-700 text-white font-semibold py-2.5 px-6 rounded-xl hover:scale-[1.02] active:scale-[0.98] transition-all"

@@ -1,15 +1,25 @@
 import { Router, type Request, type Response, type NextFunction } from 'express';
 import { z } from 'zod';
 import { createHash } from 'crypto';
+import fs from 'fs';
+import path from 'path';
+import multer from 'multer';
+import { createId } from '@paralleldrive/cuid2';
 import { PlanTier } from '@sams/shared';
 import { encodeLicenseKey } from '@sams/shared';
 import { getLicenseSecret } from '../config/secrets';
 import { getSmtpConfig, isEmailConfigured } from '../config/email';
 import { prisma } from '../lib/prisma';
 import { redis } from '../lib/redis';
+import { getSocketIO } from '../lib/socket';
 import { licenseService } from '../services/licenseService';
 import { auditService } from '../services/auditService';
 import { requirePermission } from '../middleware/rbac';
+import { AppError } from '../middleware/errors';
+import {
+  NOTIFICATION_ATTACHMENTS_DIR,
+  notificationAttachmentPublicUrl,
+} from '../config/uploads';
 
 // ─── Validation Schemas ───────────────────────────────────────────────────────
 
@@ -27,6 +37,216 @@ const updateSchoolPlanSchema = z.object({
   planTier: z.nativeEnum(PlanTier),
   newExpiry: z.string().datetime().optional(),
 });
+
+const SUPER_NOTIFICATION_TYPE = 'SUPER_ADMIN';
+const SUPER_NOTIFICATION_MAX_BYTES = 10 * 1024 * 1024;
+const SUPER_NOTIFICATION_MAX_FILES = 5;
+const SUPER_NOTIFICATION_MIME_TYPES = new Map<string, string>([
+  ['image/jpeg', '.jpg'],
+  ['image/png', '.png'],
+  ['image/webp', '.webp'],
+  ['image/gif', '.gif'],
+  ['video/mp4', '.mp4'],
+  ['video/webm', '.webm'],
+  ['video/quicktime', '.mov'],
+  ['application/pdf', '.pdf'],
+  ['text/plain', '.txt'],
+  ['application/msword', '.doc'],
+  ['application/vnd.openxmlformats-officedocument.wordprocessingml.document', '.docx'],
+  ['application/vnd.ms-excel', '.xls'],
+  ['application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', '.xlsx'],
+  ['application/vnd.ms-powerpoint', '.ppt'],
+  ['application/vnd.openxmlformats-officedocument.presentationml.presentation', '.pptx'],
+]);
+
+const superNotificationSchema = z.object({
+  audience: z.enum(['all_schools', 'school']),
+  schoolId: z.string().optional(),
+  targetRole: z.enum(['ALL', 'SCHOOL_ADMIN', 'HOD', 'TEACHER', 'STUDENT']).default('ALL'),
+  title: z.string().min(1).max(200),
+  message: z.string().min(1).max(2000),
+});
+
+const editSuperNotificationSchema = z.object({
+  title: z.string().min(1).max(200).optional(),
+  message: z.string().min(1).max(2000).optional(),
+}).refine((value) => !!value.title || !!value.message, {
+  message: 'Title or message is required',
+});
+
+type SuperNotificationAttachmentResponse = {
+  id: string;
+  fileName: string;
+  mimeType: string;
+  sizeBytes: number;
+  url: string;
+  createdAt: Date;
+};
+
+const superNotificationUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: SUPER_NOTIFICATION_MAX_BYTES, files: SUPER_NOTIFICATION_MAX_FILES },
+  fileFilter: (_req, file, cb) => {
+    if (SUPER_NOTIFICATION_MIME_TYPES.has(file.mimetype)) {
+      cb(null, true);
+      return;
+    }
+    cb(new AppError(400, 'INVALID_ATTACHMENT', 'Only images, videos, PDF, Office documents, and text files are allowed'));
+  },
+});
+
+function uploadSuperNotificationAttachments(req: Request, res: Response, next: NextFunction): void {
+  superNotificationUpload.array('attachments', SUPER_NOTIFICATION_MAX_FILES)(req, res, (err: unknown) => {
+    if (!err) {
+      next();
+      return;
+    }
+
+    if (err instanceof multer.MulterError) {
+      if (err.code === 'LIMIT_FILE_SIZE') {
+        next(new AppError(413, 'FILE_TOO_LARGE', 'Each attachment must be 10MB or smaller'));
+        return;
+      }
+      if (err.code === 'LIMIT_FILE_COUNT') {
+        next(new AppError(400, 'TOO_MANY_FILES', `Attach up to ${SUPER_NOTIFICATION_MAX_FILES} files`));
+        return;
+      }
+    }
+
+    next(err instanceof AppError ? err : new AppError(400, 'INVALID_ATTACHMENT', 'Invalid attachment upload'));
+  });
+}
+
+function uploadedSuperNotificationFiles(req: Request): Express.Multer.File[] {
+  return Array.isArray(req.files) ? (req.files as Express.Multer.File[]) : [];
+}
+
+function normalizeSuperNotificationBody(body: Record<string, unknown>): Record<string, unknown> {
+  return {
+    ...body,
+    schoolId: typeof body.schoolId === 'string' && body.schoolId.trim() === '' ? undefined : body.schoolId,
+    targetRole: typeof body.targetRole === 'string' && body.targetRole.trim() === '' ? 'ALL' : body.targetRole,
+  };
+}
+
+function safeSuperNotificationOriginalName(name: string): string {
+  return path.basename(name).replace(/[^\w.\- ()]/g, '_').slice(0, 160) || 'attachment';
+}
+
+function superNotificationAttachmentFilePath(schoolId: string, batchId: string, storedName: string): string {
+  const root = path.resolve(NOTIFICATION_ATTACHMENTS_DIR);
+  const filePath = path.resolve(root, schoolId, batchId, storedName);
+  if (!filePath.startsWith(root + path.sep)) {
+    throw new AppError(400, 'INVALID_ATTACHMENT_PATH', 'Invalid attachment path');
+  }
+  return filePath;
+}
+
+async function saveSuperNotificationAttachments(
+  files: Express.Multer.File[],
+  schoolId: string,
+  senderId: string,
+  batchId: string,
+): Promise<SuperNotificationAttachmentResponse[]> {
+  if (files.length === 0) return [];
+
+  const dir = path.join(NOTIFICATION_ATTACHMENTS_DIR, schoolId, batchId);
+  await fs.promises.mkdir(dir, { recursive: true });
+
+  const rows = await Promise.all(files.map(async (file) => {
+    const id = createId();
+    const ext = SUPER_NOTIFICATION_MIME_TYPES.get(file.mimetype) || path.extname(file.originalname).toLowerCase() || '.bin';
+    const storedName = `${id}${ext}`;
+    const fileName = safeSuperNotificationOriginalName(file.originalname);
+    const url = notificationAttachmentPublicUrl(schoolId, batchId, storedName);
+
+    await fs.promises.writeFile(path.join(dir, storedName), file.buffer);
+
+    return {
+      id,
+      schoolId,
+      senderId,
+      batchId,
+      fileName,
+      storedName,
+      mimeType: file.mimetype,
+      sizeBytes: file.size,
+      url,
+    };
+  }));
+
+  await prisma.notificationAttachment.createMany({ data: rows });
+
+  return rows.map(({ id, fileName, mimeType, sizeBytes, url }) => ({
+    id,
+    fileName,
+    mimeType,
+    sizeBytes,
+    url,
+    createdAt: new Date(),
+  }));
+}
+
+async function deleteSuperNotificationAttachments(batchId: string, senderId: string): Promise<void> {
+  const attachments = await prisma.notificationAttachment.findMany({ where: { batchId, senderId } });
+  await prisma.notificationAttachment.deleteMany({ where: { batchId, senderId } });
+
+  await Promise.all(attachments.map(async (a) => {
+    try {
+      await fs.promises.unlink(superNotificationAttachmentFilePath(a.schoolId, batchId, a.storedName));
+    } catch {
+      // Best-effort file cleanup.
+    }
+  }));
+}
+
+async function loadSuperNotificationAttachments(
+  batchIds: string[],
+  senderId: string,
+): Promise<Map<string, SuperNotificationAttachmentResponse[]>> {
+  const uniqueBatchIds = [...new Set(batchIds.filter(Boolean))];
+  if (uniqueBatchIds.length === 0) return new Map();
+
+  const attachments = await prisma.notificationAttachment.findMany({
+    where: { batchId: { in: uniqueBatchIds }, senderId },
+    orderBy: { createdAt: 'asc' },
+  });
+
+  const seen = new Set<string>();
+  const map = new Map<string, SuperNotificationAttachmentResponse[]>();
+  for (const a of attachments) {
+    const dedupeKey = `${a.batchId}:${a.fileName}:${a.sizeBytes}:${a.mimeType}`;
+    if (seen.has(dedupeKey)) continue;
+    seen.add(dedupeKey);
+    const list = map.get(a.batchId) ?? [];
+    list.push({
+      id: a.id,
+      fileName: a.fileName,
+      mimeType: a.mimeType,
+      sizeBytes: a.sizeBytes,
+      url: a.url,
+      createdAt: a.createdAt,
+    });
+    map.set(a.batchId, list);
+  }
+  return map;
+}
+
+async function resolveSuperNotificationTargetLabel(
+  scope: string | null,
+  targetId: string | null,
+  targetRole: string | null,
+): Promise<string> {
+  let label = scope === 'all_schools' ? 'All schools' : 'Selected school';
+  if (scope === 'school' && targetId) {
+    const school = await prisma.school.findUnique({ where: { id: targetId }, select: { name: true } });
+    label = school?.name ?? 'Selected school';
+  }
+  if (targetRole) {
+    label += ` (${targetRole.replace('_', ' ').toLowerCase()}s)`;
+  }
+  return label;
+}
 
 // ─── Host Restriction Middleware ──────────────────────────────────────────────
 // Requirement 2.4, 15.1: Super Admin panel is accessible only via super.smart-managment.com.
@@ -633,6 +853,234 @@ superAdminRouter.delete('/audit-logs', async (req: Request, res: Response): Prom
   });
 
   res.json({ message: `Cleared ${deletedCount} audit log record(s).`, deletedCount });
+});
+
+// ─── Super Admin Notifications ────────────────────────────────────────────────
+
+superAdminRouter.get('/notifications/sent', async (req: Request, res: Response): Promise<void> => {
+  const senderId = req.user.sub;
+
+  const sentNotifications = await prisma.notification.findMany({
+    where: { senderId, type: SUPER_NOTIFICATION_TYPE },
+    orderBy: { createdAt: 'desc' },
+    take: 250,
+  });
+
+  const seen = new Set<string>();
+  const batches: typeof sentNotifications = [];
+  for (const notification of sentNotifications) {
+    const key = notification.batchId ?? notification.id;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    batches.push(notification);
+  }
+
+  const attachmentMap = await loadSuperNotificationAttachments(
+    batches.map((notification) => notification.batchId ?? notification.id),
+    senderId,
+  );
+
+  const enriched = await Promise.all(batches.map(async (notification) => {
+    const key = notification.batchId ?? notification.id;
+    const recipientCount = notification.batchId
+      ? await prisma.notification.count({
+          where: { batchId: notification.batchId, senderId, type: SUPER_NOTIFICATION_TYPE },
+        })
+      : 1;
+    const schoolCount = notification.batchId
+      ? await prisma.notification.groupBy({
+          by: ['schoolId'],
+          where: { batchId: notification.batchId, senderId, type: SUPER_NOTIFICATION_TYPE },
+        }).then((rows) => rows.length)
+      : 1;
+    const targetScopeLabel = await resolveSuperNotificationTargetLabel(
+      notification.scope,
+      notification.targetId,
+      notification.targetRole,
+    );
+
+    return {
+      ...notification,
+      recipientCount,
+      schoolCount,
+      targetScopeLabel,
+      attachments: attachmentMap.get(key) ?? [],
+    };
+  }));
+
+  res.status(200).json(enriched);
+});
+
+superAdminRouter.post(
+  '/notifications/send',
+  uploadSuperNotificationAttachments,
+  async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const parsed = superNotificationSchema.safeParse(
+        normalizeSuperNotificationBody(req.body as Record<string, unknown>),
+      );
+      if (!parsed.success) {
+        res.status(400).json({
+          error: 'Validation failed',
+          code: 'VALIDATION_ERROR',
+          details: parsed.error.flatten().fieldErrors,
+        });
+        return;
+      }
+
+      const { audience, schoolId, targetRole, title, message } = parsed.data;
+      if (audience === 'school' && !schoolId) {
+        throw new AppError(400, 'SCHOOL_REQUIRED', 'Select a school or choose all schools');
+      }
+
+      if (audience === 'school') {
+        const school = await prisma.school.findUnique({ where: { id: schoolId }, select: { id: true } });
+        if (!school) throw new AppError(404, 'NOT_FOUND', 'School not found');
+      }
+
+      const where: any = targetRole === 'ALL'
+        ? { role: { not: 'SUPER_ADMIN' } }
+        : { role: targetRole };
+      if (audience === 'school') where.schoolId = schoolId;
+
+      const recipients = await prisma.user.findMany({
+        where,
+        select: { id: true, schoolId: true },
+      });
+
+      const batchId = createId();
+      if (recipients.length === 0) {
+        res.status(200).json({
+          success: false,
+          recipientCount: 0,
+          schoolCount: 0,
+          batchId,
+          warning: 'No users matched this audience.',
+        });
+        return;
+      }
+
+      const effectiveTargetRole = targetRole === 'ALL' ? null : targetRole;
+      const rows = recipients.map((recipient) => ({
+        schoolId: recipient.schoolId,
+        userId: recipient.id,
+        senderId: req.user.sub,
+        batchId,
+        title,
+        message,
+        type: SUPER_NOTIFICATION_TYPE,
+        scope: audience,
+        targetId: audience === 'school' ? schoolId! : null,
+        targetRole: effectiveTargetRole,
+      }));
+
+      for (let i = 0; i < rows.length; i += 500) {
+        await prisma.notification.createMany({ data: rows.slice(i, i + 500) });
+      }
+
+      const files = uploadedSuperNotificationFiles(req);
+      const schoolIds = [...new Set(recipients.map((recipient) => recipient.schoolId))];
+      const attachmentResults: SuperNotificationAttachmentResponse[] = [];
+      for (const targetSchoolId of schoolIds) {
+        const saved = await saveSuperNotificationAttachments(files, targetSchoolId, req.user.sub, batchId);
+        if (attachmentResults.length === 0) attachmentResults.push(...saved);
+      }
+
+      res.status(200).json({
+        success: true,
+        recipientCount: recipients.length,
+        schoolCount: schoolIds.length,
+        batchId,
+        attachments: attachmentResults,
+      });
+
+      setImmediate(() => {
+        for (const recipient of recipients) {
+          getSocketIO().to(`user:${recipient.id}`).emit('notification:new', {
+            title,
+            message,
+            type: SUPER_NOTIFICATION_TYPE,
+            senderId: req.user.sub,
+            batchId,
+            timestamp: new Date().toISOString(),
+          });
+        }
+      });
+    } catch (err) {
+      next(err instanceof AppError ? err : new AppError(500, 'INTERNAL_ERROR', 'Failed to send Super Admin notification'));
+    }
+  },
+);
+
+superAdminRouter.patch('/notifications/:id', async (req: Request, res: Response): Promise<void> => {
+  const parsed = editSuperNotificationSchema.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({
+      error: 'Validation failed',
+      code: 'VALIDATION_ERROR',
+      details: parsed.error.flatten().fieldErrors,
+    });
+    return;
+  }
+
+  const id = req.params.id as string;
+  const notification = await prisma.notification.findFirst({
+    where: { id, senderId: req.user.sub, type: SUPER_NOTIFICATION_TYPE },
+  });
+  if (!notification) {
+    throw new AppError(404, 'NOT_FOUND', 'Notification not found');
+  }
+
+  const data = {
+    ...(parsed.data.title ? { title: parsed.data.title } : {}),
+    ...(parsed.data.message ? { message: parsed.data.message } : {}),
+    updatedAt: new Date(),
+  };
+
+  if (notification.batchId) {
+    await prisma.notification.updateMany({
+      where: { batchId: notification.batchId, senderId: req.user.sub, type: SUPER_NOTIFICATION_TYPE },
+      data,
+    });
+  } else {
+    await prisma.notification.update({ where: { id }, data });
+  }
+
+  const affected = await prisma.notification.findMany({
+    where: notification.batchId
+      ? { batchId: notification.batchId, senderId: req.user.sub, type: SUPER_NOTIFICATION_TYPE }
+      : { id },
+    select: { id: true, userId: true },
+  });
+
+  for (const item of affected) {
+    getSocketIO().to(`user:${item.userId}`).emit('notification:updated', {
+      id: item.id,
+      title: parsed.data.title,
+      message: parsed.data.message ?? notification.message,
+      updatedAt: data.updatedAt.toISOString(),
+    });
+  }
+
+  const updated = await prisma.notification.findUnique({ where: { id } });
+  res.status(200).json(updated);
+});
+
+superAdminRouter.delete('/notifications/batch/:batchId', async (req: Request, res: Response): Promise<void> => {
+  const batchId = req.params.batchId as string;
+  const existing = await prisma.notification.findFirst({
+    where: { batchId, senderId: req.user.sub, type: SUPER_NOTIFICATION_TYPE },
+  });
+  if (!existing) {
+    throw new AppError(404, 'NOT_FOUND', 'Notification batch not found');
+  }
+
+  await prisma.notification.deleteMany({
+    where: { batchId, senderId: req.user.sub, type: SUPER_NOTIFICATION_TYPE },
+  });
+  await deleteSuperNotificationAttachments(batchId, req.user.sub);
+
+  res.status(204).send();
 });
 
 // ─── AI Knowledge Base CRUD ────────────────────────────────────────────────────

@@ -610,7 +610,7 @@ const SessionPage: React.FC = () => {
               <p className="text-xs font-semibold uppercase tracking-[0.16em] text-brand">Attendance control</p>
               <h1 className="text-2xl font-bold text-ink">Start Attendance Session</h1>
               <p className="text-ink-muted text-sm mt-1">
-                Sessions open from the timetable window. Choose QR, link, manual, or face/biometric after starting.
+                Sessions open from the timetable window. Choose QR, link, manual, or face scan after starting.
               </p>
             </div>
             <Link to="/" className="btn-secondary px-4 py-2 text-sm w-full sm:w-auto text-center">
@@ -648,11 +648,11 @@ const SessionPage: React.FC = () => {
               </select>
               {timetableEntries.length === 0 ? (
                 <p className="text-xs text-ink-muted mt-2">
-                  No classes on your timetable today. Ask the HOD/admin to add the timetable entry first.
+                  No class is assigned on today's timetable. SAMS will not open an attendance session until the HOD/admin adds the timetable entry.
                 </p>
               ) : openTimetableEntries.length === 0 ? (
                 <p className="text-xs text-amber-200 mt-2">
-                  No attendance session is open right now.
+                  No attendance session is open right now. Sessions can only start during the timetable window.
                   {nextTimetableEntry
                     ? ` Next: ${nextTimetableEntry.subject} (${nextTimetableEntry.startTime}-${nextTimetableEntry.endTime}).`
                     : ' Today\'s scheduled sessions are already outside the allowed window.'}
@@ -782,6 +782,12 @@ const SessionPage: React.FC = () => {
           </div>
           <div className="flex flex-wrap items-center gap-2">
             <Link
+              to="/"
+              className="btn-secondary py-2 px-4 text-sm font-medium transition-all duration-200"
+            >
+              Back dashboard
+            </Link>
+            <Link
               to={`/attendance?sessionId=${activeSession.id}`}
               className="btn-attendance py-2 px-4 text-sm font-medium transition-all duration-200"
             >
@@ -791,7 +797,7 @@ const SessionPage: React.FC = () => {
               to={`/biometric/attendance?sessionId=${activeSession.id}`}
               className="btn-secondary py-2 px-4 text-sm font-medium transition-all duration-200"
             >
-              Biometric scan
+              Face scan
             </Link>
             <button
               onClick={endSession}
@@ -869,8 +875,8 @@ const SessionPage: React.FC = () => {
             to={`/biometric/attendance?sessionId=${activeSession.id}`}
             className="surface-card border border-line p-4 text-left hover:border-indigo-500/40 hover:bg-indigo-500/10 transition-all"
           >
-            <p className="text-sm font-semibold text-ink">Biometric scan</p>
-            <p className="mt-1 text-xs text-ink-subtle">Fingerprint or face scan</p>
+            <p className="text-sm font-semibold text-ink">Face scan</p>
+            <p className="mt-1 text-xs text-ink-subtle">Camera match for enrolled students</p>
           </Link>
         </div>
 

@@ -54,6 +54,9 @@ const ATTACHMENT_MIME_TYPES = new Map<string, string>([
   ['image/png', '.png'],
   ['image/webp', '.webp'],
   ['image/gif', '.gif'],
+  ['video/mp4', '.mp4'],
+  ['video/webm', '.webm'],
+  ['video/quicktime', '.mov'],
   ['application/pdf', '.pdf'],
   ['text/plain', '.txt'],
   ['application/msword', '.doc'],
@@ -81,7 +84,7 @@ const attachmentUpload = multer({
       cb(null, true);
       return;
     }
-    cb(new AppError(400, 'INVALID_ATTACHMENT', 'Only images, PDF, Office documents, and text files are allowed'));
+    cb(new AppError(400, 'INVALID_ATTACHMENT', 'Only images, videos, PDF, Office documents, and text files are allowed'));
   },
 });
 
@@ -205,12 +208,18 @@ async function saveNotificationAttachments(
   }));
 }
 
-async function loadAttachmentsByBatch(batchIds: string[]): Promise<Map<string, AttachmentResponse[]>> {
+async function loadAttachmentsByBatch(
+  batchIds: string[],
+  schoolId?: string,
+): Promise<Map<string, AttachmentResponse[]>> {
   const uniqueBatchIds = [...new Set(batchIds.filter(Boolean))];
   if (uniqueBatchIds.length === 0) return new Map();
 
   const attachments = await prisma.notificationAttachment.findMany({
-    where: { batchId: { in: uniqueBatchIds } },
+    where: {
+      batchId: { in: uniqueBatchIds },
+      ...(schoolId ? { schoolId } : {}),
+    },
     orderBy: { createdAt: 'asc' },
   });
 
@@ -494,6 +503,7 @@ notificationsRouter.get('/sent', async (req: Request, res: Response): Promise<vo
 
     const attachmentMap = await loadAttachmentsByBatch(
       batches.map((n) => n.batchId ?? n.id).filter(Boolean),
+      req.schoolId,
     );
 
     // For each batch, count recipients
@@ -544,6 +554,7 @@ notificationsRouter.get('/', async (req: Request, res: Response): Promise<void> 
     );
     const attachmentMap = await loadAttachmentsByBatch(
       notifications.map((n) => n.batchId ?? n.id).filter(Boolean),
+      req.schoolId,
     );
 
     const enriched = await Promise.all(

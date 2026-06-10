@@ -221,7 +221,7 @@ const LoginPage: React.FC = () => {
             Smart Attendance Management System
           </p>
           <p className="text-sm text-ink-subtle mt-4 max-w-sm mx-auto leading-relaxed">
-            Multi-school platform with QR, GPS, and biometric attendance for Kenyan institutions.
+            Multi-school platform with QR, GPS, and face attendance for Kenyan institutions.
           </p>
         </div>
       </div>

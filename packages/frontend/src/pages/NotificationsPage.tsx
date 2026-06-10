@@ -97,6 +97,9 @@ const ATTACHMENT_ACCEPT = [
   'image/png',
   'image/webp',
   'image/gif',
+  'video/mp4',
+  'video/webm',
+  'video/quicktime',
   'application/pdf',
   'text/plain',
   '.doc',
@@ -133,6 +136,10 @@ function formatFileSize(bytes: number): string {
 
 function isImageAttachment(att: NotificationAttachment): boolean {
   return att.mimeType.startsWith('image/');
+}
+
+function isVideoAttachment(att: NotificationAttachment): boolean {
+  return att.mimeType.startsWith('video/');
 }
 
 function renderLinkedText(text: string): React.ReactNode {
@@ -292,9 +299,9 @@ const NotificationsPage: React.FC = () => {
       void newNotif;
     });
 
-    socket.on('notification:updated', (data: { id: string; message: string; updatedAt: string }) => {
+    socket.on('notification:updated', (data: { id: string; title?: string; message: string; updatedAt: string }) => {
       setNotifications((prev) =>
-        prev.map((n) => n.id === data.id ? { ...n, message: data.message, updatedAt: data.updatedAt } : n)
+        prev.map((n) => n.id === data.id ? { ...n, title: data.title ?? n.title, message: data.message, updatedAt: data.updatedAt } : n)
       );
     });
 
@@ -726,6 +733,40 @@ const NotificationsPage: React.FC = () => {
             );
           }
 
+          if (isVideoAttachment(att)) {
+            return (
+              <div
+                key={att.id}
+                className={`block overflow-hidden rounded-xl border border-line bg-surface-elevated hover:border-indigo-500/40 transition-all ${isSentFolder ? 'ml-auto' : ''}`}
+              >
+                {loading ? (
+                  <div className="flex h-44 w-full max-w-sm items-center justify-center text-xs text-ink-subtle">
+                    Loading video...
+                  </div>
+                ) : failed || !href ? (
+                  <div className="flex h-44 w-full max-w-sm items-center justify-center px-4 text-center text-xs text-red-300">
+                    Video could not be loaded. Refresh and try again.
+                  </div>
+                ) : (
+                  <video
+                    controls
+                    preload="metadata"
+                    src={href}
+                    className="max-h-72 w-full max-w-sm bg-black"
+                  />
+                )}
+                <div className="flex items-center justify-between gap-3 px-3 py-2 text-xs text-ink-muted">
+                  <span className="min-w-0 truncate">{att.fileName} - {formatFileSize(att.sizeBytes)}</span>
+                  {href && (
+                    <a href={href} download={att.fileName} className="shrink-0 text-indigo-300 hover:text-indigo-200">
+                      Download
+                    </a>
+                  )}
+                </div>
+              </div>
+            );
+          }
+
           return (
             <div
               key={att.id}
@@ -773,8 +814,11 @@ const NotificationsPage: React.FC = () => {
   };
 
   const renderMessageCard = (notif: Notification, isSentFolder: boolean) => {
-    const senderDisplay = truncateName(notif.senderName || (notif.senderId === null ? 'System' : 'Deleted User'));
-    const roleDisplay = formatRole(notif.senderRole);
+    const isSuperAdminNotice = notif.type === 'SUPER_ADMIN';
+    const senderDisplay = isSuperAdminNotice
+      ? 'SAMS Super Admin'
+      : truncateName(notif.senderName || (notif.senderId === null ? 'System' : 'Deleted User'));
+    const roleDisplay = isSuperAdminNotice ? 'Super Admin' : formatRole(notif.senderRole);
     const isOwn = isOwnSentMessage(notif);
     // Edit/delete only on Sent tab, only own messages; school admin bypasses 24h window
     const canModify =
@@ -787,6 +831,18 @@ const NotificationsPage: React.FC = () => {
     const recipientCount = isSentFolder ? (notif as SentNotification).recipientCount : undefined;
 
     const unread = !isSentFolder && !notif.read;
+    const cardClass = isSuperAdminNotice
+      ? unread
+        ? 'border-amber-400/60 bg-amber-500/12 shadow-card-soft-hover'
+        : 'border-amber-400/30 bg-amber-500/8 shadow-card-soft hover:border-amber-400/45'
+      : unread
+        ? 'border-indigo-500/35 bg-indigo-500/10 shadow-card-soft-hover'
+        : 'border-line bg-surface shadow-card-soft hover:border-indigo-500/25';
+    const bubbleClass = isSuperAdminNotice && !isSentFolder
+      ? 'max-w-[92%] bg-amber-500/12 border-amber-400/25 text-amber-50'
+      : isSentFolder
+        ? 'ml-auto max-w-[92%] bg-indigo-600/18 border-indigo-500/25 text-indigo-50'
+        : 'max-w-[92%] bg-surface-muted border-line text-ink-muted';
     const pathLabel = isSentFolder
       ? `You → ${notif.targetScopeLabel ?? 'Recipients'}`
       : `${senderDisplay} → You`;
@@ -795,23 +851,28 @@ const NotificationsPage: React.FC = () => {
       <div
         key={notif.id}
         onClick={() => openMessage(notif, isSentFolder)}
-        className={`group rounded-2xl border p-4 transition-all ${isSentFolder ? '' : 'cursor-pointer'} ${
-          unread
-            ? 'border-indigo-500/35 bg-indigo-500/10 shadow-card-soft-hover'
-            : 'border-line bg-surface shadow-card-soft hover:border-indigo-500/25'
-        }`}
+        className={`group rounded-2xl border p-4 transition-all ${isSentFolder ? '' : 'cursor-pointer'} ${cardClass}`}
       >
         <div className={`flex items-start gap-3 ${isSentFolder ? 'flex-row-reverse' : ''}`}>
           <div className={`w-10 h-10 rounded-2xl flex items-center justify-center text-xs font-bold shrink-0 ${
-            isSentFolder ? 'bg-indigo-600 text-white' : 'bg-surface-elevated text-ink border border-line'
+            isSentFolder
+              ? 'bg-indigo-600 text-white'
+              : isSuperAdminNotice
+                ? 'bg-amber-500/20 text-amber-100 border border-amber-400/30'
+                : 'bg-surface-elevated text-ink border border-line'
           }`}>
-            {isSentFolder ? 'ME' : initials(senderDisplay)}
+            {isSentFolder ? 'ME' : isSuperAdminNotice ? 'SA' : initials(senderDisplay)}
           </div>
 
           <div className={`flex-1 min-w-0 ${isSentFolder ? 'text-right' : ''}`}>
             <div className={`flex items-center gap-2 flex-wrap ${isSentFolder ? 'justify-end' : ''}`}>
               {unread && <div className="w-2 h-2 rounded-full bg-indigo-400 flex-shrink-0" />}
               <h3 className="text-sm font-semibold text-ink truncate max-w-full">{notif.title || 'Message'}</h3>
+              {isSuperAdminNotice && (
+                <span className="text-xs px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-200 border border-amber-400/25">
+                  SAMS update
+                </span>
+              )}
               {notif.updatedAt && <span className="text-xs text-amber-400/80 italic">edited</span>}
               {recipientCount != null && (
                 <span className="text-xs px-2 py-0.5 rounded-full bg-surface-elevated text-ink-muted border border-line">
@@ -836,11 +897,7 @@ const NotificationsPage: React.FC = () => {
               </div>
             )}
 
-            <div className={`mt-3 rounded-2xl px-4 py-3 border ${
-              isSentFolder
-                ? 'ml-auto max-w-[92%] bg-indigo-600/18 border-indigo-500/25 text-indigo-50'
-                : 'max-w-[92%] bg-surface-muted border-line text-ink-muted'
-            }`}>
+            <div className={`mt-3 rounded-2xl px-4 py-3 border ${bubbleClass}`}>
               <p className="text-sm leading-relaxed whitespace-pre-wrap">{renderLinkedText(notif.message)}</p>
             </div>
             {renderAttachments(notif.attachments, isSentFolder)}
@@ -1103,7 +1160,7 @@ const NotificationsPage: React.FC = () => {
                     className="block w-full text-sm text-ink-muted file:mr-3 file:rounded-lg file:border-0 file:bg-indigo-600 file:px-3 file:py-2 file:text-sm file:font-semibold file:text-white hover:file:bg-indigo-500 disabled:opacity-60"
                   />
                   <p className="mt-2 text-xs text-ink-subtle">
-                    Add images, PDFs, Office documents, or text files. Up to {MAX_ATTACHMENT_FILES} files, 10MB each.
+                    Add images, videos, PDFs, Office documents, or text files. Up to {MAX_ATTACHMENT_FILES} files, 10MB each.
                   </p>
                   {selectedAttachments.length > 0 && (
                     <div className="mt-3 flex flex-wrap gap-2">

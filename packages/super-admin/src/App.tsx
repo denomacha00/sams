@@ -9,6 +9,7 @@ import SchoolsListPage from './pages/SchoolsListPage';
 import RevenuePage from './pages/RevenuePage';
 import AuditLogPage from './pages/AuditLogPage';
 import KnowledgeBasePage from './pages/KnowledgeBasePage';
+import NotificationsPage from './pages/NotificationsPage';
 import SettingsPage from './pages/SettingsPage';
 import { useAuthStore } from './store/authStore';
 
@@ -59,6 +60,12 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
             className="block px-4 py-2 text-gray-300 hover:bg-gray-700 hover:text-white rounded-lg transition-colors"
           >
             Audit Logs
+          </Link>
+          <Link
+            to="/notifications"
+            className="block px-4 py-2 text-gray-300 hover:bg-gray-700 hover:text-white rounded-lg transition-colors"
+          >
+            Notifications
           </Link>
           <Link
             to="/knowledge"
@@ -137,6 +144,14 @@ function App(): React.ReactElement {
           element={
             <Layout>
               <AuditLogPage />
+            </Layout>
+          }
+        />
+        <Route
+          path="/notifications"
+          element={
+            <Layout>
+              <NotificationsPage />
             </Layout>
           }
         />
