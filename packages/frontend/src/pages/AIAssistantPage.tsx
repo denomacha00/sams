@@ -192,8 +192,13 @@ const AIAssistantPage: React.FC = () => {
         const formData = new FormData();
         selectedImages.forEach((file) => formData.append('images', file));
         formData.append('question', text.trim() || 'What is in this image?');
+        if (threadId) formData.append('threadId', threadId);
         clearImages();
         const { data } = await apiClient.post('/ai/query-with-image', formData);
+        if (data.threadId) {
+          setThreadId(data.threadId);
+          saveAiThreadId(data.threadId, threadOwner);
+        }
         setMessages((prev) => [...prev, {
           id: crypto.randomUUID(),
           role: 'assistant',

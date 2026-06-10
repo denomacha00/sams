@@ -10,9 +10,9 @@ export interface RegistrationOptions {
   user: { id: string; name: string; displayName: string };
   pubKeyCredParams: Array<{ type: 'public-key'; alg: number }>;
   authenticatorSelection: {
-    authenticatorAttachment: 'platform';
     userVerification: 'required';
-    residentKey: 'preferred';
+    residentKey: 'required';
+    requireResidentKey: true;
   };
   timeout: number;
   excludeCredentials: Array<{ id: string; type: 'public-key' }>;
@@ -22,7 +22,7 @@ export interface AuthenticationOptions {
   challenge: string; // base64
   rpId: string;
   allowCredentials: Array<{ id: string; type: 'public-key'; transports?: string[] }>;
-  userVerification: 'preferred';
+  userVerification: 'required';
   timeout: number;
 }
 
@@ -99,9 +99,9 @@ export class WebAuthnService {
         { type: 'public-key', alg: -257 }, // RS256
       ],
       authenticatorSelection: {
-        authenticatorAttachment: 'platform',
         userVerification: 'required',
-        residentKey: 'preferred',
+        residentKey: 'required',
+        requireResidentKey: true,
       },
       timeout: 60000,
       excludeCredentials: existingCreds.map((c) => ({
@@ -191,7 +191,7 @@ export class WebAuthnService {
       challenge,
       rpId: this.resolveRpId(rpId),
       allowCredentials,
-      userVerification: 'preferred',
+      userVerification: 'required',
       timeout: 60000,
     };
   }

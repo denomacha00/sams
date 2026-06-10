@@ -9,7 +9,7 @@ import { AttendanceStatus, UserRole } from '@sams/shared';
 import { getApiErrorMessage } from '../lib/apiError';
 import { getTeacherLocation } from '../lib/geolocation';
 
-const SESSION_START_TIMEOUT_MS = 30_000;
+const SESSION_START_TIMEOUT_MS = 18_000;
 
 interface TimetableEntry {
   id: string;
@@ -36,6 +36,7 @@ interface ActiveSession {
   subject: string;
   className: string;
   timetableEntryId?: string;
+  hasGpsAnchor: boolean;
   qrToken: string;
   startedAt: string;
   locationRadiusM: number;
@@ -121,6 +122,9 @@ const SessionPage: React.FC = () => {
     timetableEntryId?: string | null;
     qrToken?: string | null;
     currentQRToken?: string | null;
+    hasGpsAnchor?: boolean;
+    locationLat?: number | null;
+    locationLng?: number | null;
     startedAt: string;
     locationRadiusM?: number;
     records?: AttendanceRecord[];
@@ -129,6 +133,7 @@ const SessionPage: React.FC = () => {
       subject: data.subject,
       className: data.className ?? 'Class',
       timetableEntryId: data.timetableEntryId ?? undefined,
+      hasGpsAnchor: data.hasGpsAnchor ?? (data.locationLat != null && data.locationLng != null),
       qrToken: data.qrToken ?? data.currentQRToken ?? '',
       startedAt: data.startedAt,
       locationRadiusM: data.locationRadiusM || 100,
@@ -198,6 +203,8 @@ const SessionPage: React.FC = () => {
     () => timetableEntries.filter((entry) => isEntryOpenNow(entry, now)),
     [timetableEntries, now],
   );
+
+  const canRequireGpsForLink = !!activeSession?.hasGpsAnchor;
 
   const nextTimetableEntry = useMemo(() => {
     const currentMinutes = (now.getHours() * 60) + now.getMinutes();
@@ -274,6 +281,13 @@ const SessionPage: React.FC = () => {
 
     socket.on('attendance:new', handleAttendanceRecord);
     socket.on('attendance:updated', handleAttendanceRecord);
+    socket.on('session:ended', (data: { sessionId: string }) => {
+      if (data.sessionId !== activeSession.id) return;
+      setActiveSessions((prev) => prev.filter((session) => session.id !== data.sessionId));
+      setActiveSession(null);
+      setQrDataUrl('');
+      setError('This attendance session has ended.');
+    });
 
     return () => {
       socket.disconnect();
@@ -315,8 +329,10 @@ const SessionPage: React.FC = () => {
       setLinkToken('');
       setLinkExpiresAt('');
       setLinkCopied(false);
+      return;
     }
-  }, [activeSession]);
+    setRequireGps(activeSession.hasGpsAnchor);
+  }, [activeSession?.id, activeSession?.hasGpsAnchor]);
 
   useEffect(() => {
     if (!activeSession?.id) return;
@@ -375,18 +391,20 @@ const SessionPage: React.FC = () => {
       const { data } = await apiClient.post('/attendance/link/generate', {
         sessionId: activeSession.id,
         expiryMinutes,
-        requireGps,
-        gpsRadiusM: requireGps ? gpsRadiusM : 100,
+        requireGps: requireGps && canRequireGpsForLink,
+        gpsRadiusM: requireGps && canRequireGpsForLink ? gpsRadiusM : 100,
       });
       setLinkUrl(data.linkUrl);
       setLinkToken(data.linkToken);
       setLinkExpiresAt(data.expiresAt);
+      setRequireGps(Boolean(data.requireGps));
+      if (typeof data.gpsRadiusM === 'number') setGpsRadiusM(data.gpsRadiusM);
     } catch (err: unknown) {
       setError(getApiErrorMessage(err, 'Failed to generate link'));
     } finally {
       setLinkLoading(false);
     }
-  }, [activeSession, expiryMinutes, requireGps, gpsRadiusM]);
+  }, [activeSession, expiryMinutes, requireGps, gpsRadiusM, canRequireGpsForLink]);
 
   const copyLink = useCallback(async () => {
     if (!linkUrl) return;
@@ -879,26 +897,31 @@ const SessionPage: React.FC = () => {
                 <div>
                   <p className="text-sm font-medium text-ink">Require GPS</p>
                   <p className="text-xs text-ink-muted mt-0.5">
-                    {requireGps ? 'Students must be physically present' : 'No location check — use for permissions/excused'}
+                    {!canRequireGpsForLink
+                      ? 'Session has no teacher location; link will work without GPS'
+                      : requireGps
+                        ? 'Students must be physically present'
+                        : 'No location check - use for permissions/excused'}
                   </p>
                 </div>
                 <button
                   type="button"
+                  disabled={!canRequireGpsForLink}
                   onClick={() => setRequireGps((v) => !v)}
                   className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors duration-200 focus:outline-none ${
-                    requireGps ? 'bg-indigo-600' : 'bg-white/20'
-                  }`}
+                    requireGps && canRequireGpsForLink ? 'bg-indigo-600' : 'bg-white/20'
+                  } ${!canRequireGpsForLink ? 'cursor-not-allowed opacity-60' : ''}`}
                 >
                   <span
                     className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform duration-200 ${
-                      requireGps ? 'translate-x-6' : 'translate-x-1'
+                      requireGps && canRequireGpsForLink ? 'translate-x-6' : 'translate-x-1'
                     }`}
                   />
                 </button>
               </div>
 
               {/* GPS radius — only shown when GPS is on */}
-              {requireGps && (
+              {requireGps && canRequireGpsForLink && (
                 <div>
                   <label htmlFor="gpsRadiusM" className="form-label">
                     Allowed Radius (meters)
@@ -916,7 +939,7 @@ const SessionPage: React.FC = () => {
                     <span className="text-sm text-ink-muted shrink-0">m</span>
                   </div>
                   <p className="text-xs text-ink-subtle mt-1">
-                    Students outside this radius will be rejected. Typical classroom: 50–150m.
+                    Students outside this radius will be rejected. Typical classroom: 50-150m.
                   </p>
                 </div>
               )}

@@ -27,5 +27,31 @@ describe('formatSessionForClient', () => {
     expect(formatted.qrToken).toBe('jwt-token');
     expect(formatted.currentQRToken).toBe('jwt-token');
     expect(formatted.className).toBe('Form 2A');
+    expect(formatted.hasGpsAnchor).toBe(true);
+  });
+
+  it('marks sessions without a location as not GPS anchored', () => {
+    const formatted = formatSessionForClient({
+      id: 'sess2',
+      schoolId: 'school1',
+      classId: 'class1',
+      teacherId: 'teacher1',
+      timetableEntryId: 'tt1',
+      subject: 'Math',
+      lateThresholdMin: 15,
+      locationLat: null,
+      locationLng: null,
+      locationRadiusM: 100,
+      currentQRToken: 'jwt-token',
+      qrRefreshedAt: new Date('2026-06-04T10:00:00Z'),
+      currentLinkToken: null,
+      linkExpiresAt: null,
+      startedAt: new Date('2026-06-04T10:00:00Z'),
+      endedAt: null,
+      isActive: true,
+      class: null,
+    });
+
+    expect(formatted.hasGpsAnchor).toBe(false);
   });
 });

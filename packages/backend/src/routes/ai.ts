@@ -15,6 +15,7 @@ import {
   getVisionClientConfigs,
   runVisionChatCompletion,
 } from '../services/ai/aiProviderConfig';
+import { isConversationMemoryEnabled } from '../services/ai/roleActionsPrompt';
 
 // Multer config for multi-image uploads (max 4 images, 5MB each)
 const aiUpload = multer({
@@ -365,6 +366,20 @@ aiRouter.post('/query-with-image', aiUploadMiddleware(aiUpload, 'images', 4), as
       throw new AppError(400, 'VALIDATION_ERROR', 'At least one image file is required.');
     }
     const question = (req.body.question as string) || 'What is in this image?';
+    const requestedThreadId = typeof req.body.threadId === 'string' ? req.body.threadId : undefined;
+    let resolvedThreadId: string | undefined;
+    if (req.user && isConversationMemoryEnabled()) {
+      try {
+        resolvedThreadId = await conversationMemoryService.resolveThread(
+          req.user.sub,
+          req.user.schoolId,
+          requestedThreadId,
+        );
+      } catch (memoryErr) {
+        console.error('[AI/Vision] Thread resolution failed:', memoryErr);
+        resolvedThreadId = requestedThreadId;
+      }
+    }
 
     // Convert images to base64 content parts
     const imageContent = files.map((file) => ({
@@ -390,10 +405,25 @@ aiRouter.post('/query-with-image', aiUploadMiddleware(aiUpload, 'images', 4), as
       { timeoutMs: 60000 },
     );
 
+    if (req.user && resolvedThreadId) {
+      try {
+        await conversationMemoryService.persistRecord(
+          req.user.sub,
+          req.user.schoolId,
+          resolvedThreadId,
+          `[Image upload: ${files.length} file(s)] ${question}`.slice(0, 2000),
+          answer.slice(0, 10000),
+        );
+      } catch (memoryErr) {
+        console.error('[AI/Vision] Failed to persist conversation record:', memoryErr);
+      }
+    }
+
     res.status(200).json({
       answer,
       intent: 'image_analysis',
       engine: 'openai',
+      threadId: resolvedThreadId,
     });
   } catch (err) {
     if (err instanceof AppError) {

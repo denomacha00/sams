@@ -730,7 +730,7 @@ function getQuickActionGroups(role?: UserRole): QuickActionGroup[] {
           actions: [
             { to: '/sessions', label: 'Sign In Students', subtitle: 'Department sessions', icon: ICONS.qr, variant: 'signin' },
             { to: '/attendance', label: 'Mark Attendance', subtitle: 'Override or manual', icon: ICONS.clipboard, variant: 'attendance' },
-            { to: '/biometric/attendance', label: 'Face Scan', subtitle: 'Biometric check-in', icon: ICONS.check, variant: 'attendance' },
+            { to: '/biometric/attendance', label: 'Face/Biometric Scan', subtitle: 'Scan enrolled department students', icon: ICONS.check, variant: 'attendance' },
           ],
         },
         {

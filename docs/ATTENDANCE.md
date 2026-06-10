@@ -1,6 +1,6 @@
 # SAMS Attendance & Biometric — Core Reference
 
-Last verified: 2026-06-04 (HOD teacher parity, GPS controls, student GPS permission).
+Last verified: 2026-06-10 (HOD teacher parity, GPS controls, link generation, biometric dashboard entry, student GPS permission).
 
 ## Roles & permissions
 
@@ -14,7 +14,7 @@ Last verified: 2026-06-04 (HOD teacher parity, GPS controls, student GPS permiss
 
 \* Admins use manual overrides via other tooling; core teacher flows use teacher/HOD permissions.
 
-HODs who teach must appear on **timetable entries** as `teacherId` (same as teachers) to start sessions.
+HODs can start sessions for timetable entries in their own department. In the timetable editor, HODs do not choose another department; the UI locks edits to their assigned department and the backend enforces the same scope.
 
 ## Session start (QR)
 
@@ -27,7 +27,13 @@ HODs who teach must appear on **timetable entries** as `teacherId` (same as teac
 
 ## Link attendance
 
-`POST /api/v1/attendance/link/generate` — teacher sets `requireGps` and `gpsRadiusM` per link (independent of session QR settings).
+`POST /api/v1/attendance/link/generate` — teacher/HOD sets `requireGps` and `gpsRadiusM` for a share link when the active session has a GPS anchor.
+
+Current link behavior:
+
+- If the session has a teacher GPS anchor, the link may require GPS and use `gpsRadiusM`.
+- If the session has no GPS anchor, SAMS still creates the link quickly and downgrades `requireGps` to `false` instead of failing with a GPS-anchor error.
+- Link attendance is authenticated and class-scoped; a student from another class cannot use the link.
 
 Students open `/attend/:token` (web, logged in).
 
@@ -52,6 +58,8 @@ When enabled, QR and link proximity checks are skipped for that student (session
 
 Web: `/biometric/attendance` (face-api.js + camera).
 
+WebAuthn fingerprint/passkey sign-in is discoverable for new registrations. Cross-device sign-in depends on the user's passkey provider syncing the passkey to that device; local fingerprints cannot be copied to a random phone by the web app.
+
 ## Mobile
 
 `packages/mobile`:
@@ -69,6 +77,8 @@ npm run build -w @sams/backend
 npm run build -w @sams/frontend
 # restart API + reload nginx (no-cache SPA — see nginx/sams.conf)
 ```
+
+Offline replay note: only `/api/v1/attendance/sync` is queued by the service worker. Do not replay start/end session, login, or link-generation requests after the timetable window.
 
 ## Manual test script (Denis)
 

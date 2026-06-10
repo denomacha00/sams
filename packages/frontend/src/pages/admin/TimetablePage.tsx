@@ -74,6 +74,7 @@ const TimetablePage: React.FC = () => {
   const user = useAuthStore((s) => s.user);
   const navigate = useNavigate();
   const canManage = user?.role === UserRole.HOD;
+  const isHOD = user?.role === UserRole.HOD;
   const [entries, setEntries] = useState<TimetableEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
@@ -96,12 +97,15 @@ const TimetablePage: React.FC = () => {
     fetchEntries();
     fetchDepartments();
     fetchTeachers();
-  }, [user?.role, user?.id, navigate]);
+  }, [user?.role, user?.id, user?.departmentId, navigate]);
 
   const fetchDepartments = async () => {
     try {
       const { data } = await apiClient.get('/departments');
-      const depts = Array.isArray(data) ? data : (data.departments || []);
+      const allDepts = Array.isArray(data) ? data : (data.departments || []);
+      const depts = isHOD && user?.departmentId
+        ? allDepts.filter((dept: { id: string }) => dept.id === user.departmentId)
+        : allDepts;
       const enriched = await Promise.all(
         depts.map(async (dept: { id: string; name: string }) => {
           try {
@@ -169,7 +173,10 @@ const TimetablePage: React.FC = () => {
 
   const openAddModal = () => {
     setEditingEntry(null);
-    setFormData(emptyForm);
+    setFormData({
+      ...emptyForm,
+      departmentId: isHOD ? (user?.departmentId ?? '') : '',
+    });
     setError('');
     setShowModal(true);
   };
@@ -178,7 +185,7 @@ const TimetablePage: React.FC = () => {
     const matchedClass = classes.find((c) => c.id === entry.classId);
     setEditingEntry(entry);
     setFormData({
-      departmentId: matchedClass?.departmentId || '',
+      departmentId: matchedClass?.departmentId || (isHOD ? (user?.departmentId ?? '') : ''),
       classId: entry.classId,
       teacherId: entry.teacherId,
       subject: entry.subject,
@@ -233,8 +240,9 @@ const TimetablePage: React.FC = () => {
   };
 
   const getEntriesForDay = (day: number) => filteredEntries.filter((e) => e.dayOfWeek === day);
-  const modalClassOptions = formData.departmentId
-    ? classes.filter((c) => c.departmentId === formData.departmentId)
+  const effectiveDepartmentId = isHOD ? (user?.departmentId ?? '') : formData.departmentId;
+  const modalClassOptions = effectiveDepartmentId
+    ? classes.filter((c) => c.departmentId === effectiveDepartmentId)
     : [];
 
   return (
@@ -422,27 +430,40 @@ const TimetablePage: React.FC = () => {
 
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm text-ink-muted mb-1">Department *</label>
-                  <select
-                    required
-                    value={formData.departmentId}
-                    onChange={(e) => setFormData({ ...formData, departmentId: e.target.value, classId: '' })}
-                    className="w-full px-4 py-2.5 rounded-xl input-field focus:outline-none focus:border-indigo-500/50 transition-colors mb-3"
-                  >
-                    <option value="" className="bg-slate-800">-- Select Department --</option>
-                    {departments.map((dept) => (
-                      <option key={dept.id} value={dept.id} className="bg-slate-800">{dept.name}</option>
-                    ))}
-                  </select>
+                  {isHOD ? (
+                    <div className="mb-3 rounded-xl border border-line bg-surface-muted px-4 py-3">
+                      <p className="text-xs font-semibold uppercase tracking-wide text-ink-subtle">Department</p>
+                      <p className="text-sm font-medium text-ink">
+                        {departments[0]?.name ?? 'Your department'}
+                      </p>
+                    </div>
+                  ) : (
+                    <>
+                      <label className="block text-sm text-ink-muted mb-1">Department *</label>
+                      <select
+                        required
+                        value={formData.departmentId}
+                        onChange={(e) => setFormData({ ...formData, departmentId: e.target.value, classId: '' })}
+                        className="w-full px-4 py-2.5 rounded-xl input-field focus:outline-none focus:border-indigo-500/50 transition-colors mb-3"
+                      >
+                        <option value="" className="bg-slate-800">-- Select Department --</option>
+                        {departments.map((dept) => (
+                          <option key={dept.id} value={dept.id} className="bg-slate-800">{dept.name}</option>
+                        ))}
+                      </select>
+                    </>
+                  )}
                   <label className="block text-sm text-ink-muted mb-1">Class *</label>
                   <select
                     required
                     value={formData.classId}
                     onChange={(e) => setFormData({ ...formData, classId: e.target.value })}
-                    disabled={!formData.departmentId}
+                    disabled={modalClassOptions.length === 0}
                     className="w-full px-4 py-2.5 rounded-xl input-field focus:outline-none focus:border-indigo-500/50 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
                   >
-                    <option value="" className="bg-slate-800">-- Select Class --</option>
+                    <option value="" className="bg-slate-800">
+                      {modalClassOptions.length === 0 ? '-- No classes available --' : '-- Select Class --'}
+                    </option>
                     {modalClassOptions.map((cls) => (
                       <option key={cls.id} value={cls.id} className="bg-slate-800">{cls.name}</option>
                     ))}

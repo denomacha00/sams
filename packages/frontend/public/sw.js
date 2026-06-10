@@ -1,4 +1,4 @@
-const STATIC_CACHE = 'sams-static-v6';
+const STATIC_CACHE = 'sams-static-v7';
 const OFFLINE_QUEUE_STORE = 'offline-request-queue';
 
 const STATIC_ASSETS = [];
@@ -117,9 +117,15 @@ self.addEventListener('fetch', (event) => {
   const { request } = event;
   const url = new URL(request.url);
 
-  // POST/PUT requests: queue in IndexedDB when offline
+  // Only the dedicated attendance sync endpoint is safe to replay later.
+  // Live actions such as login, starting sessions, generating links, and ending
+  // sessions must fail immediately when offline so they cannot run out of time.
   if (request.method === 'POST' || request.method === 'PUT') {
-    event.respondWith(handleMutationRequest(request));
+    if (shouldQueueMutation(url)) {
+      event.respondWith(handleMutationRequest(request));
+    } else {
+      event.respondWith(fetch(request));
+    }
     return;
   }
 
@@ -149,6 +155,10 @@ self.addEventListener('fetch', (event) => {
 });
 
 // ─── Handle POST/PUT requests ────────────────────────────────────────────────
+
+function shouldQueueMutation(url) {
+  return url.origin === self.location.origin && url.pathname === '/api/v1/attendance/sync';
+}
 
 async function handleMutationRequest(request) {
   try {

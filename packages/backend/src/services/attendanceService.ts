@@ -282,13 +282,7 @@ export class AttendanceService {
 
     await this.ensureSessionOpen(session);
 
-    if (requireGps && !hasSessionGpsAnchor(session)) {
-      throw new AppError(
-        400,
-        'GPS_ANCHOR_REQUIRED',
-        'Start the session with GPS enabled before generating a GPS-protected attendance link',
-      );
-    }
+    const effectiveRequireGps = requireGps && hasSessionGpsAnchor(session);
 
     // 2. Generate JWT with type 'LINK' — embed GPS settings in the token
     const nonce = createId();
@@ -296,7 +290,7 @@ export class AttendanceService {
     const exp = now + expiryMinutes * 60;
 
     const linkToken = jwt.sign(
-      { sessionId, type: 'LINK', nonce, requireGps, gpsRadiusM, iat: now, exp },
+      { sessionId, type: 'LINK', nonce, requireGps: effectiveRequireGps, gpsRadiusM, iat: now, exp },
       getQrSecret(),
     );
 
@@ -319,6 +313,8 @@ export class AttendanceService {
       linkUrl,
       expiresAt: expiresAt.toISOString(),
       sessionId,
+      requireGps: effectiveRequireGps,
+      gpsRadiusM,
     };
   }
 

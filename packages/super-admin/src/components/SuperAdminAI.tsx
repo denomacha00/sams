@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import apiClient from '../services/apiClient';
 import { prepareImagesForAiUpload } from '../lib/aiImageUpload';
+import { useAuthStore } from '../store/authStore';
 
 interface PendingAction {
   action: string;
@@ -22,8 +23,39 @@ const AI_UNAVAILABLE_INTENTS = new Set(['ai_error', 'ai_not_configured']);
 const AI_VISION_FAILURE_INTENTS = new Set(['image_analysis_error', 'ai_not_configured', 'upload_error']);
 
 const CONFIRM_RE = /^(yes|y|confirm|proceed|ok|do it|go ahead)\.?$/i;
+const SUPER_AI_THREAD_STORAGE_KEY = 'sams-super-admin-ai-thread-id';
+
+function superAiThreadStorageKey(userId?: string): string {
+  return userId ? `${SUPER_AI_THREAD_STORAGE_KEY}:${userId}` : SUPER_AI_THREAD_STORAGE_KEY;
+}
+
+function loadSuperAiThreadId(userId?: string): string | undefined {
+  try {
+    return (
+      localStorage.getItem(superAiThreadStorageKey(userId)) ||
+      localStorage.getItem(SUPER_AI_THREAD_STORAGE_KEY) ||
+      undefined
+    );
+  } catch {
+    return undefined;
+  }
+}
+
+function saveSuperAiThreadId(threadId: string | undefined, userId?: string): void {
+  try {
+    const key = superAiThreadStorageKey(userId);
+    if (threadId) {
+      localStorage.setItem(key, threadId);
+    } else {
+      localStorage.removeItem(key);
+    }
+  } catch {
+    // Storage can be unavailable in private browsing modes.
+  }
+}
 
 const SuperAdminAI: React.FC = () => {
+  const user = useAuthStore((s) => s.user);
   const [isOpen, setIsOpen] = useState(false);
   const [messages, setMessages] = useState<ChatMessage[]>([
     {
@@ -44,7 +76,7 @@ const SuperAdminAI: React.FC = () => {
   ]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
-  const [threadId, setThreadId] = useState<string | undefined>();
+  const [threadId, setThreadId] = useState<string | undefined>(() => loadSuperAiThreadId(user?.id));
   const [selectedImages, setSelectedImages] = useState<File[]>([]);
   const [imagePreviews, setImagePreviews] = useState<string[]>([]);
   const pendingActionRef = useRef<PendingAction | null>(null);
@@ -54,6 +86,10 @@ const SuperAdminAI: React.FC = () => {
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
+
+  useEffect(() => {
+    setThreadId(loadSuperAiThreadId(user?.id));
+  }, [user?.id]);
 
   const generateId = () => Math.random().toString(36).substring(2, 10);
 
@@ -114,7 +150,10 @@ const SuperAdminAI: React.FC = () => {
       confirmAction: options?.confirmAction,
       pendingAction: options?.pendingAction,
     });
-    if (data.threadId) setThreadId(data.threadId);
+    if (data.threadId) {
+      setThreadId(data.threadId);
+      saveSuperAiThreadId(data.threadId, user?.id);
+    }
 
     if (data.pendingAction) {
       appendAssistant(data.answer, data.pendingAction, AI_UNAVAILABLE_INTENTS.has(data.intent));
@@ -158,10 +197,15 @@ const SuperAdminAI: React.FC = () => {
         const formData = new FormData();
         selectedImages.forEach((file) => formData.append('images', file));
         formData.append('question', question || 'What is in this image?');
+        if (threadId) formData.append('threadId', threadId);
         setSelectedImages([]);
         setImagePreviews([]);
 
         const { data } = await apiClient.post('/ai/query-with-image', formData);
+        if (data.threadId) {
+          setThreadId(data.threadId);
+          saveSuperAiThreadId(data.threadId, user?.id);
+        }
         appendAssistant(
           data.answer,
           undefined,

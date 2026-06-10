@@ -1,5 +1,5 @@
 /** Resolve teacher GPS with a hard cap so UI never waits indefinitely on getCurrentPosition. */
-export async function getTeacherLocation(timeoutMs = 12_000): Promise<{ lat: number; lng: number }> {
+export async function getTeacherLocation(timeoutMs = 8_000): Promise<{ lat: number; lng: number }> {
   if (!navigator.geolocation) {
     throw new Error('NO_GEOLOCATION');
   }

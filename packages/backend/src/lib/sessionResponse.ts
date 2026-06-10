@@ -15,6 +15,7 @@ export interface ClientSessionResponse {
   lateThresholdMin: number;
   locationLat: number | null;
   locationLng: number | null;
+  hasGpsAnchor: boolean;
   locationRadiusM: number;
   qrToken: string | null;
   currentQRToken: string | null;
@@ -41,6 +42,7 @@ export function formatSessionForClient(session: SessionWithClass): ClientSession
     lateThresholdMin: session.lateThresholdMin,
     locationLat: session.locationLat,
     locationLng: session.locationLng,
+    hasGpsAnchor: session.locationLat != null && session.locationLng != null,
     locationRadiusM: session.locationRadiusM,
     qrToken: session.currentQRToken,
     currentQRToken: session.currentQRToken,

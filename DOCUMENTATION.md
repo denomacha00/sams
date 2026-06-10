@@ -180,6 +180,7 @@ Native client **`packages/mobile`** (display name **SAMS**) uses the same `/api/
 - QR refreshes every 30 seconds via cron job
 - Student scans → GPS verified → attendance recorded
 - Real-time broadcast to all connected clients
+- Session screens clear themselves when the backend broadcasts that a session ended.
 
 **Manual Marking**
 - Teacher selects students and marks status
@@ -196,7 +197,7 @@ Native client **`packages/mobile`** (display name **SAMS**) uses the same `/api/
 ### 5.2 Offline Support
 - Service Worker caches static assets (cache-first)
 - API GET requests cached (network-first with fallback)
-- POST/PUT requests queued in IndexedDB when offline
+- Only `POST /api/v1/attendance/sync` is queued for offline replay; live actions such as login, start/end session, and link generation must return immediately and are not replayed later.
 - Auto-sync within 30 seconds of connectivity restoration
 - Conflict resolution: newer timestamp wins
 
