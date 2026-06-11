@@ -35,6 +35,15 @@ export default {
           hover: 'var(--color-accent-orange-hover, #ea580c)',
           light: 'var(--color-accent-orange-light, #431407)',
         },
+        'attendance-green': {
+          DEFAULT: 'var(--color-attendance-green, #16a34a)',
+        },
+        'attendance-red': {
+          DEFAULT: 'var(--color-attendance-red, #dc2626)',
+        },
+        'attendance-amber': {
+          DEFAULT: 'var(--color-attendance-amber, #d97706)',
+        },
         'accent-blue': {
           DEFAULT: 'var(--color-accent-blue, #4f46e5)',
           hover: 'var(--color-accent-blue-hover, #4338ca)',

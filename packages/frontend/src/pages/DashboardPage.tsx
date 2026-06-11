@@ -5,6 +5,7 @@ import { useAuthStore } from '../store/authStore';
 import { UserRole } from '@sams/shared';
 import apiClient from '../services/apiClient';
 import { UserAvatar } from '../components/UserAvatar';
+import { useTheme } from '../hooks/useTheme';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 

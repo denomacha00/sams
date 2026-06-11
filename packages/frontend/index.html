@@ -1,11 +1,20 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" class="dark">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>SAMS — Smart Attendance Management System</title>
+    <script>
+      // Restore saved theme before paint to prevent flash
+      (function() {
+        var t = null;
+        try { t = localStorage.getItem('sams-theme'); } catch(e) {}
+        if (t === 'light') document.documentElement.classList.remove('dark');
+        else document.documentElement.classList.add('dark');
+      })();
+    </script>
     <style>
-      html, body, #root { background: #020617; min-height: 100vh; margin: 0; }
+      html, body, #root { min-height: 100vh; margin: 0; }
     </style>
   </head>
   <body>
