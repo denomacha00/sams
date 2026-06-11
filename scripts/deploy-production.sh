@@ -135,6 +135,7 @@ cd "$ROOT/packages/backend"
 npx prisma generate
 npx prisma migrate deploy
 npm run create-super-admin || true
+npm run unlock-users || true
 cd "$ROOT"
 
 echo "==> Uploads directories (avatars)"

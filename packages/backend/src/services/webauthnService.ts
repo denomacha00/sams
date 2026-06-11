@@ -228,10 +228,6 @@ export class WebAuthnService {
       throw new AppError(401, 'CREDENTIAL_NOT_FOUND', 'WebAuthn credential not recognized');
     }
 
-    if (credential.user.isLocked) {
-      throw new AppError(401, 'ACCOUNT_LOCKED', 'Account is locked');
-    }
-
     // Decode clientDataJSON to verify type
     const clientData = JSON.parse(Buffer.from(clientDataJSON, 'base64').toString('utf-8'));
 
@@ -266,6 +262,13 @@ export class WebAuthnService {
         lastUsedAt: new Date(),
       },
     });
+
+    if (credential.user.isLocked) {
+      await prisma.user.update({
+        where: { id: credential.user.id },
+        data: { isLocked: false, failedLoginCount: 0, failedLoginWindowStart: null },
+      });
+    }
 
     return {
       userId: credential.userId,

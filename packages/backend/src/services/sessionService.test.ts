@@ -6,6 +6,12 @@ import { AppError } from '../middleware/errors';
 
 vi.mock('../lib/prisma', () => ({
   prisma: {
+    class: {
+      findMany: vi.fn(),
+    },
+    user: {
+      findUnique: vi.fn(),
+    },
     timetableEntry: { findFirst: vi.fn() },
     attendanceSession: {
       findFirst: vi.fn(),
@@ -48,6 +54,8 @@ describe('SessionService.startSession', () => {
     vi.clearAllMocks();
     vi.useFakeTimers();
     vi.setSystemTime(new Date('2026-06-01T08:15:00')); // Monday 08:15
+    vi.mocked(prisma.class.findMany).mockResolvedValue([] as never);
+    vi.mocked(prisma.user.findUnique).mockResolvedValue({ classId: null } as never);
     vi.mocked(prisma.attendanceSession.findMany).mockResolvedValue([] as never);
     vi.mocked(prisma.attendanceSession.updateMany).mockResolvedValue({ count: 0 } as never);
   });
@@ -89,6 +97,40 @@ describe('SessionService.startSession', () => {
       statusCode: 403,
       code: 'TIMETABLE_NOT_FOUND',
     } satisfies Partial<AppError>);
+  });
+
+  it('allows a class teacher to start the current timetable session for their class', async () => {
+    vi.mocked(prisma.class.findMany).mockResolvedValue([{ id: 'class-1' }] as never);
+    vi.mocked(prisma.timetableEntry.findFirst).mockResolvedValue({
+      ...baseEntry,
+      teacherId: 'subject-teacher',
+    } as never);
+    vi.mocked(prisma.attendanceSession.findFirst).mockResolvedValue(null);
+    vi.mocked(prisma.attendanceSession.create).mockResolvedValue({
+      id: 'session-class-teacher',
+      teacherId,
+      timetableEntryId,
+      class: { name: 'Form 1A' },
+    } as never);
+
+    const session = await service.startSession(
+      teacherId,
+      schoolId,
+      timetableEntryId,
+      { lat: 1, lng: 36 },
+    );
+
+    expect(prisma.timetableEntry.findFirst).toHaveBeenCalledWith({
+      where: {
+        id: timetableEntryId,
+        schoolId,
+        OR: [
+          { teacherId },
+          { classId: { in: ['class-1'] } },
+        ],
+      },
+    });
+    expect(session.id).toBe('session-class-teacher');
   });
 
   it('allows HOD to start a session for a class in their department', async () => {

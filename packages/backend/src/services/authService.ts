@@ -89,7 +89,6 @@ export class AuthService {
       // No school code and several matches — pick the one account whose password matches.
       const matches: typeof candidates = [];
       for (const candidate of candidates) {
-        if (candidate.isLocked) continue;
         if (await bcrypt.compare(password, candidate.passwordHash)) {
           matches.push(candidate);
         }
@@ -99,10 +98,6 @@ export class AuthService {
       }
       user = matches[0];
       passwordVerified = true;
-    }
-
-    if (user.isLocked) {
-      throw new Error('ACCOUNT_LOCKED');
     }
 
     await this.assertSchoolNotSuspended(user.schoolId);
@@ -144,9 +139,15 @@ export class AuthService {
       await prisma.user.update({
         where: { id: user.id },
         data: {
+          isLocked: false,
           failedLoginCount: 0,
           failedLoginWindowStart: null,
         },
+      });
+    } else if (user.isLocked) {
+      await prisma.user.update({
+        where: { id: user.id },
+        data: { isLocked: false },
       });
     }
 
@@ -183,6 +184,7 @@ export class AuthService {
     await prisma.user.update({
       where: { id: user.id },
       data: {
+        isLocked: false,
         lastLoginAt: now,
         failedLoginCount: 0,
         failedLoginWindowStart: null,
@@ -292,10 +294,6 @@ export class AuthService {
       throw new Error('USER_NOT_FOUND');
     }
 
-    if (user.isLocked) {
-      throw new Error('ACCOUNT_LOCKED');
-    }
-
     await this.assertSchoolNotSuspended(user.schoolId);
 
     // Generate new token pair
@@ -313,6 +311,10 @@ export class AuthService {
           tokenHash: newRefreshTokenHash,
           expiresAt: new Date(Date.now() + REFRESH_TOKEN_EXPIRY_MS),
         },
+      }),
+      prisma.user.update({
+        where: { id: user.id },
+        data: { isLocked: false, failedLoginCount: 0, failedLoginWindowStart: null },
       }),
     ]);
 
@@ -405,7 +407,6 @@ export class AuthService {
   async generateTokensForUser(userId: string): Promise<TokenPair> {
     const user = await prisma.user.findUnique({ where: { id: userId } });
     if (!user) throw new Error('USER_NOT_FOUND');
-    if (user.isLocked) throw new Error('ACCOUNT_LOCKED');
 
     await this.assertSchoolNotSuspended(user.schoolId);
 
@@ -424,7 +425,7 @@ export class AuthService {
     // Update lastLoginAt
     await prisma.user.update({
       where: { id: user.id },
-      data: { lastLoginAt: new Date(), failedLoginCount: 0, failedLoginWindowStart: null },
+      data: { isLocked: false, lastLoginAt: new Date(), failedLoginCount: 0, failedLoginWindowStart: null },
     });
 
     // Log USER_LOGIN

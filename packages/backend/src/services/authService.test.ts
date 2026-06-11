@@ -143,6 +143,39 @@ describe('authService school suspension', () => {
     );
   });
 
+  it('clears an old locked flag when the correct password is supplied', async () => {
+    const passwordHash = await bcrypt.hash('correct-password', 12);
+    vi.mocked(prisma.user.findFirst).mockResolvedValue({
+      id: 'user-1',
+      schoolId: 'school-1',
+      role: 'TEACHER',
+      isLocked: true,
+      failedLoginCount: 4,
+      failedLoginWindowStart: new Date(),
+      passwordHash,
+      departmentId: null,
+      classId: null,
+    } as any);
+    vi.mocked(prisma.school.findUnique).mockResolvedValue({
+      isSuspended: false,
+      schoolCode: 'SCHOOL1',
+    } as any);
+    vi.mocked(prisma.user.update).mockResolvedValue({} as any);
+
+    await expect(
+      authService.validateLoginCredentials('', 'teacher1', 'correct-password'),
+    ).resolves.toMatchObject({ id: 'user-1' });
+
+    expect(prisma.user.update).toHaveBeenCalledWith({
+      where: { id: 'user-1' },
+      data: {
+        isLocked: false,
+        failedLoginCount: 0,
+        failedLoginWindowStart: null,
+      },
+    });
+  });
+
   it('scopes identifier lookup to school code when one is supplied', async () => {
     const passwordHash = await bcrypt.hash('password123', 12);
     vi.mocked(prisma.school.findUnique)

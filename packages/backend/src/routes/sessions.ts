@@ -10,6 +10,8 @@ import {
   formatSessionForClient,
   formatStudentsForClient,
 } from '../lib/sessionResponse';
+import { getLocalTimetableClock, minutesFromTime } from '../lib/sessionWindow';
+import { resolveTeacherManagedClassIds } from '../lib/teacherScope';
 
 // ─── Validation Schemas ───────────────────────────────────────────────────────
 
@@ -26,6 +28,17 @@ const startSessionSchema = z.object({
 // ─── Router ───────────────────────────────────────────────────────────────────
 
 export const sessionsRouter = Router();
+
+const DAY_LABELS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+
+function windowLabel(entry: { startTime: string; endTime: string }, currentMinutes: number, isOpenNow: boolean): string {
+  if (isOpenNow) return 'Open now';
+  const start = minutesFromTime(entry.startTime);
+  const end = minutesFromTime(entry.endTime);
+  if (!Number.isFinite(start) || !Number.isFinite(end)) return 'Check timetable';
+  if (currentMinutes < start) return `Opens at ${entry.startTime}`;
+  return `Closed after ${entry.endTime}`;
+}
 
 function assertHodHasDepartment(req: Request): string {
   if (req.user.role === UserRole.HOD && !req.user.departmentId) {
@@ -139,6 +152,97 @@ sessionsRouter.get('/', async (req: Request, res: Response): Promise<void> => {
   } catch (err) {
     if (err instanceof AppError) throw err;
     throw new AppError(500, 'INTERNAL_ERROR', 'Failed to list sessions');
+  }
+});
+
+/**
+ * GET /api/v1/sessions/available
+ * Server-time timetable windows for the session page.
+ * Keeps browser timezone/device clock from hiding a valid class.
+ */
+sessionsRouter.get('/available', async (req: Request, res: Response): Promise<void> => {
+  try {
+    if (req.user.role === UserRole.STUDENT) {
+      res.status(403).json({ error: 'Forbidden', code: 'FORBIDDEN' });
+      return;
+    }
+
+    await sessionService.expireStaleActiveSessions(req.schoolId);
+
+    const clock = getLocalTimetableClock();
+    const where: Record<string, unknown> = {
+      schoolId: req.schoolId,
+      dayOfWeek: clock.dayOfWeek,
+    };
+
+    if (req.user.role === UserRole.TEACHER) {
+      const managedClassIds = await resolveTeacherManagedClassIds(req.user.sub, req.user.classId);
+      where.OR = [
+        { teacherId: req.user.sub },
+        ...(managedClassIds.length > 0 ? [{ classId: { in: managedClassIds } }] : []),
+      ];
+    } else if (req.user.role === UserRole.HOD) {
+      where.class = { departmentId: assertHodHasDepartment(req) };
+    }
+
+    const entries = await prisma.timetableEntry.findMany({
+      where,
+      include: {
+        class: { select: { id: true, name: true, departmentId: true } },
+        teacher: { select: { id: true, fullName: true } },
+      },
+      orderBy: { startTime: 'asc' },
+    });
+
+    const activeSessions = await prisma.attendanceSession.findMany({
+      where: {
+        schoolId: req.schoolId,
+        isActive: true,
+        timetableEntryId: { in: entries.map((entry) => entry.id) },
+      },
+      select: {
+        id: true,
+        timetableEntryId: true,
+        _count: { select: { records: true } },
+      },
+    });
+    const activeByEntry = new Map(activeSessions.map((session) => [session.timetableEntryId, session]));
+
+    const mapped = entries.map((entry) => {
+      const start = minutesFromTime(entry.startTime);
+      const end = minutesFromTime(entry.endTime);
+      const isOpenNow = Number.isFinite(start) && Number.isFinite(end) && clock.minutes >= start && clock.minutes <= end;
+      const active = activeByEntry.get(entry.id);
+      return {
+        id: entry.id,
+        subject: entry.subject,
+        className: entry.class.name,
+        class: entry.class,
+        teacherId: entry.teacherId,
+        teacherName: entry.teacher.fullName,
+        dayOfWeek: entry.dayOfWeek,
+        startTime: entry.startTime,
+        endTime: entry.endTime,
+        room: entry.room,
+        isOpenNow,
+        isPast: Number.isFinite(end) && clock.minutes > end,
+        windowLabel: windowLabel(entry, clock.minutes, isOpenNow),
+        activeSessionId: active?.id ?? null,
+        activeRecordCount: active?._count.records ?? 0,
+      };
+    });
+
+    res.status(200).json({
+      today: {
+        dayOfWeek: clock.dayOfWeek,
+        dayLabel: DAY_LABELS[clock.dayOfWeek] ?? 'Today',
+        currentMinutes: clock.minutes,
+      },
+      entries: mapped,
+    });
+  } catch (err) {
+    if (err instanceof AppError) throw err;
+    throw new AppError(500, 'INTERNAL_ERROR', 'Failed to load available sessions');
   }
 });
 

@@ -10,17 +10,29 @@ import { getApiErrorMessage } from '../lib/apiError';
 import { getTeacherLocation } from '../lib/geolocation';
 
 const SESSION_START_TIMEOUT_MS = 18_000;
-const ACTIVE_SESSION_REFRESH_MS = 15_000;
+const ACTIVE_SESSION_REFRESH_MS = 10_000;
 
 interface TimetableEntry {
   id: string;
   subject: string;
   className?: string;
   class?: { name?: string };
+  teacherName?: string;
   dayOfWeek: number;
   startTime: string;
   endTime: string;
   room?: string;
+  isOpenNow?: boolean;
+  isPast?: boolean;
+  windowLabel?: string;
+  activeSessionId?: string | null;
+  activeRecordCount?: number;
+}
+
+interface ServerToday {
+  dayOfWeek: number;
+  dayLabel: string;
+  currentMinutes: number;
 }
 
 interface AttendanceRecord {
@@ -44,48 +56,10 @@ interface ActiveSession {
   records: AttendanceRecord[];
 }
 
-const SESSION_WINDOW_TOLERANCE_MINUTES = 0;
-
-function schemaDayOfWeek(date: Date): number {
-  const jsDay = date.getDay();
-  return jsDay === 0 ? 6 : jsDay - 1;
-}
-
 function timeToMinutes(value: string): number {
   const [hours, minutes] = value.split(':').map(Number);
   if (!Number.isFinite(hours) || !Number.isFinite(minutes)) return Number.NaN;
   return (hours * 60) + minutes;
-}
-
-function formatMinutes(value: number): string {
-  const normalized = Math.max(0, Math.min(23 * 60 + 59, value));
-  const hours = Math.floor(normalized / 60).toString().padStart(2, '0');
-  const minutes = (normalized % 60).toString().padStart(2, '0');
-  return `${hours}:${minutes}`;
-}
-
-function isEntryOpenNow(entry: TimetableEntry, now: Date): boolean {
-  if (schemaDayOfWeek(now) !== entry.dayOfWeek) return false;
-  const current = (now.getHours() * 60) + now.getMinutes();
-  const start = timeToMinutes(entry.startTime);
-  const end = timeToMinutes(entry.endTime);
-  if (!Number.isFinite(start) || !Number.isFinite(end)) return false;
-  return current >= start - SESSION_WINDOW_TOLERANCE_MINUTES &&
-    current <= end + SESSION_WINDOW_TOLERANCE_MINUTES;
-}
-
-function entryWindowLabel(entry: TimetableEntry, now: Date): string {
-  if (isEntryOpenNow(entry, now)) return 'Open now';
-  if (schemaDayOfWeek(now) !== entry.dayOfWeek) return 'Not today';
-
-  const current = (now.getHours() * 60) + now.getMinutes();
-  const start = timeToMinutes(entry.startTime);
-  const end = timeToMinutes(entry.endTime);
-  if (!Number.isFinite(start) || !Number.isFinite(end)) return 'Check timetable';
-  if (current < start - SESSION_WINDOW_TOLERANCE_MINUTES) {
-    return `Opens at ${formatMinutes(start - SESSION_WINDOW_TOLERANCE_MINUTES)}`;
-  }
-  return `Closed after ${formatMinutes(end + SESSION_WINDOW_TOLERANCE_MINUTES)}`;
 }
 
 const SessionPage: React.FC = () => {
@@ -97,7 +71,7 @@ const SessionPage: React.FC = () => {
   const [qrDataUrl, setQrDataUrl] = useState<string>('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [now, setNow] = useState(() => new Date());
+  const [serverToday, setServerToday] = useState<ServerToday | null>(null);
   const socketRef = useRef<Socket | null>(null);
   const qrPanelRef = useRef<HTMLDivElement>(null);
   const linkPanelRef = useRef<HTMLDivElement>(null);
@@ -113,7 +87,7 @@ const SessionPage: React.FC = () => {
   const [linkCopied, setLinkCopied] = useState(false);
   const [linkTimeRemaining, setLinkTimeRemaining] = useState<number>(0);
   const linkTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const [sessionRequireGps, setSessionRequireGps] = useState<boolean>(true);
+  const sessionRequireGps = true;
   const [sessionRadiusM, setSessionRadiusM] = useState<number>(100);
 
   const normalizeSessionFromApi = useCallback((data: {
@@ -183,11 +157,6 @@ const SessionPage: React.FC = () => {
     }
   }, [normalizeSessionFromApi, user?.id, user?.role]);
 
-  useEffect(() => {
-    const timer = window.setInterval(() => setNow(new Date()), ACTIVE_SESSION_REFRESH_MS);
-    return () => window.clearInterval(timer);
-  }, []);
-
   // Resume an in-progress session so the page is not blocked after navigation
   useEffect(() => {
     void refreshActiveSessions({ selectFirst: true, quiet: true });
@@ -201,42 +170,43 @@ const SessionPage: React.FC = () => {
     return () => window.clearInterval(timer);
   }, [refreshActiveSessions, user?.id]);
 
-  // Fetch today's timetable entries for this teacher
-  useEffect(() => {
-    const fetchEntries = async () => {
-      try {
-        const jsDayOfWeek = new Date().getDay();
-        const schemaDayOfWeek = jsDayOfWeek === 0 ? 6 : jsDayOfWeek - 1;
-        const params: Record<string, string | number> = { dayOfWeek: schemaDayOfWeek };
-        if (user?.role === UserRole.TEACHER && user.id) {
-          params.teacherId = user.id;
-        }
-        const { data } = await apiClient.get('/timetable', { params });
-        const entries = (Array.isArray(data) ? data : []).map((entry: TimetableEntry) => ({
-          ...entry,
-          className: entry.className ?? entry.class?.name ?? 'Class',
-        }));
-        setTimetableEntries(entries);
-      } catch (err) {
+  const loadAvailableEntries = useCallback(async (quiet = false) => {
+    try {
+      const { data } = await apiClient.get('/sessions/available', { timeout: 10_000 });
+      const entries = (Array.isArray(data.entries) ? data.entries : []).map((entry: TimetableEntry) => ({
+        ...entry,
+        className: entry.className ?? entry.class?.name ?? 'Class',
+      }));
+      setServerToday(data.today ?? null);
+      setTimetableEntries(entries);
+    } catch (err) {
+      if (!quiet) {
         setError(getApiErrorMessage(err, 'Could not load today\'s timetable'));
       }
-    };
-    fetchEntries();
-  }, [user?.id, user?.role]);
+    }
+  }, []);
+
+  // Fetch server-time timetable windows so browser timezone does not hide valid sessions.
+  useEffect(() => {
+    void loadAvailableEntries(false);
+    const timer = window.setInterval(() => {
+      void loadAvailableEntries(true);
+    }, ACTIVE_SESSION_REFRESH_MS);
+    return () => window.clearInterval(timer);
+  }, [loadAvailableEntries]);
 
   const openTimetableEntries = useMemo(
-    () => timetableEntries.filter((entry) => isEntryOpenNow(entry, now)),
-    [timetableEntries, now],
+    () => timetableEntries.filter((entry) => entry.isOpenNow),
+    [timetableEntries],
   );
 
   const canRequireGpsForLink = !!activeSession?.hasGpsAnchor;
 
   const nextTimetableEntry = useMemo(() => {
-    const currentMinutes = (now.getHours() * 60) + now.getMinutes();
     return timetableEntries
-      .filter((entry) => timeToMinutes(entry.startTime) > currentMinutes)
+      .filter((entry) => !entry.isOpenNow && !entry.isPast)
       .sort((a, b) => timeToMinutes(a.startTime) - timeToMinutes(b.startTime))[0];
-  }, [timetableEntries, now]);
+  }, [timetableEntries]);
 
   useEffect(() => {
     if (selectedEntry && !openTimetableEntries.some((entry) => entry.id === selectedEntry)) {
@@ -416,8 +386,8 @@ const SessionPage: React.FC = () => {
       const { data } = await apiClient.post('/attendance/link/generate', {
         sessionId: activeSession.id,
         expiryMinutes,
-        requireGps: requireGps && canRequireGpsForLink,
-        gpsRadiusM: requireGps && canRequireGpsForLink ? gpsRadiusM : 100,
+        requireGps: canRequireGpsForLink,
+        gpsRadiusM: canRequireGpsForLink ? gpsRadiusM : 100,
       });
       setLinkUrl(data.linkUrl);
       setLinkToken(data.linkToken);
@@ -607,6 +577,12 @@ const SessionPage: React.FC = () => {
               <p className="text-ink-muted text-sm mt-1">
                 Sessions open from the timetable window. Choose QR, link, manual, or face attendance after starting.
               </p>
+              {serverToday && (
+                <p className="text-xs text-ink-subtle mt-1">
+                  School time: {serverToday.dayLabel}, {Math.floor(serverToday.currentMinutes / 60).toString().padStart(2, '0')}:
+                  {(serverToday.currentMinutes % 60).toString().padStart(2, '0')}
+                </p>
+              )}
             </div>
             <Link to="/" className="btn-secondary px-4 py-2 text-sm w-full sm:w-auto text-center">
               Back to dashboard
@@ -661,7 +637,7 @@ const SessionPage: React.FC = () => {
 
             <div className="flex items-center justify-between p-3 bg-surface-muted border border-line rounded-xl">
               <div>
-                <p className="text-sm font-medium text-ink">Require GPS for QR</p>
+                <p className="text-sm font-medium text-ink">GPS protection</p>
                 <p className="text-xs text-ink-muted mt-0.5">
                   {sessionRequireGps
                     ? 'Students must be within your set radius when scanning'
@@ -670,11 +646,11 @@ const SessionPage: React.FC = () => {
               </div>
               <button
                 type="button"
-                onClick={() => setSessionRequireGps((v) => !v)}
+                disabled
                 className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors duration-200 focus:outline-none ${
                   sessionRequireGps ? 'bg-indigo-600' : 'bg-white/20'
                 }`}
-                aria-label="Toggle QR GPS requirement"
+                aria-label="GPS requirement enabled"
               >
                 <span
                   className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform duration-200 ${
@@ -722,7 +698,7 @@ const SessionPage: React.FC = () => {
                 <p className="text-sm text-ink-subtle">No timetable entries found for today.</p>
               ) : (
                 timetableEntries.map((entry) => {
-                  const open = isEntryOpenNow(entry, now);
+                  const open = Boolean(entry.isOpenNow);
                   return (
                     <div key={entry.id} className="rounded-xl border border-line bg-surface-muted p-3">
                       <div className="flex items-start justify-between gap-3">
@@ -733,12 +709,17 @@ const SessionPage: React.FC = () => {
                         <span className={`shrink-0 rounded-full px-2 py-1 text-[11px] font-semibold ${
                           open ? 'bg-emerald-500/15 text-emerald-200' : 'bg-white/10 text-ink-subtle'
                         }`}>
-                          {entryWindowLabel(entry, now)}
+                          {entry.windowLabel ?? 'Check timetable'}
                         </span>
                       </div>
                       <p className="mt-2 text-xs text-ink-subtle">
                         {entry.startTime}-{entry.endTime}{entry.room ? ` - ${entry.room}` : ''}
                       </p>
+                      {entry.activeSessionId && (
+                        <p className="mt-1 text-xs text-emerald-200">
+                          Active session - {entry.activeRecordCount ?? 0} marked
+                        </p>
+                      )}
                     </div>
                   );
                 })
@@ -950,8 +931,7 @@ const SessionPage: React.FC = () => {
                 </div>
                 <button
                   type="button"
-                  disabled={!canRequireGpsForLink}
-                  onClick={() => setRequireGps((v) => !v)}
+                  disabled
                   className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors duration-200 focus:outline-none ${
                     requireGps && canRequireGpsForLink ? 'bg-indigo-600' : 'bg-white/20'
                   } ${!canRequireGpsForLink ? 'cursor-not-allowed opacity-60' : ''}`}

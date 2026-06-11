@@ -9,6 +9,7 @@ import {
   getLocalTimetableClock,
   isTimetableWindowExpired,
 } from '../lib/sessionWindow';
+import { resolveTeacherManagedClassIds } from '../lib/teacherScope';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -68,14 +69,23 @@ export class SessionService {
 
     await this.expireStaleActiveSessions(schoolId);
 
-    // Validate timetable entry belongs to teacher and school
+    const managedClassIds = actorRole === UserRole.TEACHER
+      ? await resolveTeacherManagedClassIds(teacherId)
+      : [];
+
+    // Validate timetable entry belongs to the actor and school
     const timetableEntry = await prisma.timetableEntry.findFirst({
       where: {
         id: timetableEntryId,
         schoolId,
         ...(actorRole === UserRole.HOD
           ? { class: { departmentId: options.actorDepartmentId } }
-          : { teacherId }),
+          : {
+              OR: [
+                { teacherId },
+                ...(managedClassIds.length > 0 ? [{ classId: { in: managedClassIds } }] : []),
+              ],
+            }),
       },
     });
 
@@ -85,7 +95,7 @@ export class SessionService {
         'TIMETABLE_NOT_FOUND',
         actorRole === UserRole.HOD
           ? 'Timetable entry not found in your department'
-          : 'Timetable entry not found or does not belong to this teacher',
+          : 'Timetable entry not found or does not belong to this teacher/class teacher',
       );
     }
 

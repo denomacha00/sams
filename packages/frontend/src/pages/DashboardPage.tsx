@@ -716,6 +716,7 @@ function getQuickActionGroups(role?: UserRole): QuickActionGroup[] {
           actions: [
             { to: '/admin/links', label: 'Registration Links', subtitle: 'Main way to onboard students and staff', icon: ICONS.link, variant: 'signin' },
             { to: '/admin/users', label: 'User Management', subtitle: 'Manual add only if someone has no phone for SMS/link signup', icon: ICONS.users },
+            { to: '/class/students', label: 'Student Workbench', subtitle: 'Classes, lessons & attendance gaps', icon: ICONS.users },
             { to: '/admin/departments', label: 'Departments', subtitle: 'Organize faculties', icon: ICONS.building },
             { to: '/class-roster', label: 'View Class Reps', subtitle: 'See assigned student leaders', icon: ICONS.users },
           ],
@@ -804,6 +805,7 @@ function getQuickActionGroups(role?: UserRole): QuickActionGroup[] {
             { to: '/admin/links', label: 'Registration Links', subtitle: 'Share department signup links', icon: ICONS.link, variant: 'signin' },
             { to: '/hod/department', label: 'Department Management', subtitle: 'Staff & structure', icon: ICONS.building },
             { to: '/admin/users', label: 'Manage Users', subtitle: 'Dept. accounts', icon: ICONS.users },
+            { to: '/class/students', label: 'Dept Students', subtitle: 'Class lists & attendance gaps', icon: ICONS.users },
             { to: '/class-roster', label: 'Class Reps', subtitle: 'Student leaders', icon: ICONS.users },
           ],
         },

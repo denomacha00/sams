@@ -13,6 +13,7 @@ import { registrationLinkService } from '../services/registrationLinkService';
 import { prisma } from '../lib/prisma';
 import { AppError } from '../middleware/errors';
 import { assertPhoneAvailableInSchool, onboardPhoneForSms, optionalPhoneForStorage } from '../services/phoneOnboardingService';
+import { getLocalTimetableClock, minutesFromTime } from '../lib/sessionWindow';
 import {
   resolveTeacherClassId,
   resolveTeacherManagedClassIds,
@@ -105,6 +106,25 @@ const updateMeSchema = z.object({
   email: z.string().email().optional(),
   phone: z.string().min(9).max(15).optional(),
 });
+
+const DAY_LABELS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+
+function localDateKey(date: Date): string {
+  const tz = process.env.APP_TIMEZONE || 'Africa/Nairobi';
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: tz,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).formatToParts(date);
+
+  const values = Object.fromEntries(parts.map((part) => [part.type, part.value]));
+  return `${values.year}-${values.month}-${values.day}`;
+}
+
+function isTodayLocal(date: Date, todayKey = localDateKey(new Date())): boolean {
+  return localDateKey(date) === todayKey;
+}
 
 // ─── Router ───────────────────────────────────────────────────────────────────
 
@@ -467,6 +487,343 @@ usersRouter.get('/class-roster', async (req: Request, res: Response, next: NextF
     );
   } catch (err) {
     next(err instanceof AppError ? err : new AppError(500, 'INTERNAL_ERROR', 'Failed to load class roster'));
+  }
+});
+
+/**
+ * GET /api/v1/users/student-workbench
+ * Role-scoped student roster for everyday class work.
+ * Teachers see classes they teach/manage, HODs see their department, admins see the school.
+ */
+usersRouter.get('/student-workbench', async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+  try {
+    const role = req.user.role;
+    if (![UserRole.TEACHER, UserRole.HOD, UserRole.SCHOOL_ADMIN].includes(role)) {
+      throw new AppError(403, 'FORBIDDEN', 'Only teachers, HODs, and school admins can view students');
+    }
+
+    const clock = getLocalTimetableClock();
+    const todayKey = localDateKey(new Date());
+    const requestedClassId = typeof req.query.classId === 'string' && req.query.classId.trim()
+      ? req.query.classId.trim()
+      : undefined;
+    const requestedDepartmentId = typeof req.query.departmentId === 'string' && req.query.departmentId.trim()
+      ? req.query.departmentId.trim()
+      : undefined;
+
+    const emptyResponse = () => ({
+      scope: role,
+      generatedAt: new Date().toISOString(),
+      today: {
+        dayOfWeek: clock.dayOfWeek,
+        dayLabel: DAY_LABELS[clock.dayOfWeek] ?? 'Today',
+        currentMinutes: clock.minutes,
+      },
+      totals: {
+        departments: 0,
+        classes: 0,
+        students: 0,
+        lessonsToday: 0,
+        activeSessions: 0,
+        presentToday: 0,
+        absentToday: 0,
+        notMarkedToday: 0,
+      },
+      departments: [],
+    });
+
+    const classWhere: Prisma.ClassWhereInput = { schoolId: req.schoolId };
+    let managedClassIds = new Set<string>();
+
+    if (role === UserRole.TEACHER) {
+      const [teachingClassIds, teacherManagedClassIds] = await Promise.all([
+        resolveTeacherTeachingClassIds(req.user.sub, req.user.classId),
+        resolveTeacherManagedClassIds(req.user.sub, req.user.classId),
+      ]);
+
+      if (teachingClassIds.length === 0) {
+        res.status(200).json(emptyResponse());
+        return;
+      }
+      if (requestedClassId && !teachingClassIds.includes(requestedClassId)) {
+        res.status(200).json(emptyResponse());
+        return;
+      }
+      classWhere.id = requestedClassId ?? { in: teachingClassIds };
+      managedClassIds = new Set(teacherManagedClassIds);
+    } else if (role === UserRole.HOD) {
+      if (!req.user.departmentId) {
+        res.status(200).json(emptyResponse());
+        return;
+      }
+      classWhere.departmentId = req.user.departmentId;
+      if (requestedClassId) classWhere.id = requestedClassId;
+    } else {
+      if (requestedDepartmentId) classWhere.departmentId = requestedDepartmentId;
+      if (requestedClassId) classWhere.id = requestedClassId;
+    }
+
+    const classes = await prisma.class.findMany({
+      where: classWhere,
+      select: {
+        id: true,
+        name: true,
+        capacity: true,
+        departmentId: true,
+        classTeacherId: true,
+        department: { select: { id: true, name: true } },
+        classTeacher: { select: { id: true, fullName: true, email: true, phone: true } },
+        users: {
+          where: { role: UserRole.STUDENT },
+          select: {
+            id: true,
+            fullName: true,
+            username: true,
+            email: true,
+            phone: true,
+            admissionNumber: true,
+            avatarUrl: true,
+            classId: true,
+            departmentId: true,
+            isClassRep: true,
+            isLocked: true,
+            attendanceGpsExempt: true,
+            createdAt: true,
+            updatedAt: true,
+          },
+          orderBy: { fullName: 'asc' },
+        },
+        timetableEntries: {
+          where: { dayOfWeek: clock.dayOfWeek },
+          select: {
+            id: true,
+            subject: true,
+            startTime: true,
+            endTime: true,
+            room: true,
+            teacherId: true,
+            teacher: { select: { id: true, fullName: true } },
+          },
+          orderBy: { startTime: 'asc' },
+        },
+      },
+    });
+
+    const sortedClasses = classes.sort((a, b) => {
+      const deptCompare = (a.department?.name ?? '').localeCompare(b.department?.name ?? '');
+      if (deptCompare !== 0) return deptCompare;
+      return a.name.localeCompare(b.name);
+    });
+
+    const visibleClassIds = sortedClasses.map((cls) => cls.id);
+    if (visibleClassIds.length === 0) {
+      res.status(200).json(emptyResponse());
+      return;
+    }
+
+    const activeSessions = await prisma.attendanceSession.findMany({
+      where: {
+        schoolId: req.schoolId,
+        classId: { in: visibleClassIds },
+        isActive: true,
+      },
+      select: {
+        id: true,
+        classId: true,
+        timetableEntryId: true,
+        subject: true,
+        startedAt: true,
+        _count: { select: { records: true } },
+      },
+      orderBy: { startedAt: 'desc' },
+    });
+
+    const studentIds = sortedClasses.flatMap((cls) => cls.users.map((student) => student.id));
+    const recentAttendance = studentIds.length > 0
+      ? await prisma.attendanceRecord.findMany({
+          where: {
+            schoolId: req.schoolId,
+            studentId: { in: studentIds },
+            scannedAt: { gte: new Date(Date.now() - 36 * 60 * 60 * 1000) },
+            session: { classId: { in: visibleClassIds } },
+          },
+          select: {
+            id: true,
+            studentId: true,
+            status: true,
+            method: true,
+            note: true,
+            scannedAt: true,
+            session: {
+              select: {
+                id: true,
+                classId: true,
+                subject: true,
+                timetableEntryId: true,
+                timetableEntry: { select: { dayOfWeek: true, startTime: true, endTime: true } },
+              },
+            },
+          },
+          orderBy: { scannedAt: 'desc' },
+        })
+      : [];
+
+    const todayAttendance = recentAttendance.filter((record) => (
+      isTodayLocal(record.scannedAt, todayKey) ||
+      record.session.timetableEntry?.dayOfWeek === clock.dayOfWeek
+    ));
+    const recordsByStudent = new Map<string, typeof todayAttendance>();
+    for (const record of todayAttendance) {
+      const existing = recordsByStudent.get(record.studentId) ?? [];
+      existing.push(record);
+      recordsByStudent.set(record.studentId, existing);
+    }
+
+    const activeByEntry = new Map<string, (typeof activeSessions)[number]>();
+    const activeByClass = new Map<string, (typeof activeSessions)>();
+    for (const session of activeSessions) {
+      if (session.timetableEntryId && !activeByEntry.has(session.timetableEntryId)) {
+        activeByEntry.set(session.timetableEntryId, session);
+      }
+      const classSessions = activeByClass.get(session.classId) ?? [];
+      classSessions.push(session);
+      activeByClass.set(session.classId, classSessions);
+    }
+
+    let totalStudents = 0;
+    let lessonsToday = 0;
+    let presentToday = 0;
+    let absentToday = 0;
+    let notMarkedToday = 0;
+    const departments = new Map<string, {
+      id: string;
+      name: string;
+      classes: unknown[];
+    }>();
+
+    for (const cls of sortedClasses) {
+      const canManageClass = role !== UserRole.TEACHER || managedClassIds.has(cls.id);
+      const lessons = cls.timetableEntries
+        .filter((entry) => role !== UserRole.TEACHER || canManageClass || entry.teacherId === req.user.sub)
+        .map((entry) => {
+          const start = minutesFromTime(entry.startTime);
+          const end = minutesFromTime(entry.endTime);
+          const active = activeByEntry.get(entry.id);
+          return {
+            id: entry.id,
+            subject: entry.subject,
+            startTime: entry.startTime,
+            endTime: entry.endTime,
+            room: entry.room,
+            teacherId: entry.teacherId,
+            teacherName: entry.teacher.fullName,
+            isCurrent: Number.isFinite(start) && Number.isFinite(end) && clock.minutes >= start && clock.minutes <= end,
+            isPast: Number.isFinite(end) && clock.minutes > end,
+            activeSessionId: active?.id ?? null,
+            activeRecordCount: active?._count.records ?? 0,
+          };
+        });
+      lessonsToday += lessons.length;
+
+      const activeClassSessions = activeByClass.get(cls.id) ?? [];
+      const expectedMarks = lessons.length > 0 ? lessons.length : activeClassSessions.length;
+      const students = cls.users.map((student) => {
+        const records = recordsByStudent.get(student.id) ?? [];
+        const sessionIds = new Set(records.map((record) => record.session.id));
+        const statusCounts = records.reduce<Record<string, number>>((counts, record) => {
+          counts[record.status] = (counts[record.status] ?? 0) + 1;
+          return counts;
+        }, {});
+        const lastRecord = records[0];
+        const notMarked = Math.max(expectedMarks - sessionIds.size, 0);
+
+        if ((statusCounts.PRESENT ?? 0) + (statusCounts.LATE ?? 0) > 0) presentToday += 1;
+        if ((statusCounts.ABSENT ?? 0) > 0) absentToday += 1;
+        if (notMarked > 0) notMarkedToday += 1;
+
+        return {
+          id: student.id,
+          fullName: student.fullName,
+          username: student.username,
+          email: student.email,
+          phone: student.phone,
+          admissionNumber: student.admissionNumber,
+          avatarUrl: student.avatarUrl,
+          classId: student.classId,
+          departmentId: student.departmentId,
+          isClassRep: student.isClassRep,
+          isLocked: student.isLocked,
+          attendanceGpsExempt: student.attendanceGpsExempt,
+          joinedAt: student.createdAt,
+          updatedAt: student.updatedAt,
+          today: {
+            present: statusCounts.PRESENT ?? 0,
+            late: statusCounts.LATE ?? 0,
+            excused: statusCounts.EXCUSED ?? 0,
+            absent: statusCounts.ABSENT ?? 0,
+            notMarked,
+            lastStatus: lastRecord?.status ?? null,
+            lastMethod: lastRecord?.method ?? null,
+            lastNote: lastRecord?.note ?? null,
+            lastSubject: lastRecord?.session.subject ?? null,
+            lastMarkedAt: lastRecord?.scannedAt ?? null,
+            records: records.map((record) => ({
+              id: record.id,
+              sessionId: record.session.id,
+              subject: record.session.subject,
+              status: record.status,
+              method: record.method,
+              note: record.note,
+              scannedAt: record.scannedAt,
+            })),
+          },
+        };
+      });
+      totalStudents += students.length;
+
+      const departmentId = cls.department?.id ?? 'unassigned';
+      const departmentName = cls.department?.name ?? 'Unassigned department';
+      const department = departments.get(departmentId) ?? { id: departmentId, name: departmentName, classes: [] };
+      department.classes.push({
+        id: cls.id,
+        name: cls.name,
+        capacity: cls.capacity,
+        departmentId: cls.departmentId,
+        departmentName,
+        classTeacherId: cls.classTeacherId,
+        classTeacher: cls.classTeacher,
+        canManageClass,
+        studentCount: students.length,
+        activeSessionCount: activeClassSessions.length,
+        todayLessons: lessons,
+        students,
+      });
+      departments.set(departmentId, department);
+    }
+
+    const departmentList = Array.from(departments.values()).sort((a, b) => a.name.localeCompare(b.name));
+    res.status(200).json({
+      scope: role,
+      generatedAt: new Date().toISOString(),
+      today: {
+        dayOfWeek: clock.dayOfWeek,
+        dayLabel: DAY_LABELS[clock.dayOfWeek] ?? 'Today',
+        currentMinutes: clock.minutes,
+      },
+      totals: {
+        departments: departmentList.length,
+        classes: sortedClasses.length,
+        students: totalStudents,
+        lessonsToday,
+        activeSessions: activeSessions.length,
+        presentToday,
+        absentToday,
+        notMarkedToday,
+      },
+      departments: departmentList,
+    });
+  } catch (err) {
+    next(err instanceof AppError ? err : new AppError(500, 'INTERNAL_ERROR', 'Failed to load student workbench'));
   }
 });
 
