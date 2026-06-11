@@ -9,6 +9,7 @@ import { buildAttendanceEventPayload } from '../lib/attendanceEvent';
 import { getQrSecret } from '../config/secrets';
 import { hasSessionGpsAnchor, hasSubmittedGps, shouldEnforceSessionGps } from '../lib/attendanceGps';
 import { isTimetableWindowExpired, type TimetableWindow } from '../lib/sessionWindow';
+import { markMissingStudentsAbsentForSessions } from '../lib/attendanceFinalizer';
 import {
   haversineDistance,
   classifyAttendanceStatus,
@@ -88,6 +89,7 @@ export class AttendanceService {
         where: { id: session.id },
         data: { isActive: false, endedAt: new Date() },
       });
+      await markMissingStudentsAbsentForSessions([session.id]);
       broadcastSessionEnd(session.id);
       throw new AppError(400, 'SESSION_ENDED', 'Attendance session has ended');
     }
@@ -258,6 +260,16 @@ export class AttendanceService {
     broadcastAttendanceUpdated(sessionId, payload);
   }
 
+  private classifyAcceptedScan(session: { startedAt: Date; lateThresholdMin: number }): AttendanceStatus {
+    const status = classifyAttendanceStatus(
+      new Date(),
+      session.startedAt,
+      session.lateThresholdMin,
+    );
+
+    return status === AttendanceStatus.ABSENT ? AttendanceStatus.LATE : status;
+  }
+
   /**
    * Generate a shareable attendance link for an active session.
    * Teacher can choose whether to enforce GPS proximity check.
@@ -418,18 +430,15 @@ export class AttendanceService {
 
     if (existing) {
       throw new AppError(
-        400,
+        409,
         'DUPLICATE_SCAN',
-        'Attendance already recorded for this session',
+        'Attendance already recorded for this session. You cannot mark again with QR or link.',
       );
     }
 
-    // 6. Classify status (PRESENT/LATE) using classifyAttendanceStatus
-    const status = classifyAttendanceStatus(
-      new Date(),
-      session.startedAt,
-      session.lateThresholdMin,
-    );
+    // 6. A successful live scan means the student attended. True ABSENT rows are
+    // written only when the timetable window ends without a mark.
+    const status = this.classifyAcceptedScan(session);
 
     // 7. Create AttendanceRecord with method="LINK"
     const record = await prisma.attendanceRecord.create({
@@ -512,18 +521,15 @@ export class AttendanceService {
 
     if (existing) {
       throw new AppError(
-        400,
+        409,
         'DUPLICATE_SCAN',
-        'Attendance already recorded for this session',
+        'Attendance already recorded for this session. You cannot mark again with QR or link.',
       );
     }
 
-    // 5. Classify status
-    const status = classifyAttendanceStatus(
-      new Date(),
-      session.startedAt,
-      session.lateThresholdMin,
-    );
+    // 5. A successful live scan means the student attended. True ABSENT rows are
+    // written only when the timetable window ends without a mark.
+    const status = this.classifyAcceptedScan(session);
 
     // 6. Create AttendanceRecord
     const record = await prisma.attendanceRecord.create({

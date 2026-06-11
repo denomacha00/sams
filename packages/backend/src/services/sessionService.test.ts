@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { UserRole } from '@sams/shared';
+import { AttendanceStatus, UserRole } from '@sams/shared';
 import { SessionService } from './sessionService';
 import { prisma } from '../lib/prisma';
 import { AppError } from '../middleware/errors';
@@ -11,6 +11,7 @@ vi.mock('../lib/prisma', () => ({
     },
     user: {
       findUnique: vi.fn(),
+      findMany: vi.fn(),
     },
     timetableEntry: { findFirst: vi.fn() },
     attendanceSession: {
@@ -20,6 +21,10 @@ vi.mock('../lib/prisma', () => ({
       create: vi.fn(),
       update: vi.fn(),
       updateMany: vi.fn(),
+    },
+    attendanceRecord: {
+      findMany: vi.fn(),
+      createMany: vi.fn(),
     },
   },
 }));
@@ -56,6 +61,9 @@ describe('SessionService.startSession', () => {
     vi.setSystemTime(new Date('2026-06-01T08:15:00')); // Monday 08:15
     vi.mocked(prisma.class.findMany).mockResolvedValue([] as never);
     vi.mocked(prisma.user.findUnique).mockResolvedValue({ classId: null } as never);
+    vi.mocked(prisma.user.findMany).mockResolvedValue([] as never);
+    vi.mocked(prisma.attendanceRecord.findMany).mockResolvedValue([] as never);
+    vi.mocked(prisma.attendanceRecord.createMany).mockResolvedValue({ count: 0 } as never);
     vi.mocked(prisma.attendanceSession.findMany).mockResolvedValue([] as never);
     vi.mocked(prisma.attendanceSession.updateMany).mockResolvedValue({ count: 0 } as never);
   });
@@ -215,6 +223,9 @@ describe('SessionService.expireStaleActiveSessions', () => {
     vi.clearAllMocks();
     vi.useFakeTimers();
     vi.setSystemTime(new Date('2026-06-01T10:00:00')); // Monday 10:00
+    vi.mocked(prisma.user.findMany).mockResolvedValue([] as never);
+    vi.mocked(prisma.attendanceRecord.findMany).mockResolvedValue([] as never);
+    vi.mocked(prisma.attendanceRecord.createMany).mockResolvedValue({ count: 0 } as never);
   });
 
   afterEach(() => {
@@ -222,7 +233,8 @@ describe('SessionService.expireStaleActiveSessions', () => {
   });
 
   it('closes active sessions after the timetable window plus grace period', async () => {
-    vi.mocked(prisma.attendanceSession.findMany).mockResolvedValue([
+    vi.mocked(prisma.attendanceSession.findMany)
+      .mockResolvedValueOnce([
       {
         id: 'expired-session',
         timetableEntry: { dayOfWeek: 0, startTime: '08:00', endTime: '09:00' },
@@ -231,7 +243,18 @@ describe('SessionService.expireStaleActiveSessions', () => {
         id: 'current-session',
         timetableEntry: { dayOfWeek: 0, startTime: '09:30', endTime: '10:30' },
       },
+    ] as never)
+      .mockResolvedValueOnce([
+        { id: 'expired-session', schoolId: 'school-1', classId: 'class-1' },
+      ] as never);
+    vi.mocked(prisma.user.findMany).mockResolvedValue([
+      { id: 'student-present' },
+      { id: 'student-missing' },
     ] as never);
+    vi.mocked(prisma.attendanceRecord.findMany).mockResolvedValue([
+      { studentId: 'student-present' },
+    ] as never);
+    vi.mocked(prisma.attendanceRecord.createMany).mockResolvedValue({ count: 1 } as never);
     vi.mocked(prisma.attendanceSession.updateMany).mockResolvedValue({ count: 1 } as never);
 
     const expired = await service.expireStaleActiveSessions('school-1');
@@ -240,6 +263,17 @@ describe('SessionService.expireStaleActiveSessions', () => {
     expect(prisma.attendanceSession.updateMany).toHaveBeenCalledWith({
       where: { id: { in: ['expired-session'] }, isActive: true },
       data: { isActive: false, endedAt: expect.any(Date) },
+    });
+    expect(prisma.attendanceRecord.createMany).toHaveBeenCalledWith({
+      data: [
+        expect.objectContaining({
+          sessionId: 'expired-session',
+          studentId: 'student-missing',
+          status: AttendanceStatus.ABSENT,
+          method: 'AUTO_ABSENT',
+        }),
+      ],
+      skipDuplicates: true,
     });
   });
 });
@@ -251,6 +285,10 @@ describe('SessionService.refreshQRCode', () => {
     vi.clearAllMocks();
     vi.useFakeTimers();
     vi.setSystemTime(new Date('2026-06-01T10:00:00')); // Monday 10:00
+    vi.mocked(prisma.attendanceSession.findMany).mockResolvedValue([] as never);
+    vi.mocked(prisma.user.findMany).mockResolvedValue([] as never);
+    vi.mocked(prisma.attendanceRecord.findMany).mockResolvedValue([] as never);
+    vi.mocked(prisma.attendanceRecord.createMany).mockResolvedValue({ count: 0 } as never);
   });
 
   afterEach(() => {

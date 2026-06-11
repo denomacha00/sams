@@ -10,6 +10,7 @@ import {
   isTimetableWindowExpired,
 } from '../lib/sessionWindow';
 import { resolveTeacherManagedClassIds } from '../lib/teacherScope';
+import { markMissingStudentsAbsentForSessions } from '../lib/attendanceFinalizer';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -292,6 +293,7 @@ export class SessionService {
       data: { isActive: false, endedAt: new Date() },
     });
 
+    await markMissingStudentsAbsentForSessions(expiredIds);
     expiredIds.forEach((sessionId) => broadcastSessionEnd(sessionId));
     return expiredIds.length;
   }
@@ -308,7 +310,10 @@ export class SessionService {
     const actorRole = actor.actorRole ?? UserRole.TEACHER;
     const session = await prisma.attendanceSession.findUnique({
       where: { id: sessionId },
-      include: { class: { select: { departmentId: true } } },
+      include: {
+        class: { select: { departmentId: true } },
+        timetableEntry: { select: { dayOfWeek: true, startTime: true, endTime: true } },
+      },
     });
 
     if (!session) {
@@ -331,6 +336,10 @@ export class SessionService {
       throw new AppError(400, 'SESSION_ENDED', 'Session is already ended');
     }
 
+    const finalizeAbsences = session.timetableEntry
+      ? isTimetableWindowExpired(session.timetableEntry)
+      : false;
+
     await prisma.attendanceSession.update({
       where: { id: sessionId },
       data: {
@@ -338,6 +347,10 @@ export class SessionService {
         endedAt: new Date(),
       },
     });
+
+    if (finalizeAbsences) {
+      await markMissingStudentsAbsentForSessions([sessionId]);
+    }
 
     // Broadcast session ended to session room
     broadcastSessionEnd(sessionId);
@@ -372,6 +385,7 @@ export class SessionService {
       where: { id: session.id },
       data: { isActive: false, endedAt: new Date() },
     });
+    await markMissingStudentsAbsentForSessions([session.id]);
     broadcastSessionEnd(session.id);
     return true;
   }

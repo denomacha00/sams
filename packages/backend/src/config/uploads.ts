@@ -1,10 +1,17 @@
 import path from 'path';
 
 /** Root folder for all uploaded files (avatars, etc.). */
-export const UPLOADS_ROOT = path.resolve(process.env.UPLOADS_DIR || '/var/www/sams/uploads');
+const configuredUploadsDir = path.resolve(process.env.UPLOADS_DIR || '/var/www/sams/uploads');
+const configuredAvatarDir = path.basename(configuredUploadsDir).toLowerCase() === 'avatars';
+
+export const UPLOADS_ROOT = configuredAvatarDir
+  ? path.dirname(configuredUploadsDir)
+  : configuredUploadsDir;
 
 /** Avatar images are stored under uploads/avatars/. */
-export const AVATARS_DIR = path.join(UPLOADS_ROOT, 'avatars');
+export const AVATARS_DIR = configuredAvatarDir
+  ? configuredUploadsDir
+  : path.join(UPLOADS_ROOT, 'avatars');
 
 /** Notification attachments are stored under uploads/notifications/. */
 export const NOTIFICATION_ATTACHMENTS_DIR = path.join(UPLOADS_ROOT, 'notifications');

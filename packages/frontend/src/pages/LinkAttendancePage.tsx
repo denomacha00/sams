@@ -228,7 +228,7 @@ const LinkAttendancePage: React.FC = () => {
         setErrorDetail('This phone/browser has already marked another student present for this session. Use your own device or ask the teacher.');
       } else if (errorCode === 'DUPLICATE_SCAN' || errorMsg.includes('already') || errorMsg.includes('duplicate')) {
         setErrorMessage('Already Recorded');
-        setErrorDetail('Your attendance for this session has already been recorded.');
+        setErrorDetail('Your attendance for this session has already been recorded. You cannot mark again with QR or link.');
       } else if (errorCode === 'SESSION_ENDED' || errorMsg.includes('ended') || errorMsg.includes('not active')) {
         setErrorMessage('Session Ended');
         setErrorDetail('This attendance session has already ended.');

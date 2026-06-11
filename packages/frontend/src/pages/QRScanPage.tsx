@@ -252,7 +252,16 @@ const QRScanPage: React.FC = () => {
         setError('Saved offline. Will sync when connected.');
       }
     } catch (err: unknown) {
-      setError(getApiErrorMessage(err, 'Failed to record attendance'));
+      const errorCode = getApiErrorCode(err);
+      if (errorCode === 'DUPLICATE_SCAN') {
+        setError('Attendance already recorded for this session. You cannot mark again with QR or link.');
+      } else if (errorCode === 'DEVICE_ALREADY_USED') {
+        setError('This phone/browser has already marked another student for this session. Use your own device or ask the teacher.');
+      } else if (errorCode === 'SESSION_ENDED' || errorCode === 'QR_EXPIRED') {
+        setError('This QR session has ended or refreshed. Ask the teacher for the current code.');
+      } else {
+        setError(getApiErrorMessage(err, 'Failed to record attendance'));
+      }
     } finally {
       setLoading(false);
     }
