@@ -75,7 +75,7 @@ async function main(): Promise<void> {
     console.log(`Super Admin created: ${email} (username: ${username})`);
   }
 
-  console.log('Login at super.smart-managment.com with school code SUPERADMIN (auto-filled by the panel).');
+  console.log('Login at super.smart-managment.com. The panel uses SUPERADMIN, mapped to platform school SAMS_PLATFORM.');
 }
 
 main()

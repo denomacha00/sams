@@ -18,6 +18,12 @@ const LOGIN_COOLDOWN_MS = 60 * 1000; // 1 minute in ms
 
 const BCRYPT_ROUNDS = 12;
 const PLATFORM_SCHOOL_CODE = 'SAMS_PLATFORM';
+const PLATFORM_SCHOOL_LOGIN_ALIASES = new Set([PLATFORM_SCHOOL_CODE, 'SUPERADMIN']);
+
+function normalizeLoginSchoolCode(schoolCode: string): string {
+  const normalized = schoolCode.trim().toUpperCase();
+  return PLATFORM_SCHOOL_LOGIN_ALIASES.has(normalized) ? PLATFORM_SCHOOL_CODE : normalized;
+}
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -212,7 +218,7 @@ export class AuthService {
   /** Find accounts matching identifier, scoped to school code when supplied. */
   private async findLoginCandidates(schoolCode: string, identifier: string) {
     const trimmed = identifier.trim();
-    const normalizedSchoolCode = schoolCode.trim().toUpperCase();
+    const normalizedSchoolCode = normalizeLoginSchoolCode(schoolCode);
 
     if (normalizedSchoolCode) {
       const school = await prisma.school.findUnique({

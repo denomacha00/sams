@@ -35,8 +35,17 @@ function writeSuperTokens(accessToken: string, refreshToken: string): void {
   }
 }
 
+function resolveApiBaseUrl(): string {
+  if (typeof window !== 'undefined' && window.location.hostname.startsWith('super.')) {
+    return '/api/v1';
+  }
+  return import.meta.env.VITE_SUPER_ADMIN_API_BASE_URL || import.meta.env.VITE_API_BASE_URL || '/api/v1';
+}
+
+const API_BASE_URL = resolveApiBaseUrl();
+
 const apiClient = axios.create({
-  baseURL: import.meta.env.VITE_API_BASE_URL || '/api/v1',
+  baseURL: API_BASE_URL,
   headers: { 'Content-Type': 'application/json' },
 });
 
@@ -106,7 +115,7 @@ apiClient.interceptors.response.use(
         if (!refreshToken) throw new Error('No refresh token');
 
         const { data } = await axios.post(
-          `${import.meta.env.VITE_API_BASE_URL || '/api/v1'}/auth/refresh`,
+          `${API_BASE_URL}/auth/refresh`,
           { refreshToken },
         );
 

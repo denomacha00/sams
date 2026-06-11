@@ -87,7 +87,7 @@ const SessionPage: React.FC = () => {
   const [linkCopied, setLinkCopied] = useState(false);
   const [linkTimeRemaining, setLinkTimeRemaining] = useState<number>(0);
   const linkTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const sessionRequireGps = true;
+  const [sessionRequireGps, setSessionRequireGps] = useState<boolean>(true);
   const [sessionRadiusM, setSessionRadiusM] = useState<number>(100);
 
   const normalizeSessionFromApi = useCallback((data: {
@@ -386,7 +386,7 @@ const SessionPage: React.FC = () => {
       const { data } = await apiClient.post('/attendance/link/generate', {
         sessionId: activeSession.id,
         expiryMinutes,
-        requireGps: canRequireGpsForLink,
+        requireGps: canRequireGpsForLink ? requireGps : false,
         gpsRadiusM: canRequireGpsForLink ? gpsRadiusM : 100,
       });
       setLinkUrl(data.linkUrl);
@@ -646,11 +646,12 @@ const SessionPage: React.FC = () => {
               </div>
               <button
                 type="button"
-                disabled
+                onClick={() => setSessionRequireGps((current) => !current)}
                 className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors duration-200 focus:outline-none ${
                   sessionRequireGps ? 'bg-indigo-600' : 'bg-white/20'
                 }`}
-                aria-label="GPS requirement enabled"
+                aria-pressed={sessionRequireGps}
+                aria-label="Toggle GPS requirement for this session"
               >
                 <span
                   className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform duration-200 ${
@@ -931,10 +932,13 @@ const SessionPage: React.FC = () => {
                 </div>
                 <button
                   type="button"
-                  disabled
+                  onClick={() => canRequireGpsForLink && setRequireGps((current) => !current)}
                   className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors duration-200 focus:outline-none ${
                     requireGps && canRequireGpsForLink ? 'bg-indigo-600' : 'bg-white/20'
                   } ${!canRequireGpsForLink ? 'cursor-not-allowed opacity-60' : ''}`}
+                  disabled={!canRequireGpsForLink}
+                  aria-pressed={requireGps && canRequireGpsForLink}
+                  aria-label="Toggle GPS requirement for this attendance link"
                 >
                   <span
                     className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform duration-200 ${

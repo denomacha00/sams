@@ -205,4 +205,33 @@ describe('authService school suspension', () => {
       }),
     );
   });
+
+  it('maps SUPERADMIN login code to the platform school', async () => {
+    const passwordHash = await bcrypt.hash('password123', 12);
+    vi.mocked(prisma.school.findUnique)
+      .mockResolvedValueOnce({ id: 'platform-school' } as any)
+      .mockResolvedValueOnce({ isSuspended: false, schoolCode: 'SAMS_PLATFORM' } as any);
+    vi.mocked(prisma.user.findMany).mockResolvedValue([
+      {
+        id: 'super-1',
+        schoolId: 'platform-school',
+        role: 'SUPER_ADMIN',
+        isLocked: false,
+        failedLoginCount: 0,
+        failedLoginWindowStart: null,
+        passwordHash,
+        departmentId: null,
+        classId: null,
+      },
+    ] as any);
+
+    await expect(
+      authService.validateLoginCredentials('SUPERADMIN', 'admin@smart-managment.com', 'password123'),
+    ).resolves.toMatchObject({ id: 'super-1', role: 'SUPER_ADMIN' });
+
+    expect(prisma.school.findUnique).toHaveBeenNthCalledWith(1, {
+      where: { schoolCode: 'SAMS_PLATFORM' },
+      select: { id: true },
+    });
+  });
 });

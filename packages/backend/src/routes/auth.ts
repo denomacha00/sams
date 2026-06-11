@@ -2,6 +2,7 @@ import { Router, type Request, type Response } from 'express';
 import { z } from 'zod';
 import crypto from 'crypto';
 import bcrypt from 'bcrypt';
+import { UserRole } from '@sams/shared';
 import { authenticate } from '../middleware/auth';
 import { loginRateLimiter } from '../middleware/loginRateLimiter';
 import { otpResendRateLimiter } from '../middleware/otpResendRateLimiter';
@@ -147,6 +148,14 @@ authRouter.post('/login', loginRateLimiter, async (req: Request, res: Response):
 
     if (isOtpLoginEnabled()) {
       const user = await authService.validateLoginCredentials(schoolCode, identifier, password);
+
+      // The platform Super Admin account is the recovery door for SMS/email/OTP
+      // outages, so it must not depend on school provider delivery.
+      if (user.role === UserRole.SUPER_ADMIN) {
+        const tokenPair = await authService.finalizePasswordLogin(user);
+        res.status(200).json(tokenPair);
+        return;
+      }
 
       if (!user.email && !user.phone) {
         res.status(400).json({
