@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import apiClient from '../services/apiClient';
 import { useAuthStore } from '../store/authStore';
+import { getAttendanceDeviceId } from '../lib/attendanceDevice';
 
 interface SessionInfo {
   valid: boolean;
@@ -202,6 +203,7 @@ const LinkAttendancePage: React.FC = () => {
       const { data } = await apiClient.post<AttendanceResult>('/attendance/link', {
         linkToken: token,
         gpsCoords: coords,
+        deviceId: getAttendanceDeviceId(),
       });
       setResult(data);
       setPageState('success');
@@ -221,6 +223,9 @@ const LinkAttendancePage: React.FC = () => {
       } else if (errorCode === 'LINK_EXPIRED' || errorMsg.includes('expired')) {
         setErrorMessage('Link Expired');
         setErrorDetail('This attendance link has expired. Ask your teacher for a new one.');
+      } else if (errorCode === 'DEVICE_ALREADY_USED') {
+        setErrorMessage('Device Already Used');
+        setErrorDetail('This phone/browser has already marked another student present for this session. Use your own device or ask the teacher.');
       } else if (errorCode === 'DUPLICATE_SCAN' || errorMsg.includes('already') || errorMsg.includes('duplicate')) {
         setErrorMessage('Already Recorded');
         setErrorDetail('Your attendance for this session has already been recorded.');

@@ -5,7 +5,11 @@ import { requirePermission } from '../middleware/rbac';
 import { sessionService } from '../services/sessionService';
 import { prisma } from '../lib/prisma';
 import { AppError } from '../middleware/errors';
-import { formatSessionForClient, formatStudentsForClient } from '../lib/sessionResponse';
+import {
+  formatAttendanceRecordsForClient,
+  formatSessionForClient,
+  formatStudentsForClient,
+} from '../lib/sessionResponse';
 
 // ─── Validation Schemas ───────────────────────────────────────────────────────
 
@@ -117,10 +121,21 @@ sessionsRouter.get('/', async (req: Request, res: Response): Promise<void> => {
 
     const sessions = await prisma.attendanceSession.findMany({
       where,
-      include: { class: { select: { name: true } } },
+      include: {
+        class: { select: { name: true } },
+        records: {
+          include: { student: { select: { fullName: true } } },
+          orderBy: { scannedAt: 'desc' },
+        },
+      },
       orderBy: { startedAt: 'desc' },
     });
-    res.status(200).json(sessions.map(formatSessionForClient));
+    res.status(200).json(
+      sessions.map((session) => ({
+        ...formatSessionForClient(session),
+        records: formatAttendanceRecordsForClient(session.records),
+      })),
+    );
   } catch (err) {
     if (err instanceof AppError) throw err;
     throw new AppError(500, 'INTERNAL_ERROR', 'Failed to list sessions');
@@ -135,7 +150,13 @@ sessionsRouter.get('/:id', async (req: Request, res: Response): Promise<void> =>
   try {
     const session = await prisma.attendanceSession.findUnique({
       where: { id: req.params.id as string },
-      include: { class: { select: { name: true, departmentId: true } } },
+      include: {
+        class: { select: { name: true, departmentId: true } },
+        records: {
+          include: { student: { select: { fullName: true } } },
+          orderBy: { scannedAt: 'desc' },
+        },
+      },
     });
 
     if (!session) {
@@ -175,6 +196,7 @@ sessionsRouter.get('/:id', async (req: Request, res: Response): Promise<void> =>
     res.status(200).json({
       ...formatSessionForClient(session),
       students: formatStudentsForClient(students),
+      records: formatAttendanceRecordsForClient(session.records),
     });
   } catch (err) {
     if (err instanceof AppError) throw err;

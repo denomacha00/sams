@@ -368,7 +368,7 @@ const SettingsPage: React.FC = () => {
               </div>
             ) : (
               <div>
-                <p className="text-sm text-ink-muted mb-4">Enroll your face so teachers can mark your attendance using face scan.</p>
+                <p className="text-sm text-ink-muted mb-4">Enroll your face so teachers can mark your attendance using face attendance.</p>
                 <button onClick={handleFaceEnroll} disabled={bioLoading}
                   className="w-full flex items-center justify-center gap-2 bg-gradient-to-r from-indigo-600 to-indigo-700 text-white font-semibold py-3 px-4 rounded-xl shadow-lg shadow-indigo-500/25 hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50 transition-all">
                   {bioLoading ? (

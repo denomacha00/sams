@@ -9,11 +9,13 @@ import { getQrSecret } from '../config/secrets';
 import { AppError } from '../middleware/errors';
 import { isTimetableWindowExpired } from '../lib/sessionWindow';
 import { broadcastSessionEnd } from '../sockets/attendanceSocket';
+import { buildAttendanceDeviceHash } from '../lib/attendanceDevice';
 
 // ─── Validation Schemas ───────────────────────────────────────────────────────
 
 const qrScanSchema = z.object({
   qrToken: z.string().min(1),
+  deviceId: z.string().min(8).max(200).optional(),
   gpsCoords: z.object({
     lat: z.number().min(-90).max(90),
     lng: z.number().min(-180).max(180),
@@ -60,6 +62,7 @@ const linkGenerateSchema = z.object({
 
 const linkAttendanceSchema = z.object({
   linkToken: z.string().min(1),
+  deviceId: z.string().min(8).max(200).optional(),
   gpsCoords: z.object({
     lat: z.number().min(-90).max(90),
     lng: z.number().min(-180).max(180),
@@ -91,6 +94,7 @@ attendanceRouter.post('/qr', async (req: Request, res: Response): Promise<void> 
       req.schoolId,
       parsed.data.qrToken,
       parsed.data.gpsCoords ?? { lat: 0, lng: 0 },
+      buildAttendanceDeviceHash(req.schoolId, parsed.data.deviceId, req.get('user-agent')),
     );
     res.status(201).json(record);
   } catch (err) {
@@ -215,6 +219,7 @@ attendanceRouter.post('/link', async (req: Request, res: Response): Promise<void
       req.schoolId,
       parsed.data.linkToken,
       parsed.data.gpsCoords ?? { lat: 0, lng: 0 },
+      buildAttendanceDeviceHash(req.schoolId, parsed.data.deviceId, req.get('user-agent')),
     );
     res.status(201).json(record);
   } catch (err) {

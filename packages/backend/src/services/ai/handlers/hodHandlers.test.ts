@@ -122,7 +122,7 @@ describe('HOD AI attendance actions', () => {
     vi.useRealTimers();
   });
 
-  it('starts a department-scoped attendance session through the session service', async () => {
+  it('finds the current department slot and sends the HOD to the GPS-aware session screen', async () => {
     const action = findAction(UserRole.HOD, 'start_session');
 
     const result = await action!.handler({ classId: 'class-1' }, scope);
@@ -137,18 +137,9 @@ describe('HOD AI attendance actions', () => {
         }),
       }),
     );
-    expect(sessionServiceMock.startSession).toHaveBeenCalledWith(
-      'hod-1',
-      'school-1',
-      'entry-1',
-      undefined,
-      {
-        actorRole: UserRole.HOD,
-        actorDepartmentId: 'dept-1',
-        requireGps: false,
-      },
-    );
-    expect(result.data).toEqual({ sessionId: 'session-1', classId: 'class-1' });
+    expect(sessionServiceMock.startSession).not.toHaveBeenCalled();
+    expect(result.answer).toMatch(/Sign In Students/i);
+    expect(result.data).toEqual({ classId: 'class-1', timetableEntryId: 'entry-1' });
   });
 
   it('ends only a department-scoped active session', async () => {

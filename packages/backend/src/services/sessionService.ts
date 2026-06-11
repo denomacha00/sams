@@ -5,12 +5,16 @@ import { prisma } from '../lib/prisma';
 import { AppError } from '../middleware/errors';
 import { getQrSecret } from '../config/secrets';
 import { broadcastQRRefresh, broadcastSessionEnd } from '../sockets/attendanceSocket';
-import { isTimetableWindowExpired } from '../lib/sessionWindow';
+import {
+  getLocalTimetableClock,
+  isTimetableWindowExpired,
+} from '../lib/sessionWindow';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
 const QR_EXPIRY_SECONDS = 30;
 const DEFAULT_LATE_THRESHOLD_MIN = 15;
+const SESSION_RESUME_LOOKBACK_MS = 12 * 60 * 60 * 1000;
 
 // ─── Interfaces ───────────────────────────────────────────────────────────────
 
@@ -85,15 +89,10 @@ export class SessionService {
       );
     }
 
-    // Validate the current day matches the scheduled day of week
-    // dayOfWeek: 0=Monday … 6=Sunday (matches JS getDay() adjusted: Sun=0 → 6, Mon=1 → 0)
-    const now = new Date();
-    // JS getDay(): 0=Sunday, 1=Monday … 6=Saturday
-    // Our schema: 0=Monday … 6=Sunday
-    const jsDayOfWeek = now.getDay(); // 0=Sun, 1=Mon, …, 6=Sat
-    const schemaDayOfWeek = jsDayOfWeek === 0 ? 6 : jsDayOfWeek - 1; // convert to 0=Mon … 6=Sun
+    // Validate the current school-local day matches the scheduled day of week.
+    const localClock = getLocalTimetableClock();
 
-    if (schemaDayOfWeek !== timetableEntry.dayOfWeek) {
+    if (localClock.dayOfWeek !== timetableEntry.dayOfWeek) {
       const dayNames = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
       throw new AppError(
         400,
@@ -102,9 +101,9 @@ export class SessionService {
       );
     }
 
-    // Validate the current time is within the scheduled slot (with ±30 min tolerance)
-    const TOLERANCE_MINUTES = 30;
-    const currentMinutes = now.getHours() * 60 + now.getMinutes();
+    // Validate the current time is within the scheduled slot.
+    const TOLERANCE_MINUTES = 0;
+    const currentMinutes = localClock.minutes;
 
     const [startHour, startMin] = timetableEntry.startTime.split(':').map(Number);
     const [endHour, endMin] = timetableEntry.endTime.split(':').map(Number);
@@ -118,7 +117,7 @@ export class SessionService {
       throw new AppError(
         400,
         'OUTSIDE_SCHEDULED_TIME',
-        `Session can only be started within 30 minutes of the scheduled time (${timetableEntry.startTime}–${timetableEntry.endTime})`,
+        `Session can only be started during the scheduled time (${timetableEntry.startTime}-${timetableEntry.endTime})`,
       );
     }
 
@@ -150,6 +149,21 @@ export class SessionService {
       );
     }
 
+    const hasSubmittedLocation = Boolean(
+      location &&
+      Number.isFinite(location.lat) &&
+      Number.isFinite(location.lng) &&
+      (location.lat !== 0 || location.lng !== 0),
+    );
+
+    if (requireGps && !hasSubmittedLocation) {
+      throw new AppError(
+        400,
+        'GPS_REQUIRED',
+        'Allow GPS before starting this attendance session so QR and link checks can prevent proxy attendance.',
+      );
+    }
+
     // Generate initial QR token
     const nonce = createId();
     const nowUnix = Math.floor(Date.now() / 1000);
@@ -159,6 +173,52 @@ export class SessionService {
       { sessionId, nonce, iat: nowUnix, exp: nowUnix + QR_EXPIRY_SECONDS },
       getQrSecret(),
     );
+
+    const recentlyEndedSession = await prisma.attendanceSession.findFirst({
+      where: {
+        timetableEntryId,
+        isActive: false,
+        startedAt: { gte: new Date(Date.now() - SESSION_RESUME_LOOKBACK_MS) },
+      },
+      include: { class: { select: { name: true, departmentId: true } } },
+      orderBy: { startedAt: 'desc' },
+    });
+
+    if (recentlyEndedSession) {
+      const canResume =
+        recentlyEndedSession.teacherId === teacherId ||
+        (
+          actorRole === UserRole.HOD &&
+          !!options.actorDepartmentId &&
+          recentlyEndedSession.class.departmentId === options.actorDepartmentId
+        );
+
+      if (canResume) {
+        return prisma.attendanceSession.update({
+          where: { id: recentlyEndedSession.id },
+          data: {
+            isActive: true,
+            endedAt: null,
+            currentQRToken: jwt.sign(
+              {
+                sessionId: recentlyEndedSession.id,
+                nonce,
+                iat: nowUnix,
+                exp: nowUnix + QR_EXPIRY_SECONDS,
+              },
+              getQrSecret(),
+            ),
+            qrRefreshedAt: new Date(),
+            currentLinkToken: null,
+            linkExpiresAt: null,
+            locationLat: hasSubmittedLocation ? location!.lat : recentlyEndedSession.locationLat,
+            locationLng: hasSubmittedLocation ? location!.lng : recentlyEndedSession.locationLng,
+            locationRadiusM,
+          },
+          include: { class: { select: { name: true } } },
+        });
+      }
+    }
 
     // Create the attendance session
     const useLocation =

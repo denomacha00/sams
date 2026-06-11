@@ -27,6 +27,36 @@ interface SentNotification {
   }>;
 }
 
+interface SupportThread {
+  schoolId: string;
+  schoolName: string;
+  schoolCode: string;
+  adminUserId: string;
+  adminName: string;
+  lastMessage: string;
+  lastSenderRole: string | null;
+  lastSenderName: string;
+  lastAt: string;
+}
+
+interface SupportMessage {
+  id: string;
+  message: string;
+  createdAt: string;
+  senderName: string;
+  senderRole: string;
+  isMine: boolean;
+}
+
+interface SupportThreadDetail {
+  schoolId: string;
+  schoolName: string;
+  schoolCode: string;
+  adminUserId: string;
+  adminName: string;
+  messages: SupportMessage[];
+}
+
 type Audience = 'all_schools' | 'school';
 type TargetRole = 'ALL' | 'SCHOOL_ADMIN' | 'HOD' | 'TEACHER' | 'STUDENT';
 
@@ -77,8 +107,13 @@ const roleOptions: Array<{ value: TargetRole; label: string }> = [
 const NotificationsPage: React.FC = () => {
   const [schools, setSchools] = useState<School[]>([]);
   const [sent, setSent] = useState<SentNotification[]>([]);
+  const [supportThreads, setSupportThreads] = useState<SupportThread[]>([]);
+  const [selectedSupportThread, setSelectedSupportThread] = useState<SupportThreadDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [sentLoading, setSentLoading] = useState(true);
+  const [supportLoading, setSupportLoading] = useState(true);
+  const [supportReply, setSupportReply] = useState('');
+  const [supportReplying, setSupportReplying] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
 
@@ -118,8 +153,62 @@ const NotificationsPage: React.FC = () => {
     }
   };
 
+  const fetchSupportThreads = async () => {
+    setSupportLoading(true);
+    try {
+      const { data } = await apiClient.get('/super/notifications/support');
+      setSupportThreads(Array.isArray(data) ? data : []);
+    } catch (err) {
+      setError(getSuperAdminApiError(err, 'Failed to load school support messages.'));
+    } finally {
+      setSupportLoading(false);
+    }
+  };
+
+  const openSupportThread = async (thread: SupportThread) => {
+    setError(null);
+    try {
+      const { data } = await apiClient.get(`/super/notifications/support/${thread.schoolId}/${thread.adminUserId}`);
+      setSelectedSupportThread(data);
+      setSupportReply('');
+    } catch (err) {
+      setError(getSuperAdminApiError(err, 'Failed to open support thread.'));
+    }
+  };
+
+  const handleSupportReply = async () => {
+    if (!selectedSupportThread || !supportReply.trim()) return;
+    setSupportReplying(true);
+    setError(null);
+    try {
+      await apiClient.post('/super/notifications/support/reply', {
+        schoolId: selectedSupportThread.schoolId,
+        adminUserId: selectedSupportThread.adminUserId,
+        message: supportReply.trim(),
+      });
+      setSupportReply('');
+      await openSupportThread({
+        schoolId: selectedSupportThread.schoolId,
+        schoolName: selectedSupportThread.schoolName,
+        schoolCode: selectedSupportThread.schoolCode,
+        adminUserId: selectedSupportThread.adminUserId,
+        adminName: selectedSupportThread.adminName,
+        lastMessage: '',
+        lastSenderRole: null,
+        lastSenderName: '',
+        lastAt: new Date().toISOString(),
+      });
+      await fetchSupportThreads();
+      setSuccess('Reply sent to school admin.');
+    } catch (err) {
+      setError(getSuperAdminApiError(err, 'Failed to send support reply.'));
+    } finally {
+      setSupportReplying(false);
+    }
+  };
+
   useEffect(() => {
-    Promise.all([fetchSchools(), fetchSent()])
+    Promise.all([fetchSchools(), fetchSent(), fetchSupportThreads()])
       .catch((err) => setError(getSuperAdminApiError(err, 'Failed to load notifications page.')))
       .finally(() => setLoading(false));
   }, []);
@@ -404,6 +493,108 @@ const NotificationsPage: React.FC = () => {
             </button>
           </aside>
         </form>
+      </section>
+
+      <section className="rounded-2xl border border-amber-500/25 bg-gray-800/80 p-6 shadow-lg shadow-black/10">
+        <div className="mb-5 flex flex-col gap-1 border-b border-gray-700/80 pb-4">
+          <h2 className="text-lg font-semibold tracking-tight text-white">School admin support inbox</h2>
+          <p className="text-sm text-gray-400">Read messages sent from school admins and reply inside the app.</p>
+        </div>
+
+        {supportLoading ? (
+          <p className="py-8 text-center text-sm text-gray-400">Loading support messages...</p>
+        ) : supportThreads.length === 0 ? (
+          <p className="rounded-xl border border-dashed border-gray-700 py-8 text-center text-sm text-gray-500">
+            No school admin support messages yet.
+          </p>
+        ) : (
+          <div className="grid grid-cols-1 gap-4 xl:grid-cols-[22rem_minmax(0,1fr)]">
+            <div className="space-y-2">
+              {supportThreads.map((thread) => {
+                const selected =
+                  selectedSupportThread?.schoolId === thread.schoolId &&
+                  selectedSupportThread?.adminUserId === thread.adminUserId;
+                return (
+                  <button
+                    key={`${thread.schoolId}-${thread.adminUserId}`}
+                    type="button"
+                    onClick={() => void openSupportThread(thread)}
+                    className={`w-full rounded-2xl border p-4 text-left transition-colors ${
+                      selected
+                        ? 'border-amber-400/45 bg-amber-500/10'
+                        : 'border-gray-700 bg-gray-900/45 hover:border-gray-600 hover:bg-gray-900'
+                    }`}
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <p className="truncate text-sm font-semibold text-white">{thread.adminName}</p>
+                        <p className="truncate text-xs text-amber-200">{thread.schoolName} ({thread.schoolCode})</p>
+                      </div>
+                      <span className="shrink-0 text-xs text-gray-500">{formatDateTime(thread.lastAt)}</span>
+                    </div>
+                    <p className="mt-2 line-clamp-2 text-sm text-gray-400">{thread.lastMessage}</p>
+                  </button>
+                );
+              })}
+            </div>
+
+            <div className="min-h-[22rem] rounded-2xl border border-gray-700 bg-gray-900/45 p-4">
+              {!selectedSupportThread ? (
+                <div className="flex h-full items-center justify-center text-center text-sm text-gray-500">
+                  Select a school admin conversation.
+                </div>
+              ) : (
+                <div className="flex h-full flex-col">
+                  <div className="border-b border-gray-700 pb-3">
+                    <h3 className="text-sm font-semibold text-white">{selectedSupportThread.adminName}</h3>
+                    <p className="text-xs text-gray-400">
+                      {selectedSupportThread.schoolName} ({selectedSupportThread.schoolCode})
+                    </p>
+                  </div>
+
+                  <div className="mt-4 max-h-80 flex-1 space-y-3 overflow-y-auto pr-1">
+                    {selectedSupportThread.messages.map((item) => (
+                      <div key={item.id} className={`flex ${item.isMine ? 'justify-end' : 'justify-start'}`}>
+                        <div className={`max-w-[86%] rounded-2xl border px-4 py-3 text-sm ${
+                          item.isMine
+                            ? 'border-amber-500/25 bg-amber-500/12 text-amber-50'
+                            : 'border-gray-700 bg-gray-800 text-gray-200'
+                        }`}>
+                          <div className="mb-1 flex flex-wrap items-center gap-2 text-xs text-gray-500">
+                            <span>{item.isMine ? 'You' : item.senderName}</span>
+                            <span>{formatDateTime(item.createdAt)}</span>
+                          </div>
+                          <p className="whitespace-pre-wrap leading-relaxed">{item.message}</p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+
+                  <div className="mt-4 border-t border-gray-700 pt-4">
+                    <textarea
+                      value={supportReply}
+                      onChange={(event) => setSupportReply(event.target.value)}
+                      rows={3}
+                      maxLength={2000}
+                      placeholder="Reply to this school admin..."
+                      className="w-full rounded-lg border border-gray-700 bg-gray-950 px-4 py-2 text-sm text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-amber-500"
+                    />
+                    <div className="mt-3 flex justify-end">
+                      <button
+                        type="button"
+                        onClick={() => void handleSupportReply()}
+                        disabled={supportReplying || !supportReply.trim()}
+                        className="rounded-xl bg-amber-600 px-4 py-2 text-sm font-bold text-white hover:bg-amber-500 disabled:cursor-not-allowed disabled:opacity-50"
+                      >
+                        {supportReplying ? 'Sending...' : 'Send reply'}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
       </section>
 
       <section className="rounded-2xl border border-gray-700/80 bg-gray-800/80 p-6 shadow-lg shadow-black/10">

@@ -23,7 +23,7 @@ function isCurrentTimetableSlot(
   entry: { startTime: string; endTime: string },
   currentMinutes: number,
 ): boolean {
-  const toleranceMinutes = 30;
+  const toleranceMinutes = 0;
   return (
     currentMinutes >= timeToMinutes(entry.startTime) - toleranceMinutes &&
     currentMinutes <= timeToMinutes(entry.endTime) + toleranceMinutes
@@ -71,7 +71,6 @@ const startHodSessionHandler: ActionHandler = async (params, scope) => {
   }
 
   const { prisma } = await import('../../../lib/prisma');
-  const { sessionService } = await import('../../sessionService');
 
   const classes = await listDepartmentClasses(scope);
   const selectedClass = pickDepartmentClass(classes, params);
@@ -108,22 +107,13 @@ const startHodSessionHandler: ActionHandler = async (params, scope) => {
     };
   }
 
-  const session = await sessionService.startSession(
-    scope.userId,
-    scope.schoolId,
-    currentEntry.id,
-    undefined,
-    {
-      actorRole: UserRole.HOD,
-      actorDepartmentId: scope.departmentId,
-      requireGps: false,
-    },
-  );
-
   return {
-    answer: `Attendance session started for ${selectedClass.name} - ${currentEntry.subject}.`,
-    data: { sessionId: session.id, classId: selectedClass.id },
+    answer:
+      `I found the current slot for ${selectedClass.name} (${currentEntry.subject}). ` +
+      'Open **Sign In Students** and tap **Start Session** so SAMS can capture GPS before QR/link attendance starts.',
+    data: { classId: selectedClass.id, timetableEntryId: currentEntry.id },
   };
+
 };
 
 async function findHodActiveSessions(

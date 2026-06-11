@@ -223,6 +223,31 @@ export class AttendanceService {
     return this.getStudentForSession(studentId, schoolId, session);
   }
 
+  private async assertDeviceAvailableForSession(
+    sessionId: string,
+    studentId: string,
+    deviceHash?: string | null,
+  ): Promise<void> {
+    if (!deviceHash) return;
+
+    const existing = await prisma.attendanceRecord.findFirst({
+      where: {
+        sessionId,
+        deviceHash,
+        NOT: { studentId },
+      },
+      select: { studentId: true },
+    });
+
+    if (existing) {
+      throw new AppError(
+        409,
+        'DEVICE_ALREADY_USED',
+        'This device has already marked attendance for another student in this session. Use your own phone/account.',
+      );
+    }
+  }
+
   private async emitAttendanceNew(sessionId: string, record: { id: string; studentId: string; status: string; method: string; scannedAt: Date }): Promise<void> {
     const payload = await buildAttendanceEventPayload(record as Parameters<typeof buildAttendanceEventPayload>[0]);
     broadcastAttendanceNew(sessionId, payload);
@@ -328,6 +353,7 @@ export class AttendanceService {
     schoolId: string,
     linkToken: string,
     gpsCoords: { lat: number; lng: number },
+    deviceHash?: string | null,
   ) {
     // 1. Verify JWT signature and expiry
     let payload: LinkTokenPayload;
@@ -373,6 +399,7 @@ export class AttendanceService {
     }
 
     const student = await this.getStudentForSession(studentId, schoolId, session);
+    await this.assertDeviceAvailableForSession(session.id, studentId, deviceHash);
 
     // 4. Validate GPS proximity — only if the token requires GPS
     if (payload.requireGps) {
@@ -413,6 +440,7 @@ export class AttendanceService {
         studentId,
         status,
         method: 'LINK',
+        deviceHash,
         scannedAt: new Date(),
       },
     });
@@ -434,6 +462,7 @@ export class AttendanceService {
     schoolId: string,
     qrToken: string,
     gpsCoords: { lat: number; lng: number },
+    deviceHash?: string | null,
   ) {
     // 1. Verify QR JWT
     let payload: QRTokenPayload;
@@ -466,6 +495,7 @@ export class AttendanceService {
     await this.ensureSessionOpen(session);
 
     const student = await this.getStudentForSession(studentId, schoolId, session);
+    await this.assertDeviceAvailableForSession(session.id, studentId, deviceHash);
 
     // 3. Validate GPS proximity when session anchor is set and student has no exemption
     this.enforceGpsForSession(session, gpsCoords, session.locationRadiusM, student.attendanceGpsExempt);
@@ -504,6 +534,7 @@ export class AttendanceService {
         studentId,
         status,
         method: 'QR',
+        deviceHash,
         scannedAt: new Date(),
       },
     });

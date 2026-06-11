@@ -5,6 +5,7 @@ import { saveAttendanceRecord } from '../services/offlineStore';
 import { AttendanceStatus } from '@sams/shared';
 import { useAuthStore } from '../store/authStore';
 import { getApiErrorMessage } from '../lib/apiError';
+import { getAttendanceDeviceId } from '../lib/attendanceDevice';
 
 const QR_ATTENDANCE_TIMEOUT_MS = 8_000;
 
@@ -195,7 +196,11 @@ const QRScanPage: React.FC = () => {
         try {
           await apiClient.post(
             '/attendance/qr',
-            { qrToken, gpsCoords: lastGpsCoordsRef.current ?? { lat: 0, lng: 0 } },
+            {
+              qrToken,
+              gpsCoords: lastGpsCoordsRef.current ?? { lat: 0, lng: 0 },
+              deviceId: getAttendanceDeviceId(),
+            },
             { timeout: QR_ATTENDANCE_TIMEOUT_MS },
           );
         } catch (err: unknown) {
@@ -224,7 +229,7 @@ const QRScanPage: React.FC = () => {
           setGpsStatus('success');
           await apiClient.post(
             '/attendance/qr',
-            { qrToken, gpsCoords },
+            { qrToken, gpsCoords, deviceId: getAttendanceDeviceId() },
             { timeout: QR_ATTENDANCE_TIMEOUT_MS },
           );
         }

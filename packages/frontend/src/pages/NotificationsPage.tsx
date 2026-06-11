@@ -5,6 +5,7 @@ import { useAuthStore } from '../store/authStore';
 
 interface Notification {
   id: string;
+  userId: string;
   title: string;
   message: string;
   type: string;
@@ -39,6 +40,10 @@ interface AttachmentBlobState {
 
 interface SentNotification extends Notification {
   recipientCount: number;
+}
+
+interface SupportMessage extends Notification {
+  isMine?: boolean;
 }
 
 type Folder = 'alerts' | 'inbox' | 'sent';
@@ -202,6 +207,11 @@ const NotificationsPage: React.FC = () => {
   const [deletingNotification, setDeletingNotification] = useState<Notification | null>(null);
   const [deleteLoading, setDeleteLoading] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
+  const [supportMessages, setSupportMessages] = useState<SupportMessage[]>([]);
+  const [supportDraft, setSupportDraft] = useState('');
+  const [supportLoading, setSupportLoading] = useState(false);
+  const [supportError, setSupportError] = useState<string | null>(null);
+  const [supportSuccess, setSupportSuccess] = useState(false);
 
   // Reply modal (class rep only)
   const [replyingTo, setReplyingTo] = useState<Notification | null>(null);
@@ -230,6 +240,7 @@ const NotificationsPage: React.FC = () => {
   useEffect(() => {
     fetchNotifications();
     if (canSend) fetchScopeData();
+    if (user?.role === 'SCHOOL_ADMIN') void fetchSupportThread();
     if (user?.role === 'STUDENT') {
       apiClient.get('/users/me').then(({ data }) => setIsClassRep(!!data.isClassRep)).catch(() => {});
     } else if (user?.role === 'TEACHER') {
@@ -283,6 +294,7 @@ const NotificationsPage: React.FC = () => {
     socket.on('notification:new', (data: any) => {
       const newNotif: Notification = {
         id: data.id || `tmp-${Date.now()}`,
+        userId: user?.id ?? '',
         title: data.title || 'New Message',
         message: data.message,
         type: data.type || 'MESSAGE',
@@ -296,6 +308,9 @@ const NotificationsPage: React.FC = () => {
       };
       // Refresh to get full sender info
       fetchNotifications();
+      if (user?.role === 'SCHOOL_ADMIN' && data.type === 'SUPER_ADMIN_SUPPORT') {
+        void fetchSupportThread();
+      }
       void newNotif;
     });
 
@@ -325,6 +340,33 @@ const NotificationsPage: React.FC = () => {
       setSentMessages(data);
     } catch { /* ignore */ } finally {
       setSentLoading(false);
+    }
+  };
+
+  const fetchSupportThread = async () => {
+    if (user?.role !== 'SCHOOL_ADMIN') return;
+    try {
+      const { data } = await apiClient.get('/notifications/support-thread');
+      setSupportMessages(Array.isArray(data) ? data : []);
+    } catch { /* ignore */ }
+  };
+
+  const handleSupportSend = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!supportDraft.trim()) return;
+    setSupportLoading(true);
+    setSupportError(null);
+    setSupportSuccess(false);
+    try {
+      await apiClient.post('/notifications/support', { message: supportDraft.trim() });
+      setSupportDraft('');
+      setSupportSuccess(true);
+      await fetchSupportThread();
+      setTimeout(() => setSupportSuccess(false), 2500);
+    } catch (err: any) {
+      setSupportError(err.response?.data?.error || 'Failed to send message to Super Admin');
+    } finally {
+      setSupportLoading(false);
     }
   };
 
@@ -618,7 +660,8 @@ const NotificationsPage: React.FC = () => {
     setDeleteLoading(true);
     setDeleteError(null);
     try {
-      if (deletingNotification.batchId) {
+      const shouldDeleteSentBatch = isOwnSentMessage(deletingNotification) && !!deletingNotification.batchId;
+      if (shouldDeleteSentBatch) {
         await apiClient.delete(`/notifications/batch/${deletingNotification.batchId}`);
         setNotifications((prev) => prev.filter((n) => n.batchId !== deletingNotification.batchId));
         setSentMessages((prev) => prev.filter((n) => n.batchId !== deletingNotification.batchId));
@@ -626,6 +669,7 @@ const NotificationsPage: React.FC = () => {
         await apiClient.delete(`/notifications/${deletingNotification.id}`);
         setNotifications((prev) => prev.filter((n) => n.id !== deletingNotification.id));
         setSentMessages((prev) => prev.filter((n) => n.id !== deletingNotification.id));
+        setSupportMessages((prev) => prev.filter((n) => n.id !== deletingNotification.id));
       }
       setDeletingNotification(null);
     } catch (err: any) {
@@ -669,8 +713,12 @@ const NotificationsPage: React.FC = () => {
     setOpenedNotification(isSentFolder ? null : { ...notif, read: true });
   };
 
-  const alertMessages = notifications.filter((n) => n.type !== 'MESSAGE' || !n.senderId);
-  const inboxMessages = notifications.filter((n) => n.type === 'MESSAGE' && !!n.senderId);
+  const alertMessages = notifications.filter((n) =>
+    !['MESSAGE', 'SUPER_ADMIN_SUPPORT'].includes(n.type) || !n.senderId,
+  );
+  const inboxMessages = notifications.filter((n) =>
+    ['MESSAGE', 'SUPER_ADMIN_SUPPORT'].includes(n.type) && !!n.senderId,
+  );
   const inboxUnreadCount = inboxMessages.filter((n) => !n.read).length;
   const alertsUnreadCount = alertMessages.filter((n) => !n.read).length;
   const totalUnreadCount = notifications.filter((n) => !n.read).length;
@@ -826,6 +874,7 @@ const NotificationsPage: React.FC = () => {
       isOwn &&
       notif.senderId === user?.id &&
       (!!isSchoolAdmin || isWithin24Hours(notif.createdAt));
+    const canDeleteReceived = !isSentFolder && notif.userId === user?.id;
     const windowExpired = isSentFolder && isOwn && !isSchoolAdmin && !isWithin24Hours(notif.createdAt);
     const canReply = !isSentFolder && isClassRep && notif.senderRole === 'TEACHER' && !!notif.senderId;
     const recipientCount = isSentFolder ? (notif as SentNotification).recipientCount : undefined;
@@ -908,6 +957,15 @@ const NotificationsPage: React.FC = () => {
               <button onClick={(e) => { e.stopPropagation(); setReplyingTo(notif); setReplyMessage(''); setReplyError(null); }}
                 className="px-2 py-1 text-xs rounded-lg bg-indigo-600/20 text-brand hover:bg-indigo-600/30 border border-indigo-500/30 transition-all">
                 Reply
+              </button>
+            )}
+            {canDeleteReceived && (
+              <button onClick={(e) => { e.stopPropagation(); setDeletingNotification(notif); setDeleteError(null); }}
+                className="p-1.5 rounded-lg transition-all hover:bg-white/10 text-ink-muted hover:text-red-400"
+                aria-label="Delete message">
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                </svg>
               </button>
             )}
             {canModify && (
@@ -1014,6 +1072,86 @@ const NotificationsPage: React.FC = () => {
           <div className="mb-6 p-4 rounded-2xl border border-line bg-surface shadow-card-soft text-sm text-ink-muted">
             You can read messages from teachers, HODs, and school admin here. If you are the class representative, replies go only to the teacher who messaged your class.
           </div>
+        )}
+
+        {isSchoolAdmin && (
+          <section className="mb-6 rounded-3xl border border-amber-400/25 bg-amber-500/8 p-5 shadow-card-soft">
+            <div className="flex flex-col gap-1 sm:flex-row sm:items-start sm:justify-between">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-[0.16em] text-amber-300">SAMS support</p>
+                <h2 className="text-lg font-semibold text-ink">Chat with Super Admin</h2>
+                <p className="mt-1 text-sm text-ink-muted">Reach the platform owner directly from this school account.</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => void fetchSupportThread()}
+                className="mt-3 rounded-xl border border-amber-400/25 px-3 py-2 text-sm font-semibold text-amber-200 hover:bg-amber-500/10 sm:mt-0"
+              >
+                Refresh
+              </button>
+            </div>
+
+            <div className="mt-4 max-h-72 space-y-3 overflow-y-auto rounded-2xl border border-amber-400/15 bg-surface/70 p-3">
+              {supportMessages.length === 0 ? (
+                <p className="py-6 text-center text-sm text-ink-subtle">No support messages yet.</p>
+              ) : (
+                supportMessages.map((item) => {
+                  const mine = item.senderId === user?.id || item.isMine;
+                  return (
+                    <div key={item.id} className={`flex ${mine ? 'justify-end' : 'justify-start'}`}>
+                      <div className={`max-w-[88%] rounded-2xl border px-4 py-3 text-sm ${
+                        mine
+                          ? 'border-indigo-500/25 bg-indigo-600/15 text-indigo-50'
+                          : 'border-amber-400/25 bg-amber-500/12 text-amber-50'
+                      }`}>
+                        <div className="mb-1 flex flex-wrap items-center gap-2 text-xs text-ink-subtle">
+                          <span>{mine ? 'You' : 'SAMS Super Admin'}</span>
+                          <span>{formatDateTime(item.createdAt)}</span>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setDeletingNotification(item);
+                              setDeleteError(null);
+                            }}
+                            className="ml-auto rounded border border-white/10 px-2 py-0.5 text-[11px] text-ink-subtle hover:border-red-400/30 hover:text-red-300"
+                          >
+                            Delete
+                          </button>
+                        </div>
+                        <p className="whitespace-pre-wrap leading-relaxed">{renderLinkedText(item.message)}</p>
+                      </div>
+                    </div>
+                  );
+                })
+              )}
+            </div>
+
+            <form onSubmit={handleSupportSend} className="mt-4 space-y-3">
+              {supportError && (
+                <div className="rounded-xl border border-red-400/30 bg-red-500/15 p-3 text-sm text-red-300">{supportError}</div>
+              )}
+              {supportSuccess && (
+                <div className="rounded-xl border border-emerald-400/30 bg-emerald-500/15 p-3 text-sm text-emerald-300">Message sent to Super Admin.</div>
+              )}
+              <textarea
+                value={supportDraft}
+                onChange={(e) => setSupportDraft(e.target.value)}
+                rows={3}
+                maxLength={2000}
+                className="w-full input-field placeholder-ink-subtle focus:outline-none focus:ring-2 focus:ring-amber-500/35"
+                placeholder="Type your support message..."
+              />
+              <div className="flex justify-end">
+                <button
+                  type="submit"
+                  disabled={supportLoading || !supportDraft.trim()}
+                  className="rounded-xl bg-amber-600 px-4 py-2 text-sm font-bold text-white hover:bg-amber-500 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  {supportLoading ? 'Sending...' : 'Send to Super Admin'}
+                </button>
+              </div>
+            </form>
+          </section>
         )}
 
         {/* Send Form */}
@@ -1261,6 +1399,21 @@ const NotificationsPage: React.FC = () => {
               {renderLinkedText(openedNotification.message)}
             </div>
             {renderAttachments(openedNotification.attachments, false)}
+
+            {openedNotification.userId === user?.id && (
+              <div className="mt-5 flex justify-end">
+                <button
+                  onClick={() => {
+                    setDeletingNotification(openedNotification);
+                    setDeleteError(null);
+                    setOpenedNotification(null);
+                  }}
+                  className="rounded-xl border border-red-500/35 px-4 py-2 text-sm font-semibold text-red-300 hover:bg-red-500/10"
+                >
+                  Delete from my inbox
+                </button>
+              </div>
+            )}
 
             {isClassRep && openedNotification.senderRole === 'TEACHER' && openedNotification.senderId && (
               <div className="mt-5 flex justify-end">

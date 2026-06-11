@@ -79,29 +79,29 @@ model LicenseKey {
 }
 
 model School {
-  id               String    @id @default(cuid())
+  id               String   @id @default(cuid())
   name             String
-  schoolCode       String    @unique // short memorable code, e.g. "KHS2024"
-  planTier         PlanTier  @default(TRIAL)
+  schoolCode       String   @unique // short memorable code, e.g. "KHS2024"
+  planTier         PlanTier @default(TRIAL)
   licenseExpiresAt DateTime
-  isSuspended      Boolean   @default(false)
-  isReadOnly       Boolean   @default(false)
+  isSuspended      Boolean  @default(false)
+  isReadOnly       Boolean  @default(false)
   logoUrl          String? // Enterprise: custom branding
   primaryColor     String?
-  createdAt        DateTime  @default(now())
-  updatedAt        DateTime  @updatedAt
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
 
-  licenseKey        LicenseKey?
-  users             User[]
-  departments       Department[]
-  classes           Class[]
-  timetableEntries  TimetableEntry[]
-  sessions          AttendanceSession[]
-  registrationLinks RegistrationLink[]
-  auditLogs         AuditLog[]
-  payments          Payment[]
-  riskScores        RiskScore[]
-  notifications     Notification[]
+  licenseKey          LicenseKey?
+  users               User[]
+  departments         Department[]
+  classes             Class[]
+  timetableEntries    TimetableEntry[]
+  sessions            AttendanceSession[]
+  registrationLinks   RegistrationLink[]
+  auditLogs           AuditLog[]
+  payments            Payment[]
+  riskScores          RiskScore[]
+  notifications       Notification[]
   conversationThreads ConversationThread[]
   conversationRecords ConversationRecord[]
 
@@ -111,12 +111,12 @@ model School {
 }
 
 model User {
-  id                     String    @id @default(cuid())
+  id                     String      @id @default(cuid())
   schoolId               String
-  school                 School    @relation(fields: [schoolId], references: [id])
+  school                 School      @relation(fields: [schoolId], references: [id])
   role                   UserRole
   fullName               String
-  username               String?   @unique
+  username               String?     @unique
   email                  String?
   phone                  String?
   admissionNumber        String? // Students only
@@ -127,29 +127,29 @@ model User {
   department             Department? @relation(fields: [departmentId], references: [id])
   classId                String?
   class                  Class?      @relation(fields: [classId], references: [id])
-  isLocked               Boolean   @default(false)
-  failedLoginCount       Int       @default(0)
+  isLocked               Boolean     @default(false)
+  failedLoginCount       Int         @default(0)
   failedLoginWindowStart DateTime?
   lastLoginAt            DateTime?
   avatarUrl              String?
-  isClassRep             Boolean   @default(false)
+  isClassRep             Boolean     @default(false)
   /// When true, QR/link GPS radius checks are skipped (medical leave, permission, etc.)
-  attendanceGpsExempt    Boolean   @default(false)
-  createdAt              DateTime  @default(now())
-  updatedAt              DateTime  @updatedAt
+  attendanceGpsExempt    Boolean     @default(false)
+  createdAt              DateTime    @default(now())
+  updatedAt              DateTime    @updatedAt
 
-  refreshTokens     RefreshToken[]
+  refreshTokens       RefreshToken[]
   webauthnCredentials WebAuthnCredential[]
-  biometricTemplate BiometricTemplate?
-  attendanceRecords AttendanceRecord[]
-  sessionsStarted   AttendanceSession[] @relation("SessionTeacher")
-  auditLogsActed    AuditLog[]          @relation("AuditActor")
-  timetableEntries  TimetableEntry[]
-  notifications     Notification[]
+  biometricTemplate   BiometricTemplate?
+  attendanceRecords   AttendanceRecord[]
+  sessionsStarted     AttendanceSession[]  @relation("SessionTeacher")
+  auditLogsActed      AuditLog[]           @relation("AuditActor")
+  timetableEntries    TimetableEntry[]
+  notifications       Notification[]
   conversationThreads ConversationThread[]
   conversationRecords ConversationRecord[]
-  knowledgeEntries  AIKnowledge[]
-  classesAsTeacher  Class[]             @relation("ClassTeacher")
+  knowledgeEntries    AIKnowledge[]
+  classesAsTeacher    Class[]              @relation("ClassTeacher")
 
   @@unique([schoolId, admissionNumber])
   @@unique([schoolId, phone])
@@ -186,16 +186,16 @@ model Department {
 }
 
 model Class {
-  id             String   @id @default(cuid())
+  id             String     @id @default(cuid())
   schoolId       String
-  school         School   @relation(fields: [schoolId], references: [id])
+  school         School     @relation(fields: [schoolId], references: [id])
   departmentId   String
   department     Department @relation(fields: [departmentId], references: [id])
   name           String
-  capacity       Int      @default(50)
+  capacity       Int        @default(50)
   classTeacherId String?
-  classTeacher   User?    @relation("ClassTeacher", fields: [classTeacherId], references: [id])
-  createdAt      DateTime @default(now())
+  classTeacher   User?      @relation("ClassTeacher", fields: [classTeacherId], references: [id])
+  createdAt      DateTime   @default(now())
 
   users             User[]
   timetableEntries  TimetableEntry[]
@@ -208,20 +208,20 @@ model Class {
 }
 
 model TimetableEntry {
-  id         String @id @default(cuid())
-  schoolId   String
-  school     School @relation(fields: [schoolId], references: [id])
-  classId    String
-  class      Class  @relation(fields: [classId], references: [id])
-  teacherId  String
-  teacher    User   @relation(fields: [teacherId], references: [id])
-  subject    String
-  dayOfWeek  Int // 0=Monday … 6=Sunday
-  startTime  String // "HH:MM" 24-hour
-  endTime    String
-  room       String?
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
+  id        String   @id @default(cuid())
+  schoolId  String
+  school    School   @relation(fields: [schoolId], references: [id])
+  classId   String
+  class     Class    @relation(fields: [classId], references: [id])
+  teacherId String
+  teacher   User     @relation(fields: [teacherId], references: [id])
+  subject   String
+  dayOfWeek Int // 0=Monday … 6=Sunday
+  startTime String // "HH:MM" 24-hour
+  endTime   String
+  room      String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   sessions AttendanceSession[]
 
@@ -234,27 +234,27 @@ model TimetableEntry {
 }
 
 model AttendanceSession {
-  id               String   @id @default(cuid())
+  id               String          @id @default(cuid())
   schoolId         String
-  school           School   @relation(fields: [schoolId], references: [id])
+  school           School          @relation(fields: [schoolId], references: [id])
   classId          String
-  class            Class    @relation(fields: [classId], references: [id])
+  class            Class           @relation(fields: [classId], references: [id])
   teacherId        String
-  teacher          User     @relation("SessionTeacher", fields: [teacherId], references: [id])
+  teacher          User            @relation("SessionTeacher", fields: [teacherId], references: [id])
   timetableEntryId String?
   timetableEntry   TimetableEntry? @relation(fields: [timetableEntryId], references: [id])
   subject          String
-  lateThresholdMin Int      @default(15)
+  lateThresholdMin Int             @default(15)
   locationLat      Float?
   locationLng      Float?
-  locationRadiusM  Int      @default(100)
+  locationRadiusM  Int             @default(100)
   currentQRToken   String?
   qrRefreshedAt    DateTime?
   currentLinkToken String?
   linkExpiresAt    DateTime?
-  startedAt        DateTime @default(now())
+  startedAt        DateTime        @default(now())
   endedAt          DateTime?
-  isActive         Boolean  @default(true)
+  isActive         Boolean         @default(true)
 
   records AttendanceRecord[]
 
@@ -267,21 +267,23 @@ model AttendanceSession {
 }
 
 model AttendanceRecord {
-  id        String           @id @default(cuid())
-  schoolId  String
-  sessionId String
-  session   AttendanceSession @relation(fields: [sessionId], references: [id])
-  studentId String
-  student   User             @relation(fields: [studentId], references: [id])
-  status    AttendanceStatus
-  method    String // "QR" | "MANUAL" | "BIOMETRIC" | "OFFLINE_QR" | "OFFLINE_MANUAL"
-  note      String?          @db.VarChar(500)
-  scannedAt DateTime
-  syncedAt  DateTime?
-  createdAt DateTime         @default(now())
-  updatedAt DateTime         @updatedAt
+  id         String            @id @default(cuid())
+  schoolId   String
+  sessionId  String
+  session    AttendanceSession @relation(fields: [sessionId], references: [id])
+  studentId  String
+  student    User              @relation(fields: [studentId], references: [id])
+  status     AttendanceStatus
+  method     String // "QR" | "MANUAL" | "BIOMETRIC" | "OFFLINE_QR" | "OFFLINE_MANUAL"
+  deviceHash String?           @db.VarChar(64)
+  note       String?           @db.VarChar(500)
+  scannedAt  DateTime
+  syncedAt   DateTime?
+  createdAt  DateTime          @default(now())
+  updatedAt  DateTime          @updatedAt
 
   @@unique([sessionId, studentId])
+  @@unique([sessionId, deviceHash])
   @@index([schoolId, studentId])
   @@index([sessionId])
   @@index([schoolId, scannedAt])
@@ -379,24 +381,23 @@ model Payment {
   @@index([schoolId, initiatedAt])
 }
 
-
 // ─── Notifications ────────────────────────────────────────────────────────────
 
 model Notification {
-  id        String    @id @default(cuid())
-  schoolId  String
-  userId    String
-  senderId  String?
-  batchId   String?
-  title     String
-  message   String
-  type        String    @default("MESSAGE")
-  scope       String?
-  targetId    String?
-  targetRole  String?
-  read        Boolean   @default(false)
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime?
+  id         String    @id @default(cuid())
+  schoolId   String
+  userId     String
+  senderId   String?
+  batchId    String?
+  title      String
+  message    String
+  type       String    @default("MESSAGE")
+  scope      String?
+  targetId   String?
+  targetRole String?
+  read       Boolean   @default(false)
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime?
 
   user   User   @relation(fields: [userId], references: [id])
   school School @relation(fields: [schoolId], references: [id])
@@ -489,17 +490,17 @@ model ConversationRecord {
 // ─── WebAuthn Credentials ─────────────────────────────────────────────────────
 
 model WebAuthnCredential {
-  id              String   @id @default(cuid())
-  userId          String
-  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  credentialId    String   @unique // base64url-encoded credential ID
-  publicKey       Bytes    // COSE public key
-  counter         Int      @default(0) // signature counter for replay protection
-  deviceType      String   @default("platform") // "platform" or "cross-platform"
-  transports      String[] // e.g. ["internal", "usb", "ble", "nfc"]
-  backedUp        Boolean  @default(false)
-  createdAt       DateTime @default(now())
-  lastUsedAt      DateTime?
+  id           String    @id @default(cuid())
+  userId       String
+  user         User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  credentialId String    @unique // base64url-encoded credential ID
+  publicKey    Bytes // COSE public key
+  counter      Int       @default(0) // signature counter for replay protection
+  deviceType   String    @default("platform") // "platform" or "cross-platform"
+  transports   String[] // e.g. ["internal", "usb", "ble", "nfc"]
+  backedUp     Boolean   @default(false)
+  createdAt    DateTime  @default(now())
+  lastUsedAt   DateTime?
 
   @@index([userId])
 }

@@ -72,7 +72,7 @@ describe('teacher AI attendance actions', () => {
     vi.useRealTimers();
   });
 
-  it('starts a session through the timetable-backed session service', async () => {
+  it('finds the current timetable slot and sends the teacher to the GPS-aware session screen', async () => {
     const action = teacherActions.find((item) => item.action === 'start_session');
 
     const result = await action!.handler({ classId: 'class-1' }, scope as any);
@@ -87,14 +87,9 @@ describe('teacher AI attendance actions', () => {
         }),
       }),
     );
-    expect(sessionServiceMock.startSession).toHaveBeenCalledWith(
-      'teacher-1',
-      'school-1',
-      'entry-1',
-      undefined,
-      { requireGps: false },
-    );
-    expect(result.data).toEqual({ sessionId: 'session-1', classId: 'class-1' });
+    expect(sessionServiceMock.startSession).not.toHaveBeenCalled();
+    expect(result.answer).toMatch(/Sign In Students/i);
+    expect(result.data).toEqual({ classId: 'class-1', timetableEntryId: 'entry-1' });
   });
 
   it('does not start a session outside the current timetable slot', async () => {

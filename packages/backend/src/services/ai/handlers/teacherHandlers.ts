@@ -56,7 +56,7 @@ function isCurrentTimetableSlot(
   entry: { startTime: string; endTime: string },
   currentMinutes: number,
 ): boolean {
-  const toleranceMinutes = 30;
+  const toleranceMinutes = 0;
   return (
     currentMinutes >= timeToMinutes(entry.startTime) - toleranceMinutes &&
     currentMinutes <= timeToMinutes(entry.endTime) + toleranceMinutes
@@ -65,7 +65,6 @@ function isCurrentTimetableSlot(
 
 const startSessionHandler: ActionHandler = async (params, scope) => {
   const { prisma } = await import('../../../lib/prisma');
-  const { sessionService } = await import('../../sessionService');
 
   const subject = params.subject as string | undefined;
   const classes = await listTeacherClasses(scope);
@@ -104,18 +103,13 @@ const startSessionHandler: ActionHandler = async (params, scope) => {
     };
   }
 
-  const session = await sessionService.startSession(
-    scope.userId,
-    scope.schoolId,
-    currentEntry.id,
-    undefined,
-    { requireGps: false },
-  );
-
   return {
-    answer: `✅ Attendance session started for "${subject || currentEntry.subject}".`,
-    data: { sessionId: session.id, classId: selectedClass.id },
+    answer:
+      `I found the current slot for ${selectedClass.name} (${subject || currentEntry.subject}). ` +
+      'Open **Sign In Students** and tap **Start Session** so SAMS can capture GPS before QR/link attendance starts.',
+    data: { classId: selectedClass.id, timetableEntryId: currentEntry.id },
   };
+
 };
 
 const endSessionHandler: ActionHandler = async (_params, scope) => {

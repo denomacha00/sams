@@ -1,7 +1,11 @@
-import type { AttendanceSession, Class, User } from '@prisma/client';
+import type { AttendanceRecord, AttendanceSession, Class, User } from '@prisma/client';
 
 type SessionWithClass = AttendanceSession & {
   class?: Pick<Class, 'name'> | null;
+};
+
+type RecordWithStudent = Pick<AttendanceRecord, 'id' | 'studentId' | 'status' | 'method' | 'scannedAt' | 'note'> & {
+  student?: Pick<User, 'fullName'> | null;
 };
 
 export interface ClientSessionResponse {
@@ -28,6 +32,16 @@ export interface ClientStudentPreview {
   id: string;
   fullName: string;
   admissionNumber: string | null;
+}
+
+export interface ClientAttendanceRecordPreview {
+  id: string;
+  studentId: string;
+  studentName: string;
+  status: string;
+  method: string;
+  scannedAt: Date;
+  note: string | null;
 }
 
 export function formatSessionForClient(session: SessionWithClass): ClientSessionResponse {
@@ -59,5 +73,19 @@ export function formatStudentsForClient(
     id: s.id,
     fullName: s.fullName,
     admissionNumber: s.admissionNumber,
+  }));
+}
+
+export function formatAttendanceRecordsForClient(
+  records: RecordWithStudent[],
+): ClientAttendanceRecordPreview[] {
+  return records.map((record) => ({
+    id: record.id,
+    studentId: record.studentId,
+    studentName: record.student?.fullName ?? 'Student',
+    status: record.status,
+    method: record.method,
+    scannedAt: record.scannedAt,
+    note: record.note,
   }));
 }

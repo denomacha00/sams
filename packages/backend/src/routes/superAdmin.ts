@@ -39,6 +39,7 @@ const updateSchoolPlanSchema = z.object({
 });
 
 const SUPER_NOTIFICATION_TYPE = 'SUPER_ADMIN';
+const SUPER_SUPPORT_NOTIFICATION_TYPE = 'SUPER_ADMIN_SUPPORT';
 const SUPER_NOTIFICATION_MAX_BYTES = 10 * 1024 * 1024;
 const SUPER_NOTIFICATION_MAX_FILES = 5;
 const SUPER_NOTIFICATION_MIME_TYPES = new Map<string, string>([
@@ -72,6 +73,12 @@ const editSuperNotificationSchema = z.object({
   message: z.string().min(1).max(2000).optional(),
 }).refine((value) => !!value.title || !!value.message, {
   message: 'Title or message is required',
+});
+
+const superSupportReplySchema = z.object({
+  schoolId: z.string().min(1),
+  adminUserId: z.string().min(1),
+  message: z.string().min(1).max(2000),
 });
 
 type SuperNotificationAttachmentResponse = {
@@ -246,6 +253,15 @@ async function resolveSuperNotificationTargetLabel(
     label += ` (${targetRole.replace('_', ' ').toLowerCase()}s)`;
   }
   return label;
+}
+
+function emitSuperSupportMessage(userId: string, payload: Record<string, unknown>): void {
+  setImmediate(() => {
+    getSocketIO().to(`user:${userId}`).emit('notification:new', {
+      ...payload,
+      timestamp: new Date().toISOString(),
+    });
+  });
 }
 
 // ─── Host Restriction Middleware ──────────────────────────────────────────────
@@ -1084,6 +1100,171 @@ superAdminRouter.delete('/notifications/batch/:batchId', async (req: Request, re
 });
 
 // ─── AI Knowledge Base CRUD ────────────────────────────────────────────────────
+
+superAdminRouter.get('/notifications/support', async (_req: Request, res: Response): Promise<void> => {
+  const messages = await prisma.notification.findMany({
+    where: { type: SUPER_SUPPORT_NOTIFICATION_TYPE },
+    orderBy: { createdAt: 'desc' },
+    take: 300,
+    include: {
+      school: { select: { id: true, name: true, schoolCode: true } },
+      user: { select: { id: true, fullName: true, role: true } },
+    },
+  });
+
+  const senderIds = [...new Set(messages.map((n) => n.senderId).filter((id): id is string => !!id))];
+  const senders = senderIds.length
+    ? await prisma.user.findMany({
+        where: { id: { in: senderIds } },
+        select: { id: true, fullName: true, role: true },
+      })
+    : [];
+  const senderMap = new Map(senders.map((s) => [s.id, s]));
+
+  const seenThreads = new Set<string>();
+  const threads: Array<Record<string, unknown>> = [];
+
+  for (const message of messages) {
+    const sender = message.senderId ? senderMap.get(message.senderId) : null;
+    const adminUserId = sender?.role === 'SCHOOL_ADMIN'
+      ? message.senderId
+      : message.user.role === 'SCHOOL_ADMIN'
+        ? message.userId
+        : null;
+    if (!adminUserId) continue;
+
+    const threadKey = `${message.schoolId}:${adminUserId}`;
+    if (seenThreads.has(threadKey)) continue;
+    seenThreads.add(threadKey);
+
+    threads.push({
+      schoolId: message.schoolId,
+      schoolName: message.school.name,
+      schoolCode: message.school.schoolCode,
+      adminUserId,
+      adminName: sender?.role === 'SCHOOL_ADMIN'
+        ? sender.fullName
+        : message.user.role === 'SCHOOL_ADMIN'
+          ? message.user.fullName
+          : 'School Admin',
+      lastMessage: message.message,
+      lastSenderRole: sender?.role ?? 'SUPER_ADMIN',
+      lastSenderName: sender?.fullName ?? 'SAMS Super Admin',
+      lastAt: message.createdAt,
+    });
+  }
+
+  res.status(200).json(threads);
+});
+
+superAdminRouter.get('/notifications/support/:schoolId/:adminUserId', async (req: Request, res: Response): Promise<void> => {
+  const schoolId = req.params.schoolId as string;
+  const adminUserId = req.params.adminUserId as string;
+
+  const admin = await prisma.user.findFirst({
+    where: { id: adminUserId, schoolId, role: 'SCHOOL_ADMIN' },
+    select: { id: true, fullName: true, school: { select: { name: true, schoolCode: true } } },
+  });
+  if (!admin) throw new AppError(404, 'NOT_FOUND', 'School admin support thread not found');
+
+  const messages = await prisma.notification.findMany({
+    where: {
+      schoolId,
+      type: SUPER_SUPPORT_NOTIFICATION_TYPE,
+      OR: [
+        { senderId: adminUserId },
+        { userId: adminUserId },
+      ],
+    },
+    orderBy: { createdAt: 'asc' },
+    take: 250,
+  });
+
+  const senderIds = [...new Set(messages.map((n) => n.senderId).filter((id): id is string => !!id))];
+  const senders = senderIds.length
+    ? await prisma.user.findMany({
+        where: { id: { in: senderIds } },
+        select: { id: true, fullName: true, role: true },
+      })
+    : [];
+  const senderMap = new Map(senders.map((s) => [s.id, s]));
+
+  res.status(200).json({
+    schoolId,
+    schoolName: admin.school.name,
+    schoolCode: admin.school.schoolCode,
+    adminUserId: admin.id,
+    adminName: admin.fullName,
+    messages: messages.map((message) => {
+      const sender = message.senderId ? senderMap.get(message.senderId) : null;
+      return {
+        ...message,
+        senderName: sender?.fullName ?? 'SAMS Super Admin',
+        senderRole: sender?.role ?? 'SUPER_ADMIN',
+        isMine: message.senderId === req.user.sub,
+      };
+    }),
+  });
+});
+
+superAdminRouter.post('/notifications/support/reply', async (req: Request, res: Response): Promise<void> => {
+  const parsed = superSupportReplySchema.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({
+      error: 'Validation failed',
+      code: 'VALIDATION_ERROR',
+      details: parsed.error.flatten().fieldErrors,
+    });
+    return;
+  }
+
+  const admin = await prisma.user.findFirst({
+    where: {
+      id: parsed.data.adminUserId,
+      schoolId: parsed.data.schoolId,
+      role: 'SCHOOL_ADMIN',
+    },
+    select: {
+      id: true,
+      fullName: true,
+      schoolId: true,
+      school: { select: { name: true, schoolCode: true } },
+    },
+  });
+  if (!admin) throw new AppError(404, 'NOT_FOUND', 'School admin not found');
+
+  const batchId = createId();
+  const title = 'Reply from SAMS Super Admin';
+  const notification = await prisma.notification.create({
+    data: {
+      schoolId: admin.schoolId,
+      userId: admin.id,
+      senderId: req.user.sub,
+      batchId,
+      title,
+      message: parsed.data.message,
+      type: SUPER_SUPPORT_NOTIFICATION_TYPE,
+      scope: 'support',
+      targetId: admin.schoolId,
+      targetRole: 'SCHOOL_ADMIN',
+    },
+  });
+
+  res.status(200).json({ success: true, notification });
+
+  emitSuperSupportMessage(admin.id, {
+    id: notification.id,
+    title,
+    message: notification.message,
+    type: SUPER_SUPPORT_NOTIFICATION_TYPE,
+    senderId: req.user.sub,
+    senderName: 'SAMS Super Admin',
+    senderRole: 'SUPER_ADMIN',
+    schoolName: admin.school.name,
+    schoolCode: admin.school.schoolCode,
+    batchId,
+  });
+});
 
 const aiKnowledgeSchema = z.object({
   title: z.string().min(1).max(200),

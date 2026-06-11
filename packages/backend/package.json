@@ -14,6 +14,7 @@
     "prisma:migrate": "prisma migrate dev",
     "prisma:studio": "prisma studio",
     "create-super-admin": "prisma generate && tsx scripts/create-super-admin.ts",
+    "unlock-users": "prisma generate && tsx scripts/unlock-users.ts",
     "lint": "tsc --noEmit"
   },
   "dependencies": {

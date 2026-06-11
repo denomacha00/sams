@@ -44,7 +44,7 @@ interface ActiveSession {
   records: AttendanceRecord[];
 }
 
-const SESSION_WINDOW_TOLERANCE_MINUTES = 30;
+const SESSION_WINDOW_TOLERANCE_MINUTES = 0;
 
 function schemaDayOfWeek(date: Date): number {
   const jsDay = date.getDay();
@@ -113,7 +113,7 @@ const SessionPage: React.FC = () => {
   const [linkCopied, setLinkCopied] = useState(false);
   const [linkTimeRemaining, setLinkTimeRemaining] = useState<number>(0);
   const linkTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const [sessionRequireGps, setSessionRequireGps] = useState<boolean>(false);
+  const [sessionRequireGps, setSessionRequireGps] = useState<boolean>(true);
   const [sessionRadiusM, setSessionRadiusM] = useState<number>(100);
 
   const normalizeSessionFromApi = useCallback((data: {
@@ -160,12 +160,7 @@ const SessionPage: React.FC = () => {
         .filter((s: { isActive?: boolean }) => s.isActive !== false)
         .map(normalizeSessionFromApi);
 
-      setActiveSessions((previous) =>
-        normalized.map((session) => ({
-          ...session,
-          records: previous.find((known) => known.id === session.id)?.records ?? session.records,
-        })),
-      );
+      setActiveSessions(normalized);
       if (normalized.length === 0) {
         setQrDataUrl('');
       }
@@ -176,7 +171,7 @@ const SessionPage: React.FC = () => {
         if (current) {
           const stillActive = normalized.find((session) => session.id === current.id);
           if (stillActive) {
-            return { ...stillActive, records: current.records };
+            return stillActive;
           }
         }
         return options.selectFirst ? normalized[0] : current;
@@ -491,7 +486,7 @@ const SessionPage: React.FC = () => {
       if (sessionRequireGps) {
         if (!navigator.geolocation) {
           setError(
-            'Location is not available in this browser. Use HTTPS, or turn off "Require GPS" to start without a location check.',
+            'Location is not available in this browser. Use HTTPS and allow GPS before starting this attendance session.',
           );
           return;
         }
@@ -500,8 +495,8 @@ const SessionPage: React.FC = () => {
         } catch (geoErr: unknown) {
           const msg =
             geoErr instanceof Error && geoErr.message === 'GPS_TIMEOUT'
-              ? 'Location timed out. Allow GPS access or turn off "Require GPS" for this session.'
-              : 'Could not get your location. Allow GPS or turn off "Require GPS" for this session.';
+              ? 'Location timed out. Allow GPS access and try again.'
+              : 'Could not get your location. Allow GPS access and try again.';
           setError(msg);
           return;
         }
@@ -610,7 +605,7 @@ const SessionPage: React.FC = () => {
               <p className="text-xs font-semibold uppercase tracking-[0.16em] text-brand">Attendance control</p>
               <h1 className="text-2xl font-bold text-ink">Start Attendance Session</h1>
               <p className="text-ink-muted text-sm mt-1">
-                Sessions open from the timetable window. Choose QR, link, manual, or face scan after starting.
+                Sessions open from the timetable window. Choose QR, link, manual, or face attendance after starting.
               </p>
             </div>
             <Link to="/" className="btn-secondary px-4 py-2 text-sm w-full sm:w-auto text-center">
@@ -670,7 +665,7 @@ const SessionPage: React.FC = () => {
                 <p className="text-xs text-ink-muted mt-0.5">
                   {sessionRequireGps
                     ? 'Students must be within your set radius when scanning'
-                    : 'No location check for QR — use link GPS toggle separately if needed'}
+                    : 'No location check for QR — use only with school-admin approval'}
                 </p>
               </div>
               <button
@@ -797,7 +792,7 @@ const SessionPage: React.FC = () => {
               to={`/biometric/attendance?sessionId=${activeSession.id}`}
               className="btn-secondary py-2 px-4 text-sm font-medium transition-all duration-200"
             >
-              Face scan
+              Face attendance
             </Link>
             <button
               onClick={endSession}
@@ -844,7 +839,7 @@ const SessionPage: React.FC = () => {
         )}
 
         {/* Check-in methods */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 mb-6">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 mb-6">
           <button
             type="button"
             onClick={() => qrPanelRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
@@ -875,9 +870,13 @@ const SessionPage: React.FC = () => {
             to={`/biometric/attendance?sessionId=${activeSession.id}`}
             className="surface-card border border-line p-4 text-left hover:border-indigo-500/40 hover:bg-indigo-500/10 transition-all"
           >
-            <p className="text-sm font-semibold text-ink">Face scan</p>
+            <p className="text-sm font-semibold text-ink">Face attendance</p>
             <p className="mt-1 text-xs text-ink-subtle">Camera match for enrolled students</p>
           </Link>
+          <div className="surface-card border border-line p-4 text-left opacity-80">
+            <p className="text-sm font-semibold text-ink">Fingerprint station</p>
+            <p className="mt-1 text-xs text-ink-subtle">External scanner integration</p>
+          </div>
         </div>
 
         {/* QR Code Display */}

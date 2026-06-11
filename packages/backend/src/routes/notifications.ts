@@ -37,6 +37,10 @@ const replyNotificationSchema = z.object({
   message: z.string().min(1).max(1000),
 });
 
+const supportNotificationSchema = z.object({
+  message: z.string().min(1).max(2000),
+});
+
 const testSmsSchema = z.object({
   phone: z.string().min(9).max(20),
   message: z.string().min(1).max(160).optional(),
@@ -49,6 +53,8 @@ const testEmailSchema = z.object({
 
 const ATTACHMENT_MAX_BYTES = 10 * 1024 * 1024;
 const ATTACHMENT_MAX_FILES = 5;
+const SUPER_NOTIFICATION_TYPE = 'SUPER_ADMIN';
+const SUPER_SUPPORT_NOTIFICATION_TYPE = 'SUPER_ADMIN_SUPPORT';
 const ATTACHMENT_MIME_TYPES = new Map<string, string>([
   ['image/jpeg', '.jpg'],
   ['image/png', '.png'],
@@ -302,6 +308,24 @@ async function getTeachersForClass(classId: string): Promise<string[]> {
   return [...teacherIds];
 }
 
+async function getSuperAdminRecipientId(): Promise<string | null> {
+  const superAdmin = await prisma.user.findFirst({
+    where: { role: 'SUPER_ADMIN' },
+    orderBy: { createdAt: 'asc' },
+    select: { id: true },
+  });
+  return superAdmin?.id ?? null;
+}
+
+function emitNotificationToUser(userId: string, payload: Record<string, unknown>): void {
+  setImmediate(() => {
+    getSocketIO().to(`user:${userId}`).emit('notification:new', {
+      ...payload,
+      timestamp: new Date().toISOString(),
+    });
+  });
+}
+
 /**
  * GET /api/v1/notifications/sms-status
  * Africa's Talking configuration status (no secrets).
@@ -523,6 +547,112 @@ notificationsRouter.get('/sent', async (req: Request, res: Response): Promise<vo
     if (err instanceof AppError) throw err;
     throw new AppError(500, 'INTERNAL_ERROR', 'Failed to fetch sent notifications');
   }
+});
+
+/**
+ * GET /api/v1/notifications/support-thread
+ * School admins can see their direct support conversation with Super Admin.
+ */
+notificationsRouter.get('/support-thread', async (req: Request, res: Response): Promise<void> => {
+  if (req.user.role !== 'SCHOOL_ADMIN') {
+    throw new AppError(403, 'FORBIDDEN', 'Only school admins can open Super Admin support');
+  }
+
+  const notifications = await prisma.notification.findMany({
+    where: {
+      schoolId: req.schoolId,
+      type: SUPER_SUPPORT_NOTIFICATION_TYPE,
+      OR: [
+        { userId: req.user.sub },
+        { senderId: req.user.sub },
+      ],
+    },
+    orderBy: { createdAt: 'asc' },
+    take: 200,
+  });
+
+  const senderIds = [...new Set(
+    notifications.map((n) => n.senderId).filter((id): id is string => id !== null),
+  )];
+  const senders = senderIds.length
+    ? await prisma.user.findMany({
+        where: { id: { in: senderIds } },
+        select: { id: true, fullName: true, role: true },
+      })
+    : [];
+  const senderMap = new Map(senders.map((s) => [s.id, { name: s.fullName, role: s.role }]));
+
+  res.status(200).json(notifications.map((n) => {
+    const sender = n.senderId ? senderMap.get(n.senderId) : null;
+    return {
+      ...n,
+      senderName: sender?.name ?? (n.senderId ? 'SAMS Super Admin' : 'System'),
+      senderRole: sender?.role ?? (n.senderId ? 'SUPER_ADMIN' : null),
+      isMine: n.senderId === req.user.sub,
+    };
+  }));
+});
+
+/**
+ * POST /api/v1/notifications/support
+ * School admins send a direct in-app support message to Super Admin.
+ */
+notificationsRouter.post('/support', async (req: Request, res: Response): Promise<void> => {
+  if (req.user.role !== 'SCHOOL_ADMIN') {
+    throw new AppError(403, 'FORBIDDEN', 'Only school admins can contact Super Admin support');
+  }
+
+  const parsed = supportNotificationSchema.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({
+      error: 'Validation failed',
+      code: 'VALIDATION_ERROR',
+      details: parsed.error.flatten().fieldErrors,
+    });
+    return;
+  }
+
+  const recipientId = await getSuperAdminRecipientId();
+  if (!recipientId) {
+    throw new AppError(503, 'SUPER_ADMIN_NOT_READY', 'Super Admin account is not ready yet');
+  }
+
+  const sender = await prisma.user.findUnique({
+    where: { id: req.user.sub },
+    select: { fullName: true, school: { select: { name: true, schoolCode: true } } },
+  });
+  const batchId = createId();
+  const title = `Support from ${sender?.school?.name ?? 'School Admin'}`;
+
+  const notification = await prisma.notification.create({
+    data: {
+      schoolId: req.schoolId,
+      userId: recipientId,
+      senderId: req.user.sub,
+      batchId,
+      title,
+      message: parsed.data.message,
+      type: SUPER_SUPPORT_NOTIFICATION_TYPE,
+      scope: 'support',
+      targetId: req.schoolId,
+      targetRole: 'SUPER_ADMIN',
+    },
+  });
+
+  res.status(200).json({ success: true, notification });
+
+  emitNotificationToUser(recipientId, {
+    id: notification.id,
+    title,
+    message: notification.message,
+    type: SUPER_SUPPORT_NOTIFICATION_TYPE,
+    senderId: req.user.sub,
+    senderName: sender?.fullName ?? 'School Admin',
+    senderRole: 'SCHOOL_ADMIN',
+    schoolName: sender?.school?.name,
+    schoolCode: sender?.school?.schoolCode,
+    batchId,
+  });
 });
 
 /**
@@ -765,7 +895,6 @@ notificationsRouter.delete('/:id', async (req: Request, res: Response): Promise<
 
     if (!notification) throw new AppError(404, 'NOT_FOUND', 'Notification not found');
 
-    const isSchoolAdmin = req.user.role === 'SCHOOL_ADMIN';
     const isRecipient = notification.userId === req.user.sub;
     const isSender = notification.senderId === req.user.sub;
 
@@ -776,7 +905,7 @@ notificationsRouter.delete('/:id', async (req: Request, res: Response): Promise<
       return;
     }
 
-    if (!isSchoolAdmin && !isSender) {
+    if (!isSender) {
       throw new AppError(403, 'FORBIDDEN', 'You cannot delete this notification');
     }
 
