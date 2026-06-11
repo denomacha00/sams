@@ -64,6 +64,7 @@ const LoginPage: React.FC = () => {
 
     if (authReason === 'school_suspended') {
       clearAuthState({ markSuspended: authReason === 'school_suspended' });
+      window.history.replaceState(null, '', '/login');
       return;
     }
 
