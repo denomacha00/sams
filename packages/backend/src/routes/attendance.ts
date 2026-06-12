@@ -58,6 +58,7 @@ const linkGenerateSchema = z.object({
   expiryMinutes: z.number().int().min(1).max(60).default(5),
   requireGps: z.boolean().default(true),
   gpsRadiusM: z.number().int().min(10).max(10000).default(100),
+  maxUses: z.number().int().min(1).max(10000).nullable().optional(),
 });
 
 const linkAttendanceSchema = z.object({
@@ -189,6 +190,7 @@ attendanceRouter.post('/link/generate', requirePermission('start:session'), asyn
       parsed.data.expiryMinutes,
       parsed.data.requireGps,
       parsed.data.gpsRadiusM,
+      parsed.data.maxUses,
       { actorRole: req.user.role, actorDepartmentId: req.user.departmentId },
     );
     res.status(201).json(result);
@@ -239,9 +241,9 @@ attendanceRouter.get('/link/:token/info', async (req: Request, res: Response): P
     // Verify the token JWT, extract sessionId
     const QR_SECRET = getQrSecret();
 
-    let payload: { sessionId: string; type?: string; exp?: number; requireGps?: boolean; gpsRadiusM?: number };
+    let payload: { sessionId: string; type?: string; exp?: number; requireGps?: boolean; gpsRadiusM?: number; maxUses?: number | null };
     try {
-      payload = jwt.verify(token, QR_SECRET) as unknown as { sessionId: string; type?: string; exp?: number; requireGps?: boolean; gpsRadiusM?: number };
+      payload = jwt.verify(token, QR_SECRET) as unknown as { sessionId: string; type?: string; exp?: number; requireGps?: boolean; gpsRadiusM?: number; maxUses?: number | null };
     } catch {
       res.status(200).json({ valid: false, error: 'INVALID' });
       return;
@@ -305,6 +307,7 @@ attendanceRouter.get('/link/:token/info', async (req: Request, res: Response): P
       expiresAt,
       requireGps: payload.requireGps ?? true,
       gpsRadiusM: payload.gpsRadiusM ?? 100,
+      maxUses: payload.maxUses ?? null,
     });
   } catch (err) {
     if (err instanceof AppError) throw err;

@@ -8,13 +8,14 @@ const QR_SECRET = 'test-qr-secret-with-enough-length-for-jwt-signing-ok';
 
 vi.mock('../lib/prisma', () => ({
   prisma: {
-    user: { findUnique: vi.fn() },
+    user: { findUnique: vi.fn(), count: vi.fn() },
     attendanceSession: {
       findUnique: vi.fn(),
       update: vi.fn(),
       findMany: vi.fn(),
     },
     attendanceRecord: {
+      count: vi.fn(),
       findFirst: vi.fn(),
       findUnique: vi.fn(),
       findMany: vi.fn(),
@@ -87,7 +88,9 @@ describe('AttendanceService QR/link scan recording', () => {
     process.env.APP_TIMEZONE = 'Africa/Nairobi';
     vi.setSystemTime(new Date('2026-06-01T05:40:00.000Z')); // Monday 08:40 Nairobi
     vi.mocked(prisma.user.findUnique).mockResolvedValue(student as never);
+    vi.mocked(prisma.user.count).mockResolvedValue(1 as never);
     vi.mocked(prisma.attendanceSession.findMany).mockResolvedValue([] as never);
+    vi.mocked(prisma.attendanceRecord.count).mockResolvedValue(0 as never);
     vi.mocked(prisma.attendanceRecord.findFirst).mockResolvedValue(null);
     vi.mocked(prisma.attendanceRecord.findUnique).mockResolvedValue(null);
     vi.mocked(prisma.attendanceRecord.findMany).mockResolvedValue([] as never);
@@ -164,6 +167,36 @@ describe('AttendanceService QR/link scan recording', () => {
         method: 'LINK',
       }),
     });
+  });
+
+  it('rejects attendance link scans after the teacher link limit is reached', async () => {
+    const linkToken = jwt.sign(
+      {
+        sessionId,
+        type: 'LINK',
+        nonce: 'nonce-1',
+        requireGps: false,
+        gpsRadiusM: 100,
+        maxUses: 2,
+        iat: 0,
+        exp: Math.floor(Date.now() / 1000) + 60,
+      },
+      QR_SECRET,
+    );
+    vi.mocked(prisma.attendanceSession.findUnique).mockResolvedValue({
+      ...baseSession,
+      currentLinkToken: linkToken,
+      linkExpiresAt: new Date(Date.now() + 60_000),
+    } as never);
+    vi.mocked(prisma.attendanceRecord.count).mockResolvedValue(2 as never);
+
+    await expect(
+      service.recordLinkAttendance(studentId, schoolId, linkToken, { lat: 0, lng: 0 }, 'device-1'),
+    ).rejects.toMatchObject({
+      statusCode: 409,
+      code: 'LINK_CAP_REACHED',
+    });
+    expect(prisma.attendanceRecord.create).not.toHaveBeenCalled();
   });
 
   it('blocks a second mark for the same session even if the student switches QR/link method', async () => {

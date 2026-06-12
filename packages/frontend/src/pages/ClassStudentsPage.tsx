@@ -121,6 +121,7 @@ const ClassStudentsPage: React.FC = () => {
   const [departmentFilter, setDepartmentFilter] = useState('all');
   const [classFilter, setClassFilter] = useState('all');
   const [error, setError] = useState('');
+  const canChooseDepartment = user?.role === UserRole.SCHOOL_ADMIN;
 
   useEffect(() => {
     let cancelled = false;
@@ -152,7 +153,7 @@ const ClassStudentsPage: React.FC = () => {
   const visibleDepartments = useMemo(() => {
     const q = searchQuery.trim().toLowerCase();
     return departments
-      .filter((department) => departmentFilter === 'all' || department.id === departmentFilter)
+      .filter((department) => !canChooseDepartment || departmentFilter === 'all' || department.id === departmentFilter)
       .map((department) => ({
         ...department,
         classes: department.classes
@@ -175,12 +176,17 @@ const ClassStudentsPage: React.FC = () => {
           .filter((cls) => cls.students.length > 0 || !q),
       }))
       .filter((department) => department.classes.length > 0);
-  }, [classFilter, departmentFilter, departments, searchQuery]);
+  }, [canChooseDepartment, classFilter, departmentFilter, departments, searchQuery]);
 
   const filteredStudentCount = visibleDepartments.reduce(
     (sum, department) => sum + department.classes.reduce((classSum, cls) => classSum + cls.students.length, 0),
     0,
   );
+  const scopedDepartmentLabel = departments.length === 1
+    ? departments[0].name
+    : user?.role === UserRole.HOD
+      ? 'Your department'
+      : 'Your assigned department';
 
   return (
     <div className="page-shell">
@@ -192,9 +198,16 @@ const ClassStudentsPage: React.FC = () => {
             <p className="text-xs text-ink-muted mt-1">{roleHint(user?.role)}</p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
-            <Link to="/admin/links" className="btn-secondary px-4 py-2 text-sm">
-              Registration Links
-            </Link>
+            {user?.role === UserRole.SCHOOL_ADMIN && (
+              <>
+                <Link to="/admin/links" className="btn-secondary px-4 py-2 text-sm">
+                  Registration Links
+                </Link>
+                <Link to="/admin/departments" className="btn-secondary px-4 py-2 text-sm">
+                  Departments
+                </Link>
+              </>
+            )}
             <Link to="/dashboard" className="btn-secondary px-4 py-2 text-sm">
               Dashboard
             </Link>
@@ -228,22 +241,28 @@ const ClassStudentsPage: React.FC = () => {
             <input
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Search student, ADM, phone, class, department..."
+              placeholder={canChooseDepartment ? 'Search student, ADM, phone, class, department...' : 'Search student, ADM, phone, or class...'}
               className="input-field"
             />
-            <select value={departmentFilter} onChange={(e) => setDepartmentFilter(e.target.value)} className="input-field">
-              <option value="all">All departments</option>
-              {departments.map((department) => (
-                <option key={department.id} value={department.id}>
-                  {department.name}
-                </option>
-              ))}
-            </select>
+            {canChooseDepartment ? (
+              <select value={departmentFilter} onChange={(e) => setDepartmentFilter(e.target.value)} className="input-field">
+                <option value="all">All departments</option>
+                {departments.map((department) => (
+                  <option key={department.id} value={department.id}>
+                    {department.name}
+                  </option>
+                ))}
+              </select>
+            ) : (
+              <div className="input-field flex items-center text-sm text-ink-muted">
+                Department: <span className="ml-1 font-semibold text-ink">{scopedDepartmentLabel}</span>
+              </div>
+            )}
             <select value={classFilter} onChange={(e) => setClassFilter(e.target.value)} className="input-field">
               <option value="all">All classes</option>
               {classes.map((cls) => (
                 <option key={cls.id} value={cls.id}>
-                  {cls.departmentName} - {cls.name}
+                  {canChooseDepartment ? `${cls.departmentName} - ${cls.name}` : cls.name}
                 </option>
               ))}
             </select>

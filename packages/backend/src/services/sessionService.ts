@@ -8,6 +8,7 @@ import { broadcastQRRefresh, broadcastSessionEnd } from '../sockets/attendanceSo
 import {
   getLocalTimetableClock,
   isTimetableWindowExpired,
+  minutesFromTime,
 } from '../lib/sessionWindow';
 import { resolveTeacherManagedClassIds } from '../lib/teacherScope';
 import { markMissingStudentsAbsentForSessions } from '../lib/attendanceFinalizer';
@@ -16,6 +17,7 @@ import { markMissingStudentsAbsentForSessions } from '../lib/attendanceFinalizer
 
 const QR_EXPIRY_SECONDS = 30;
 const DEFAULT_LATE_THRESHOLD_MIN = 15;
+const LATE_THRESHOLD_RATIO = 0.4;
 const SESSION_RESUME_LOOKBACK_MS = 12 * 60 * 60 * 1000;
 
 // ─── Interfaces ───────────────────────────────────────────────────────────────
@@ -40,6 +42,16 @@ interface SessionWindowState {
     startTime: string;
     endTime: string;
   } | null;
+}
+
+function calculateLateThresholdMin(entry: { startTime: string; endTime: string }): number {
+  const start = minutesFromTime(entry.startTime);
+  const end = minutesFromTime(entry.endTime);
+  if (!Number.isFinite(start) || !Number.isFinite(end) || end <= start) {
+    return DEFAULT_LATE_THRESHOLD_MIN;
+  }
+
+  return Math.max(1, Math.round((end - start) * LATE_THRESHOLD_RATIO));
 }
 
 // ─── Session Service ──────────────────────────────────────────────────────────
@@ -225,6 +237,7 @@ export class SessionService {
             locationLat: hasSubmittedLocation ? location!.lat : recentlyEndedSession.locationLat,
             locationLng: hasSubmittedLocation ? location!.lng : recentlyEndedSession.locationLng,
             locationRadiusM,
+            lateThresholdMin: calculateLateThresholdMin(timetableEntry),
           },
           include: { class: { select: { name: true } } },
         });
@@ -245,7 +258,7 @@ export class SessionService {
         teacherId,
         timetableEntryId,
         subject: timetableEntry.subject,
-        lateThresholdMin: DEFAULT_LATE_THRESHOLD_MIN,
+        lateThresholdMin: calculateLateThresholdMin(timetableEntry),
         locationLat: useLocation ? location!.lat : null,
         locationLng: useLocation ? location!.lng : null,
         locationRadiusM,

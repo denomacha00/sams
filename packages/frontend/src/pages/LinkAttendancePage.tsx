@@ -208,6 +208,9 @@ const LinkAttendancePage: React.FC = () => {
       } else if (errorCode === 'DEVICE_ALREADY_USED') {
         setErrorMessage('Device Already Used');
         setErrorDetail('This phone/browser has already marked another student present for this session. Use your own device or ask the teacher.');
+      } else if (errorCode === 'LINK_CAP_REACHED') {
+        setErrorMessage('Link Full');
+        setErrorDetail('This attendance link has reached its sign-in limit. Ask your teacher for a new link or to mark you manually.');
       } else if (errorCode === 'DUPLICATE_SCAN' || errorMsg.includes('already') || errorMsg.includes('duplicate')) {
         setErrorMessage('Already Recorded');
         setErrorDetail('Your attendance for this session has already been recorded. You cannot mark again with QR or link.');

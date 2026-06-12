@@ -443,18 +443,14 @@ usersRouter.get('/class-roster', async (req: Request, res: Response, next: NextF
         res.status(200).json([]);
         return;
       }
-      where.OR = [
-        { departmentId: req.user.departmentId },
-        { class: { departmentId: req.user.departmentId } },
-      ];
+      where.class = { departmentId: req.user.departmentId };
+      where.isClassRep = true;
       if (typeof req.query.classId === 'string') where.classId = req.query.classId;
     } else if (role === UserRole.SCHOOL_ADMIN) {
+      where.isClassRep = true;
       if (typeof req.query.classId === 'string') where.classId = req.query.classId;
       if (typeof req.query.departmentId === 'string') {
-        where.OR = [
-          { departmentId: req.query.departmentId },
-          { class: { departmentId: req.query.departmentId } },
-        ];
+        where.class = { departmentId: req.query.departmentId };
       }
     } else {
       throw new AppError(403, 'FORBIDDEN', 'Only teachers, HODs, and school admins can view class roster');
@@ -550,6 +546,7 @@ usersRouter.get('/student-workbench', async (req: Request, res: Response, next: 
         return;
       }
       classWhere.id = requestedClassId ?? { in: teachingClassIds };
+      if (req.user.departmentId) classWhere.departmentId = req.user.departmentId;
       managedClassIds = new Set(teacherManagedClassIds);
     } else if (role === UserRole.HOD) {
       if (!req.user.departmentId) {

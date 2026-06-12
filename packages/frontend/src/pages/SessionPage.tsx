@@ -51,8 +51,11 @@ interface ActiveSession {
   timetableEntryId?: string;
   hasGpsAnchor: boolean;
   qrToken: string;
+  currentLinkToken?: string | null;
+  linkExpiresAt?: string | null;
   startedAt: string;
   locationRadiusM: number;
+  studentCount?: number;
   records: AttendanceRecord[];
 }
 
@@ -60,6 +63,27 @@ function timeToMinutes(value: string): number {
   const [hours, minutes] = value.split(':').map(Number);
   if (!Number.isFinite(hours) || !Number.isFinite(minutes)) return Number.NaN;
   return (hours * 60) + minutes;
+}
+
+function buildAttendanceLinkUrl(token: string): string {
+  return `${window.location.origin}/attend/${token}`;
+}
+
+function decodeAttendanceLinkSettings(token: string): { requireGps?: boolean; gpsRadiusM?: number; maxUses?: number | null } {
+  try {
+    const [, payload] = token.split('.');
+    if (!payload) return {};
+    const normalized = payload.replace(/-/g, '+').replace(/_/g, '/');
+    const padded = normalized.padEnd(normalized.length + ((4 - (normalized.length % 4)) % 4), '=');
+    const decoded = JSON.parse(window.atob(padded)) as Record<string, unknown>;
+    return {
+      requireGps: typeof decoded.requireGps === 'boolean' ? decoded.requireGps : undefined,
+      gpsRadiusM: typeof decoded.gpsRadiusM === 'number' ? decoded.gpsRadiusM : undefined,
+      maxUses: typeof decoded.maxUses === 'number' ? decoded.maxUses : decoded.maxUses === null ? null : undefined,
+    };
+  } catch {
+    return {};
+  }
 }
 
 const SessionPage: React.FC = () => {
@@ -84,6 +108,8 @@ const SessionPage: React.FC = () => {
   const [expiryMinutes, setExpiryMinutes] = useState<number>(5);
   const [requireGps, setRequireGps] = useState<boolean>(true);
   const [gpsRadiusM, setGpsRadiusM] = useState<number>(100);
+  const [linkLimitEnabled, setLinkLimitEnabled] = useState<boolean>(true);
+  const [linkMaxUses, setLinkMaxUses] = useState<number>(1);
   const [linkCopied, setLinkCopied] = useState(false);
   const [linkTimeRemaining, setLinkTimeRemaining] = useState<number>(0);
   const linkTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -97,11 +123,15 @@ const SessionPage: React.FC = () => {
     timetableEntryId?: string | null;
     qrToken?: string | null;
     currentQRToken?: string | null;
+    currentLinkToken?: string | null;
+    linkExpiresAt?: string | null;
     hasGpsAnchor?: boolean;
     locationLat?: number | null;
     locationLng?: number | null;
     startedAt: string;
     locationRadiusM?: number;
+    students?: Array<{ id: string }>;
+    studentCount?: number;
     records?: AttendanceRecord[];
   }): ActiveSession => ({
       id: data.id,
@@ -110,8 +140,15 @@ const SessionPage: React.FC = () => {
       timetableEntryId: data.timetableEntryId ?? undefined,
       hasGpsAnchor: data.hasGpsAnchor ?? (data.locationLat != null && data.locationLng != null),
       qrToken: data.qrToken ?? data.currentQRToken ?? '',
+      currentLinkToken: data.currentLinkToken ?? null,
+      linkExpiresAt: data.linkExpiresAt ?? null,
       startedAt: data.startedAt,
       locationRadiusM: data.locationRadiusM || 100,
+      studentCount: typeof data.studentCount === 'number'
+        ? data.studentCount
+        : Array.isArray(data.students)
+          ? data.students.length
+          : undefined,
       records: data.records ?? [],
     }), []);
 
@@ -145,7 +182,11 @@ const SessionPage: React.FC = () => {
         if (current) {
           const stillActive = normalized.find((session) => session.id === current.id);
           if (stillActive) {
-            return stillActive;
+            return {
+              ...current,
+              ...stillActive,
+              studentCount: stillActive.studentCount ?? current.studentCount,
+            };
           }
         }
         return options.selectFirst ? normalized[0] : current;
@@ -288,7 +329,7 @@ const SessionPage: React.FC = () => {
       socket.disconnect();
       socketRef.current = null;
     };
-  }, [activeSession?.id]);
+  }, [activeSession?.id, normalizeSessionFromApi]);
 
   // Link countdown timer
   useEffect(() => {
@@ -317,7 +358,7 @@ const SessionPage: React.FC = () => {
     };
   }, [linkExpiresAt]);
 
-  // Clear link state when session ends
+  // Restore link state when a live session already has a valid link token.
   useEffect(() => {
     if (!activeSession) {
       setLinkUrl('');
@@ -326,8 +367,43 @@ const SessionPage: React.FC = () => {
       setLinkCopied(false);
       return;
     }
+
+    const sessionStudentCount = activeSession.studentCount;
+    if (typeof sessionStudentCount === 'number' && sessionStudentCount > 0) {
+      setLinkMaxUses(sessionStudentCount);
+    }
+
+    const storedToken = activeSession.currentLinkToken;
+    const storedExpiry = activeSession.linkExpiresAt;
+    if (storedToken && storedExpiry && new Date(storedExpiry).getTime() > Date.now()) {
+      const settings = decodeAttendanceLinkSettings(storedToken);
+      setLinkToken(storedToken);
+      setLinkUrl(buildAttendanceLinkUrl(storedToken));
+      setLinkExpiresAt(storedExpiry);
+      setLinkCopied(false);
+      setRequireGps(settings.requireGps ?? activeSession.hasGpsAnchor);
+      if (typeof settings.gpsRadiusM === 'number') setGpsRadiusM(settings.gpsRadiusM);
+      if (typeof settings.maxUses === 'number') {
+        setLinkLimitEnabled(true);
+        setLinkMaxUses(settings.maxUses);
+      } else if (settings.maxUses === null) {
+        setLinkLimitEnabled(false);
+      }
+      return;
+    }
+
+    setLinkUrl('');
+    setLinkToken('');
+    setLinkExpiresAt('');
+    setLinkCopied(false);
     setRequireGps(activeSession.hasGpsAnchor);
-  }, [activeSession?.id, activeSession?.hasGpsAnchor]);
+  }, [
+    activeSession?.id,
+    activeSession?.hasGpsAnchor,
+    activeSession?.currentLinkToken,
+    activeSession?.linkExpiresAt,
+    activeSession?.studentCount,
+  ]);
 
   useEffect(() => {
     if (!activeSession?.id) return;
@@ -357,13 +433,14 @@ const SessionPage: React.FC = () => {
           method: record.method,
           scannedAt: record.scannedAt,
         }));
+        const sessionDetails = normalizeSessionFromApi({ ...sessionRes.data, records });
 
         setActiveSession((current) =>
-          current?.id === activeSession.id ? { ...current, records } : current,
+          current?.id === activeSession.id ? { ...current, ...sessionDetails, records } : current,
         );
         setActiveSessions((current) =>
           current.map((session) =>
-            session.id === activeSession.id ? { ...session, records } : session,
+            session.id === activeSession.id ? { ...session, ...sessionDetails, records } : session,
           ),
         );
       } catch {
@@ -396,18 +473,25 @@ const SessionPage: React.FC = () => {
         expiryMinutes,
         requireGps,
         gpsRadiusM: requireGps ? gpsRadiusM : 100,
+        maxUses: linkLimitEnabled ? linkMaxUses : null,
       });
       setLinkUrl(data.linkUrl);
       setLinkToken(data.linkToken);
       setLinkExpiresAt(data.expiresAt);
       setRequireGps(Boolean(data.requireGps));
       if (typeof data.gpsRadiusM === 'number') setGpsRadiusM(data.gpsRadiusM);
+      if (typeof data.maxUses === 'number') {
+        setLinkLimitEnabled(true);
+        setLinkMaxUses(data.maxUses);
+      } else {
+        setLinkLimitEnabled(false);
+      }
     } catch (err: unknown) {
       setError(getApiErrorMessage(err, 'Failed to generate link'));
     } finally {
       setLinkLoading(false);
     }
-  }, [activeSession, expiryMinutes, requireGps, gpsRadiusM, canRequireGpsForLink]);
+  }, [activeSession, expiryMinutes, requireGps, gpsRadiusM, linkLimitEnabled, linkMaxUses, canRequireGpsForLink]);
 
   const copyLink = useCallback(async () => {
     if (!linkUrl) return;
@@ -975,6 +1059,50 @@ const SessionPage: React.FC = () => {
                 </div>
               )}
 
+              <div className="flex items-center justify-between p-3 bg-surface-muted border border-line rounded-xl">
+                <div>
+                  <p className="text-sm font-medium text-ink">Limit link sign-ins</p>
+                  <p className="text-xs text-ink-muted mt-0.5">
+                    Default is the current class size{activeSession.studentCount ? ` (${activeSession.studentCount})` : ''}. Turn off only for supervised exceptions.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setLinkLimitEnabled((current) => !current)}
+                  className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors duration-200 focus:outline-none ${
+                    linkLimitEnabled ? 'bg-indigo-600' : 'bg-white/20'
+                  }`}
+                  aria-pressed={linkLimitEnabled}
+                  aria-label="Toggle attendance link sign-in limit"
+                >
+                  <span
+                    className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform duration-200 ${
+                      linkLimitEnabled ? 'translate-x-6' : 'translate-x-1'
+                    }`}
+                  />
+                </button>
+              </div>
+
+              {linkLimitEnabled && (
+                <div>
+                  <label htmlFor="linkMaxUses" className="form-label">
+                    Maximum Link Sign-ins
+                  </label>
+                  <input
+                    id="linkMaxUses"
+                    type="number"
+                    min={1}
+                    max={10000}
+                    value={linkMaxUses}
+                    onChange={(e) => setLinkMaxUses(Math.max(1, Math.min(10000, parseInt(e.target.value) || 1)))}
+                    className="w-full input-field focus:outline-none focus:ring-2 focus:ring-indigo-500/50 transition-all duration-200"
+                  />
+                  <p className="text-xs text-ink-subtle mt-1">
+                    After this many students mark through the link, SAMS will reject more link marks and ask for teacher action.
+                  </p>
+                </div>
+              )}
+
               <button
                 onClick={generateLink}
                 disabled={linkLoading}
@@ -997,7 +1125,7 @@ const SessionPage: React.FC = () => {
           {linkUrl && (
             <div className="space-y-3">
               {/* GPS badge */}
-              <div className="flex items-center gap-2">
+              <div className="flex flex-wrap items-center gap-2">
                 {requireGps ? (
                   <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-indigo-500/20 border border-indigo-500/30 text-indigo-300">
                     <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -1014,6 +1142,9 @@ const SessionPage: React.FC = () => {
                     No GPS check
                   </span>
                 )}
+                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-500/15 border border-emerald-500/30 text-emerald-200">
+                  {linkLimitEnabled ? `Limit ${linkMaxUses} sign-ins` : 'Unlimited sign-ins'}
+                </span>
               </div>
 
               {/* Link URL display */}

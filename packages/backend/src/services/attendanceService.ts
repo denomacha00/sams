@@ -43,6 +43,7 @@ interface LinkTokenPayload {
   nonce: string;
   requireGps: boolean;
   gpsRadiusM: number;
+  maxUses?: number | null;
   iat: number;
   exp: number;
 }
@@ -285,6 +286,7 @@ export class AttendanceService {
     expiryMinutes: number = 5,
     requireGps: boolean = true,
     gpsRadiusM: number = 100,
+    maxUses?: number | null,
     actor: AttendanceActorOptions = {},
   ) {
     // 1. Validate session exists, is active, and belongs to the teacher's school
@@ -332,6 +334,16 @@ export class AttendanceService {
     }
 
     const effectiveRequireGps = requireGps;
+    const effectiveMaxUses = maxUses === undefined
+      ? await prisma.user.count({
+          where: {
+            schoolId,
+            classId: session.classId,
+            role: UserRole.STUDENT,
+            isLocked: false,
+          },
+        })
+      : maxUses;
 
     // 2. Generate JWT with type 'LINK' — embed GPS settings in the token
     const nonce = createId();
@@ -339,7 +351,16 @@ export class AttendanceService {
     const exp = now + expiryMinutes * 60;
 
     const linkToken = jwt.sign(
-      { sessionId, type: 'LINK', nonce, requireGps: effectiveRequireGps, gpsRadiusM, iat: now, exp },
+      {
+        sessionId,
+        type: 'LINK',
+        nonce,
+        requireGps: effectiveRequireGps,
+        gpsRadiusM,
+        maxUses: effectiveMaxUses,
+        iat: now,
+        exp,
+      },
       getQrSecret(),
     );
 
@@ -364,6 +385,7 @@ export class AttendanceService {
       sessionId,
       requireGps: effectiveRequireGps,
       gpsRadiusM,
+      maxUses: effectiveMaxUses,
     };
   }
 
@@ -446,6 +468,23 @@ export class AttendanceService {
         'DUPLICATE_SCAN',
         'Attendance already recorded for this session. You cannot mark again with QR or link.',
       );
+    }
+
+    if (typeof payload.maxUses === 'number') {
+      const linkUseCount = await prisma.attendanceRecord.count({
+        where: {
+          sessionId: session.id,
+          method: 'LINK',
+        },
+      });
+
+      if (linkUseCount >= payload.maxUses) {
+        throw new AppError(
+          409,
+          'LINK_CAP_REACHED',
+          'This attendance link has reached its sign-in limit. Ask your teacher to generate a new link or mark you manually.',
+        );
+      }
     }
 
     // 6. A successful live scan means the student attended. True ABSENT rows are

@@ -23,6 +23,8 @@ export interface ClientSessionResponse {
   locationRadiusM: number;
   qrToken: string | null;
   currentQRToken: string | null;
+  currentLinkToken: string | null;
+  linkExpiresAt: Date | null;
   startedAt: Date;
   endedAt: Date | null;
   isActive: boolean;
@@ -60,6 +62,8 @@ export function formatSessionForClient(session: SessionWithClass): ClientSession
     locationRadiusM: session.locationRadiusM,
     qrToken: session.currentQRToken,
     currentQRToken: session.currentQRToken,
+    currentLinkToken: session.currentLinkToken,
+    linkExpiresAt: session.linkExpiresAt,
     startedAt: session.startedAt,
     endedAt: session.endedAt,
     isActive: session.isActive,
