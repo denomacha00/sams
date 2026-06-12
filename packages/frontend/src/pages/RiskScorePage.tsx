@@ -4,8 +4,8 @@ import { RiskLevel } from '@sams/shared';
 
 interface RiskScoreEntry {
   studentId: string;
-  studentName: string;
-  admissionNumber?: string;
+  studentName?: string;
+  admissionNumber?: string | null;
   score: number;
   riskLevel: RiskLevel;
   attendanceWeight: number;
@@ -32,8 +32,9 @@ const RiskScorePage: React.FC = () => {
     const fetchScores = async () => {
       try {
         const { data } = await apiClient.get('/risk-scores');
-        setScores(data);
-        setFilteredScores(data);
+        const rows = Array.isArray(data) ? data : [];
+        setScores(rows);
+        setFilteredScores(rows);
       } catch (err: any) {
         setError(err.response?.data?.error || 'Failed to load risk scores');
       } finally {
@@ -123,6 +124,7 @@ const RiskScorePage: React.FC = () => {
             filteredScores.map((entry) => {
               const colors = RISK_COLORS[entry.riskLevel];
               const width = Math.min(entry.score, 100);
+              const displayName = entry.studentName || entry.admissionNumber || `Student ${entry.studentId.slice(-6)}`;
               return (
                 <div
                   key={entry.studentId}
@@ -131,10 +133,10 @@ const RiskScorePage: React.FC = () => {
                   <div className="flex items-center justify-between mb-3">
                     <div className="flex items-center gap-3">
                       <div className="w-10 h-10 rounded-full bg-gradient-to-br from-indigo-500 to-indigo-700 flex items-center justify-center text-sm font-bold text-ink">
-                        {entry.studentName.charAt(0)}
+                        {displayName.charAt(0).toUpperCase()}
                       </div>
                       <div>
-                        <p className="font-medium text-white">{entry.studentName}</p>
+                        <p className="font-medium text-white">{displayName}</p>
                         {entry.admissionNumber && (
                           <p className="text-xs text-ink-subtle">{entry.admissionNumber}</p>
                         )}

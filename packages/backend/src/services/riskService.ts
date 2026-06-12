@@ -7,6 +7,8 @@ import { notificationService } from './notificationService';
 
 export interface RiskScoreResult {
   studentId: string;
+  studentName?: string;
+  admissionNumber?: string | null;
   attendanceWeight: number;
   gradeWeight: number;
   patternWeight: number;
@@ -117,41 +119,37 @@ export class RiskService {
     departmentId?: string,
     classIds?: string[],
   ): Promise<RiskScoreResult[]> {
-    const where: Record<string, unknown> = { schoolId };
+    type RiskStudent = { id: string; fullName: string; admissionNumber: string | null };
 
-    const mapScores = (scores: any[]): RiskScoreResult[] =>
-      scores.map((s: any) => ({
+    const mapScores = (scores: any[], studentMap: Map<string, RiskStudent>): RiskScoreResult[] =>
+      scores.map((s: any) => {
+        const student = studentMap.get(s.studentId);
+        return {
         studentId: s.studentId,
+        studentName: student?.fullName ?? 'Unknown student',
+        admissionNumber: student?.admissionNumber ?? null,
         attendanceWeight: s.attendanceWeight,
         gradeWeight: s.gradeWeight,
         patternWeight: s.patternWeight,
         score: s.score,
         riskLevel: s.riskLevel as RiskLevel,
         computedAt: s.computedAt,
-      }));
+      };
+      });
+
+    let students: RiskStudent[];
 
     if (classIds) {
       if (classIds.length === 0) return [];
 
-      const students = await prisma.user.findMany({
+      students = await prisma.user.findMany({
         where: { schoolId, role: 'STUDENT', classId: { in: classIds } },
-        select: { id: true },
+        select: { id: true, fullName: true, admissionNumber: true },
+        orderBy: { fullName: 'asc' },
       });
-
-      const studentIds = students.map((s: { id: string }) => s.id);
-      if (studentIds.length === 0) return [];
-
-      const scores = await prisma.riskScore.findMany({
-        where: { schoolId, studentId: { in: studentIds } },
-        orderBy: { score: 'desc' },
-      });
-
-      return mapScores(scores);
-    }
-
-    if (departmentId) {
+    } else if (departmentId) {
       // Get students in the department
-      const students = await prisma.user.findMany({
+      students = await prisma.user.findMany({
         where: {
           schoolId,
           role: 'STUDENT',
@@ -160,26 +158,52 @@ export class RiskService {
             { class: { is: { departmentId } } },
           ],
         },
-        select: { id: true },
+        select: { id: true, fullName: true, admissionNumber: true },
+        orderBy: { fullName: 'asc' },
       });
-
-      const studentIds = students.map((s: { id: string }) => s.id);
-      if (studentIds.length === 0) return [];
-
-      const scores = await prisma.riskScore.findMany({
-        where: { schoolId, studentId: { in: studentIds } },
-        orderBy: { score: 'desc' },
+    } else {
+      students = await prisma.user.findMany({
+        where: { schoolId, role: 'STUDENT' },
+        select: { id: true, fullName: true, admissionNumber: true },
+        orderBy: { fullName: 'asc' },
       });
-
-      return mapScores(scores);
     }
 
+    const studentIds = students.map((s) => s.id);
+    if (studentIds.length === 0) return [];
+    const studentMap = new Map(students.map((student) => [student.id, student]));
+
     const scores = await prisma.riskScore.findMany({
-      where,
+      where: { schoolId, studentId: { in: studentIds } },
       orderBy: { score: 'desc' },
     });
+    const existingIds = new Set(scores.map((score) => score.studentId));
+    const computedScores: RiskScoreResult[] = [];
 
-    return mapScores(scores);
+    const missingStudents = students.filter((student) => !existingIds.has(student.id));
+    for (let i = 0; i < missingStudents.length; i += 8) {
+      const batch = missingStudents.slice(i, i + 8);
+      const batchScores = await Promise.all(
+        batch.map(async (student) => {
+          try {
+            const score = await this.computeRiskScore(schoolId, student.id);
+            return {
+              ...score,
+              studentName: student.fullName,
+              admissionNumber: student.admissionNumber,
+            };
+          } catch {
+            return null;
+          }
+        }),
+      );
+      for (const score of batchScores) {
+        if (score) computedScores.push(score);
+      }
+    }
+
+    return [...mapScores(scores, studentMap), ...computedScores]
+      .sort((a, b) => b.score - a.score);
   }
 
   // ─── Private Helpers ────────────────────────────────────────────────────────

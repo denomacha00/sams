@@ -269,6 +269,7 @@ const AttendanceWorkflowPanel: React.FC<{ role?: UserRole }> = ({ role }) => {
     { to: '/timetable', label: 'Timetable', detail: 'Current slot', icon: ICONS.calendar },
     { to: '/sessions', label: 'Start Session', detail: 'QR and link', icon: ICONS.qr },
     { to: '/attendance', label: 'Manual', detail: 'Roll call', icon: ICONS.clipboard },
+    { to: '/fingerprint/attendance', label: 'Fingerprint', detail: 'External reader', icon: ICONS.check },
     { to: '/biometric/attendance', label: 'Face Attendance', detail: 'Camera match', icon: ICONS.check },
     { to: '/reports', label: 'Reports', detail: 'After class', icon: ICONS.chart },
   ];
@@ -278,13 +279,13 @@ const AttendanceWorkflowPanel: React.FC<{ role?: UserRole }> = ({ role }) => {
       <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h3 className="text-sm font-semibold text-ink">Attendance workflow</h3>
-          <p className="text-xs text-ink-muted">Timetable-locked sessions with QR, link, manual, and face attendance paths.</p>
+          <p className="text-xs text-ink-muted">Timetable-locked sessions with QR, link, manual, fingerprint, and face attendance paths.</p>
         </div>
         <Link to="/sessions" className="btn-primary px-4 py-2 text-sm w-full sm:w-auto text-center">
           Open Sessions
         </Link>
       </div>
-      <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-5">
+      <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-6">
         {steps.map((step, index) => (
           <Link
             key={step.to}
@@ -728,6 +729,7 @@ function getQuickActionGroups(role?: UserRole): QuickActionGroup[] {
           title: 'Reports & Schedule',
           actions: [
             { to: '/reports', label: 'View Reports', subtitle: 'School-wide attendance', icon: ICONS.chart },
+            { to: '/risk-scores', label: 'Risk Scores', subtitle: 'At-risk students and follow-up', icon: ICONS.warning },
             { to: '/timetable', label: 'View Timetable', subtitle: 'Master schedule', icon: ICONS.calendar },
             { to: '/admin/knowledge', label: 'Knowledge Base', subtitle: 'Policies & guides', icon: ICONS.book },
           ],
@@ -755,6 +757,7 @@ function getQuickActionGroups(role?: UserRole): QuickActionGroup[] {
           actions: [
             { to: '/sessions', label: 'QR / Link Session', subtitle: 'Start session and share check-in link', icon: ICONS.qr, variant: 'signin' },
             { to: '/attendance', label: 'Manual Attendance', subtitle: 'Roll call and corrections', icon: ICONS.clipboard, variant: 'attendance' },
+            { to: '/fingerprint/attendance', label: 'Fingerprint Attendance', subtitle: 'External reader sign-in', icon: ICONS.check, variant: 'attendance' },
             { to: '/biometric/attendance', label: 'Face Attendance', subtitle: 'Camera match for enrolled students', icon: ICONS.check, variant: 'attendance' },
             { to: '/settings', label: 'Fingerprint Setup', subtitle: 'Passkey or external scanner settings', icon: ICONS.settings },
           ],
@@ -815,8 +818,9 @@ function getQuickActionGroups(role?: UserRole): QuickActionGroup[] {
         {
           title: 'Attendance',
           actions: [
-            { to: '/sessions', label: 'Sign In Students', subtitle: 'QR, link, manual, face attendance', icon: ICONS.qr, variant: 'signin' },
+            { to: '/sessions', label: 'Sign In Students', subtitle: 'QR, link, manual, fingerprint, face', icon: ICONS.qr, variant: 'signin' },
             { to: '/attendance', label: 'Mark Attendance', subtitle: 'Override or manual', icon: ICONS.clipboard, variant: 'attendance' },
+            { to: '/fingerprint/attendance', label: 'Fingerprint Attendance', subtitle: 'External reader sign-in', icon: ICONS.check, variant: 'attendance' },
             { to: '/biometric/attendance', label: 'Face Attendance', subtitle: 'Camera match for enrolled students', icon: ICONS.check, variant: 'attendance' },
             { to: '/settings', label: 'Fingerprint Setup', subtitle: 'Passkey or external scanner settings', icon: ICONS.settings },
           ],

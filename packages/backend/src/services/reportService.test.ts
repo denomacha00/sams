@@ -5,7 +5,14 @@ vi.mock('../index', () => ({
   prisma: {},
 }));
 
-import { ReportService, StudentReportData, ClassReportData, DepartmentReportData, SchoolReportData } from './reportService';
+import {
+  calculateAttendancePercentage,
+  ReportService,
+  StudentReportData,
+  ClassReportData,
+  DepartmentReportData,
+  SchoolReportData,
+} from './reportService';
 
 describe('ReportService.exportReport', () => {
   const service = new ReportService();
@@ -46,6 +53,7 @@ describe('ReportService.exportReport', () => {
   const departmentReport: DepartmentReportData = {
     departmentId: 'dept-1',
     departmentName: 'Science',
+    totalSessions: 20,
     classes: [classReport],
     averageAttendancePercentage: 92.5,
   };
@@ -53,9 +61,18 @@ describe('ReportService.exportReport', () => {
   const schoolReport: SchoolReportData = {
     schoolId: 'school-1',
     schoolName: 'Kenya High School',
+    totalSessions: 20,
     departments: [departmentReport],
     averageAttendancePercentage: 92.5,
   };
+
+  describe('attendance percentage', () => {
+    it('counts late arrivals as attended lessons but keeps excused separate', () => {
+      expect(calculateAttendancePercentage(15, 3, 20)).toBe(90);
+      expect(calculateAttendancePercentage(15, 0, 20)).toBe(75);
+      expect(calculateAttendancePercentage(0, 0, 0)).toBe(0);
+    });
+  });
 
   // ─── PDF Export ─────────────────────────────────────────────────────────────
 

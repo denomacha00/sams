@@ -54,6 +54,8 @@ interface AttendanceSessionScope {
   teacherId: string;
   class: { departmentId: string };
   isActive?: boolean;
+  startedAt: Date;
+  lateThresholdMin: number;
   timetableEntry?: TimetableWindow | null;
   locationLat: number | null;
   locationLng: number | null;
@@ -183,6 +185,8 @@ export class AttendanceService {
         teacherId: true,
         class: { select: { departmentId: true } },
         isActive: true,
+        startedAt: true,
+        lateThresholdMin: true,
         timetableEntry: {
           select: { dayOfWeek: true, startTime: true, endTime: true },
         },
@@ -717,14 +721,16 @@ export class AttendanceService {
       );
     }
 
-    // Create record with status PRESENT
+    const status = this.classifyAcceptedScan(session);
+
+    // Create record with timetable-aware status
     const record = await prisma.attendanceRecord.create({
       data: {
         id: createId(),
         schoolId,
         sessionId,
         studentId,
-        status: AttendanceStatus.PRESENT,
+        status,
         method: 'BIOMETRIC',
         scannedAt: new Date(),
       },

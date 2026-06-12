@@ -207,7 +207,10 @@ const ReportsPage: React.FC = () => {
         _displayPercentage: data.averageAttendancePercentage ?? 0,
         _displayPresent: totals.present,
         _displayAbsent: totals.absent,
-        _displaySessions: totals.sessions,
+        _displaySessions: data.totalSessions ?? (data.classes ?? []).reduce(
+          (sum: number, cls: any) => sum + (cls.totalSessions ?? 0),
+          0,
+        ),
         students: allStudents,
       };
     }
@@ -242,7 +245,10 @@ const ReportsPage: React.FC = () => {
         _displayPercentage: data.averageAttendancePercentage ?? 0,
         _displayPresent: totals.present,
         _displayAbsent: totals.absent,
-        _displaySessions: totals.sessions,
+        _displaySessions: data.totalSessions ?? (data.departments ?? []).reduce(
+          (sum: number, dept: any) => sum + (dept.totalSessions ?? 0),
+          0,
+        ),
         students: allStudents,
       };
     }

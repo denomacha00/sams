@@ -51,6 +51,7 @@ export interface ClassReportData {
 export interface DepartmentReportData {
   departmentId: string;
   departmentName: string;
+  totalSessions: number;
   classes: ClassReportData[];
   averageAttendancePercentage: number;
 }
@@ -58,6 +59,7 @@ export interface DepartmentReportData {
 export interface SchoolReportData {
   schoolId: string;
   schoolName: string;
+  totalSessions: number;
   departments: DepartmentReportData[];
   averageAttendancePercentage: number;
 }
@@ -88,14 +90,22 @@ function sumStatusCounts(counts: StatusCounts): number {
   return (counts.PRESENT ?? 0) + (counts.LATE ?? 0) + (counts.EXCUSED ?? 0) + (counts.ABSENT ?? 0);
 }
 
+export function calculateAttendancePercentage(
+  totalPresent: number,
+  totalLate: number,
+  totalExpected: number,
+): number {
+  return totalExpected > 0
+    ? Math.round(((totalPresent + totalLate) / totalExpected) * 100 * 100) / 100
+    : 0;
+}
+
 function buildStudentReport(student: StudentSeed, counts: StatusCounts, totalSessions: number): StudentReportData {
   const totalPresent = counts.PRESENT ?? 0;
   const totalLate = counts.LATE ?? 0;
   const totalExcused = counts.EXCUSED ?? 0;
   const totalExpected = totalSessions > 0 ? totalSessions : sumStatusCounts(counts);
-  const attendancePercentage = totalExpected > 0
-    ? Math.round((totalPresent / totalExpected) * 100 * 100) / 100
-    : 0;
+  const attendancePercentage = calculateAttendancePercentage(totalPresent, totalLate, totalExpected);
 
   return {
     studentId: student.id,
@@ -217,11 +227,9 @@ export class ReportService {
     const totalExcused = counts.EXCUSED ?? 0;
     const totalAbsent = totalExpected - totalPresent - totalLate - totalExcused;
 
-    // Attendance percentage = (totalPresent / totalExpected) * 100, rounded to 2 dp
+    // Attendance percentage treats PRESENT and LATE as attended lessons.
     // Per Requirement 10.5: (Total Present / Total Expected) × 100
-    const attendancePercentage = totalExpected > 0
-      ? Math.round((totalPresent / totalExpected) * 100 * 100) / 100
-      : 0;
+    const attendancePercentage = calculateAttendancePercentage(totalPresent, totalLate, totalExpected);
 
     return {
       studentId,
@@ -301,6 +309,7 @@ export class ReportService {
     return {
       departmentId,
       departmentName: department.name,
+      totalSessions: classReports.reduce((sum, report) => sum + report.totalSessions, 0),
       classes: classReports,
       averageAttendancePercentage: averageAttendance(classReports),
     };
@@ -350,6 +359,7 @@ export class ReportService {
       return {
         departmentId: dept.id,
         departmentName: dept.name,
+        totalSessions: classReports.reduce((sum, report) => sum + report.totalSessions, 0),
         classes: classReports,
         averageAttendancePercentage: averageAttendance(classReports),
       };
@@ -358,6 +368,7 @@ export class ReportService {
     return {
       schoolId,
       schoolName: school.name,
+      totalSessions: departmentReports.reduce((sum, report) => sum + report.totalSessions, 0),
       departments: departmentReports,
       averageAttendancePercentage: averageAttendance(departmentReports),
     };
@@ -546,6 +557,7 @@ export class ReportService {
       } else if ('departmentName' in data) {
         // Department report
         doc.fontSize(14).text(`Department: ${data.departmentName}`);
+        doc.text(`Total Sessions: ${data.totalSessions}`);
         doc.text(`Average Attendance: ${data.averageAttendancePercentage}%`);
         doc.moveDown();
         for (const cls of data.classes) {
@@ -554,6 +566,7 @@ export class ReportService {
       } else {
         // School report
         doc.fontSize(14).text(`School: ${data.schoolName}`);
+        doc.text(`Total Sessions: ${data.totalSessions}`);
         doc.text(`Average Attendance: ${data.averageAttendancePercentage}%`);
         doc.moveDown();
         for (const dept of data.departments) {

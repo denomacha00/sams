@@ -19,6 +19,7 @@ import QRScanPage from './pages/QRScanPage';
 import ManualAttendancePage from './pages/ManualAttendancePage';
 import BiometricEnrollPage from './pages/BiometricEnrollPage';
 import BiometricAttendancePage from './pages/BiometricAttendancePage';
+import FingerprintAttendancePage from './pages/FingerprintAttendancePage';
 import ReportsPage from './pages/ReportsPage';
 import RiskScorePage from './pages/RiskScorePage';
 import AIAssistantPage from './pages/AIAssistantPage';
@@ -78,6 +79,7 @@ ReactDOM.createRoot(document.getElementById('root') as HTMLElement).render(
           <Route path="/sessions" element={<SessionPage />} />
           <Route path="/attendance" element={<ManualAttendancePage />} />
           <Route path="/biometric/attendance" element={<BiometricAttendancePage />} />
+          <Route path="/fingerprint/attendance" element={<FingerprintAttendancePage />} />
         </Route>
 
         {/* Student workbench */}
