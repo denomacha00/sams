@@ -1,6 +1,7 @@
 import express, { type Request, type Response, type NextFunction } from 'express';
 import type { Server as HttpServer } from 'http';
 import { Server as SocketIOServer } from 'socket.io';
+import { createAdapter } from '@socket.io/redis-adapter';
 import { UPLOADS_ROOT } from './config/uploads';
 import { getAfricasTalkingConfig, getAtSmsMode, isSmsConfigured } from './config/africasTalking';
 import { getSmtpConfig, isEmailConfigured } from './config/email';
@@ -115,6 +116,29 @@ function prometheusMetrics(): string {
   ].join('\n');
 }
 
+function setupSocketRedisAdapter(socketServer: SocketIOServer): void {
+  if (process.env.NODE_ENV === 'test' || process.env.SOCKET_IO_REDIS_ADAPTER === 'false') {
+    return;
+  }
+
+  const pubClient = redis.duplicate();
+  const subClient = redis.duplicate();
+
+  pubClient.on('error', (err) => console.error('[Socket] Redis pub adapter error:', err));
+  subClient.on('error', (err) => console.error('[Socket] Redis sub adapter error:', err));
+
+  void Promise.all([pubClient.connect(), subClient.connect()])
+    .then(() => {
+      socketServer.adapter(createAdapter(pubClient, subClient));
+      console.log('[Socket] Redis adapter enabled for multi-worker broadcasts');
+    })
+    .catch((err) => {
+      console.error('[Socket] Redis adapter disabled; socket broadcasts are local to this worker:', err);
+      pubClient.disconnect();
+      subClient.disconnect();
+    });
+}
+
 /** Mount routes, sockets, and full /health after HTTP listen (heavy imports stay out of index.ts). */
 export function registerApplication(app: express.Express, httpServer: HttpServer): void {
   applyGlobalMiddleware(app);
@@ -157,6 +181,7 @@ export function registerApplication(app: express.Express, httpServer: HttpServer
     },
   });
 
+  setupSocketRedisAdapter(io);
   registerSocketServer(io);
   setupAttendanceSocket(io);
 
