@@ -11,6 +11,22 @@ export interface DateRange {
   to: Date;
 }
 
+export interface AttendanceEvidenceRow {
+  sessionId: string;
+  recordId: string | null;
+  date: string;
+  subject: string;
+  classId: string | null;
+  className: string | null;
+  teacherName: string | null;
+  status: AttendanceStatusKey;
+  method: string | null;
+  scannedAt: string | null;
+  sessionStartedAt: string;
+  sessionEndedAt: string | null;
+  note: string | null;
+}
+
 export interface StudentReportData {
   studentId: string;
   studentName: string;
@@ -21,6 +37,7 @@ export interface StudentReportData {
   totalExcused: number;
   totalAbsent: number;
   attendancePercentage: number;
+  records?: AttendanceEvidenceRow[];
 }
 
 export interface ClassReportData {
@@ -142,13 +159,53 @@ export class ReportService {
     }
 
     let totalSessions = 0;
+    let evidenceRows: AttendanceEvidenceRow[] = [];
     if (student.classId) {
       const sessionWhere = withDateRange<Prisma.AttendanceSessionWhereInput>({
         schoolId,
         classId: student.classId,
       }, 'startedAt', dateRange);
-      totalSessions = await prisma.attendanceSession.count({
+      const sessions = await prisma.attendanceSession.findMany({
         where: sessionWhere,
+        select: {
+          id: true,
+          classId: true,
+          subject: true,
+          startedAt: true,
+          endedAt: true,
+          class: { select: { name: true } },
+          teacher: { select: { fullName: true } },
+          records: {
+            where: { studentId },
+            select: {
+              id: true,
+              status: true,
+              method: true,
+              scannedAt: true,
+              note: true,
+            },
+          },
+        },
+        orderBy: { startedAt: 'desc' },
+      });
+      totalSessions = sessions.length;
+      evidenceRows = sessions.map((session) => {
+        const record = session.records[0];
+        return {
+          sessionId: session.id,
+          recordId: record?.id ?? null,
+          date: session.startedAt.toISOString().slice(0, 10),
+          subject: session.subject,
+          classId: session.classId,
+          className: session.class?.name ?? null,
+          teacherName: session.teacher?.fullName ?? null,
+          status: (record?.status ?? 'ABSENT') as AttendanceStatusKey,
+          method: record?.method ?? null,
+          scannedAt: record?.scannedAt?.toISOString() ?? null,
+          sessionStartedAt: session.startedAt.toISOString(),
+          sessionEndedAt: session.endedAt?.toISOString() ?? null,
+          note: record?.note ?? null,
+        };
       });
     }
 
@@ -176,6 +233,7 @@ export class ReportService {
       totalExcused,
       totalAbsent: Math.max(0, totalAbsent),
       attendancePercentage,
+      records: evidenceRows,
     };
   }
 
@@ -463,6 +521,20 @@ export class ReportService {
         doc.text(`Absent: ${data.totalAbsent}`);
         doc.moveDown(0.5);
         doc.fontSize(14).text(`Attendance: ${data.attendancePercentage}%`);
+        if (data.records?.length) {
+          doc.moveDown();
+          doc.fontSize(13).text('Daily Evidence');
+          doc.moveDown(0.25);
+          for (const row of data.records.slice(0, 80)) {
+            const marked = row.scannedAt ? new Date(row.scannedAt).toLocaleString('en-GB') : 'Not marked';
+            doc.fontSize(9).text(
+              `${row.date} | ${row.subject} | ${row.status} | ${row.method ?? 'ABSENT'} | ${marked}`,
+            );
+          }
+          if (data.records.length > 80) {
+            doc.fontSize(9).text(`...and ${data.records.length - 80} more row(s). Export Excel for the full detail.`);
+          }
+        }
       } else if ('className' in data) {
         // Class report
         doc.fontSize(14).text(`Class: ${data.className}`);
@@ -510,6 +582,31 @@ export class ReportService {
       sheet.addRow({ metric: 'Excused', value: data.totalExcused });
       sheet.addRow({ metric: 'Absent', value: data.totalAbsent });
       sheet.addRow({ metric: 'Attendance %', value: data.attendancePercentage });
+      if (data.records?.length) {
+        const detailSheet = workbook.addWorksheet('Daily Evidence');
+        detailSheet.columns = [
+          { header: 'Date', key: 'date', width: 14 },
+          { header: 'Subject', key: 'subject', width: 28 },
+          { header: 'Class', key: 'className', width: 20 },
+          { header: 'Teacher', key: 'teacherName', width: 24 },
+          { header: 'Status', key: 'status', width: 14 },
+          { header: 'Method', key: 'method', width: 14 },
+          { header: 'Marked At', key: 'scannedAt', width: 24 },
+          { header: 'Note', key: 'note', width: 32 },
+        ];
+        for (const row of data.records) {
+          detailSheet.addRow({
+            date: row.date,
+            subject: row.subject,
+            className: row.className ?? '',
+            teacherName: row.teacherName ?? '',
+            status: row.status,
+            method: row.method ?? '',
+            scannedAt: row.scannedAt ?? '',
+            note: row.note ?? '',
+          });
+        }
+      }
     } else if ('className' in data) {
       // Class report
       sheet.columns = [
@@ -569,6 +666,22 @@ export class ReportService {
       lines.push(`Excused,${data.totalExcused}`);
       lines.push(`Absent,${data.totalAbsent}`);
       lines.push(`Attendance %,${data.attendancePercentage}`);
+      if (data.records?.length) {
+        lines.push('');
+        lines.push('Date,Subject,Class,Teacher,Status,Method,Marked At,Note');
+        for (const row of data.records) {
+          lines.push([
+            row.date,
+            this._escapeCSV(row.subject),
+            this._escapeCSV(row.className ?? ''),
+            this._escapeCSV(row.teacherName ?? ''),
+            row.status,
+            row.method ?? '',
+            row.scannedAt ?? '',
+            this._escapeCSV(row.note ?? ''),
+          ].map((value) => `"${value}"`).join(','));
+        }
+      }
     } else if ('className' in data) {
       // Class report
       lines.push('Student,Expected,Present,Late,Excused,Absent,Attendance %');

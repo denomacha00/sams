@@ -3,6 +3,21 @@ import apiClient from '../services/apiClient';
 import { useAuthStore } from '../store/authStore';
 import { UserRole } from '@sams/shared';
 
+interface AttendanceRecordDetail {
+  sessionId: string;
+  recordId?: string | null;
+  date: string;
+  subject: string;
+  className?: string | null;
+  teacherName?: string | null;
+  status: 'PRESENT' | 'LATE' | 'EXCUSED' | 'ABSENT';
+  method?: string | null;
+  scannedAt?: string | null;
+  sessionStartedAt: string;
+  sessionEndedAt?: string | null;
+  note?: string | null;
+}
+
 interface StudentEntry {
   studentId: string;
   studentName: string;
@@ -13,6 +28,7 @@ interface StudentEntry {
   totalLate: number;
   totalExcused: number;
   totalAbsent: number;
+  records?: AttendanceRecordDetail[];
 }
 
 interface ReportData {
@@ -27,6 +43,7 @@ interface ReportData {
   averageAttendancePercentage?: number;
   totalSessions?: number;
   students?: StudentEntry[];
+  records?: AttendanceRecordDetail[];
   // Computed display fields (normalised below)
   _displayPercentage?: number;
   _displayPresent?: number;
@@ -46,6 +63,10 @@ const ReportsPage: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [exporting, setExporting] = useState(false);
+  const [selectedStudent, setSelectedStudent] = useState<StudentEntry | null>(null);
+  const [studentDetail, setStudentDetail] = useState<ReportData | null>(null);
+  const [studentDetailLoading, setStudentDetailLoading] = useState(false);
+  const [studentDetailError, setStudentDetailError] = useState<string | null>(null);
 
   const getReportEndpoint = (): string | null => {
     switch (user?.role) {
@@ -92,6 +113,22 @@ const ReportsPage: React.FC = () => {
     }
   };
 
+  const normalizeRecords = (records: any[] | undefined): AttendanceRecordDetail[] =>
+    (records ?? []).map((row) => ({
+      sessionId: row.sessionId,
+      recordId: row.recordId ?? null,
+      date: row.date,
+      subject: row.subject,
+      className: row.className ?? null,
+      teacherName: row.teacherName ?? null,
+      status: row.status,
+      method: row.method ?? null,
+      scannedAt: row.scannedAt ?? null,
+      sessionStartedAt: row.sessionStartedAt,
+      sessionEndedAt: row.sessionEndedAt ?? null,
+      note: row.note ?? null,
+    }));
+
   /** Normalise the various backend response shapes into a single display shape */
   const normaliseReport = (data: any): ReportData => {
     // Student report: { studentId, studentName, totalExpected, totalPresent, totalLate, totalExcused, totalAbsent, attendancePercentage }
@@ -102,6 +139,7 @@ const ReportsPage: React.FC = () => {
         _displayPresent: data.totalPresent ?? 0,
         _displayAbsent: data.totalAbsent ?? 0,
         _displaySessions: data.totalExpected ?? 0,
+        records: normalizeRecords(data.records),
         students: undefined,
       };
     }
@@ -117,6 +155,7 @@ const ReportsPage: React.FC = () => {
         totalLate: s.totalLate ?? 0,
         totalExcused: s.totalExcused ?? 0,
         totalAbsent: s.totalAbsent ?? 0,
+        records: normalizeRecords(s.records),
       }));
       const totals = students.reduce(
         (acc, s) => ({
@@ -152,6 +191,7 @@ const ReportsPage: React.FC = () => {
           totalLate: s.totalLate ?? 0,
           totalExcused: s.totalExcused ?? 0,
           totalAbsent: s.totalAbsent ?? 0,
+          records: normalizeRecords(s.records),
         })),
       );
       const totals = allStudents.reduce(
@@ -185,6 +225,7 @@ const ReportsPage: React.FC = () => {
             totalLate: s.totalLate ?? 0,
             totalExcused: s.totalExcused ?? 0,
             totalAbsent: s.totalAbsent ?? 0,
+            records: normalizeRecords(s.records),
           })),
         ),
       );
@@ -216,6 +257,9 @@ const ReportsPage: React.FC = () => {
     }
     setLoading(true);
     setError(null);
+    setSelectedStudent(null);
+    setStudentDetail(null);
+    setStudentDetailError(null);
     try {
       const { data } = await apiClient.get(
         `${endpoint}?from=${dateFrom}T00:00:00.000Z&to=${dateTo}T23:59:59.999Z`
@@ -266,6 +310,48 @@ const ReportsPage: React.FC = () => {
   const displayPresent = report?._displayPresent ?? report?.totalPresent ?? 0;
   const displaySessions = report?._displaySessions ?? report?.totalExpected ?? 0;
   const displayAbsent = report?._displayAbsent ?? report?.totalAbsent ?? 0;
+  const dailyEvidence = studentDetail?.records ?? report?.records ?? [];
+
+  const formatDateTime = (value?: string | null): string => {
+    if (!value) return 'Not marked';
+    return new Date(value).toLocaleString([], {
+      dateStyle: 'medium',
+      timeStyle: 'short',
+    });
+  };
+
+  const getStatusClass = (status: AttendanceRecordDetail['status']): string => {
+    switch (status) {
+      case 'PRESENT':
+        return 'bg-emerald-500/15 text-emerald-300 border-emerald-400/25';
+      case 'LATE':
+        return 'bg-amber-500/15 text-amber-300 border-amber-400/25';
+      case 'EXCUSED':
+        return 'bg-sky-500/15 text-sky-300 border-sky-400/25';
+      case 'ABSENT':
+      default:
+        return 'bg-red-500/15 text-red-300 border-red-400/25';
+    }
+  };
+
+  const handleStudentDetails = async (student: StudentEntry) => {
+    setSelectedStudent(student);
+    setStudentDetail(null);
+    setStudentDetailError(null);
+    setStudentDetailLoading(true);
+    try {
+      const { data } = await apiClient.get(
+        `/reports/student/${student.studentId}?from=${dateFrom}T00:00:00.000Z&to=${dateTo}T23:59:59.999Z`,
+      );
+      setStudentDetail(normaliseReport(data));
+    } catch (err: any) {
+      setStudentDetailError(
+        err.response?.data?.error || err.response?.data?.message || 'Failed to load student evidence',
+      );
+    } finally {
+      setStudentDetailLoading(false);
+    }
+  };
 
   return (
     <div className="page-shell p-6">
@@ -368,8 +454,13 @@ const ReportsPage: React.FC = () => {
                     <thead>
                       <tr className="border-b border-white/10">
                         <th className="text-left text-xs font-semibold text-ink-muted uppercase tracking-wider py-3 px-2">Student</th>
+                        <th className="text-right text-xs font-semibold text-ink-muted uppercase tracking-wider py-3 px-2">Expected</th>
+                        <th className="text-right text-xs font-semibold text-ink-muted uppercase tracking-wider py-3 px-2">Present</th>
+                        <th className="text-right text-xs font-semibold text-ink-muted uppercase tracking-wider py-3 px-2">Late</th>
+                        <th className="text-right text-xs font-semibold text-ink-muted uppercase tracking-wider py-3 px-2">Absent</th>
                         <th className="text-right text-xs font-semibold text-ink-muted uppercase tracking-wider py-3 px-2">Attendance</th>
                         <th className="text-right text-xs font-semibold text-ink-muted uppercase tracking-wider py-3 px-2">Status</th>
+                        <th className="text-right text-xs font-semibold text-ink-muted uppercase tracking-wider py-3 px-2">Evidence</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-white/5">
@@ -383,6 +474,10 @@ const ReportsPage: React.FC = () => {
                               <span className="font-medium text-ink text-sm">{s.studentName || s.fullName}</span>
                             </div>
                           </td>
+                          <td className="py-3 px-2 text-right text-sm text-ink-muted">{s.totalExpected}</td>
+                          <td className="py-3 px-2 text-right text-sm text-emerald-300">{s.totalPresent}</td>
+                          <td className="py-3 px-2 text-right text-sm text-amber-300">{s.totalLate}</td>
+                          <td className="py-3 px-2 text-right text-sm text-red-300">{s.totalAbsent}</td>
                           <td className="py-3 px-2 text-right">
                             <span className={`font-semibold text-sm ${
                               s.attendancePercentage >= 80 ? 'text-indigo-300' :
@@ -401,11 +496,98 @@ const ReportsPage: React.FC = () => {
                               {s.attendancePercentage >= 80 ? 'Good' : s.attendancePercentage >= 60 ? 'Warning' : 'At Risk'}
                             </span>
                           </td>
+                          <td className="py-3 px-2 text-right">
+                            <button
+                              type="button"
+                              onClick={() => void handleStudentDetails(s)}
+                              className="rounded-lg border border-indigo-400/30 bg-indigo-500/10 px-3 py-1.5 text-xs font-semibold text-indigo-200 hover:bg-indigo-500/20"
+                            >
+                              View days
+                            </button>
+                          </td>
                         </tr>
                       ))}
                     </tbody>
                   </table>
                 </div>
+              </div>
+            )}
+
+            {(dailyEvidence.length > 0 || selectedStudent || studentDetailLoading || studentDetailError) && (
+              <div className="surface-card rounded-2xl p-6 mb-6">
+                <div className="mb-4 flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
+                  <div>
+                    <h2 className="text-lg font-semibold text-ink">
+                      {selectedStudent ? `${selectedStudent.studentName || selectedStudent.fullName} - Daily Evidence` : 'Daily Evidence'}
+                    </h2>
+                    <p className="text-sm text-ink-muted">
+                      Lesson-by-lesson status for the selected date range.
+                    </p>
+                  </div>
+                  {selectedStudent && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSelectedStudent(null);
+                        setStudentDetail(null);
+                        setStudentDetailError(null);
+                      }}
+                      className="rounded-lg border border-line bg-surface-muted px-3 py-2 text-xs font-semibold text-ink-muted hover:text-ink"
+                    >
+                      Clear selection
+                    </button>
+                  )}
+                </div>
+
+                {studentDetailLoading && (
+                  <p className="py-6 text-center text-sm text-ink-muted">Loading daily evidence...</p>
+                )}
+
+                {studentDetailError && (
+                  <div className="mb-4 rounded-xl border border-red-400/30 bg-red-500/15 p-3 text-sm text-red-300">
+                    {studentDetailError}
+                  </div>
+                )}
+
+                {!studentDetailLoading && !studentDetailError && dailyEvidence.length === 0 && (
+                  <p className="py-6 text-center text-sm text-ink-muted">No lesson evidence found for this date range.</p>
+                )}
+
+                {!studentDetailLoading && dailyEvidence.length > 0 && (
+                  <div className="overflow-x-auto">
+                    <table className="w-full">
+                      <thead>
+                        <tr className="border-b border-white/10">
+                          <th className="py-3 px-2 text-left text-xs font-semibold uppercase tracking-wider text-ink-muted">Date</th>
+                          <th className="py-3 px-2 text-left text-xs font-semibold uppercase tracking-wider text-ink-muted">Lesson</th>
+                          <th className="py-3 px-2 text-left text-xs font-semibold uppercase tracking-wider text-ink-muted">Teacher</th>
+                          <th className="py-3 px-2 text-right text-xs font-semibold uppercase tracking-wider text-ink-muted">Status</th>
+                          <th className="py-3 px-2 text-right text-xs font-semibold uppercase tracking-wider text-ink-muted">Method</th>
+                          <th className="py-3 px-2 text-right text-xs font-semibold uppercase tracking-wider text-ink-muted">Marked At</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-white/5">
+                        {dailyEvidence.map((row) => (
+                          <tr key={`${row.sessionId}-${row.recordId ?? 'absent'}`} className="hover:bg-white/5">
+                            <td className="py-3 px-2 text-sm text-ink-muted">{row.date}</td>
+                            <td className="py-3 px-2">
+                              <p className="text-sm font-medium text-ink">{row.subject}</p>
+                              <p className="text-xs text-ink-subtle">{row.className ?? 'Class not set'}</p>
+                            </td>
+                            <td className="py-3 px-2 text-sm text-ink-muted">{row.teacherName ?? 'Not set'}</td>
+                            <td className="py-3 px-2 text-right">
+                              <span className={`inline-flex rounded-full border px-2 py-1 text-xs font-semibold ${getStatusClass(row.status)}`}>
+                                {row.status}
+                              </span>
+                            </td>
+                            <td className="py-3 px-2 text-right text-sm text-ink-muted">{row.method ?? '-'}</td>
+                            <td className="py-3 px-2 text-right text-sm text-ink-muted">{formatDateTime(row.scannedAt)}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
               </div>
             )}
 

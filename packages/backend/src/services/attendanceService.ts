@@ -319,7 +319,15 @@ export class AttendanceService {
 
     await this.ensureSessionOpen(session);
 
-    const effectiveRequireGps = requireGps && hasSessionGpsAnchor(session);
+    if (requireGps && !hasSessionGpsAnchor(session)) {
+      throw new AppError(
+        400,
+        'SESSION_GPS_ANCHOR_REQUIRED',
+        'GPS links require the session to be started with teacher GPS enabled',
+      );
+    }
+
+    const effectiveRequireGps = requireGps;
 
     // 2. Generate JWT with type 'LINK' — embed GPS settings in the token
     const nonce = createId();

@@ -99,6 +99,21 @@ describe('AttendanceService QR/link scan recording', () => {
     vi.useRealTimers();
   });
 
+  it('rejects GPS attendance links when the active session has no teacher GPS anchor', async () => {
+    vi.mocked(prisma.attendanceSession.findUnique).mockResolvedValue({
+      ...baseSession,
+      class: { departmentId: 'dept-1' },
+    } as never);
+
+    await expect(
+      service.generateAttendanceLink(sessionId, schoolId, 'teacher-1', 5, true, 100),
+    ).rejects.toMatchObject({
+      statusCode: 400,
+      code: 'SESSION_GPS_ANCHOR_REQUIRED',
+    });
+    expect(prisma.attendanceSession.update).not.toHaveBeenCalled();
+  });
+
   it('records a late QR scan as LATE, not ABSENT, while the lesson window is still open', async () => {
     const qrToken = jwt.sign(
       { sessionId, nonce: 'nonce-1', iat: 0, exp: Math.floor(Date.now() / 1000) + 60 },

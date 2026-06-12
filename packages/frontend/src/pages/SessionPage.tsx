@@ -7,7 +7,7 @@ import apiClient from '../services/apiClient';
 import { useAuthStore } from '../store/authStore';
 import { AttendanceStatus, UserRole } from '@sams/shared';
 import { getApiErrorMessage } from '../lib/apiError';
-import { getTeacherLocation } from '../lib/geolocation';
+import { getGpsErrorMessage, getTeacherLocation } from '../lib/geolocation';
 
 const SESSION_START_TIMEOUT_MS = 18_000;
 const ACTIVE_SESSION_REFRESH_MS = 10_000;
@@ -382,12 +382,20 @@ const SessionPage: React.FC = () => {
     if (!activeSession) return;
     setLinkLoading(true);
     setLinkCopied(false);
+    setError(null);
     try {
+      if (requireGps && !canRequireGpsForLink) {
+        setError(
+          'GPS links need a teacher location anchor. Start or restart this session with session GPS enabled, or turn GPS off for this link.',
+        );
+        return;
+      }
+
       const { data } = await apiClient.post('/attendance/link/generate', {
         sessionId: activeSession.id,
         expiryMinutes,
-        requireGps: canRequireGpsForLink ? requireGps : false,
-        gpsRadiusM: canRequireGpsForLink ? gpsRadiusM : 100,
+        requireGps,
+        gpsRadiusM: requireGps ? gpsRadiusM : 100,
       });
       setLinkUrl(data.linkUrl);
       setLinkToken(data.linkToken);
@@ -461,13 +469,9 @@ const SessionPage: React.FC = () => {
           return;
         }
         try {
-          location = await getTeacherLocation();
+          location = await getTeacherLocation(20_000);
         } catch (geoErr: unknown) {
-          const msg =
-            geoErr instanceof Error && geoErr.message === 'GPS_TIMEOUT'
-              ? 'Location timed out. Allow GPS access and try again.'
-              : 'Could not get your location. Allow GPS access and try again.';
-          setError(msg);
+          setError(getGpsErrorMessage(geoErr));
           return;
         }
       }
@@ -923,8 +927,8 @@ const SessionPage: React.FC = () => {
                 <div>
                   <p className="text-sm font-medium text-ink">Require GPS</p>
                   <p className="text-xs text-ink-muted mt-0.5">
-                    {!canRequireGpsForLink
-                      ? 'Session has no teacher location; link will work without GPS'
+                    {!canRequireGpsForLink && requireGps
+                      ? 'GPS selected. Restart this session with GPS on before generating a GPS link.'
                       : requireGps
                         ? 'Students must be physically present'
                         : 'No location check - use for permissions/excused'}
@@ -932,24 +936,23 @@ const SessionPage: React.FC = () => {
                 </div>
                 <button
                   type="button"
-                  onClick={() => canRequireGpsForLink && setRequireGps((current) => !current)}
+                  onClick={() => setRequireGps((current) => !current)}
                   className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors duration-200 focus:outline-none ${
-                    requireGps && canRequireGpsForLink ? 'bg-indigo-600' : 'bg-white/20'
-                  } ${!canRequireGpsForLink ? 'cursor-not-allowed opacity-60' : ''}`}
-                  disabled={!canRequireGpsForLink}
-                  aria-pressed={requireGps && canRequireGpsForLink}
+                    requireGps ? 'bg-indigo-600' : 'bg-white/20'
+                  }`}
+                  aria-pressed={requireGps}
                   aria-label="Toggle GPS requirement for this attendance link"
                 >
                   <span
                     className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform duration-200 ${
-                      requireGps && canRequireGpsForLink ? 'translate-x-6' : 'translate-x-1'
+                      requireGps ? 'translate-x-6' : 'translate-x-1'
                     }`}
                   />
                 </button>
               </div>
 
               {/* GPS radius — only shown when GPS is on */}
-              {requireGps && canRequireGpsForLink && (
+              {requireGps && (
                 <div>
                   <label htmlFor="gpsRadiusM" className="form-label">
                     Allowed Radius (meters)
@@ -967,7 +970,7 @@ const SessionPage: React.FC = () => {
                     <span className="text-sm text-ink-muted shrink-0">m</span>
                   </div>
                   <p className="text-xs text-ink-subtle mt-1">
-                    Students outside this radius will be rejected. Typical classroom: 50-150m.
+                    Students outside this radius will be rejected when the session has a teacher GPS anchor.
                   </p>
                 </div>
               )}

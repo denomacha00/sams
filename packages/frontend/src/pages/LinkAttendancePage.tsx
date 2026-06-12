@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import apiClient from '../services/apiClient';
 import { useAuthStore } from '../store/authStore';
 import { getAttendanceDeviceId } from '../lib/attendanceDevice';
+import { getAttendanceLocation, getGpsErrorMessage } from '../lib/geolocation';
 
 interface SessionInfo {
   valid: boolean;
@@ -123,36 +124,23 @@ const LinkAttendancePage: React.FC = () => {
     // If the link doesn't require GPS, skip location entirely
     if (sessionInfo?.requireGps === false) return;
 
-    if (!navigator.geolocation) {
-      setGpsError('Geolocation is not supported by your browser.');
-      return;
-    }
+    let cancelled = false;
 
-    navigator.geolocation.getCurrentPosition(
-      (position) => {
-        setGpsCoords({
-          lat: position.coords.latitude,
-          lng: position.coords.longitude,
-        });
+    void (async () => {
+      try {
+        const coords = await getAttendanceLocation(20_000);
+        if (cancelled) return;
+        setGpsCoords({ lat: coords.lat, lng: coords.lng });
         setGpsError('');
-      },
-      (err) => {
-        switch (err.code) {
-          case err.PERMISSION_DENIED:
-            setGpsError('Location permission denied. Please enable GPS to mark attendance.');
-            break;
-          case err.POSITION_UNAVAILABLE:
-            setGpsError('Location unavailable. Please try again.');
-            break;
-          case err.TIMEOUT:
-            setGpsError('Location request timed out. Please try again.');
-            break;
-          default:
-            setGpsError('Could not get your location.');
-        }
-      },
-      { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
-    );
+      } catch (err) {
+        if (cancelled) return;
+        setGpsError(getGpsErrorMessage(err));
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
   }, [pageState, sessionInfo?.requireGps]);
 
   const handleMarkAttendance = useCallback(async () => {
@@ -174,18 +162,12 @@ const LinkAttendancePage: React.FC = () => {
     if (!gpsCoords) {
       setPageState('gps-pending');
       try {
-        const position = await new Promise<GeolocationPosition>((resolve, reject) =>
-          navigator.geolocation.getCurrentPosition(resolve, reject, {
-            enableHighAccuracy: true,
-            timeout: 15000,
-            maximumAge: 0,
-          })
-        );
-        const coords = { lat: position.coords.latitude, lng: position.coords.longitude };
+        const location = await getAttendanceLocation(20_000);
+        const coords = { lat: location.lat, lng: location.lng };
         setGpsCoords(coords);
         submitAttendance(coords);
-      } catch {
-        setGpsError('Could not get your location. Please enable GPS and try again.');
+      } catch (err) {
+        setGpsError(getGpsErrorMessage(err));
         setPageState('info');
       }
       return;
