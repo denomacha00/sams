@@ -168,6 +168,43 @@ attendanceRouter.post('/biometric', requirePermission('mark:attendance'), async 
 });
 
 /**
+ * POST /api/v1/attendance/fingerprint
+ * Record attendance via fingerprint reader (teacher-assisted quick mark).
+ * Does NOT use confidence — the external reader handles identity verification
+ * before the teacher triggers this record.
+ */
+const fingerprintSchema = z.object({
+  sessionId: z.string().min(1),
+  studentId: z.string().min(1),
+});
+
+attendanceRouter.post('/fingerprint', requirePermission('mark:attendance'), async (req: Request, res: Response): Promise<void> => {
+  const parsed = fingerprintSchema.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({
+      error: 'Validation failed',
+      code: 'VALIDATION_ERROR',
+      details: parsed.error.flatten().fieldErrors,
+    });
+    return;
+  }
+
+  try {
+    const record = await attendanceService.recordFingerprint(
+      req.user.sub,
+      req.schoolId,
+      parsed.data.sessionId,
+      parsed.data.studentId,
+      { actorRole: req.user.role, actorDepartmentId: req.user.departmentId },
+    );
+    res.status(201).json(record);
+  } catch (err) {
+    if (err instanceof AppError) throw err;
+    throw new AppError(500, 'INTERNAL_ERROR', 'Failed to record fingerprint attendance');
+  }
+});
+
+/**
  * POST /api/v1/attendance/link/generate
  * Generate a shareable attendance link for an active session (teacher).
  */

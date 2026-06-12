@@ -785,6 +785,67 @@ export class AttendanceService {
   }
 
   /**
+   * POST /api/v1/attendance/fingerprint
+   * Record attendance via fingerprint reader (teacher-assisted quick mark).
+   * This is a dedicated endpoint for fingerprint-based attendance marking.
+   * Unlike recordBiometric which requires face-matching confidence validation,
+   * fingerprint attendance relies on the external reader having already verified
+   * the student's identity before the teacher triggers this record.
+   * The method is stored as 'FINGERPRINT' for accurate audit trails.
+   */
+  async recordFingerprint(
+    teacherId: string,
+    schoolId: string,
+    sessionId: string,
+    studentId: string,
+    actor: AttendanceActorOptions = {},
+  ) {
+    const session = await this.getOwnedSession(sessionId, schoolId, teacherId, actor);
+    await this.assertStudentInSession(studentId, schoolId, session);
+
+    // Check for existing record
+    const existing = await prisma.attendanceRecord.findUnique({
+      where: {
+        sessionId_studentId: {
+          sessionId,
+          studentId,
+        },
+      },
+    });
+
+    if (existing) {
+      throw new AppError(
+        400,
+        'DUPLICATE_SCAN',
+        'Attendance already recorded for this session',
+      );
+    }
+
+    const status = this.classifyAcceptedScan(session);
+
+    // Create record with method 'FINGERPRINT'
+    const record = await prisma.attendanceRecord.create({
+      data: {
+        id: createId(),
+        schoolId,
+        sessionId,
+        studentId,
+        status,
+        method: 'FINGERPRINT',
+        scannedAt: new Date(),
+      },
+    });
+
+    // Broadcast new attendance to session room
+    await this.emitAttendanceNew(sessionId, record);
+
+    // Fire-and-forget: recompute student risk score
+    riskService.computeRiskScore(schoolId, studentId).catch(() => {});
+
+    return record;
+  }
+
+  /**
    * Update an existing attendance record.
    * Validates school ownership, stores previous status, and logs to audit.
    */

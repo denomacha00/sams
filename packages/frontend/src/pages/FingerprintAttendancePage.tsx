@@ -140,10 +140,9 @@ const FingerprintAttendancePage: React.FC = () => {
     setError(null);
     setSuccess(null);
     try {
-      await apiClient.post('/attendance/biometric', {
+      await apiClient.post('/attendance/fingerprint', {
         sessionId,
         studentId: student.id,
-        confidence: 1,
       });
       setMarkedIds((current) => new Set(current).add(student.id));
       setSuccess(`${student.fullName} marked present by fingerprint.`);
