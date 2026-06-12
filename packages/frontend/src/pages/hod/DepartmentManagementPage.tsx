@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuthStore } from '../../store/authStore';
 import apiClient from '../../services/apiClient';
@@ -27,6 +27,14 @@ interface Student {
   phone: string | null;
 }
 
+interface StudentClassGroup {
+  id: string;
+  name: string;
+  capacity: number | null;
+  classTeacherName: string | null;
+  students: Student[];
+}
+
 const DepartmentManagementPage: React.FC = () => {
   const user = useAuthStore((s) => s.user);
 
@@ -39,6 +47,7 @@ const DepartmentManagementPage: React.FC = () => {
   const [teachersError, setTeachersError] = useState('');
   const [classesError, setClassesError] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
+  const [selectedStudentClassId, setSelectedStudentClassId] = useState('all');
   const [activeTab, setActiveTab] = useState<'teachers' | 'classes' | 'students'>('teachers');
 
   // Assignment state
@@ -138,11 +147,68 @@ const DepartmentManagementPage: React.FC = () => {
     }
   };
 
-  const filteredStudents = students.filter((s) => {
-    if (!searchQuery.trim()) return true;
-    const q = searchQuery.toLowerCase();
-    return s.fullName.toLowerCase().includes(q) || (s.admissionNumber?.toLowerCase().includes(q) ?? false);
-  });
+  const studentsWithoutClass = useMemo(
+    () => students.filter((student) => !student.classId).length,
+    [students],
+  );
+
+  const filteredStudents = useMemo(() => {
+    const q = searchQuery.trim().toLowerCase();
+    return students.filter((student) => {
+      const matchesClass =
+        selectedStudentClassId === 'all' ||
+        (selectedStudentClassId === 'unassigned' && !student.classId) ||
+        student.classId === selectedStudentClassId;
+      if (!matchesClass) return false;
+      if (!q) return true;
+      return [
+        student.fullName,
+        student.admissionNumber,
+        student.email,
+        student.phone,
+      ].some((value) => value?.toLowerCase().includes(q));
+    });
+  }, [searchQuery, selectedStudentClassId, students]);
+
+  const studentClassGroups = useMemo<StudentClassGroup[]>(() => {
+    const groups = classes.map((cls) => ({
+      id: cls.id,
+      name: cls.name,
+      capacity: cls.capacity,
+      classTeacherName: cls.classTeacherName,
+      students: [] as Student[],
+    }));
+    const groupById = new Map(groups.map((group) => [group.id, group]));
+    const unassignedGroup: StudentClassGroup = {
+      id: 'unassigned',
+      name: 'Unassigned class',
+      capacity: null,
+      classTeacherName: null,
+      students: [],
+    };
+
+    filteredStudents.forEach((student) => {
+      if (student.classId && groupById.has(student.classId)) {
+        groupById.get(student.classId)!.students.push(student);
+      } else {
+        unassignedGroup.students.push(student);
+      }
+    });
+
+    if (selectedStudentClassId === 'unassigned') {
+      return unassignedGroup.students.length > 0 ? [unassignedGroup] : [];
+    }
+
+    if (selectedStudentClassId !== 'all') {
+      const selected = groupById.get(selectedStudentClassId);
+      return selected && selected.students.length > 0 ? [selected] : [];
+    }
+
+    return [
+      ...groups.filter((group) => group.students.length > 0),
+      ...(unassignedGroup.students.length > 0 ? [unassignedGroup] : []),
+    ];
+  }, [classes, filteredStudents, selectedStudentClassId]);
 
   return (
     <div className="page-shell">
@@ -200,18 +266,40 @@ const DepartmentManagementPage: React.FC = () => {
 
         {/* Search for students */}
         {activeTab === 'students' && (
-          <div className="mb-6 relative">
-            <svg className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-ink-muted" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-            </svg>
-            <input
-              type="text"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Search by name or admission number..."
-              className="w-full pl-11 pr-4 py-3 bg-surface-muted border border-line rounded-xl text-ink placeholder-ink-subtle focus:outline-none focus:ring-2 focus:ring-brand/40/40 focus:border-brand transition-all"
-            />
-            {searchQuery && <p className="text-xs text-ink-muted mt-1">{filteredStudents.length} result{filteredStudents.length !== 1 ? 's' : ''}</p>}
+          <div className="mb-6 rounded-2xl border border-line bg-surface-muted p-4">
+            <div className="grid grid-cols-1 gap-3 md:grid-cols-[minmax(0,1fr)_260px]">
+              <div className="relative">
+                <svg className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-ink-muted" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                </svg>
+                <input
+                  type="text"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  placeholder="Search by name, admission number, phone, or email..."
+                  className="w-full pl-11 pr-4 py-3 bg-surface-elevated border border-line rounded-xl text-ink placeholder-ink-subtle focus:outline-none focus:ring-2 focus:ring-brand/40 focus:border-brand transition-all"
+                />
+              </div>
+
+              <select
+                value={selectedStudentClassId}
+                onChange={(e) => setSelectedStudentClassId(e.target.value)}
+                className="input-field"
+                aria-label="Filter students by class"
+              >
+                <option value="all">All classes</option>
+                {classes.map((cls) => (
+                  <option key={cls.id} value={cls.id}>
+                    {cls.name}
+                  </option>
+                ))}
+                {studentsWithoutClass > 0 && <option value="unassigned">Unassigned class</option>}
+              </select>
+            </div>
+            <p className="mt-3 text-xs text-ink-muted">
+              Showing {filteredStudents.length} of {students.length} department student{students.length === 1 ? '' : 's'}.
+              {selectedStudentClassId === 'all' ? ' Students are separated by class below.' : ' Use All classes to see the grouped department view.'}
+            </p>
           </div>
         )}
 
@@ -328,12 +416,52 @@ const DepartmentManagementPage: React.FC = () => {
           <div>
             {loadingStudents ? (
               <div className="text-center text-ink-muted py-8">Loading students...</div>
-            ) : filteredStudents.length === 0 ? (
+            ) : studentClassGroups.length === 0 ? (
               <div className="text-center text-ink-muted py-8">
                 {searchQuery ? `No students found matching "${searchQuery}"` : 'No students in this department yet.'}
               </div>
             ) : (
-              <div className="space-y-2">
+              <>
+                <div className="space-y-5">
+                  {studentClassGroups.map((group) => (
+                    <section key={group.id} className="overflow-hidden rounded-2xl border border-line bg-white/[0.04]">
+                      <div className="flex flex-col gap-2 border-b border-line bg-surface-muted px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+                        <div>
+                          <h3 className="text-sm font-semibold text-ink">{group.name}</h3>
+                          <p className="text-xs text-ink-muted">
+                            {group.students.length} student{group.students.length === 1 ? '' : 's'}
+                            {group.capacity !== null ? ` | Capacity ${group.capacity}` : ''}
+                            {group.classTeacherName ? ` | Class teacher: ${group.classTeacherName}` : ''}
+                          </p>
+                        </div>
+                        {group.capacity !== null && (
+                          <span className="w-fit rounded-full border border-indigo-500/30 bg-indigo-500/10 px-2.5 py-1 text-xs font-semibold text-indigo-200">
+                            {group.students.length}/{group.capacity}
+                          </span>
+                        )}
+                      </div>
+
+                      <div className="divide-y divide-white/5">
+                        {group.students.map((student) => (
+                          <div key={student.id} className="flex items-center gap-3 px-4 py-3 hover:bg-white/5">
+                            <div className="w-8 h-8 rounded-full bg-gradient-to-br from-indigo-500/30 to-indigo-600/30 flex items-center justify-center shrink-0">
+                              <span className="text-xs font-semibold text-indigo-300">{student.fullName.charAt(0)}</span>
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <p className="truncate text-sm font-medium text-ink">{student.fullName}</p>
+                              <p className="text-xs text-ink-muted">
+                                {student.admissionNumber ? `ADM: ${student.admissionNumber}` : 'No admission number'}
+                                {student.phone ? ` | ${student.phone}` : ''}
+                                {student.email ? ` | ${student.email}` : ''}
+                              </p>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </section>
+                  ))}
+                </div>
+                <div className="hidden" aria-hidden="true">
                 {filteredStudents.map((s) => (
                   <div key={s.id} className="rounded-xl border border-white/10 bg-white/5 px-4 py-3 flex items-center gap-3">
                     <div className="w-8 h-8 rounded-full bg-gradient-to-br from-indigo-500/30 to-indigo-600/30 flex items-center justify-center shrink-0">
@@ -350,7 +478,8 @@ const DepartmentManagementPage: React.FC = () => {
                     </div>
                   </div>
                 ))}
-              </div>
+                </div>
+              </>
             )}
           </div>
         )}
