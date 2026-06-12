@@ -87,7 +87,9 @@
   }
 
   .app-header {
-    @apply border-b border-line bg-surface/80 backdrop-blur-md sticky top-0 z-50 shadow-card;
+    @apply border-b border-line sticky top-0 z-50 shadow-card;
+    background-color: color-mix(in srgb, var(--color-surface) 80%, transparent);
+    backdrop-filter: blur(12px);
   }
 
   .surface-card {
@@ -267,7 +269,9 @@
   }
 
   .inner-page-header {
-    @apply border-b border-line bg-surface/80 backdrop-blur-sm sticky top-0 z-40;
+    @apply border-b border-line sticky top-0 z-40;
+    background-color: color-mix(in srgb, var(--color-surface) 80%, transparent);
+    backdrop-filter: blur(12px);
   }
 
   /* Timetable */
@@ -311,7 +315,8 @@
 
 @layer utilities {
   .glass {
-    @apply backdrop-blur-xl bg-surface/70 border border-line;
+    @apply backdrop-blur-xl border border-line;
+    background-color: color-mix(in srgb, var(--color-surface) 70%, transparent);
   }
 
   /* Attendance status colors */
