@@ -6,55 +6,91 @@
   :root {
     /* ── Light mode ───────────────────────────────────────── */
     --color-bg: #f1f5f9;
+    --color-bg-rgb: 241 245 249;
     --color-surface: #ffffff;
+    --color-surface-rgb: 255 255 255;
     --color-surface-muted: #f8fafc;
+    --color-surface-muted-rgb: 248 250 252;
     --color-surface-elevated: #e2e8f0;
+    --color-surface-elevated-rgb: 226 232 240;
 
     --color-text: #0f172a;
+    --color-text-rgb: 15 23 42;
     --color-text-muted: #475569;
+    --color-text-muted-rgb: 71 85 105;
     --color-text-subtle: #64748b;
+    --color-text-subtle-rgb: 100 116 139;
 
     --color-border: #cbd5e1;
+    --color-border-rgb: 203 213 225;
     --color-border-strong: #94a3b8;
+    --color-border-strong-rgb: 148 163 184;
 
     --color-brand: #2563eb;
+    --color-brand-rgb: 37 99 235;
     --color-brand-hover: #1d4ed8;
+    --color-brand-hover-rgb: 29 78 216;
     --color-brand-light: #dbeafe;
+    --color-brand-light-rgb: 219 234 254;
 
     --color-accent-orange: #d97706;
+    --color-accent-orange-rgb: 217 119 6;
     --color-accent-orange-hover: #b45309;
+    --color-accent-orange-hover-rgb: 180 83 9;
     --color-accent-orange-light: #fef3c7;
+    --color-accent-orange-light-rgb: 254 243 199;
 
     --color-attendance-green: #16a34a;
+    --color-attendance-green-rgb: 22 163 74;
     --color-attendance-red: #dc2626;
+    --color-attendance-red-rgb: 220 38 38;
     --color-attendance-amber: #d97706;
+    --color-attendance-amber-rgb: 217 119 6;
   }
 
   .dark {
     /* ── Dark mode ────────────────────────────────────────── */
     --color-bg: #0d1117;
+    --color-bg-rgb: 13 17 23;
     --color-surface: #151b23;
+    --color-surface-rgb: 21 27 35;
     --color-surface-muted: #111827;
+    --color-surface-muted-rgb: 17 24 39;
     --color-surface-elevated: #1f2937;
+    --color-surface-elevated-rgb: 31 41 55;
 
     --color-text: #f8fafc;
+    --color-text-rgb: 248 250 252;
     --color-text-muted: #9aa4b2;
+    --color-text-muted-rgb: 154 164 178;
     --color-text-subtle: #7f8a99;
+    --color-text-subtle-rgb: 127 138 153;
 
     --color-border: #263241;
+    --color-border-rgb: 38 50 65;
     --color-border-strong: #364557;
+    --color-border-strong-rgb: 54 69 87;
 
     --color-brand: #3b82f6;
+    --color-brand-rgb: 59 130 246;
     --color-brand-hover: #2563eb;
+    --color-brand-hover-rgb: 37 99 235;
     --color-brand-light: #1e3a5f;
+    --color-brand-light-rgb: 30 58 95;
 
     --color-accent-orange: #f59e0b;
+    --color-accent-orange-rgb: 245 158 11;
     --color-accent-orange-hover: #d97706;
+    --color-accent-orange-hover-rgb: 217 119 6;
     --color-accent-orange-light: #451a03;
+    --color-accent-orange-light-rgb: 69 26 3;
 
     --color-attendance-green: #22c55e;
+    --color-attendance-green-rgb: 34 197 94;
     --color-attendance-red: #ef4444;
+    --color-attendance-red-rgb: 239 68 68;
     --color-attendance-amber: #f59e0b;
+    --color-attendance-amber-rgb: 245 158 11;
   }
 
   * {

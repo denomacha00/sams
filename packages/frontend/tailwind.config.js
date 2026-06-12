@@ -8,46 +8,46 @@ export default {
     extend: {
       colors: {
         canvas: {
-          DEFAULT: 'var(--color-bg, #0f172a)',
+          DEFAULT: 'rgb(var(--color-bg-rgb, 15 23 42) / <alpha-value>)',
         },
         surface: {
-          DEFAULT: 'var(--color-surface, #1e293b)',
-          muted: 'var(--color-surface-muted, #1a1a1a)',
-          elevated: 'var(--color-surface-elevated, #334155)',
+          DEFAULT: 'rgb(var(--color-surface-rgb, 30 41 59) / <alpha-value>)',
+          muted: 'rgb(var(--color-surface-muted-rgb, 26 26 26) / <alpha-value>)',
+          elevated: 'rgb(var(--color-surface-elevated-rgb, 51 65 85) / <alpha-value>)',
         },
         ink: {
-          DEFAULT: 'var(--color-text, #f5f5f5)',
-          muted: 'var(--color-text-muted, #94a3b8)',
-          subtle: 'var(--color-text-subtle, #9ca3af)',
+          DEFAULT: 'rgb(var(--color-text-rgb, 245 245 245) / <alpha-value>)',
+          muted: 'rgb(var(--color-text-muted-rgb, 148 163 184) / <alpha-value>)',
+          subtle: 'rgb(var(--color-text-subtle-rgb, 156 163 175) / <alpha-value>)',
         },
         line: {
-          DEFAULT: 'var(--color-border, #334155)',
-          strong: 'var(--color-border-strong, #475569)',
+          DEFAULT: 'rgb(var(--color-border-rgb, 51 65 85) / <alpha-value>)',
+          strong: 'rgb(var(--color-border-strong-rgb, 71 85 105) / <alpha-value>)',
         },
         brand: {
-          DEFAULT: 'var(--color-brand, #4f46e5)',
-          hover: 'var(--color-brand-hover, #4338ca)',
-          light: 'var(--color-brand-light, #1e1b4b)',
+          DEFAULT: 'rgb(var(--color-brand-rgb, 79 70 229) / <alpha-value>)',
+          hover: 'rgb(var(--color-brand-hover-rgb, 67 56 202) / <alpha-value>)',
+          light: 'rgb(var(--color-brand-light-rgb, 30 27 75) / <alpha-value>)',
           foreground: '#ffffff',
         },
         'accent-orange': {
-          DEFAULT: 'var(--color-accent-orange, #f97316)',
-          hover: 'var(--color-accent-orange-hover, #ea580c)',
-          light: 'var(--color-accent-orange-light, #431407)',
+          DEFAULT: 'rgb(var(--color-accent-orange-rgb, 249 115 22) / <alpha-value>)',
+          hover: 'rgb(var(--color-accent-orange-hover-rgb, 234 88 12) / <alpha-value>)',
+          light: 'rgb(var(--color-accent-orange-light-rgb, 67 20 7) / <alpha-value>)',
         },
         'attendance-green': {
-          DEFAULT: 'var(--color-attendance-green, #16a34a)',
+          DEFAULT: 'rgb(var(--color-attendance-green-rgb, 22 163 74) / <alpha-value>)',
         },
         'attendance-red': {
-          DEFAULT: 'var(--color-attendance-red, #dc2626)',
+          DEFAULT: 'rgb(var(--color-attendance-red-rgb, 220 38 38) / <alpha-value>)',
         },
         'attendance-amber': {
-          DEFAULT: 'var(--color-attendance-amber, #d97706)',
+          DEFAULT: 'rgb(var(--color-attendance-amber-rgb, 217 119 6) / <alpha-value>)',
         },
         'accent-blue': {
-          DEFAULT: 'var(--color-accent-blue, #4f46e5)',
-          hover: 'var(--color-accent-blue-hover, #4338ca)',
-          light: 'var(--color-accent-blue-light, #1e1b4b)',
+          DEFAULT: 'rgb(var(--color-accent-blue-rgb, 79 70 229) / <alpha-value>)',
+          hover: 'rgb(var(--color-accent-blue-hover-rgb, 67 56 202) / <alpha-value>)',
+          light: 'rgb(var(--color-accent-blue-light-rgb, 30 27 75) / <alpha-value>)',
         },
         primary: {
           50: 'var(--color-primary-50, #eef2ff)',
