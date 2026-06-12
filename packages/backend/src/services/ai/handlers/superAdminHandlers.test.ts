@@ -65,6 +65,24 @@ describe('generate_license action', () => {
 
     expect(params).toMatchObject({ schoolName: 'Green Valley', planTier: 'PROFESSIONAL' });
   });
+
+  it('accepts British spelling "licence" for license generation', () => {
+    const actionDef = findAction(UserRole.SUPER_ADMIN, 'generate_license')!;
+    const pattern = actionDef.patterns.find((candidate) =>
+      candidate.test('generate professional licence for school called Green Valley'),
+    );
+    expect(pattern).toBeDefined();
+
+    const params = actionDef.extractParams(
+      'generate professional licence for school called Green Valley',
+      [
+        'generate professional licence for school called Green Valley',
+        'school called Green Valley',
+      ],
+    );
+
+    expect(params).toMatchObject({ schoolName: 'Green Valley', planTier: 'PROFESSIONAL' });
+  });
 });
 
 describe('reset_user_password handler', () => {
@@ -134,6 +152,25 @@ describe('reset_user_password handler', () => {
     );
 
     expect(params.mode).toBe('trigger_reset');
+  });
+
+  it('matches spaced "pass word" reset wording', () => {
+    const actionDef = findAction(UserRole.SUPER_ADMIN, 'reset_user_password')!;
+    const pattern = actionDef.patterns.find((candidate) =>
+      candidate.test('reset pass word for jsmith at school ABC123'),
+    );
+    expect(pattern).toBeDefined();
+
+    const params = actionDef.extractParams(
+      'reset pass word for jsmith at school ABC123',
+      ['reset pass word for jsmith at school ABC123', 'jsmith at school ABC123'],
+    );
+
+    expect(params).toMatchObject({
+      identifier: 'jsmith',
+      schoolCode: 'ABC123',
+      mode: 'temp_password',
+    });
   });
 });
 

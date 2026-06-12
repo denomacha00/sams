@@ -41,6 +41,10 @@ import {
 export type { PendingAction };
 
 const CONFIRM_ANSWER_RE = /^(yes|y|confirm|proceed|ok|do it|go ahead)\.?$/i;
+const LICENSE_KEY_LIKE_RE = /\b[A-Z0-9]{4}(?:-[A-Z0-9]{4}){2,}\b/;
+const FAKE_LICENSE_PLACEHOLDER_RE = /\b(?:LK|LICEN[CS]E)[-_]?(?:X{3,}|[A-Z0-9]{8,})\b/i;
+const TEMP_PASSWORD_LEAK_RE = /\b(?:temporary|temp)\s+pass\s*word\s*[:：]\s*`?[^\s`]{6,}`?/i;
+const RESET_CODE_LEAK_RE = /\b(?:otp|reset)\s+code\s*[:：]\s*`?\d{4,8}`?/i;
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -91,6 +95,15 @@ function mergeHistoryMessages(
     seen.add(key);
   }
   return merged.slice(-20);
+}
+
+function containsGeneratedSecretLikeText(answer: string): boolean {
+  return (
+    LICENSE_KEY_LIKE_RE.test(answer) ||
+    FAKE_LICENSE_PLACEHOLDER_RE.test(answer) ||
+    TEMP_PASSWORD_LEAK_RE.test(answer) ||
+    RESET_CODE_LEAK_RE.test(answer)
+  );
 }
 
 // ─── AI Service ───────────────────────────────────────────────────────────────
@@ -381,6 +394,24 @@ export class AIService {
         return {
           answer: localResult.answer,
           intent: 'unknown',
+          engine: 'local',
+          threadId,
+          memoryNotice,
+          memoryStatus,
+        };
+      }
+
+      if (containsGeneratedSecretLikeText(openaiResult.answer)) {
+        const answer =
+          'I will not guess or invent license keys, temporary passwords, or reset codes. Those values must come only from a real SAMS action.\n\n' +
+          'For a license, ask: **generate licence for [School Name]** and confirm the action. The real key is shown once after SAMS creates it.\n\n' +
+          'For password reset, ask: **reset password for [username/email] at school [code]**. SAMS will set a real temporary password, unlock the account, and show it once.';
+        if (user.sub !== 'guest') {
+          threadId = await this.safelyPersist(user, question, answer, threadId);
+        }
+        return {
+          answer,
+          intent: 'guarded_secret',
           engine: 'local',
           threadId,
           memoryNotice,

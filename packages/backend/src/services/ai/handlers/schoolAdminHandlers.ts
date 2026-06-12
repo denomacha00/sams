@@ -425,11 +425,14 @@ export const schoolAdminActions: ActionDefinition[] = [
       'Reset a user password at your school (temporary password shown once, or send OTP reset). Cannot read existing passwords.',
     destructive: true,
     patterns: [
-      /reset\s+(?:user\s+)?password\s+(?:for\s+)?(.+)/i,
-      /password\s+reset\s+(?:for\s+)?(.+)/i,
+      /reset\s+(?:user\s+)?pass\s*word\s+(?:for\s+)?(.+)/i,
+      /rest\s+(?:user\s+)?pass\s*word\s+(?:for\s+)?(.+)/i,
+      /pass\s*word\s+reset\s+(?:for\s+)?(.+)/i,
+      /otp\s+(?:pass\s*word\s+)?reset\s+(?:for\s+)?(.+)/i,
       /help\s+(?:user\s+)?(.+?)\s+(?:with\s+)?(?:login|password)/i,
-      /forgot\s+password\s+(?:for\s+)?(.+)/i,
-      /new\s+(?:temp(?:orary)?\s+)?password\s+(?:for\s+)?(.+)/i,
+      /help\s+(?:user\s+)?(.+?)\s+(?:with\s+)?(?:login|pass\s*word)/i,
+      /forgot\s+pass\s*word\s+(?:for\s+)?(.+)/i,
+      /new\s+(?:temp(?:orary)?\s+)?pass\s*word\s+(?:for\s+)?(.+)/i,
     ],
     extractParams: (message: string, match: RegExpMatchArray | null) => {
       let identifier = match && match[1] ? match[1].trim() : '';

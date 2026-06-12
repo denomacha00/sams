@@ -86,6 +86,14 @@ const hodUser = {
   exp: 9999999999,
 };
 
+const superAdminUser = {
+  sub: 'super-1',
+  schoolId: 'platform',
+  role: UserRole.SUPER_ADMIN,
+  iat: 0,
+  exp: 9999999999,
+};
+
 describe('AIService anti-hallucination routing', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -185,5 +193,35 @@ describe('AIService anti-hallucination routing', () => {
 
     expect(openaiQueryWithHistory).toHaveBeenCalled();
     expect(r.engine).toBe('openai');
+  });
+
+  it('blocks fake license keys from LLM answers', async () => {
+    localQuery.mockResolvedValue({ answer: 'help', intent: 'unknown' });
+    vi.mocked(openaiQueryWithHistory).mockResolvedValue({
+      answer: 'Here is your licence key: ABCD-EFGH-IJKL-MNOP',
+      intent: 'openai_response',
+    });
+
+    const service = new AIService();
+    const r = await service.query(superAdminUser as never, 'what is the licence key');
+
+    expect(r.intent).toBe('guarded_secret');
+    expect(r.answer).toMatch(/will not guess/i);
+    expect(r.answer).not.toContain('ABCD-EFGH');
+  });
+
+  it('blocks fake temporary passwords from LLM answers', async () => {
+    localQuery.mockResolvedValue({ answer: 'help', intent: 'unknown' });
+    vi.mocked(openaiQueryWithHistory).mockResolvedValue({
+      answer: 'Temporary password: MadeUp123',
+      intent: 'openai_response',
+    });
+
+    const service = new AIService();
+    const r = await service.query(superAdminUser as never, 'reset pass word');
+
+    expect(r.intent).toBe('guarded_secret');
+    expect(r.answer).toMatch(/real SAMS action/i);
+    expect(r.answer).not.toContain('MadeUp123');
   });
 });

@@ -401,10 +401,10 @@ export const superAdminActions: ActionDefinition[] = [
     description: 'Generate a new license key for a school',
     destructive: false,
     patterns: [
-      /generate\s+(?:a\s+)?(?:(?:trial|basic|professional|enterprise)\s+)?(?:license|key)\s+(?:for\s+)?(.+)/i,
-      /create\s+(?:a\s+)?(?:(?:trial|basic|professional|enterprise)\s+)?(?:license|key)\s+(?:for\s+)?(.+)/i,
-      /new\s+(?:(?:trial|basic|professional|enterprise)\s+)?license\s+(?:for\s+)?(.+)/i,
-      /new\s+(?:(?:trial|basic|professional|enterprise)\s+)?(?:license|key)\s+(.+)/i,
+      /generate\s+(?:a\s+)?(?:(?:trial|basic|professional|enterprise)\s+)?(?:licen[cs]e|key)\s+(?:for\s+)?(.+)/i,
+      /create\s+(?:a\s+)?(?:(?:trial|basic|professional|enterprise)\s+)?(?:licen[cs]e|key)\s+(?:for\s+)?(.+)/i,
+      /new\s+(?:(?:trial|basic|professional|enterprise)\s+)?licen[cs]e\s+(?:for\s+)?(.+)/i,
+      /new\s+(?:(?:trial|basic|professional|enterprise)\s+)?(?:licen[cs]e|key)\s+(.+)/i,
     ],
     extractParams: (question: string, match: RegExpMatchArray | null) => {
       const remainder = match && match[1] ? match[1].trim() : '';
@@ -433,7 +433,7 @@ export const superAdminActions: ActionDefinition[] = [
       /extend\s+(.+?)\s+by\s+(\d+)\s*days?/i,
       /add\s+(\d+)\s*days?\s+to\s+(.+)/i,
       /renew\s+(.+)/i,
-      /extend\s+(?:license\s+(?:for\s+)?)?(.+)/i,
+      /extend\s+(?:licen[cs]e\s+(?:for\s+)?)?(.+)/i,
     ],
     extractParams: (question: string, match: RegExpMatchArray | null) => {
       const days = extractDays(question) || 30;
@@ -451,7 +451,7 @@ export const superAdminActions: ActionDefinition[] = [
         }
       }
 
-      schoolName = schoolName.replace(/^license\s+(?:for\s+)?/i, '').trim();
+      schoolName = schoolName.replace(/^licen[cs]e\s+(?:for\s+)?/i, '').trim();
       return { schoolName, daysToAdd: days };
     },
     descriptionTemplate: (params) =>
@@ -517,11 +517,14 @@ export const superAdminActions: ActionDefinition[] = [
       'Reset a user password (temporary password shown once, or send OTP reset). Cannot read existing passwords.',
     destructive: true,
     patterns: [
-      /reset\s+(?:user\s+)?password\s+(?:for\s+)?(.+)/i,
-      /password\s+reset\s+(?:for\s+)?(.+)/i,
+      /reset\s+(?:user\s+)?pass\s*word\s+(?:for\s+)?(.+)/i,
+      /rest\s+(?:user\s+)?pass\s*word\s+(?:for\s+)?(.+)/i,
+      /pass\s*word\s+reset\s+(?:for\s+)?(.+)/i,
+      /otp\s+(?:pass\s*word\s+)?reset\s+(?:for\s+)?(.+)/i,
       /help\s+(?:user\s+)?(.+?)\s+(?:with\s+)?(?:login|password)/i,
-      /forgot\s+password\s+(?:for\s+)?(.+)/i,
-      /new\s+(?:temp(?:orary)?\s+)?password\s+(?:for\s+)?(.+)/i,
+      /help\s+(?:user\s+)?(.+?)\s+(?:with\s+)?(?:login|pass\s*word)/i,
+      /forgot\s+pass\s*word\s+(?:for\s+)?(.+)/i,
+      /new\s+(?:temp(?:orary)?\s+)?pass\s*word\s+(?:for\s+)?(.+)/i,
     ],
     extractParams: (message: string, match: RegExpMatchArray | null) => {
       const remainder = match && match[1] ? match[1].trim() : '';
