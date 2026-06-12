@@ -70,6 +70,24 @@ type AttendanceStatusKey = 'PRESENT' | 'LATE' | 'EXCUSED' | 'ABSENT';
 type StatusCounts = Partial<Record<AttendanceStatusKey, number>>;
 type StudentSeed = { id: string; fullName: string; classId?: string | null };
 type ClassSeed = { id: string; name: string; departmentId?: string | null };
+type ClassReportBuildOptions = { includeEvidence?: boolean };
+type EvidenceSessionSeed = {
+  id: string;
+  classId: string;
+  subject: string;
+  startedAt: Date;
+  endedAt: Date | null;
+  class: { name: string } | null;
+  teacher: { fullName: string } | null;
+  records: Array<{
+    id: string;
+    studentId: string;
+    status: string;
+    method: string;
+    scannedAt: Date;
+    note: string | null;
+  }>;
+};
 
 function withDateRange<T extends object>(
   where: T,
@@ -268,6 +286,7 @@ export class ReportService {
       schoolId,
       [{ id: classData.id, name: classData.name }],
       dateRange,
+      { includeEvidence: true },
     );
 
     return reports[0] ?? {
@@ -378,6 +397,7 @@ export class ReportService {
     schoolId: string,
     classes: ClassSeed[],
     dateRange?: DateRange,
+    options: ClassReportBuildOptions = {},
   ): Promise<ClassReportData[]> {
     if (classes.length === 0) return [];
 
@@ -387,7 +407,7 @@ export class ReportService {
       classId: { in: classIds },
     }, 'startedAt', dateRange);
 
-    const [sessionRows, students] = await Promise.all([
+    const [sessionRows, students, evidenceSessions] = await Promise.all([
       prisma.attendanceSession.groupBy({
         by: ['classId'],
         where: sessionWhere,
@@ -398,6 +418,32 @@ export class ReportService {
         select: { id: true, fullName: true, classId: true },
         orderBy: [{ classId: 'asc' }, { fullName: 'asc' }],
       }),
+      options.includeEvidence
+        ? prisma.attendanceSession.findMany({
+            where: sessionWhere,
+            select: {
+              id: true,
+              classId: true,
+              subject: true,
+              startedAt: true,
+              endedAt: true,
+              class: { select: { name: true } },
+              teacher: { select: { fullName: true } },
+              records: {
+                where: { student: { role: 'STUDENT' } },
+                select: {
+                  id: true,
+                  studentId: true,
+                  status: true,
+                  method: true,
+                  scannedAt: true,
+                  note: true,
+                },
+              },
+            },
+            orderBy: { startedAt: 'desc' },
+          })
+        : Promise.resolve([] as EvidenceSessionSeed[]),
     ]);
 
     const sessionCountByClass = new Map<string, number>(
@@ -413,6 +459,38 @@ export class ReportService {
       rows.push(student);
       studentsByClass.set(student.classId, rows);
     }
+
+    const sessionsByClass = new Map<string, EvidenceSessionSeed[]>();
+    if (options.includeEvidence) {
+      for (const session of evidenceSessions as EvidenceSessionSeed[]) {
+        const rows = sessionsByClass.get(session.classId) ?? [];
+        rows.push(session);
+        sessionsByClass.set(session.classId, rows);
+      }
+    }
+
+    const buildEvidenceRows = (student: StudentSeed): AttendanceEvidenceRow[] => {
+      if (!options.includeEvidence || !student.classId) return [];
+      const sessions = sessionsByClass.get(student.classId) ?? [];
+      return sessions.map((session) => {
+        const record = session.records.find((row) => row.studentId === student.id);
+        return {
+          sessionId: session.id,
+          recordId: record?.id ?? null,
+          date: session.startedAt.toISOString().slice(0, 10),
+          subject: session.subject,
+          classId: session.classId,
+          className: session.class?.name ?? null,
+          teacherName: session.teacher?.fullName ?? null,
+          status: (record?.status ?? 'ABSENT') as AttendanceStatusKey,
+          method: record?.method ?? null,
+          scannedAt: record?.scannedAt?.toISOString() ?? null,
+          sessionStartedAt: session.startedAt.toISOString(),
+          sessionEndedAt: session.endedAt?.toISOString() ?? null,
+          note: record?.note ?? null,
+        };
+      });
+    };
 
     const countsByStudent = new Map<string, StatusCounts>();
     if (studentIds.length > 0) {
@@ -436,9 +514,13 @@ export class ReportService {
 
     return classes.map((cls) => {
       const totalSessions = sessionCountByClass.get(cls.id) ?? 0;
-      const studentReports = (studentsByClass.get(cls.id) ?? []).map((student) =>
-        buildStudentReport(student, countsByStudent.get(student.id) ?? {}, totalSessions),
-      );
+      const studentReports = (studentsByClass.get(cls.id) ?? []).map((student) => {
+        const report = buildStudentReport(student, countsByStudent.get(student.id) ?? {}, totalSessions);
+        if (options.includeEvidence) {
+          report.records = buildEvidenceRows(student);
+        }
+        return report;
+      });
 
       return {
         classId: cls.id,
@@ -549,10 +631,33 @@ export class ReportService {
       } else if ('className' in data) {
         // Class report
         doc.fontSize(14).text(`Class: ${data.className}`);
+        doc.text(`Total Sessions: ${data.totalSessions}`);
         doc.text(`Average Attendance: ${data.averageAttendancePercentage}%`);
         doc.moveDown();
+        doc.fontSize(11).text('Student Summary');
+        doc.moveDown(0.25);
         for (const student of data.students) {
-          doc.fontSize(10).text(`${student.studentName}: ${student.attendancePercentage}%`);
+          doc.fontSize(9).text(
+            `${student.studentName} | Expected ${student.totalExpected} | Present ${student.totalPresent} | Late ${student.totalLate} | Excused ${student.totalExcused} | Absent ${student.totalAbsent} | ${student.attendancePercentage}%`,
+          );
+        }
+
+        const evidenceRows = data.students.flatMap((student) =>
+          (student.records ?? []).map((row) => ({ studentName: student.studentName, row })),
+        );
+        if (evidenceRows.length) {
+          doc.moveDown();
+          doc.fontSize(11).text('Daily Evidence Preview');
+          doc.moveDown(0.25);
+          for (const { studentName, row } of evidenceRows.slice(0, 120)) {
+            const marked = row.scannedAt ? new Date(row.scannedAt).toLocaleString('en-GB') : 'Not marked';
+            doc.fontSize(8).text(
+              `${row.date} | ${studentName} | ${row.subject} | ${row.status} | ${row.method ?? 'ABSENT'} | ${marked}`,
+            );
+          }
+          if (evidenceRows.length > 120) {
+            doc.fontSize(8).text(`...and ${evidenceRows.length - 120} more row(s). Export Excel for the full detail.`);
+          }
         }
       } else if ('departmentName' in data) {
         // Department report
@@ -642,6 +747,34 @@ export class ReportService {
           percentage: student.attendancePercentage,
         });
       }
+      const evidenceRows = data.students.flatMap((student) =>
+        (student.records ?? []).map((row) => ({ studentName: student.studentName, row })),
+      );
+      if (evidenceRows.length) {
+        const detailSheet = workbook.addWorksheet('Daily Evidence');
+        detailSheet.columns = [
+          { header: 'Student', key: 'student', width: 30 },
+          { header: 'Date', key: 'date', width: 14 },
+          { header: 'Subject', key: 'subject', width: 28 },
+          { header: 'Teacher', key: 'teacherName', width: 24 },
+          { header: 'Status', key: 'status', width: 14 },
+          { header: 'Method', key: 'method', width: 14 },
+          { header: 'Marked At', key: 'scannedAt', width: 24 },
+          { header: 'Note', key: 'note', width: 32 },
+        ];
+        for (const { studentName, row } of evidenceRows) {
+          detailSheet.addRow({
+            student: studentName,
+            date: row.date,
+            subject: row.subject,
+            teacherName: row.teacherName ?? '',
+            status: row.status,
+            method: row.method ?? '',
+            scannedAt: row.scannedAt ?? '',
+            note: row.note ?? '',
+          });
+        }
+      }
     } else if ('departmentName' in data) {
       // Department report
       sheet.columns = [
@@ -702,6 +835,25 @@ export class ReportService {
         lines.push(
           `"${this._escapeCSV(student.studentName)}",${student.totalExpected},${student.totalPresent},${student.totalLate},${student.totalExcused},${student.totalAbsent},${student.attendancePercentage}`,
         );
+      }
+      const evidenceRows = data.students.flatMap((student) =>
+        (student.records ?? []).map((row) => ({ studentName: student.studentName, row })),
+      );
+      if (evidenceRows.length) {
+        lines.push('');
+        lines.push('Student,Date,Subject,Teacher,Status,Method,Marked At,Note');
+        for (const { studentName, row } of evidenceRows) {
+          lines.push([
+            this._escapeCSV(studentName),
+            row.date,
+            this._escapeCSV(row.subject),
+            this._escapeCSV(row.teacherName ?? ''),
+            row.status,
+            row.method ?? '',
+            row.scannedAt ?? '',
+            this._escapeCSV(row.note ?? ''),
+          ].map((value) => `"${value}"`).join(','));
+        }
       }
     } else if ('departmentName' in data) {
       // Department report

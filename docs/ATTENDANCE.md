@@ -1,6 +1,6 @@
 # SAMS Attendance & Biometric — Core Reference
 
-Last verified: 2026-06-10 (HOD teacher parity, GPS controls, link generation, biometric dashboard entry, student GPS permission).
+Last verified: 2026-06-12 (HOD teacher parity, GPS controls, link generation, biometric dashboard entry, student GPS permission, fingerprint reader bridge guard).
 
 ## Roles & permissions
 
@@ -48,12 +48,14 @@ When enabled, QR and link proximity checks are skipped for that student (session
 - **Login** (each user’s own device): WebAuthn passkey/fingerprint on login page (`/auth/webauthn/*`)
 - **Enrollment**: Settings → fingerprint; students `/biometric/enroll` (face template stored server-side)
 - **Class attendance** (teacher/HOD device): Teacher or HOD holds the phone, camera scans **the student’s face**, server matches template and marks that student present via `POST /api/v1/biometric/match` (Pro/Enterprise `biometric` feature + `mark:attendance`). Requires an **active session** started by that teacher.
+- **Fingerprint attendance** (external reader only): `/fingerprint/attendance` stays locked until `window.SAMS_FINGERPRINT_READER` is installed by a supported reader bridge and reports ready. A normal checkbox click is not accepted as device proof.
 - **Not** student self-scan at class time: students use **QR on their own phone**, not face match on their phone.
 
 | Channel | Who holds device | API |
 |---------|------------------|-----|
 | QR check-in | Student | `POST /attendance/qr` |
 | Face check-in | Teacher or HOD | `POST /biometric/match` |
+| Fingerprint check-in | Teacher or HOD with supported bridge | `POST /attendance/fingerprint` |
 | Login fingerprint | Each user | `/auth/webauthn/*` |
 
 Web: `/biometric/attendance` (face-api.js + camera).

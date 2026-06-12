@@ -22,6 +22,24 @@ interface AttendanceRecordRow {
   studentId: string;
 }
 
+type FingerprintReaderStatus = 'unchecked' | 'checking' | 'ready' | 'missing' | 'error';
+
+interface FingerprintReaderBridge {
+  isReady: () => boolean | Promise<boolean>;
+  scanStudent?: (student: {
+    id: string;
+    fullName: string;
+    admissionNumber?: string | null;
+    sessionId: string;
+  }) => Promise<{ matched?: boolean; studentId?: string; message?: string } | void>;
+}
+
+declare global {
+  interface Window {
+    SAMS_FINGERPRINT_READER?: FingerprintReaderBridge;
+  }
+}
+
 const FingerprintAttendancePage: React.FC = () => {
   const user = useAuthStore((s) => s.user);
   const [searchParams] = useSearchParams();
@@ -38,7 +56,10 @@ const FingerprintAttendancePage: React.FC = () => {
   const [submittingId, setSubmittingId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
-  const [deviceConfirmed, setDeviceConfirmed] = useState(false);
+  const [readerStatus, setReaderStatus] = useState<FingerprintReaderStatus>('unchecked');
+  const [readerMessage, setReaderMessage] = useState(
+    'SAMS has not detected a supported fingerprint reader bridge on this browser.',
+  );
 
   useEffect(() => {
     if (sessionFromUrl) setSessionId(sessionFromUrl);
@@ -131,9 +152,55 @@ const FingerprintAttendancePage: React.FC = () => {
     });
   }, [query, students]);
 
+  const readerReady = readerStatus === 'ready';
+
+  const checkFingerprintReader = useCallback(async () => {
+    setReaderStatus('checking');
+    setError(null);
+    setSuccess(null);
+
+    try {
+      const bridge = window.SAMS_FINGERPRINT_READER;
+      if (!bridge || typeof bridge.isReady !== 'function') {
+        setReaderStatus('missing');
+        setReaderMessage(
+          'No SAMS fingerprint reader bridge was detected. Connect a supported reader and install its bridge before using fingerprint attendance.',
+        );
+        return;
+      }
+
+      const ready = await bridge.isReady();
+      if (!ready) {
+        setReaderStatus('missing');
+        setReaderMessage('The fingerprint reader bridge is installed, but no ready reader was detected.');
+        return;
+      }
+
+      setReaderStatus('ready');
+      setReaderMessage('Fingerprint reader bridge is ready. Scan each student before saving attendance.');
+    } catch (err) {
+      setReaderStatus('error');
+      setReaderMessage(getApiErrorMessage(err, 'Could not check the fingerprint reader.'));
+    }
+  }, []);
+
+  useEffect(() => {
+    void checkFingerprintReader();
+  }, [checkFingerprintReader]);
+
   const markFingerprint = useCallback(async (student: Student) => {
     if (!sessionId) {
       setError('Choose an active session first.');
+      return;
+    }
+    if (!readerReady) {
+      setError('Fingerprint reader is not ready. Connect the reader, install the SAMS bridge, then check reader again.');
+      return;
+    }
+
+    const bridge = window.SAMS_FINGERPRINT_READER;
+    if (!bridge || typeof bridge.scanStudent !== 'function') {
+      setError('Fingerprint scan support is not enabled. SAMS cannot safely mark fingerprint attendance from a normal click.');
       return;
     }
 
@@ -141,6 +208,19 @@ const FingerprintAttendancePage: React.FC = () => {
     setError(null);
     setSuccess(null);
     try {
+      const scanResult = await bridge.scanStudent({
+        id: student.id,
+        fullName: student.fullName,
+        admissionNumber: student.admissionNumber,
+        sessionId,
+      });
+      if (scanResult?.matched === false) {
+        throw new Error(scanResult.message || 'Fingerprint did not match this student.');
+      }
+      if (scanResult?.studentId && scanResult.studentId !== student.id) {
+        throw new Error('Fingerprint matched a different student. Attendance was not saved.');
+      }
+
       await apiClient.post('/attendance/fingerprint', {
         sessionId,
         studentId: student.id,
@@ -153,7 +233,7 @@ const FingerprintAttendancePage: React.FC = () => {
     } finally {
       setSubmittingId(null);
     }
-  }, [sessionId]);
+  }, [readerReady, sessionId]);
 
   const noActiveSession = !loadingSessions && sessions.length === 0;
 
@@ -179,52 +259,50 @@ const FingerprintAttendancePage: React.FC = () => {
           </div>
         )}
 
-        {!deviceConfirmed && !noActiveSession && (
+        {!readerReady && !noActiveSession && (
           <div className="mb-5 rounded-xl border border-accent-orange/40 bg-accent-orange/10 p-5">
             <div className="flex items-start gap-3">
               <svg className="mt-0.5 h-5 w-5 shrink-0 text-accent-orange" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
               </svg>
               <div className="min-w-0 flex-1">
-                <h3 className="text-sm font-bold text-ink">Fingerprint reader not confirmed</h3>
+                <h3 className="text-sm font-bold text-ink">Fingerprint reader not ready</h3>
+                <p className="mt-1 text-sm text-ink-muted">{readerMessage}</p>
                 <ul className="mt-2 space-y-1.5 text-sm text-ink-muted">
                   <li className="flex items-start gap-2">
                     <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-accent-orange" />
-                    Connect your external fingerprint reader to this computer via USB or Bluetooth.
+                    Connect the supported external fingerprint reader to this computer.
                   </li>
                   <li className="flex items-start gap-2">
                     <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-accent-orange" />
-                    Install any required driver or software for the reader.
+                    Install the reader driver and SAMS fingerprint bridge.
                   </li>
                   <li className="flex items-start gap-2">
                     <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-accent-orange" />
-                    Test the reader with a student before marking the whole class.
+                    Use face, QR, link, or manual attendance until the reader is detected.
                   </li>
                 </ul>
-                <label className="mt-4 flex cursor-pointer items-start gap-3 rounded-lg border border-accent-orange/25 bg-accent-orange/5 p-3 transition-colors hover:bg-accent-orange/10">
-                  <input
-                    type="checkbox"
-                    checked={deviceConfirmed}
-                    onChange={(event) => setDeviceConfirmed(event.target.checked)}
-                    className="mt-0.5 h-4 w-4 shrink-0 accent-accent-orange"
-                  />
-                  <span className="text-sm text-ink">
-                    I confirm the fingerprint reader is connected, powered on, and ready to scan.
-                  </span>
-                </label>
+                <button
+                  type="button"
+                  onClick={() => void checkFingerprintReader()}
+                  disabled={readerStatus === 'checking'}
+                  className="mt-4 rounded-lg border border-accent-orange/30 bg-accent-orange/10 px-4 py-2 text-sm font-semibold text-accent-orange hover:bg-accent-orange/15 disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  {readerStatus === 'checking' ? 'Checking reader...' : 'Check reader again'}
+                </button>
               </div>
             </div>
           </div>
         )}
 
-        {deviceConfirmed && !noActiveSession && (
+        {readerReady && !noActiveSession && (
           <div className="mb-5 rounded-xl border border-emerald-500/30 bg-emerald-500/10 p-3">
             <div className="flex items-center gap-2 text-sm text-emerald-200">
               <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
               </svg>
-              <span className="font-medium">Fingerprint reader confirmed.</span>
-              <span className="text-emerald-200/70">Device ready. Scan each student's fingerprint.</span>
+              <span className="font-medium">Fingerprint reader bridge ready.</span>
+              <span className="text-emerald-200/70">{readerMessage}</span>
             </div>
           </div>
         )}
@@ -297,7 +375,7 @@ const FingerprintAttendancePage: React.FC = () => {
                         <button
                           type="button"
                           onClick={() => void markFingerprint(student)}
-                          disabled={alreadyMarked || submittingId === student.id}
+                          disabled={!readerReady || alreadyMarked || submittingId === student.id}
                           className={`rounded-xl px-4 py-2 text-sm font-semibold transition-colors ${
                             alreadyMarked
                               ? 'border border-emerald-400/25 bg-emerald-500/10 text-emerald-300'
@@ -308,6 +386,8 @@ const FingerprintAttendancePage: React.FC = () => {
                             ? 'Already recorded'
                             : submittingId === student.id
                               ? 'Saving...'
+                              : !readerReady
+                                ? 'Reader not ready'
                               : 'Mark fingerprint'}
                         </button>
                       </div>

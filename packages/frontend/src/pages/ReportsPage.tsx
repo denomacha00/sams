@@ -47,6 +47,8 @@ interface ReportData {
   // Computed display fields (normalised below)
   _displayPercentage?: number;
   _displayPresent?: number;
+  _displayLate?: number;
+  _displayExcused?: number;
   _displayAbsent?: number;
   _displaySessions?: number;
 }
@@ -137,6 +139,8 @@ const ReportsPage: React.FC = () => {
         ...data,
         _displayPercentage: data.attendancePercentage ?? 0,
         _displayPresent: data.totalPresent ?? 0,
+        _displayLate: data.totalLate ?? 0,
+        _displayExcused: data.totalExcused ?? 0,
         _displayAbsent: data.totalAbsent ?? 0,
         _displaySessions: data.totalExpected ?? 0,
         records: normalizeRecords(data.records),
@@ -160,19 +164,25 @@ const ReportsPage: React.FC = () => {
       const totals = students.reduce(
         (acc, s) => ({
           present: acc.present + s.totalPresent,
+          late: acc.late + s.totalLate,
+          excused: acc.excused + s.totalExcused,
           absent: acc.absent + s.totalAbsent,
           sessions: acc.sessions + s.totalExpected,
         }),
-        { present: 0, absent: 0, sessions: 0 },
+        { present: 0, late: 0, excused: 0, absent: 0, sessions: 0 },
       );
       return {
         ...data,
         attendancePercentage: data.averageAttendancePercentage ?? 0,
         totalPresent: totals.present,
+        totalLate: totals.late,
+        totalExcused: totals.excused,
         totalAbsent: totals.absent,
         totalExpected: totals.sessions,
         _displayPercentage: data.averageAttendancePercentage ?? 0,
         _displayPresent: totals.present,
+        _displayLate: totals.late,
+        _displayExcused: totals.excused,
         _displayAbsent: totals.absent,
         _displaySessions: data.totalSessions ?? totals.sessions,
         students,
@@ -195,17 +205,27 @@ const ReportsPage: React.FC = () => {
         })),
       );
       const totals = allStudents.reduce(
-        (acc, s) => ({ present: acc.present + s.totalPresent, absent: acc.absent + s.totalAbsent, sessions: acc.sessions + s.totalExpected }),
-        { present: 0, absent: 0, sessions: 0 },
+        (acc, s) => ({
+          present: acc.present + s.totalPresent,
+          late: acc.late + s.totalLate,
+          excused: acc.excused + s.totalExcused,
+          absent: acc.absent + s.totalAbsent,
+          sessions: acc.sessions + s.totalExpected,
+        }),
+        { present: 0, late: 0, excused: 0, absent: 0, sessions: 0 },
       );
       return {
         ...data,
         attendancePercentage: data.averageAttendancePercentage ?? 0,
         totalPresent: totals.present,
+        totalLate: totals.late,
+        totalExcused: totals.excused,
         totalAbsent: totals.absent,
         totalExpected: totals.sessions,
         _displayPercentage: data.averageAttendancePercentage ?? 0,
         _displayPresent: totals.present,
+        _displayLate: totals.late,
+        _displayExcused: totals.excused,
         _displayAbsent: totals.absent,
         _displaySessions: data.totalSessions ?? (data.classes ?? []).reduce(
           (sum: number, cls: any) => sum + (cls.totalSessions ?? 0),
@@ -233,17 +253,27 @@ const ReportsPage: React.FC = () => {
         ),
       );
       const totals = allStudents.reduce(
-        (acc, s) => ({ present: acc.present + s.totalPresent, absent: acc.absent + s.totalAbsent, sessions: acc.sessions + s.totalExpected }),
-        { present: 0, absent: 0, sessions: 0 },
+        (acc, s) => ({
+          present: acc.present + s.totalPresent,
+          late: acc.late + s.totalLate,
+          excused: acc.excused + s.totalExcused,
+          absent: acc.absent + s.totalAbsent,
+          sessions: acc.sessions + s.totalExpected,
+        }),
+        { present: 0, late: 0, excused: 0, absent: 0, sessions: 0 },
       );
       return {
         ...data,
         attendancePercentage: data.averageAttendancePercentage ?? 0,
         totalPresent: totals.present,
+        totalLate: totals.late,
+        totalExcused: totals.excused,
         totalAbsent: totals.absent,
         totalExpected: totals.sessions,
         _displayPercentage: data.averageAttendancePercentage ?? 0,
         _displayPresent: totals.present,
+        _displayLate: totals.late,
+        _displayExcused: totals.excused,
         _displayAbsent: totals.absent,
         _displaySessions: data.totalSessions ?? (data.departments ?? []).reduce(
           (sum: number, dept: any) => sum + (dept.totalSessions ?? 0),
@@ -314,6 +344,8 @@ const ReportsPage: React.FC = () => {
 
   const displayPercentage = report?._displayPercentage ?? report?.attendancePercentage ?? 0;
   const displayPresent = report?._displayPresent ?? report?.totalPresent ?? 0;
+  const displayLate = report?._displayLate ?? report?.totalLate ?? 0;
+  const displayExcused = report?._displayExcused ?? report?.totalExcused ?? 0;
   const displaySessions = report?._displaySessions ?? report?.totalExpected ?? 0;
   const displayAbsent = report?._displayAbsent ?? report?.totalAbsent ?? 0;
   const dailyEvidence = studentDetail?.records ?? report?.records ?? [];
@@ -430,7 +462,7 @@ const ReportsPage: React.FC = () => {
 
         {report && (
           <>
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-6">
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4 mb-6">
               <div className="surface-card rounded-2xl p-5 text-center">
                 <p className="text-3xl font-bold text-accent-orange">
                   {displayPercentage.toFixed(1)}%
@@ -446,6 +478,14 @@ const ReportsPage: React.FC = () => {
                 <p className="text-xs text-ink-muted mt-1 uppercase tracking-wider">Present</p>
               </div>
               <div className="surface-card rounded-2xl p-5 text-center">
+                <p className="text-3xl font-bold text-amber-300">{displayLate}</p>
+                <p className="text-xs text-ink-muted mt-1 uppercase tracking-wider">Late</p>
+              </div>
+              <div className="surface-card rounded-2xl p-5 text-center">
+                <p className="text-3xl font-bold text-sky-300">{displayExcused}</p>
+                <p className="text-xs text-ink-muted mt-1 uppercase tracking-wider">Excused</p>
+              </div>
+              <div className="surface-card rounded-2xl p-5 text-center">
                 <p className="text-3xl font-bold text-red-400">{atRiskCount > 0 ? atRiskCount : displayAbsent}</p>
                 <p className="text-xs text-ink-muted mt-1 uppercase tracking-wider">{atRiskCount > 0 ? 'At-Risk' : 'Absent'}</p>
               </div>
@@ -454,7 +494,10 @@ const ReportsPage: React.FC = () => {
             {/* Student breakdown table */}
             {report.students && report.students.length > 0 && (
               <div className="surface-card rounded-2xl p-6 mb-6">
-                <h2 className="text-lg font-semibold text-ink mb-4">Student Breakdown</h2>
+                <div className="mb-4">
+                  <h2 className="text-lg font-semibold text-ink">Student Breakdown</h2>
+                  <p className="text-sm text-ink-muted">Counts are shown here. Open View days for lesson-by-lesson proof.</p>
+                </div>
                 <div className="overflow-x-auto">
                   <table className="w-full">
                     <thead>
@@ -463,6 +506,7 @@ const ReportsPage: React.FC = () => {
                         <th className="text-right text-xs font-semibold text-ink-muted uppercase tracking-wider py-3 px-2">Expected</th>
                         <th className="text-right text-xs font-semibold text-ink-muted uppercase tracking-wider py-3 px-2">Present</th>
                         <th className="text-right text-xs font-semibold text-ink-muted uppercase tracking-wider py-3 px-2">Late</th>
+                        <th className="text-right text-xs font-semibold text-ink-muted uppercase tracking-wider py-3 px-2">Excused</th>
                         <th className="text-right text-xs font-semibold text-ink-muted uppercase tracking-wider py-3 px-2">Absent</th>
                         <th className="text-right text-xs font-semibold text-ink-muted uppercase tracking-wider py-3 px-2">Attendance</th>
                         <th className="text-right text-xs font-semibold text-ink-muted uppercase tracking-wider py-3 px-2">Status</th>
@@ -483,6 +527,7 @@ const ReportsPage: React.FC = () => {
                           <td className="py-3 px-2 text-right text-sm text-ink-muted">{s.totalExpected}</td>
                           <td className="py-3 px-2 text-right text-sm text-emerald-300">{s.totalPresent}</td>
                           <td className="py-3 px-2 text-right text-sm text-amber-300">{s.totalLate}</td>
+                          <td className="py-3 px-2 text-right text-sm text-sky-300">{s.totalExcused}</td>
                           <td className="py-3 px-2 text-right text-sm text-red-300">{s.totalAbsent}</td>
                           <td className="py-3 px-2 text-right">
                             <span className={`font-semibold text-sm ${
