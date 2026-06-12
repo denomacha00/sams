@@ -17,6 +17,14 @@ interface ChatMessage {
   timestamp: Date;
   pendingAction?: PendingAction;
   isError?: boolean;
+  isSystemNotice?: boolean;
+}
+
+interface AiThreadRecord {
+  id: string;
+  message: string;
+  response: string;
+  createdAt: string;
 }
 
 const AI_UNAVAILABLE_INTENTS = new Set(['ai_error', 'ai_not_configured']);
@@ -72,6 +80,40 @@ function saveSuperAiThreadId(threadId: string | undefined, userId?: string): voi
   }
 }
 
+function threadRecordsToMessages(records: AiThreadRecord[]): ChatMessage[] {
+  const messages: ChatMessage[] = [];
+  for (const record of records) {
+    const timestamp = new Date(record.createdAt);
+    if (record.message?.trim()) {
+      messages.push({
+        id: `${record.id}-u`,
+        role: 'user',
+        content: record.message,
+        timestamp,
+      });
+    }
+    if (record.response?.trim()) {
+      messages.push({
+        id: `${record.id}-a`,
+        role: 'assistant',
+        content: record.response,
+        timestamp,
+      });
+    }
+  }
+  return messages;
+}
+
+function buildMemoryNoticeMessage(notice: string): ChatMessage {
+  return {
+    id: `memory-notice-${Date.now()}`,
+    role: 'assistant',
+    content: notice,
+    timestamp: new Date(),
+    isSystemNotice: true,
+  };
+}
+
 const SuperAdminAI: React.FC = () => {
   const user = useAuthStore((s) => s.user);
   const [isOpen, setIsOpen] = useState(false);
@@ -95,6 +137,7 @@ const SuperAdminAI: React.FC = () => {
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
   const [threadId, setThreadId] = useState<string | undefined>(() => loadSuperAiThreadId(user?.id));
+  const [historyLoaded, setHistoryLoaded] = useState(false);
   const [selectedImages, setSelectedImages] = useState<File[]>([]);
   const [imagePreviews, setImagePreviews] = useState<string[]>([]);
   const pendingActionRef = useRef<PendingAction | null>(null);
@@ -107,9 +150,41 @@ const SuperAdminAI: React.FC = () => {
 
   useEffect(() => {
     setThreadId(loadSuperAiThreadId(user?.id));
+    setHistoryLoaded(false);
     pendingActionRef.current = null;
     setMessages([createWelcomeMessage()]);
   }, [user?.id]);
+
+  useEffect(() => {
+    if (!threadId || historyLoaded) return;
+    let cancelled = false;
+
+    void (async () => {
+      try {
+        const { data } = await apiClient.get(`/ai/conversations/${threadId}`);
+        if (cancelled) return;
+        const restored = threadRecordsToMessages(data.records ?? []);
+        const next: ChatMessage[] = [];
+        if (data.memoryNotice) {
+          next.push(buildMemoryNoticeMessage(data.memoryNotice));
+        }
+        if (restored.length > 0) {
+          next.push(...restored);
+        } else if (next.length === 0) {
+          next.push(createWelcomeMessage());
+        }
+        setMessages(next);
+      } catch {
+        if (!cancelled) setMessages([createWelcomeMessage()]);
+      } finally {
+        if (!cancelled) setHistoryLoaded(true);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [threadId, historyLoaded]);
 
   const generateId = () => Math.random().toString(36).substring(2, 10);
 
@@ -160,6 +235,14 @@ const SuperAdminAI: React.FC = () => {
     ]);
   };
 
+  const appendMemoryNotice = (notice?: string) => {
+    if (!notice) return;
+    setMessages((prev) => {
+      if (prev.some((m) => m.isSystemNotice && m.content === notice)) return prev;
+      return [...prev, buildMemoryNoticeMessage(notice)];
+    });
+  };
+
   const runQuery = async (
     question: string,
     options?: { confirmAction?: boolean; pendingAction?: PendingAction },
@@ -174,6 +257,7 @@ const SuperAdminAI: React.FC = () => {
       setThreadId(data.threadId);
       saveSuperAiThreadId(data.threadId, user?.id);
     }
+    appendMemoryNotice(data.memoryNotice);
 
     if (data.pendingAction) {
       appendAssistant(data.answer, data.pendingAction, AI_UNAVAILABLE_INTENTS.has(data.intent));
@@ -199,6 +283,7 @@ const SuperAdminAI: React.FC = () => {
       setSelectedImages([]);
       setImagePreviews([]);
       setMessages([createWelcomeMessage()]);
+      setHistoryLoaded(true);
       setLoading(false);
     }
   };
@@ -245,6 +330,7 @@ const SuperAdminAI: React.FC = () => {
           setThreadId(data.threadId);
           saveSuperAiThreadId(data.threadId, user?.id);
         }
+        appendMemoryNotice(data.memoryNotice);
         appendAssistant(
           data.answer,
           undefined,

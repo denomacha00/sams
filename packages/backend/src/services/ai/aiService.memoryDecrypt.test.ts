@@ -124,4 +124,41 @@ describe('AIService conversation memory decrypt failures', () => {
     expect(result.memoryStatus).toBe('unreadable');
     expect(result.memoryNotice).toContain('encryption key');
   });
+
+  it('persists provider error responses so the thread remains continuous', async () => {
+    vi.mocked(openaiQueryWithHistory).mockResolvedValue({
+      answer: 'The AI service is rate-limited. Wait a moment and try again.',
+      intent: 'ai_error',
+    });
+
+    const service = new AIService();
+    const result = await service.query(studentUser as never, 'remember this question');
+
+    expect(result.intent).toBe('ai_error');
+    expect(persistRecord).toHaveBeenCalledWith(
+      studentUser.sub,
+      studentUser.schoolId,
+      'thread-1',
+      'remember this question',
+      'The AI service is rate-limited. Wait a moment and try again.',
+    );
+  });
+
+  it('persists thrown provider errors with the formatted fallback answer', async () => {
+    const { formatProviderError } = await import('./aiProviderConfig');
+    vi.mocked(formatProviderError).mockReturnValue('Provider failed but this turn was saved.');
+    vi.mocked(openaiQueryWithHistory).mockRejectedValue(new Error('rate limited'));
+
+    const service = new AIService();
+    const result = await service.query(studentUser as never, 'continue from before');
+
+    expect(result.intent).toBe('ai_error');
+    expect(persistRecord).toHaveBeenCalledWith(
+      studentUser.sub,
+      studentUser.schoolId,
+      'thread-1',
+      'continue from before',
+      'Provider failed but this turn was saved.',
+    );
+  });
 });

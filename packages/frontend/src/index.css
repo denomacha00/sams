@@ -5,40 +5,40 @@
 @layer base {
   :root {
     /* ── Light mode ───────────────────────────────────────── */
-    --color-bg: #f1f5f9;
-    --color-bg-rgb: 241 245 249;
-    --color-surface: #ffffff;
-    --color-surface-rgb: 255 255 255;
-    --color-surface-muted: #f8fafc;
-    --color-surface-muted-rgb: 248 250 252;
-    --color-surface-elevated: #e2e8f0;
-    --color-surface-elevated-rgb: 226 232 240;
+    --color-bg: #e6edf5;
+    --color-bg-rgb: 230 237 245;
+    --color-surface: #f8fafc;
+    --color-surface-rgb: 248 250 252;
+    --color-surface-muted: #eef4fa;
+    --color-surface-muted-rgb: 238 244 250;
+    --color-surface-elevated: #dde7f0;
+    --color-surface-elevated-rgb: 221 231 240;
 
-    --color-text: #0f172a;
-    --color-text-rgb: 15 23 42;
-    --color-text-muted: #475569;
-    --color-text-muted-rgb: 71 85 105;
-    --color-text-subtle: #64748b;
-    --color-text-subtle-rgb: 100 116 139;
+    --color-text: #101827;
+    --color-text-rgb: 16 24 39;
+    --color-text-muted: #334155;
+    --color-text-muted-rgb: 51 65 85;
+    --color-text-subtle: #4b5f78;
+    --color-text-subtle-rgb: 75 95 120;
 
-    --color-border: #cbd5e1;
-    --color-border-rgb: 203 213 225;
-    --color-border-strong: #94a3b8;
-    --color-border-strong-rgb: 148 163 184;
+    --color-border: #b8c6d6;
+    --color-border-rgb: 184 198 214;
+    --color-border-strong: #7f91a8;
+    --color-border-strong-rgb: 127 145 168;
 
-    --color-brand: #2563eb;
-    --color-brand-rgb: 37 99 235;
-    --color-brand-hover: #1d4ed8;
-    --color-brand-hover-rgb: 29 78 216;
-    --color-brand-light: #dbeafe;
-    --color-brand-light-rgb: 219 234 254;
+    --color-brand: #1d4ed8;
+    --color-brand-rgb: 29 78 216;
+    --color-brand-hover: #1e40af;
+    --color-brand-hover-rgb: 30 64 175;
+    --color-brand-light: #d2e3ff;
+    --color-brand-light-rgb: 210 227 255;
 
-    --color-accent-orange: #d97706;
-    --color-accent-orange-rgb: 217 119 6;
-    --color-accent-orange-hover: #b45309;
-    --color-accent-orange-hover-rgb: 180 83 9;
-    --color-accent-orange-light: #fef3c7;
-    --color-accent-orange-light-rgb: 254 243 199;
+    --color-accent-orange: #b45309;
+    --color-accent-orange-rgb: 180 83 9;
+    --color-accent-orange-hover: #92400e;
+    --color-accent-orange-hover-rgb: 146 64 14;
+    --color-accent-orange-light: #f3dfb7;
+    --color-accent-orange-light-rgb: 243 223 183;
 
     --color-attendance-green: #16a34a;
     --color-attendance-green-rgb: 22 163 74;

@@ -306,8 +306,12 @@ export class AIService {
 
     // Local engine couldn't resolve — try the OpenAI-compatible provider chain
     if (!hasPrimaryAIKey()) {
+      const answer = getMissingAIKeyMessage();
+      if (user.sub !== 'guest') {
+        threadId = await this.safelyPersist(user, question, answer, threadId);
+      }
       return {
-        answer: getMissingAIKeyMessage(),
+        answer,
         intent: 'ai_not_configured',
         engine: 'local',
         threadId,
@@ -319,6 +323,9 @@ export class AIService {
       const openaiResult = await openaiQueryWithHistory(user, question, historyMessages);
 
       if (openaiResult.intent === 'ai_error' || openaiResult.intent === 'ai_not_configured') {
+        if (user.sub !== 'guest') {
+          threadId = await this.safelyPersist(user, question, openaiResult.answer, threadId);
+        }
         return {
           answer: openaiResult.answer,
           intent: openaiResult.intent,
@@ -357,8 +364,12 @@ export class AIService {
       };
     } catch (err) {
       console.error('[AIService] OpenAI fallback failed:', err);
+      const answer = formatProviderError(err);
+      if (user.sub !== 'guest') {
+        threadId = await this.safelyPersist(user, question, answer, threadId);
+      }
       return {
-        answer: formatProviderError(err),
+        answer,
         intent: 'ai_error',
         engine: 'openai',
         threadId,

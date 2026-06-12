@@ -12,9 +12,6 @@ function getStoredTheme(): Theme {
     // localStorage unavailable
   }
   // Default to dark — SAMS ships dark-first
-  if (typeof window !== 'undefined' && window.matchMedia('(prefers-color-scheme: light)').matches) {
-    return 'light';
-  }
   return 'dark';
 }
 
