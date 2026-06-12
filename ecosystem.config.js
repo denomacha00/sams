@@ -1,7 +1,7 @@
 const path = require('path');
 
 const root = __dirname;
-const requestedInstances = process.env.PM2_INSTANCES || '1';
+const requestedInstances = process.env.PM2_INSTANCES || '2';
 const instances = /^\d+$/.test(requestedInstances)
   ? Number(requestedInstances)
   : requestedInstances;

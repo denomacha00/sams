@@ -13,6 +13,15 @@ const httpServer = createServer(app);
 
 const PORT = process.env.PORT ?? 3001;
 
+function getPm2InstanceId(): string | undefined {
+  return process.env.SAMS_INSTANCE_ID ?? process.env.NODE_APP_INSTANCE;
+}
+
+function shouldRunBackgroundJobs(): boolean {
+  const instanceId = getPm2InstanceId();
+  return instanceId === undefined || instanceId === '0';
+}
+
 async function connectDependencies(): Promise<void> {
   await ensureRedisConnected();
   await prisma.$connect();
@@ -63,10 +72,14 @@ async function connectDependencies(): Promise<void> {
     console.warn('[STARTUP] Email disabled â€” set SMTP_USER and SMTP_PASS in .env to enable SMTP.');
   }
 
-  const { startQRRefreshJob } = await import('./jobs/qrRefresh');
-  const { startNotificationJob } = await import('./jobs/notifications');
-  startQRRefreshJob();
-  startNotificationJob();
+  if (shouldRunBackgroundJobs()) {
+    const { startQRRefreshJob } = await import('./jobs/qrRefresh');
+    const { startNotificationJob } = await import('./jobs/notifications');
+    startQRRefreshJob();
+    startNotificationJob();
+  } else {
+    console.log(`[SAMS] Background jobs skipped on PM2 worker ${getPm2InstanceId()}`);
+  }
 
   if (process.send) {
     process.send('ready');

@@ -379,12 +379,12 @@ Backend unchanged — no PM2 restart needed unless API code changed.
 - **Name:** `sams-api`
 - **Script:** `packages/backend/bin/pm2-start.js` (not raw `dist/index.js`)
 - **CWD:** repo root `/var/www/sams`
-- **Mode:** `fork`, 1 instance
+- **Mode:** `cluster`, 2 instances by default
 - **Logs:** `/var/log/sams/sams-api-out.log`, `sams-api-error.log`
 - **Memory:** restart at 512M
 - **wait_ready:** `false` (avoid crash loops on some PM2 builds)
 
-`pm2-start.js` loads env, finds `dist/index.js`, calls `boot()`.
+`pm2-start.js` loads env, finds `dist/index.js`, calls `boot()`. Socket.io uses the Redis adapter for cross-worker notification and attendance broadcasts. Background schedulers (QR refresh and daily notifications) run only on PM2 worker `0` so they do not duplicate work.
 
 ### 4.2 Safe restart
 
