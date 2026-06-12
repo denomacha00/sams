@@ -74,6 +74,24 @@ const linkAttendanceSchema = z.object({
 
 export const attendanceRouter = Router();
 
+function sendAttendanceError(
+  req: Request,
+  res: Response,
+  err: unknown,
+  fallbackMessage: string,
+): void {
+  const appError = AppError.isAppError(err)
+    ? err
+    : new AppError(500, 'INTERNAL_ERROR', fallbackMessage);
+
+  res.status(appError.statusCode).json({
+    error: appError.message,
+    code: appError.code,
+    requestId: req.id,
+    ...(appError.details !== undefined ? { details: appError.details } : {}),
+  });
+}
+
 /**
  * POST /api/v1/attendance/qr
  * Record attendance via QR code scan (student).
@@ -99,8 +117,7 @@ attendanceRouter.post('/qr', async (req: Request, res: Response): Promise<void> 
     );
     res.status(201).json(record);
   } catch (err) {
-    if (err instanceof AppError) throw err;
-    throw new AppError(500, 'INTERNAL_ERROR', 'Failed to record QR scan');
+    sendAttendanceError(req, res, err, 'Failed to record QR scan');
   }
 });
 
@@ -131,8 +148,7 @@ attendanceRouter.post('/manual', requirePermission('mark:attendance'), async (re
     );
     res.status(201).json(record);
   } catch (err) {
-    if (err instanceof AppError) throw err;
-    throw new AppError(500, 'INTERNAL_ERROR', 'Failed to record manual attendance');
+    sendAttendanceError(req, res, err, 'Failed to record manual attendance');
   }
 });
 
@@ -162,8 +178,7 @@ attendanceRouter.post('/biometric', requirePermission('mark:attendance'), async 
     );
     res.status(201).json(record);
   } catch (err) {
-    if (err instanceof AppError) throw err;
-    throw new AppError(500, 'INTERNAL_ERROR', 'Failed to record biometric attendance');
+    sendAttendanceError(req, res, err, 'Failed to record biometric attendance');
   }
 });
 
@@ -199,8 +214,7 @@ attendanceRouter.post('/fingerprint', requirePermission('mark:attendance'), asyn
     );
     res.status(201).json(record);
   } catch (err) {
-    if (err instanceof AppError) throw err;
-    throw new AppError(500, 'INTERNAL_ERROR', 'Failed to record fingerprint attendance');
+    sendAttendanceError(req, res, err, 'Failed to record fingerprint attendance');
   }
 });
 
@@ -232,8 +246,7 @@ attendanceRouter.post('/link/generate', requirePermission('start:session'), asyn
     );
     res.status(201).json(result);
   } catch (err) {
-    if (err instanceof AppError) throw err;
-    throw new AppError(500, 'INTERNAL_ERROR', 'Failed to generate attendance link');
+    sendAttendanceError(req, res, err, 'Failed to generate attendance link');
   }
 });
 
@@ -262,8 +275,7 @@ attendanceRouter.post('/link', async (req: Request, res: Response): Promise<void
     );
     res.status(201).json(record);
   } catch (err) {
-    if (err instanceof AppError) throw err;
-    throw new AppError(500, 'INTERNAL_ERROR', 'Failed to record link attendance');
+    sendAttendanceError(req, res, err, 'Failed to record link attendance');
   }
 });
 
@@ -347,8 +359,7 @@ attendanceRouter.get('/link/:token/info', async (req: Request, res: Response): P
       maxUses: payload.maxUses ?? null,
     });
   } catch (err) {
-    if (err instanceof AppError) throw err;
-    throw new AppError(500, 'INTERNAL_ERROR', 'Failed to get link info');
+    sendAttendanceError(req, res, err, 'Failed to get link info');
   }
 });
 
@@ -378,8 +389,7 @@ attendanceRouter.put('/:id', requirePermission('mark:attendance'), async (req: R
     );
     res.status(200).json(record);
   } catch (err) {
-    if (err instanceof AppError) throw err;
-    throw new AppError(500, 'INTERNAL_ERROR', 'Failed to update attendance record');
+    sendAttendanceError(req, res, err, 'Failed to update attendance record');
   }
 });
 
@@ -408,8 +418,7 @@ attendanceRouter.post('/sync', requirePermission('mark:attendance'), async (req:
     );
     res.status(200).json(result);
   } catch (err) {
-    if (err instanceof AppError) throw err;
-    throw new AppError(500, 'INTERNAL_ERROR', 'Failed to sync offline records');
+    sendAttendanceError(req, res, err, 'Failed to sync offline records');
   }
 });
 
@@ -511,7 +520,6 @@ attendanceRouter.get('/', async (req: Request, res: Response): Promise<void> => 
     const records = await prisma.attendanceRecord.findMany({ where });
     res.status(200).json(records);
   } catch (err) {
-    if (err instanceof AppError) throw err;
-    throw new AppError(500, 'INTERNAL_ERROR', 'Failed to list attendance records');
+    sendAttendanceError(req, res, err, 'Failed to list attendance records');
   }
 });

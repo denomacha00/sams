@@ -50,7 +50,7 @@ export function errorHandler(
 ): void {
   const requestId: string = (req as Request & { id?: string }).id ?? 'unknown';
 
-  if (err instanceof AppError) {
+  if (AppError.isAppError(err)) {
     const body: {
       error: string;
       code: string;
