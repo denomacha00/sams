@@ -11,6 +11,7 @@ import {
   isAiUploadErrorIntent,
   isAiVisionFailureIntent,
   loadAiThreadId,
+  messagesToAiHistory,
   saveAiThreadId,
   threadRecordsToMessages,
   type AiChatMessage,
@@ -193,6 +194,7 @@ const FloatingAI: React.FC = () => {
       const { data } = await apiClient.post('/ai/query', {
         question: 'yes',
         threadId,
+        history: messagesToAiHistory(messages),
         confirmAction: true,
         pendingAction: pending,
       });
@@ -217,7 +219,7 @@ const FloatingAI: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  }, [threadId, threadOwner]);
+  }, [messages, threadId, threadOwner]);
 
   const submitQuery = useCallback(async (text: string) => {
     if (!text.trim() && selectedImages.length === 0) return;
@@ -273,9 +275,11 @@ const FloatingAI: React.FC = () => {
       // Case 3: Normal text query (with action confirmation support)
       const isConfirm = CONFIRM_RE.test(text.trim()) && pendingActionRef.current;
       const pending = pendingActionRef.current;
+      const history = messagesToAiHistory(messages);
       const { data } = await apiClient.post('/ai/query', {
         question: text.trim(),
         threadId,
+        history,
         ...(isConfirm && pending
           ? { confirmAction: true, pendingAction: pending }
           : pending
@@ -320,7 +324,7 @@ const FloatingAI: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  }, [selectedImages, imagePreviews, threadId, threadOwner, appendMemoryNotice]);
+  }, [messages, selectedImages, imagePreviews, threadId, threadOwner, appendMemoryNotice]);
 
   const { isListening, startListening, stopListening } = useVoiceQuery(submitQuery);
 

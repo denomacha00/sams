@@ -40,7 +40,8 @@ function readBoundedIntEnv(name: string, fallback: number, min: number, max: num
   return Math.min(max, Math.max(min, parsed));
 }
 
-const MAX_CHAT_INPUT_TOKENS = readBoundedIntEnv('AI_MAX_INPUT_TOKENS', 3_500, 1_000, 8_000);
+const MAX_CHAT_INPUT_TOKENS = readBoundedIntEnv('AI_MAX_INPUT_TOKENS', 8_000, 1_000, 16_000);
+const MIN_HISTORY_TOKENS = readBoundedIntEnv('AI_MIN_HISTORY_TOKENS', 1_200, 0, 4_000);
 const CHAT_MAX_TOKENS = readBoundedIntEnv('AI_MAX_TOKENS', 300, 50, 1_500);
 
 function truncateForPrompt(value: string, maxChars: number): string {
@@ -79,11 +80,21 @@ function buildMessagesWithinContext(
   history: Array<{ role: 'user' | 'assistant'; content: string }> = [],
 ): OpenAI.Chat.Completions.ChatCompletionMessageParam[] {
   const baseCost = estimateTokens(systemPrompt) + estimateTokens(question) + 600;
-  const availableHistoryTokens = Math.max(0, MAX_CHAT_INPUT_TOKENS - baseCost);
+  const normalHistoryBudget = Math.max(0, MAX_CHAT_INPUT_TOKENS - baseCost);
+  const availableHistoryTokens = history.length > 0
+    ? Math.max(normalHistoryBudget, Math.min(MIN_HISTORY_TOKENS, MAX_CHAT_INPUT_TOKENS))
+    : 0;
   const trimmedHistory = trimHistoryMessages(history, availableHistoryTokens);
 
   return [
     { role: 'system', content: systemPrompt },
+    ...(trimmedHistory.length > 0
+      ? [{
+          role: 'system' as const,
+          content:
+            'Conversation memory follows. Treat these prior user and assistant messages as authoritative context for this same chat. If the user asks whether you remember something, answer from these prior turns instead of saying this is a new conversation.',
+        }]
+      : []),
     ...trimmedHistory,
     { role: 'user', content: question },
   ];

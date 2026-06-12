@@ -5,6 +5,7 @@ import {
   getAiErrorMessage,
   isAiVisionFailureIntent,
   loadAiThreadId,
+  messagesToAiHistory,
   saveAiThreadId,
   threadRecordsToMessages,
 } from './aiChat';
@@ -75,6 +76,20 @@ describe('aiChat', () => {
     const msg = buildMemoryNoticeMessage('Key rotated');
     expect(msg.isSystemNotice).toBe(true);
     expect(msg.content).toBe('Key rotated');
+  });
+
+  it('builds compact API history from visible chat messages', () => {
+    const history = messagesToAiHistory([
+      { id: 'welcome', role: 'assistant', content: 'Welcome', timestamp: new Date() },
+      { id: 'notice', role: 'assistant', content: 'Memory notice', timestamp: new Date(), isSystemNotice: true },
+      { id: 'u1', role: 'user', content: 'hi', timestamp: new Date() },
+      { id: 'a1', role: 'assistant', content: 'hello', timestamp: new Date() },
+    ]);
+
+    expect(history).toEqual([
+      { role: 'user', content: 'hi' },
+      { role: 'assistant', content: 'hello' },
+    ]);
   });
 
   it('scopes remembered thread ids per signed-in account', () => {

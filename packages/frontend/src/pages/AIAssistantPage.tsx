@@ -11,6 +11,7 @@ import {
   isAiUploadErrorIntent,
   isAiVisionFailureIntent,
   loadAiThreadId,
+  messagesToAiHistory,
   saveAiThreadId,
   threadRecordsToMessages,
   type AiChatMessage,
@@ -166,6 +167,7 @@ const AIAssistantPage: React.FC = () => {
       const { data } = await apiClient.post('/ai/query', {
         question: 'yes',
         threadId,
+        history: messagesToAiHistory(messages),
         confirmAction: true,
         pendingAction: pending,
       });
@@ -245,9 +247,11 @@ const AIAssistantPage: React.FC = () => {
 
       const isConfirm = CONFIRM_RE.test(text.trim()) && pendingActionRef.current;
       const pending = pendingActionRef.current;
+      const history = messagesToAiHistory(messages);
       const { data } = await apiClient.post('/ai/query', {
         question: text.trim(),
         threadId,
+        history,
         ...(isConfirm && pending
           ? { confirmAction: true, pendingAction: pending }
           : pending

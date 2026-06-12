@@ -57,6 +57,42 @@ export interface AIServiceResponse {
   memoryStatus?: 'ok' | 'partial' | 'unreadable' | 'empty' | 'disabled';
 }
 
+type AiHistoryMessage = { role: 'user' | 'assistant'; content: string };
+
+function normalizeClientHistory(history?: unknown): AiHistoryMessage[] {
+  if (!Array.isArray(history)) return [];
+  return history
+    .filter((item): item is { role: unknown; content: unknown } => (
+      item != null &&
+      typeof item === 'object' &&
+      (item as { role?: unknown }).role !== undefined &&
+      (item as { content?: unknown }).content !== undefined
+    ))
+    .filter((item) => item.role === 'user' || item.role === 'assistant')
+    .map((item) => ({
+      role: item.role as 'user' | 'assistant',
+      content: String(item.content).trim().slice(0, 2_000),
+    }))
+    .filter((item) => item.content.length > 0)
+    .slice(-12);
+}
+
+function mergeHistoryMessages(
+  storedHistory: AiHistoryMessage[],
+  clientHistory: AiHistoryMessage[],
+): AiHistoryMessage[] {
+  if (clientHistory.length === 0) return storedHistory;
+  const seen = new Set(storedHistory.map((item) => `${item.role}:${item.content}`));
+  const merged = [...storedHistory];
+  for (const item of clientHistory) {
+    const key = `${item.role}:${item.content}`;
+    if (seen.has(key)) continue;
+    merged.push(item);
+    seen.add(key);
+  }
+  return merged.slice(-20);
+}
+
 // ─── AI Service ───────────────────────────────────────────────────────────────
 
 /**
@@ -82,6 +118,7 @@ export class AIService {
       threadId?: string;
       confirmAction?: boolean;
       pendingAction?: PendingAction;
+      history?: unknown;
     },
   ): Promise<AIServiceResponse> {
     let threadId = await this.resolveThreadForUser(user, options?.threadId);
@@ -276,6 +313,7 @@ export class AIService {
 
     // Step 3: Load encrypted conversation history for LLM context
     let historyMessages: Array<{ role: 'user' | 'assistant'; content: string }> = [];
+    const clientHistory = normalizeClientHistory(options?.history);
     let memoryNotice: string | undefined;
     let memoryStatus: AIServiceResponse['memoryStatus'];
 
@@ -303,6 +341,8 @@ export class AIService {
     } else if (user.sub !== 'guest' && !isConversationMemoryEnabled()) {
       memoryStatus = 'disabled';
     }
+
+    historyMessages = mergeHistoryMessages(historyMessages, clientHistory);
 
     // Local engine couldn't resolve — try the OpenAI-compatible provider chain
     if (!hasPrimaryAIKey()) {

@@ -29,6 +29,11 @@ export interface AiChatMessage {
   isSystemNotice?: boolean;
 }
 
+export interface AiApiHistoryMessage {
+  role: 'user' | 'assistant';
+  content: string;
+}
+
 /** Expand server thread records into alternating user/assistant chat messages. */
 export function threadRecordsToMessages(records: AiThreadRecord[]): AiChatMessage[] {
   const messages: AiChatMessage[] = [];
@@ -70,6 +75,22 @@ export function aiThreadStorageKey(owner?: AiThreadOwner | null): string {
   const schoolId = owner?.schoolId?.trim();
   if (!userId) return AI_THREAD_STORAGE_KEY;
   return `${AI_THREAD_STORAGE_KEY}:${schoolId || 'school'}:${userId}`;
+}
+
+/** Build a compact client-side fallback history for the next AI request. */
+export function messagesToAiHistory(
+  messages: Array<Pick<AiChatMessage, 'id' | 'role' | 'content' | 'isSystemNotice'>>,
+  maxMessages = 12,
+): AiApiHistoryMessage[] {
+  return messages
+    .filter((message) => !message.isSystemNotice)
+    .filter((message) => message.id !== 'welcome')
+    .filter((message) => message.content.trim().length > 0)
+    .map((message) => ({
+      role: message.role,
+      content: message.content.trim().slice(0, 2_000),
+    }))
+    .slice(-maxMessages);
 }
 
 export function loadAiThreadId(owner?: AiThreadOwner | null): string | null {

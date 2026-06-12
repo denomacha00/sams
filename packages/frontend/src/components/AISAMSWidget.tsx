@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import apiClient from '../services/apiClient';
 import { useVoiceQuery } from '../hooks/useVoiceQuery';
-import { loadAiThreadId, saveAiThreadId } from '../lib/aiChat';
+import { loadAiThreadId, messagesToAiHistory, saveAiThreadId } from '../lib/aiChat';
 import { AiMessageContent } from '../lib/aiMessageContent';
 
 interface PendingAction {
@@ -52,6 +52,7 @@ const AISAMSWidget: React.FC = () => {
       const { data } = await apiClient.post('/ai/query', {
         question: 'yes',
         threadId,
+        history: messagesToAiHistory(messages),
         confirmAction: true,
         pendingAction: pending,
       });
@@ -76,7 +77,7 @@ const AISAMSWidget: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  }, [threadId]);
+  }, [messages, threadId]);
 
   const submitQuery = useCallback(async (text: string) => {
     if (!text.trim()) return;
@@ -94,9 +95,11 @@ const AISAMSWidget: React.FC = () => {
     try {
       const isConfirm = CONFIRM_RE.test(text.trim()) && pendingActionRef.current;
       const pending = pendingActionRef.current;
+      const history = messagesToAiHistory(messages);
       const { data } = await apiClient.post('/ai/query', {
         question: text.trim(),
         threadId,
+        history,
         ...(isConfirm && pending
           ? { confirmAction: true, pendingAction: pending }
           : pending
@@ -139,7 +142,7 @@ const AISAMSWidget: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  }, [threadId]);
+  }, [messages, threadId]);
 
   const { isListening, startListening, stopListening } = useVoiceQuery(submitQuery);
 

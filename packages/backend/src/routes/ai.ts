@@ -217,7 +217,7 @@ aiRouter.delete('/conversations', asyncHandler(async (req: Request, res: Respons
  */
 aiRouter.post('/query', asyncHandler(async (req: Request, res: Response): Promise<void> => {
   try {
-    const { question, threadId, confirmAction, pendingAction } = req.body;
+    const { question, threadId, confirmAction, pendingAction, history: clientHistory } = req.body;
 
     if (!question || typeof question !== 'string' || !question.trim()) {
       throw new AppError(400, 'VALIDATION_ERROR', 'A non-empty "question" field is required.');
@@ -226,7 +226,7 @@ aiRouter.post('/query', asyncHandler(async (req: Request, res: Response): Promis
     // Authenticated user — full access
     if (req.user) {
       try {
-        const result = await aiService.query(req.user, question.trim(), { threadId, confirmAction, pendingAction });
+        const result = await aiService.query(req.user, question.trim(), { threadId, confirmAction, pendingAction, history: clientHistory });
         const response: Record<string, unknown> = { ...result };
         res.status(200).json(response);
       } catch (aiErr) {

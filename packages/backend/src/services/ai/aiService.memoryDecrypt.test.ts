@@ -110,6 +110,25 @@ describe('AIService conversation memory decrypt failures', () => {
     );
   });
 
+  it('uses client-visible history when encrypted thread history cannot be decrypted', async () => {
+    const service = new AIService();
+    await service.query(studentUser as never, 'do you remember my last task', {
+      history: [
+        { role: 'user', content: 'my last task was fixing department students' },
+        { role: 'assistant', content: 'Yes, we grouped students by class.' },
+      ],
+    });
+
+    expect(openaiQueryWithHistory).toHaveBeenCalledWith(
+      studentUser,
+      'do you remember my last task',
+      [
+        { role: 'user', content: 'my last task was fixing department students' },
+        { role: 'assistant', content: 'Yes, we grouped students by class.' },
+      ],
+    );
+  });
+
   it('surfaces memoryNotice when context window has unreadable records', async () => {
     getContextWindow.mockResolvedValue({
       records: [],

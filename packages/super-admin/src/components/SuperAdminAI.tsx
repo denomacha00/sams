@@ -114,6 +114,18 @@ function buildMemoryNoticeMessage(notice: string): ChatMessage {
   };
 }
 
+function messagesToAiHistory(messages: ChatMessage[], maxMessages = 12): Array<{ role: 'user' | 'assistant'; content: string }> {
+  return messages
+    .filter((message) => !message.isSystemNotice)
+    .filter((message) => message.id !== 'welcome')
+    .filter((message) => message.content.trim().length > 0)
+    .map((message) => ({
+      role: message.role,
+      content: message.content.trim().slice(0, 2_000),
+    }))
+    .slice(-maxMessages);
+}
+
 const SuperAdminAI: React.FC = () => {
   const user = useAuthStore((s) => s.user);
   const [isOpen, setIsOpen] = useState(false);
@@ -250,6 +262,7 @@ const SuperAdminAI: React.FC = () => {
     const { data } = await apiClient.post('/ai/query', {
       question,
       threadId,
+      history: messagesToAiHistory(messages),
       confirmAction: options?.confirmAction,
       pendingAction: options?.pendingAction,
     });
