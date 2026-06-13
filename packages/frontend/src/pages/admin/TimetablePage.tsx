@@ -15,6 +15,9 @@ interface TimetableEntry {
   room?: string;
   class?: { name: string };
   teacher?: { fullName: string };
+  activeSessionId?: string | null;
+  activeRecordCount?: number;
+  studentCount?: number;
 }
 
 interface SchoolClass {
@@ -277,6 +280,10 @@ const TimetablePage: React.FC = () => {
     if (status === 'past') return 'bg-slate-500/15 text-ink-subtle border border-white/10';
     return '';
   };
+  const attendanceProgressLabel = (entry: TimetableEntry) => {
+    if (getEntryTimeStatus(entry) !== 'now') return null;
+    return `${entry.activeRecordCount ?? 0}/${entry.studentCount ?? 0}`;
+  };
   const effectiveDepartmentId = isHOD ? (user?.departmentId ?? '') : formData.departmentId;
   const modalClassOptions = effectiveDepartmentId
     ? classes.filter((c) => c.departmentId === effectiveDepartmentId)
@@ -353,6 +360,7 @@ const TimetablePage: React.FC = () => {
                     <th className="text-left px-6 py-4 text-sm font-semibold text-ink">Class</th>
                     <th className="text-left px-6 py-4 text-sm font-semibold text-ink">Teacher</th>
                     <th className="text-left px-6 py-4 text-sm font-semibold text-ink">Time</th>
+                    <th className="text-left px-6 py-4 text-sm font-semibold text-ink">Active</th>
                     <th className="text-left px-6 py-4 text-sm font-semibold text-ink">Room</th>
                     <th className="text-right px-6 py-4 text-sm font-semibold text-ink">Actions</th>
                   </tr>
@@ -360,7 +368,7 @@ const TimetablePage: React.FC = () => {
                 <tbody>
                   {filteredEntries.length === 0 ? (
                     <tr>
-                      <td colSpan={7} className="px-6 py-12 text-center text-ink-muted">No timetable entries</td>
+                      <td colSpan={8} className="px-6 py-12 text-center text-ink-muted">No timetable entries</td>
                     </tr>
                   ) : (
                     filteredEntries
@@ -379,6 +387,15 @@ const TimetablePage: React.FC = () => {
                           <td className="px-6 py-4 text-sm text-ink-muted">{entry.class?.name || classes.find((c) => c.id === entry.classId)?.name || 'Unknown class'}</td>
                           <td className="px-6 py-4 text-sm text-ink-muted">{entry.teacher?.fullName || entry.teacherId}</td>
                           <td className="px-6 py-4 text-sm text-ink-muted">{entry.startTime} - {entry.endTime}</td>
+                          <td className="px-6 py-4 text-sm text-ink-muted">
+                            {attendanceProgressLabel(entry) ? (
+                              <span className="inline-flex items-center rounded-full bg-red-500/10 border border-red-400/20 px-2 py-0.5 text-xs font-semibold text-red-200">
+                                {attendanceProgressLabel(entry)}
+                              </span>
+                            ) : (
+                              '-'
+                            )}
+                          </td>
                           <td className="px-6 py-4 text-sm text-ink-muted">{entry.room || '—'}</td>
                           <td className="px-6 py-4 text-right">
                             {canManage && (
@@ -440,6 +457,11 @@ const TimetablePage: React.FC = () => {
                             )}
                           </div>
                           <p className="text-ink-muted text-xs mt-1 font-mono">{entry.startTime} - {entry.endTime}</p>
+                          {attendanceProgressLabel(entry) && (
+                            <p className="mt-2 inline-flex items-center rounded-full bg-red-500/10 border border-red-400/20 px-2 py-0.5 text-[11px] font-semibold text-red-200">
+                              {attendanceProgressLabel(entry)} marked
+                            </p>
+                          )}
                           <p className="text-ink-muted text-xs">{entry.class?.name || classes.find((c) => c.id === entry.classId)?.name || 'Unknown class'}</p>
                           {entry.room && <p className="text-ink-subtle text-xs">Room: {entry.room}</p>}
                         </div>

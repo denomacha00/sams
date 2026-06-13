@@ -15,6 +15,9 @@ interface TimetableEntry {
   room?: string;
   class?: { name: string; departmentId?: string };
   teacher?: { fullName: string };
+  activeSessionId?: string | null;
+  activeRecordCount?: number;
+  studentCount?: number;
 }
 
 interface Department {
@@ -24,6 +27,14 @@ interface Department {
 }
 
 const DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+
+function normalizeUsersList(data: unknown): { id: string; fullName: string }[] {
+  if (Array.isArray(data)) return data;
+  if (data && typeof data === 'object' && Array.isArray((data as { users?: unknown }).users)) {
+    return (data as { users: { id: string; fullName: string }[] }).users;
+  }
+  return [];
+}
 
 function minutesFromTime(time: string): number {
   const [hours, minutes] = time.split(':').map((part) => Number(part));
@@ -36,10 +47,13 @@ type EntryTimeStatus = 'now' | 'later' | 'past' | null;
 const TimetableViewPage: React.FC = () => {
   const user = useAuthStore((s) => s.user);
   const isSchoolAdmin = user?.role === UserRole.SCHOOL_ADMIN;
+  const canSeeActiveProgress = user?.role !== UserRole.STUDENT;
   const [entries, setEntries] = useState<TimetableEntry[]>([]);
   const [departments, setDepartments] = useState<Department[]>([]);
+  const [teachers, setTeachers] = useState<{ id: string; fullName: string }[]>([]);
   const [filterDepartmentId, setFilterDepartmentId] = useState('');
   const [filterClassId, setFilterClassId] = useState('');
+  const [filterTeacherId, setFilterTeacherId] = useState('');
   const [loading, setLoading] = useState(true);
   const [viewMode, setViewMode] = useState<'table' | 'grid'>('table');
   const [selectedEntryId, setSelectedEntryId] = useState<string | null>(null);
@@ -61,6 +75,7 @@ const TimetableViewPage: React.FC = () => {
       try {
         const params: Record<string, string> = {};
         if (filterClassId) params.classId = filterClassId;
+        if (filterTeacherId) params.teacherId = filterTeacherId;
         const { data } = await apiClient.get('/timetable', { params });
         const list = Array.isArray(data) ? data : (data.entries || []);
         setEntries(list);
@@ -72,7 +87,7 @@ const TimetableViewPage: React.FC = () => {
       }
     };
     void fetchEntries();
-  }, [filterClassId]);
+  }, [filterClassId, filterTeacherId]);
 
   useEffect(() => {
     if (!isSchoolAdmin) return;
@@ -95,7 +110,20 @@ const TimetableViewPage: React.FC = () => {
         /* ignore */
       }
     };
+
+    const loadTeachers = async () => {
+      try {
+        const { data } = await apiClient.get('/users', {
+          params: { roles: 'TEACHER,HOD' },
+        });
+        setTeachers(normalizeUsersList(data).sort((a, b) => a.fullName.localeCompare(b.fullName)));
+      } catch {
+        setTeachers([]);
+      }
+    };
+
     void loadDepartments();
+    void loadTeachers();
   }, [isSchoolAdmin]);
 
   const classOptions = useMemo(() => {
@@ -129,6 +157,11 @@ const TimetableViewPage: React.FC = () => {
     if (status === 'past') return 'bg-slate-500/15 text-ink-subtle border border-white/10';
     return '';
   };
+  const attendanceProgressLabel = (entry: TimetableEntry) => {
+    if (!canSeeActiveProgress) return null;
+    if (getEntryTimeStatus(entry) !== 'now') return null;
+    return `${entry.activeRecordCount ?? 0}/${entry.studentCount ?? 0}`;
+  };
 
   const pageTitle = isSchoolAdmin ? 'School Timetable' : 'My Timetable';
 
@@ -138,7 +171,7 @@ const TimetableViewPage: React.FC = () => {
         <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <Link to="/dashboard" className="text-ink-muted hover:text-brand transition-colors">
-              ← Dashboard
+              Dashboard
             </Link>
             <h1 className="text-lg font-bold text-ink">{pageTitle}</h1>
           </div>
@@ -155,7 +188,7 @@ const TimetableViewPage: React.FC = () => {
               onClick={() => setViewMode(viewMode === 'table' ? 'grid' : 'table')}
               className="px-3 py-2 rounded-lg input-field text-ink-muted text-sm hover:bg-surface-elevated transition-colors"
             >
-              {viewMode === 'table' ? '📅 Grid View' : '📋 Table View'}
+              {viewMode === 'table' ? 'Grid View' : 'Table View'}
             </button>
           </div>
         </div>
@@ -183,6 +216,16 @@ const TimetableViewPage: React.FC = () => {
               <option value="">All classes in department</option>
               {classOptions.map((c) => (
                 <option key={c.id} value={c.id}>{c.name}</option>
+              ))}
+            </select>
+            <select
+              value={filterTeacherId}
+              onChange={(e) => { setFilterTeacherId(e.target.value); setLoading(true); }}
+              className="px-4 py-2 rounded-xl input-field text-sm min-w-[14rem]"
+            >
+              <option value="">All teachers</option>
+              {teachers.map((teacher) => (
+                <option key={teacher.id} value={teacher.id}>{teacher.fullName}</option>
               ))}
             </select>
           </div>
@@ -256,9 +299,14 @@ const TimetableViewPage: React.FC = () => {
                           )}
                         </div>
                         <p className="text-brand text-xs mt-1 font-mono">{entry.startTime} - {entry.endTime}</p>
+                        {attendanceProgressLabel(entry) && (
+                          <p className="mt-2 inline-flex items-center rounded-full bg-red-500/10 border border-red-400/20 px-2 py-0.5 text-[11px] font-semibold text-red-200">
+                            {attendanceProgressLabel(entry)} marked
+                          </p>
+                        )}
                         {entry.class?.name && <p className="text-ink-muted text-xs mt-0.5">{entry.class.name}</p>}
                         {entry.teacher?.fullName && <p className="text-ink-subtle text-xs">{entry.teacher.fullName}</p>}
-                        {entry.room && <p className="text-ink-subtle text-xs">📍 {entry.room}</p>}
+                        {entry.room && <p className="text-ink-subtle text-xs">Room: {entry.room}</p>}
                       </div>
                     ))
                   )}
@@ -277,6 +325,9 @@ const TimetableViewPage: React.FC = () => {
                     <th className="text-left px-6 py-4 text-sm font-semibold text-ink">Class</th>
                     <th className="text-left px-6 py-4 text-sm font-semibold text-ink">Teacher</th>
                     <th className="text-left px-6 py-4 text-sm font-semibold text-ink">Time</th>
+                    {canSeeActiveProgress && (
+                      <th className="text-left px-6 py-4 text-sm font-semibold text-ink">Active</th>
+                    )}
                     <th className="text-left px-6 py-4 text-sm font-semibold text-ink">Room</th>
                   </tr>
                 </thead>
@@ -299,10 +350,21 @@ const TimetableViewPage: React.FC = () => {
                           )}
                         </td>
                         <td className="px-6 py-4 text-sm text-ink font-medium">{entry.subject}</td>
-                        <td className="px-6 py-4 text-sm text-ink-muted">{entry.class?.name || '—'}</td>
-                        <td className="px-6 py-4 text-sm text-ink-muted">{entry.teacher?.fullName || '—'}</td>
+                        <td className="px-6 py-4 text-sm text-ink-muted">{entry.class?.name || '-'}</td>
+                        <td className="px-6 py-4 text-sm text-ink-muted">{entry.teacher?.fullName || '-'}</td>
                         <td className="px-6 py-4 text-sm text-ink-muted font-mono">{entry.startTime} - {entry.endTime}</td>
-                        <td className="px-6 py-4 text-sm text-ink-muted">{entry.room || '—'}</td>
+                        {canSeeActiveProgress && (
+                          <td className="px-6 py-4 text-sm text-ink-muted">
+                            {attendanceProgressLabel(entry) ? (
+                              <span className="inline-flex items-center rounded-full bg-red-500/10 border border-red-400/20 px-2 py-0.5 text-xs font-semibold text-red-200">
+                                {attendanceProgressLabel(entry)}
+                              </span>
+                            ) : (
+                              '-'
+                            )}
+                          </td>
+                        )}
+                        <td className="px-6 py-4 text-sm text-ink-muted">{entry.room || '-'}</td>
                       </tr>
                     ))}
                 </tbody>
@@ -314,7 +376,7 @@ const TimetableViewPage: React.FC = () => {
 
       <footer className="border-t border-white/5 mt-20 py-6">
         <div className="max-w-7xl mx-auto px-6 text-center">
-          <p className="text-xs text-ink-subtle">© 2025 SAMS · Developed by Denis Macharia</p>
+          <p className="text-xs text-ink-subtle">(c) 2025 SAMS - Developed by Denis Macharia</p>
         </div>
       </footer>
     </div>

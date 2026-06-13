@@ -1,5 +1,6 @@
 import { prisma } from '../lib/prisma';
 import { AppError } from '../middleware/errors';
+import { UserRole } from '@sams/shared';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -171,12 +172,65 @@ export class TimetableService {
     const entries = await prisma.timetableEntry.findMany({
       where,
       include: {
-        class: { select: { name: true } },
+        class: { select: { id: true, name: true, departmentId: true } },
         teacher: { select: { fullName: true } },
       },
     });
 
-    return entries;
+    if (entries.length === 0) {
+      return entries;
+    }
+
+    const entryIds = entries.map((entry) => entry.id);
+    const classIds = [...new Set(entries.map((entry) => entry.classId))];
+
+    const [activeSessions, studentCounts] = await Promise.all([
+      prisma.attendanceSession.findMany({
+        where: {
+          schoolId,
+          isActive: true,
+          timetableEntryId: { in: entryIds },
+        },
+        select: {
+          id: true,
+          timetableEntryId: true,
+          _count: { select: { records: true } },
+        },
+      }),
+      prisma.user.groupBy({
+        by: ['classId'],
+        where: {
+          schoolId,
+          role: UserRole.STUDENT,
+          classId: { in: classIds },
+        },
+        _count: { _all: true },
+      }),
+    ]);
+
+    const activeByEntry = new Map<string, (typeof activeSessions)[number]>();
+    for (const session of activeSessions) {
+      if (session.timetableEntryId) {
+        activeByEntry.set(session.timetableEntryId, session);
+      }
+    }
+
+    const studentCountByClass = new Map<string, number>();
+    for (const row of studentCounts) {
+      if (row.classId) {
+        studentCountByClass.set(row.classId, row._count._all);
+      }
+    }
+
+    return entries.map((entry) => {
+      const active = activeByEntry.get(entry.id);
+      return {
+        ...entry,
+        activeSessionId: active?.id ?? null,
+        activeRecordCount: active?._count.records ?? 0,
+        studentCount: studentCountByClass.get(entry.classId) ?? 0,
+      };
+    });
   }
 
   // ─── Private Helpers ────────────────────────────────────────────────────────

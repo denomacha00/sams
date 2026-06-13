@@ -87,14 +87,60 @@ export const timetableRouter = Router();
  */
 timetableRouter.get('/', requirePermission('view:timetable'), async (req: Request, res: Response): Promise<void> => {
   try {
-    const filters = {
+    const filters: {
+      classId?: string;
+      teacherId?: string;
+      dayOfWeek?: number;
+      departmentId?: string;
+    } = {
       classId: req.query.classId as string | undefined,
       teacherId: req.query.teacherId as string | undefined,
       dayOfWeek: req.query.dayOfWeek !== undefined ? Number(req.query.dayOfWeek) : undefined,
-      ...(req.user.role === UserRole.HOD && req.user.departmentId
-        ? { departmentId: req.user.departmentId }
-        : {}),
     };
+
+    if (req.user.role === UserRole.TEACHER) {
+      filters.teacherId = req.user.sub;
+    }
+
+    if (req.user.role === UserRole.STUDENT) {
+      let studentClassId = req.user.classId;
+      if (!studentClassId) {
+        const student = await prisma.user.findUnique({
+          where: { id: req.user.sub },
+          select: { classId: true, schoolId: true },
+        });
+        if (student?.schoolId === req.schoolId) {
+          studentClassId = student.classId ?? undefined;
+        }
+      }
+
+      if (!studentClassId) {
+        res.status(200).json([]);
+        return;
+      }
+
+      filters.classId = studentClassId;
+      filters.teacherId = undefined;
+    }
+
+    if (req.user.role === UserRole.HOD) {
+      let hodDepartmentId = req.user.departmentId;
+      if (!hodDepartmentId) {
+        const hod = await prisma.user.findUnique({
+          where: { id: req.user.sub },
+          select: { departmentId: true, schoolId: true },
+        });
+        if (hod?.schoolId === req.schoolId) {
+          hodDepartmentId = hod.departmentId ?? undefined;
+        }
+      }
+      if (hodDepartmentId) {
+        filters.departmentId = hodDepartmentId;
+      } else {
+        res.status(200).json([]);
+        return;
+      }
+    }
 
     const entries = await timetableService.listEntries(req.schoolId, filters);
     res.status(200).json(entries);
