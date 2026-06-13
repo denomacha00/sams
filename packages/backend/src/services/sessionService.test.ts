@@ -232,7 +232,7 @@ describe('SessionService.expireStaleActiveSessions', () => {
     vi.useRealTimers();
   });
 
-  it('closes active sessions after the timetable window plus grace period', async () => {
+  it('closes active sessions after the timetable window ends', async () => {
     vi.mocked(prisma.attendanceSession.findMany)
       .mockResolvedValueOnce([
       {

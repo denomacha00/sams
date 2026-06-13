@@ -61,7 +61,7 @@ export class SessionService {
   /**
    * Start a new attendance session for a teacher.
    * Validates that the timetable entry belongs to the teacher and that the
-   * current time falls within the scheduled slot (±30 min tolerance).
+   * current time falls within the scheduled slot.
    * Creates the session with an initial QR token and returns the session record.
    *
    * Requirements: 17.3
@@ -125,7 +125,7 @@ export class SessionService {
       );
     }
 
-    // Validate the current time is within the scheduled slot (±tolerance for early start).
+    // Validate the current time is within the scheduled slot.
     const TOLERANCE_MINUTES = SESSION_WINDOW_TOLERANCE_MINUTES;
     const currentMinutes = localClock.minutes;
 

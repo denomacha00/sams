@@ -6,13 +6,13 @@ describe('getApiErrorMessage', () => {
     const err = {
       response: {
         data: {
-          error: 'Session can only be started within 30 minutes of the scheduled time',
+          error: 'Session can only be started during the scheduled time',
           code: 'OUTSIDE_SCHEDULED_TIME',
         },
       },
     };
     expect(getApiErrorMessage(err, 'failed')).toBe(
-      'Session can only be started within 30 minutes of the scheduled time',
+      'Session can only be started during the scheduled time',
     );
   });
 
