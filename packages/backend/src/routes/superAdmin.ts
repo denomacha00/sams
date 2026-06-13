@@ -1207,6 +1207,51 @@ superAdminRouter.get('/notifications/support/:schoolId/:adminUserId', async (req
   });
 });
 
+superAdminRouter.delete('/notifications/support/:schoolId/:adminUserId', async (req: Request, res: Response): Promise<void> => {
+  const schoolId = req.params.schoolId as string;
+  const adminUserId = req.params.adminUserId as string;
+
+  const admin = await prisma.user.findFirst({
+    where: { id: adminUserId, schoolId, role: 'SCHOOL_ADMIN' },
+    select: {
+      id: true,
+      fullName: true,
+      schoolId: true,
+      school: { select: { name: true, schoolCode: true } },
+    },
+  });
+  if (!admin) throw new AppError(404, 'NOT_FOUND', 'School admin support thread not found');
+
+  const deleted = await prisma.notification.deleteMany({
+    where: {
+      schoolId,
+      type: SUPER_SUPPORT_NOTIFICATION_TYPE,
+      OR: [
+        { senderId: adminUserId },
+        { userId: adminUserId },
+      ],
+    },
+  });
+
+  await auditService.log({
+    eventType: 'AI_ACTION_EXECUTED',
+    actorId: req.user.sub,
+    actorRole: req.user.role,
+    schoolId,
+    resourceSnapshot: {
+      action: 'SUPER_ADMIN_SUPPORT_THREAD_CLEARED',
+      adminUserId: admin.id,
+      adminName: admin.fullName,
+      schoolName: admin.school.name,
+      schoolCode: admin.school.schoolCode,
+      deletedCount: deleted.count,
+      clearedAt: new Date().toISOString(),
+    },
+  });
+
+  res.status(200).json({ success: true, deletedCount: deleted.count });
+});
+
 superAdminRouter.post('/notifications/support/reply', async (req: Request, res: Response): Promise<void> => {
   const parsed = superSupportReplySchema.safeParse(req.body);
   if (!parsed.success) {

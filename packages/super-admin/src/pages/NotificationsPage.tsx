@@ -114,6 +114,7 @@ const NotificationsPage: React.FC = () => {
   const [supportLoading, setSupportLoading] = useState(true);
   const [supportReply, setSupportReply] = useState('');
   const [supportReplying, setSupportReplying] = useState(false);
+  const [clearingSupportThread, setClearingSupportThread] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
 
@@ -204,6 +205,30 @@ const NotificationsPage: React.FC = () => {
       setError(getSuperAdminApiError(err, 'Failed to send support reply.'));
     } finally {
       setSupportReplying(false);
+    }
+  };
+
+  const handleClearSupportThread = async () => {
+    if (!selectedSupportThread) return;
+    const confirmed = window.confirm(
+      `Clear support conversation with ${selectedSupportThread.adminName}? This removes the messages in this support thread.`,
+    );
+    if (!confirmed) return;
+
+    setClearingSupportThread(true);
+    setError(null);
+    try {
+      await apiClient.delete(
+        `/super/notifications/support/${selectedSupportThread.schoolId}/${selectedSupportThread.adminUserId}`,
+      );
+      setSelectedSupportThread(null);
+      setSupportReply('');
+      await fetchSupportThreads();
+      setSuccess('Support conversation cleared.');
+    } catch (err) {
+      setError(getSuperAdminApiError(err, 'Failed to clear support conversation.'));
+    } finally {
+      setClearingSupportThread(false);
     }
   };
 
@@ -545,11 +570,21 @@ const NotificationsPage: React.FC = () => {
                 </div>
               ) : (
                 <div className="flex h-full flex-col">
-                  <div className="border-b border-gray-700 pb-3">
-                    <h3 className="text-sm font-semibold text-white">{selectedSupportThread.adminName}</h3>
-                    <p className="text-xs text-gray-400">
-                      {selectedSupportThread.schoolName} ({selectedSupportThread.schoolCode})
-                    </p>
+                  <div className="flex flex-col gap-3 border-b border-gray-700 pb-3 sm:flex-row sm:items-start sm:justify-between">
+                    <div>
+                      <h3 className="text-sm font-semibold text-white">{selectedSupportThread.adminName}</h3>
+                      <p className="text-xs text-gray-400">
+                        {selectedSupportThread.schoolName} ({selectedSupportThread.schoolCode})
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => void handleClearSupportThread()}
+                      disabled={clearingSupportThread}
+                      className="rounded-lg border border-red-500/40 px-3 py-2 text-xs font-semibold text-red-200 transition-colors hover:bg-red-950/40 disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                      {clearingSupportThread ? 'Clearing...' : 'Clear conversation'}
+                    </button>
                   </div>
 
                   <div className="mt-4 max-h-80 flex-1 space-y-3 overflow-y-auto pr-1">
