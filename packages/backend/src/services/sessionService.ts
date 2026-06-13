@@ -9,6 +9,7 @@ import {
   getLocalTimetableClock,
   isTimetableWindowExpired,
   minutesFromTime,
+  SESSION_WINDOW_TOLERANCE_MINUTES,
 } from '../lib/sessionWindow';
 import { resolveTeacherManagedClassIds } from '../lib/teacherScope';
 import { markMissingStudentsAbsentForSessions } from '../lib/attendanceFinalizer';
@@ -124,8 +125,8 @@ export class SessionService {
       );
     }
 
-    // Validate the current time is within the scheduled slot.
-    const TOLERANCE_MINUTES = 0;
+    // Validate the current time is within the scheduled slot (±tolerance for early start).
+    const TOLERANCE_MINUTES = SESSION_WINDOW_TOLERANCE_MINUTES;
     const currentMinutes = localClock.minutes;
 
     const [startHour, startMin] = timetableEntry.startTime.split(':').map(Number);

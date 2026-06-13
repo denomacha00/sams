@@ -159,7 +159,7 @@ const SessionPage: React.FC = () => {
 
     try {
       const params: Record<string, string | boolean> = { isActive: true };
-      if (user.role === UserRole.TEACHER) {
+      if (user.role === UserRole.TEACHER || user.role === UserRole.HOD) {
         params.teacherId = user.id;
       }
 

@@ -216,7 +216,8 @@ const ReportsPage: React.FC = () => {
         setReportScope((current) => (current === 'class' ? 'class' : 'department'));
         setSelectedDepartmentId(user.departmentId ?? '');
         if (user.departmentId) {
-          const { data } = await apiClient.get(`/departments/${user.departmentId}/classes`);
+          // Show only classes the HOD personally teaches (like a teacher)
+          const { data } = await apiClient.get('/users/teaching-classes');
           const classes = (Array.isArray(data) ? data : []).map((row: any) =>
             normalizeClassOption(row, row.departmentName ?? null),
           );

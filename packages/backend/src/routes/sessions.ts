@@ -182,7 +182,16 @@ sessionsRouter.get('/available', async (req: Request, res: Response): Promise<vo
         ...(managedClassIds.length > 0 ? [{ classId: { in: managedClassIds } }] : []),
       ];
     } else if (req.user.role === UserRole.HOD) {
-      where.class = { departmentId: assertHodHasDepartment(req) };
+      // HOD is also a teacher — show only the classes they personally teach on the session start page.
+      // Department-wide view is available via reports and timetable management.
+      const hodDepartmentId = assertHodHasDepartment(req);
+      const managedClassIds = await resolveTeacherManagedClassIds(req.user.sub, req.user.classId);
+      where.OR = [
+        { teacherId: req.user.sub },
+        ...(managedClassIds.length > 0 ? [{ classId: { in: managedClassIds } }] : []),
+      ];
+      // Still ensure it's within their department in case of mismatched data
+      where.class = { departmentId: hodDepartmentId };
     }
 
     const entries = await prisma.timetableEntry.findMany({
