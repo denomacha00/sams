@@ -133,23 +133,19 @@ const LinkAttendancePage: React.FC = () => {
       return;
     }
 
-    // If no GPS yet, try to get it
-    if (!gpsCoords) {
-      setPageState('gps-pending');
-      try {
-        const location = await getAttendanceLocation(20_000);
-        const coords = { lat: location.lat, lng: location.lng };
-        setGpsCoords(coords);
-        submitAttendance(coords);
-      } catch (err) {
-        setGpsError(getGpsErrorMessage(err));
-        setPageState('info');
-      }
-      return;
+    setPageState('gps-pending');
+    setGpsCoords(null);
+    setGpsError('');
+    try {
+      const location = await getAttendanceLocation(20_000);
+      const coords = { lat: location.lat, lng: location.lng };
+      setGpsCoords(coords);
+      await submitAttendance(coords);
+    } catch (err) {
+      setGpsError(getGpsErrorMessage(err));
+      setPageState('info');
     }
-
-    submitAttendance(gpsCoords);
-  }, [token, gpsCoords, isAuthenticated, navigate, sessionInfo?.requireGps]);
+  }, [token, isAuthenticated, navigate, sessionInfo?.requireGps]);
 
   async function submitAttendance(coords: { lat: number; lng: number }) {
     setPageState('submitting');
@@ -165,34 +161,40 @@ const LinkAttendancePage: React.FC = () => {
       setResult(data);
       setPageState('success');
     } catch (err: any) {
-      setPageState('error');
       const errorCode = err.response?.data?.code || err.response?.data?.error || '';
       const errorMsg = err.response?.data?.error || err.response?.data?.message || '';
 
       if (errorCode === 'GPS_OUT_OF_RANGE' || errorMsg.includes('out of range') || errorMsg.includes('GPS')) {
-        setErrorMessage('Out of Range');
         const distance = err.response?.data?.distance;
-        setErrorDetail(
+        const detail =
           distance
             ? `You are ${Math.round(distance)}m away from the class. You need to be within range to mark attendance.`
-            : 'You are too far from the classroom to mark attendance.'
-        );
+            : 'You are too far from the classroom to mark attendance.';
+        setGpsCoords(null);
+        setGpsError(`${detail} Move closer, then tap Mark Attendance again.`);
+        setPageState('info');
       } else if (errorCode === 'LINK_EXPIRED' || errorMsg.includes('expired')) {
+        setPageState('error');
         setErrorMessage('Link Expired');
         setErrorDetail('This attendance link has expired. Ask your teacher for a new one.');
       } else if (errorCode === 'DEVICE_ALREADY_USED') {
+        setPageState('error');
         setErrorMessage('Device Already Used');
         setErrorDetail('This phone/browser has already marked another student present for this session. Use your own device or ask the teacher.');
       } else if (errorCode === 'LINK_CAP_REACHED') {
+        setPageState('error');
         setErrorMessage('Link Full');
         setErrorDetail('This attendance link has reached its sign-in limit. Ask your teacher for a new link or to mark you manually.');
       } else if (errorCode === 'DUPLICATE_SCAN' || errorMsg.includes('already') || errorMsg.includes('duplicate')) {
+        setPageState('error');
         setErrorMessage('Already Recorded');
         setErrorDetail('Your attendance for this session has already been recorded. You cannot mark again with QR or link.');
       } else if (errorCode === 'SESSION_ENDED' || errorMsg.includes('ended') || errorMsg.includes('not active')) {
+        setPageState('error');
         setErrorMessage('Session Ended');
         setErrorDetail('This attendance session has already ended.');
       } else {
+        setPageState('error');
         setErrorMessage('Attendance Failed');
         setErrorDetail(errorMsg || 'Something went wrong. Please try again.');
       }

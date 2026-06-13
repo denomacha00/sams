@@ -234,6 +234,14 @@ const QRScanPage: React.FC = () => {
         setError('This phone/browser has already marked another student for this session. Use your own device or ask the teacher.');
       } else if (errorCode === 'SESSION_ENDED' || errorCode === 'QR_EXPIRED') {
         setError('This QR session has ended or refreshed. Ask the teacher for the current code.');
+      } else if (errorCode === 'GPS_OUT_OF_RANGE') {
+        lastGpsCoordsRef.current = null;
+        setGpsStatus('idle');
+        setError('You are outside the allowed class area. Move closer, then scan again.');
+      } else if (errorCode === 'GPS_REQUIRED') {
+        lastGpsCoordsRef.current = null;
+        setGpsStatus('idle');
+        setError('Location is required for this QR session. Allow GPS, then scan again.');
       } else {
         setError(getApiErrorMessage(err, 'Failed to record attendance'));
       }
