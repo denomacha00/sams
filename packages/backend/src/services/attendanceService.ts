@@ -284,7 +284,7 @@ export class AttendanceService {
     schoolId: string,
     teacherId: string,
     expiryMinutes: number = 5,
-    requireGps: boolean = true,
+    requireGps: boolean = false,
     gpsRadiusM: number = 100,
     maxUses?: number | null,
     actor: AttendanceActorOptions = {},

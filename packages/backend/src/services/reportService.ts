@@ -665,6 +665,22 @@ export class ReportService {
         doc.text(`Total Sessions: ${data.totalSessions}`);
         doc.text(`Average Attendance: ${data.averageAttendancePercentage}%`);
         doc.moveDown();
+
+        // Compute aggregate counts
+        let deptPresent = 0, deptLate = 0, deptExcused = 0, deptAbsent = 0;
+        for (const cls of data.classes) {
+          for (const student of cls.students ?? []) {
+            deptPresent += student.totalPresent ?? 0;
+            deptLate += student.totalLate ?? 0;
+            deptExcused += student.totalExcused ?? 0;
+            deptAbsent += student.totalAbsent ?? 0;
+          }
+        }
+        doc.fontSize(12).text(`Total Present: ${deptPresent}`);
+        doc.text(`Total Late: ${deptLate}`);
+        doc.text(`Total Excused: ${deptExcused}`);
+        doc.text(`Total Absent: ${deptAbsent}`);
+        doc.moveDown();
         for (const cls of data.classes) {
           doc.fontSize(12).text(`${cls.className}: ${cls.averageAttendancePercentage}%`);
         }
@@ -673,6 +689,24 @@ export class ReportService {
         doc.fontSize(14).text(`School: ${data.schoolName}`);
         doc.text(`Total Sessions: ${data.totalSessions}`);
         doc.text(`Average Attendance: ${data.averageAttendancePercentage}%`);
+        doc.moveDown();
+
+        // Compute aggregate counts
+        let schoolPresent = 0, schoolLate = 0, schoolExcused = 0, schoolAbsent = 0;
+        for (const dept of data.departments) {
+          for (const cls of dept.classes ?? []) {
+            for (const student of cls.students ?? []) {
+              schoolPresent += student.totalPresent ?? 0;
+              schoolLate += student.totalLate ?? 0;
+              schoolExcused += student.totalExcused ?? 0;
+              schoolAbsent += student.totalAbsent ?? 0;
+            }
+          }
+        }
+        doc.fontSize(12).text(`Total Present: ${schoolPresent}`);
+        doc.text(`Total Late: ${schoolLate}`);
+        doc.text(`Total Excused: ${schoolExcused}`);
+        doc.text(`Total Absent: ${schoolAbsent}`);
         doc.moveDown();
         for (const dept of data.departments) {
           doc.fontSize(12).text(`${dept.departmentName}: ${dept.averageAttendancePercentage}%`);

@@ -21,7 +21,7 @@ const startSessionSchema = z.object({
     lat: z.number().min(-90).max(90),
     lng: z.number().min(-180).max(180),
   }).optional(),
-  requireGps: z.boolean().default(true),
+  requireGps: z.boolean().default(false),
   locationRadiusM: z.number().int().min(10).max(10000).default(100),
 });
 

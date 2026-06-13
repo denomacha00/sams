@@ -72,7 +72,7 @@ export class SessionService {
     location: { lat: number; lng: number } | undefined,
     options: { requireGps?: boolean; locationRadiusM?: number } & SessionActorOptions = {},
   ) {
-    const requireGps = options.requireGps ?? true;
+    const requireGps = options.requireGps ?? false;
     const locationRadiusM = options.locationRadiusM ?? 100;
     const actorRole = options.actorRole ?? UserRole.TEACHER;
 

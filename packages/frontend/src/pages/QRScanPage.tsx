@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import apiClient from '../services/apiClient';
 import { saveAttendanceRecord } from '../services/offlineStore';
-import { AttendanceStatus } from '@sams/shared';
+import { AttendanceStatus, UserRole } from '@sams/shared';
 import { useAuthStore } from '../store/authStore';
 import { getApiErrorMessage } from '../lib/apiError';
 import { getAttendanceDeviceId } from '../lib/attendanceDevice';
@@ -131,6 +131,7 @@ function waitForVideoReady(video: HTMLVideoElement, timeoutMs = 10000): Promise<
 const QRScanPage: React.FC = () => {
   const user = useAuthStore((s) => s.user);
   const videoRef = useRef<HTMLVideoElement>(null);
+  const hasNoClass = user?.role === UserRole.STUDENT && !user?.classId;
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const animationRef = useRef<number>(0);
   const scanningRef = useRef(false);
@@ -156,32 +157,6 @@ const QRScanPage: React.FC = () => {
       animationRef.current = 0;
     }
     setScanning(false);
-  }, []);
-
-  useEffect(() => {
-    if (!navigator.geolocation) {
-      setGpsStatus('failed');
-      return;
-    }
-
-    let cancelled = false;
-    void getCurrentPosition({
-      enableHighAccuracy: false,
-      timeout: 3500,
-      maximumAge: 60_000,
-    })
-      .then((pos) => {
-        if (cancelled) return;
-        lastGpsCoordsRef.current = { lat: pos.coords.latitude, lng: pos.coords.longitude };
-        setGpsStatus('success');
-      })
-      .catch(() => {
-        if (!cancelled) setGpsStatus('idle');
-      });
-
-    return () => {
-      cancelled = true;
-    };
   }, []);
 
   const handleQRDetected = useCallback(async (qrToken: string) => {
@@ -378,26 +353,27 @@ const QRScanPage: React.FC = () => {
         <div className="mb-4 flex items-center justify-between gap-3">
           <div>
             <h1 className="page-title">Scan QR Code</h1>
-            <p className="text-ink-muted text-sm mt-1">Point your camera at the teacher&apos;s QR code</p>
+            <p className="text-ink-muted text-sm mt-1">Point your camera at the teacher's QR code</p>
           </div>
           <Link to="/dashboard" className="btn-secondary text-sm px-3 py-2 shrink-0">
             Back
           </Link>
         </div>
 
-        <div className="mb-4 flex items-center gap-2">
-          <div className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-medium ${
-            gpsStatus === 'success' ? 'bg-indigo-950/50 text-indigo-200 border border-indigo-500/30' :
-            gpsStatus === 'failed' ? 'bg-red-50 text-red-300 border border-red-200' :
-            gpsStatus === 'acquiring' ? 'bg-indigo-500/10 text-indigo-300 border border-indigo-500/30' :
-            'bg-slate-800 text-ink-muted border border-line'
-          }`}>
-            {gpsStatus === 'idle' && 'GPS Ready'}
-            {gpsStatus === 'acquiring' && 'Acquiring GPS...'}
-            {gpsStatus === 'success' && 'GPS Locked'}
-            {gpsStatus === 'failed' && 'GPS Unavailable'}
+        {gpsStatus !== 'idle' && (
+          <div className="mb-4 flex items-center gap-2">
+            <div className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-medium ${
+              gpsStatus === 'success' ? 'bg-indigo-950/50 text-indigo-200 border border-indigo-500/30' :
+              gpsStatus === 'failed' ? 'bg-red-50 text-red-300 border border-red-200' :
+              gpsStatus === 'acquiring' ? 'bg-indigo-500/10 text-indigo-300 border border-indigo-500/30' :
+              'bg-slate-800 text-ink-muted border border-line'
+            }`}>
+              {gpsStatus === 'acquiring' && 'Acquiring GPS...'}
+              {gpsStatus === 'success' && 'GPS Locked'}
+              {gpsStatus === 'failed' && 'GPS Unavailable'}
+            </div>
           </div>
-        </div>
+        )}
 
         {success && (
           <div className="mb-4 p-4 alert-success rounded-xl text-center">
@@ -412,69 +388,84 @@ const QRScanPage: React.FC = () => {
         )}
 
         <div className="surface-card p-4 sm:p-6">
-          {/* Video always mounted so ref exists before getUserMedia (fixes preview-not-ready race) */}
-          <div className={scanning ? 'relative' : 'sr-only'} aria-hidden={!scanning}>
-            <div className="relative rounded-xl overflow-hidden border border-line">
-              <video
-                ref={videoRef}
-                className="w-full h-64 sm:h-80 object-cover bg-black"
-                playsInline
-                muted
-              />
-              <canvas ref={canvasRef} className="hidden" />
-              <div className="absolute inset-0 pointer-events-none">
-                <div className="absolute top-4 left-4 w-10 h-10 border-t-2 border-l-2 border-indigo-400 rounded-tl-lg" />
-                <div className="absolute top-4 right-4 w-10 h-10 border-t-2 border-r-2 border-indigo-400 rounded-tr-lg" />
-                <div className="absolute bottom-4 left-4 w-10 h-10 border-b-2 border-l-2 border-indigo-400 rounded-bl-lg" />
-                <div className="absolute bottom-4 right-4 w-10 h-10 border-b-2 border-r-2 border-indigo-400 rounded-br-lg" />
-                <div className="absolute left-4 right-4 h-0.5 bg-indigo-400/80 animate-[scan_2s_ease-in-out_infinite]" style={{ top: '50%' }} />
-              </div>
-            </div>
-            <div className="flex items-center justify-center gap-2 mt-4">
-              <div className="w-2 h-2 bg-indigo-400 rounded-full animate-pulse" />
-              <p className="text-sm text-ink-muted">Scanning — hold steady</p>
-            </div>
-            <button type="button" onClick={stopCamera} className="mt-4 w-full btn-secondary py-2.5">
-              Cancel
-            </button>
-          </div>
-
-          {initializing && !success && (
+          {hasNoClass ? (
             <div className="text-center py-10">
-              <div className="inline-block w-8 h-8 border-2 border-indigo-400 border-t-transparent rounded-full animate-spin mb-3" />
-              <p className="text-ink-muted text-sm">Opening camera...</p>
+              <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-amber-500/20 border border-amber-500/30 mb-4">
+                <svg className="w-8 h-8 text-amber-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.34 16.5c-.77.833.192 2.5 1.732 2.5z" />
+                </svg>
+              </div>
+              <p className="text-ink font-semibold mb-2">No class assigned</p>
+              <p className="text-ink-muted text-sm max-w-xs mx-auto">
+                You have not been assigned to a class yet. Please contact your HOD or school admin to be placed in a class before you can scan QR codes for attendance.
+              </p>
             </div>
-          )}
+          ) : (
+            <>
+              <div className={scanning ? 'relative' : 'sr-only'} aria-hidden={!scanning}>
+                <div className="relative rounded-xl overflow-hidden border border-line">
+                  <video
+                    ref={videoRef}
+                    className="w-full h-64 sm:h-80 object-cover bg-black"
+                    playsInline
+                    muted
+                  />
+                  <canvas ref={canvasRef} className="hidden" />
+                  <div className="absolute inset-0 pointer-events-none">
+                    <div className="absolute top-4 left-4 w-10 h-10 border-t-2 border-l-2 border-indigo-400 rounded-tl-lg" />
+                    <div className="absolute top-4 right-4 w-10 h-10 border-t-2 border-r-2 border-indigo-400 rounded-tr-lg" />
+                    <div className="absolute bottom-4 left-4 w-10 h-10 border-b-2 border-l-2 border-indigo-400 rounded-bl-lg" />
+                    <div className="absolute bottom-4 right-4 w-10 h-10 border-b-2 border-r-2 border-indigo-400 rounded-br-lg" />
+                    <div className="absolute left-4 right-4 h-0.5 bg-indigo-400/80 animate-[scan_2s_ease-in-out_infinite]" style={{ top: '50%' }} />
+                  </div>
+                </div>
+                <div className="flex items-center justify-center gap-2 mt-4">
+                  <div className="w-2 h-2 bg-indigo-400 rounded-full animate-pulse" />
+                  <p className="text-sm text-ink-muted">Scanning — hold steady</p>
+                </div>
+                <button type="button" onClick={stopCamera} className="mt-4 w-full btn-secondary py-2.5">
+                  Cancel
+                </button>
+              </div>
 
-          {!initializing && !scanning && !success && (
-            <div className="text-center py-8">
-              <p className="text-ink mb-6">Camera is ready. Tap below if it did not start automatically.</p>
-              <button type="button" onClick={() => void startCamera()} className="btn-attendance py-3 px-8">
-                Start Scanner
-              </button>
-            </div>
-          )}
+              {initializing && !success && (
+                <div className="text-center py-10">
+                  <div className="inline-block w-8 h-8 border-2 border-indigo-400 border-t-transparent rounded-full animate-spin mb-3" />
+                  <p className="text-ink-muted text-sm">Opening camera...</p>
+                </div>
+              )}
 
-          {loading && (
-            <p className="text-center text-sm text-ink-muted mt-4">Submitting attendance...</p>
-          )}
+              {!initializing && !scanning && !success && (
+                <div className="text-center py-8">
+                  <p className="text-ink mb-6">Camera is ready. Tap below if it did not start automatically.</p>
+                  <button type="button" onClick={() => void startCamera()} className="btn-attendance py-3 px-8">
+                    Start Scanner
+                  </button>
+                </div>
+              )}
 
-          {success && (
-            <div className="text-center py-4">
-              <button
-                type="button"
-                onClick={() => {
-                  setSuccess(false);
-                  setResult(null);
-                  setError(null);
-                  setGpsStatus('idle');
-                  void startCamera();
-                }}
-                className="btn-attendance py-3 px-8"
-              >
-                Scan again
-              </button>
-            </div>
+              {loading && (
+                <p className="text-center text-sm text-ink-muted mt-4">Submitting attendance...</p>
+              )}
+
+              {success && (
+                <div className="text-center py-4">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSuccess(false);
+                      setResult(null);
+                      setError(null);
+                      setGpsStatus('idle');
+                      void startCamera();
+                    }}
+                    className="btn-attendance py-3 px-8"
+                  >
+                    Scan again
+                  </button>
+                </div>
+              )}
+            </>
           )}
         </div>
 

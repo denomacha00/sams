@@ -153,14 +153,24 @@ const TimetablePage: React.FC = () => {
 
   const fetchTeachers = async () => {
     try {
-      const { data } = await apiClient.get('/users', {
-        params: { roles: 'TEACHER,HOD' },
-      });
-      let users = normalizeUsersList(data);
-      if (user?.role === UserRole.HOD && user.id && !users.some((t) => t.id === user.id)) {
-        users = [{ id: user.id, fullName: user.fullName }, ...users];
+      // For HODs, only fetch teachers in their own department to avoid "FORBIDDEN" from backend
+      if (user?.role === UserRole.HOD && user.departmentId) {
+        const { data } = await apiClient.get(`/departments/${user.departmentId}/teachers`);
+        let users = normalizeUsersList(data);
+        if (user.id && !users.some((t) => t.id === user.id)) {
+          users = [{ id: user.id, fullName: user.fullName }, ...users];
+        }
+        setTeachers(sortTeachersForSelect(users, user?.id));
+      } else {
+        const { data } = await apiClient.get('/users', {
+          params: { roles: 'TEACHER,HOD' },
+        });
+        let users = normalizeUsersList(data);
+        if (user?.role === UserRole.HOD && user.id && !users.some((t) => t.id === user.id)) {
+          users = [{ id: user.id, fullName: user.fullName }, ...users];
+        }
+        setTeachers(sortTeachersForSelect(users, user?.id));
       }
-      setTeachers(sortTeachersForSelect(users, user?.id));
     } catch (err) {
       console.error('Failed to fetch teachers:', err);
       if (user?.role === UserRole.HOD && user.id) {

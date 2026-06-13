@@ -56,7 +56,7 @@ const syncSchema = z.object({
 const linkGenerateSchema = z.object({
   sessionId: z.string().min(1),
   expiryMinutes: z.number().int().min(1).max(60).default(5),
-  requireGps: z.boolean().default(true),
+  requireGps: z.boolean().default(false),
   gpsRadiusM: z.number().int().min(10).max(10000).default(100),
   maxUses: z.number().int().min(1).max(10000).nullable().optional(),
 });
