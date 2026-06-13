@@ -1,4 +1,4 @@
-export const SESSION_WINDOW_TOLERANCE_MINUTES = 15;
+export const SESSION_WINDOW_TOLERANCE_MINUTES = 0;
 
 export interface TimetableWindow {
   dayOfWeek: number;

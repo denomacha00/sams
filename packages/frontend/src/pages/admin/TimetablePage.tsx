@@ -256,7 +256,10 @@ const TimetablePage: React.FC = () => {
       setShowModal(false);
       fetchEntries();
     } catch (err: any) {
-      setError(err.response?.data?.error || err.response?.data?.message || 'Operation failed');
+      const backendMsg = err.response?.data?.error || err.response?.data?.message;
+      const statusCode = err.response?.status;
+      console.error('[Timetable] Submit error:', statusCode, err.response?.data || err.message);
+      setError(backendMsg || `Operation failed (${statusCode || 'network error'})`);
     } finally {
       setSubmitting(false);
     }
