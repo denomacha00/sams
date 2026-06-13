@@ -31,6 +31,8 @@ function minutesFromTime(time: string): number {
   return hours * 60 + minutes;
 }
 
+type EntryTimeStatus = 'now' | 'later' | 'past' | null;
+
 const TimetableViewPage: React.FC = () => {
   const user = useAuthStore((s) => s.user);
   const isSchoolAdmin = user?.role === UserRole.SCHOOL_ADMIN;
@@ -111,10 +113,22 @@ const TimetableViewPage: React.FC = () => {
     filteredEntries.filter((e) => e.dayOfWeek === day).sort((a, b) => a.startTime.localeCompare(b.startTime));
 
   const todayIndex = (new Date().getDay() + 6) % 7;
-  const isEntryNow = (entry: TimetableEntry) =>
-    entry.dayOfWeek === todayIndex &&
-    currentMinutes >= minutesFromTime(entry.startTime) &&
-    currentMinutes < minutesFromTime(entry.endTime);
+  const getEntryTimeStatus = (entry: TimetableEntry): EntryTimeStatus => {
+    if (entry.dayOfWeek !== todayIndex) return null;
+    const start = minutesFromTime(entry.startTime);
+    const end = minutesFromTime(entry.endTime);
+    if (currentMinutes >= start && currentMinutes < end) return 'now';
+    if (currentMinutes < start) return 'later';
+    return 'past';
+  };
+  const timeStatusLabel = (status: EntryTimeStatus) =>
+    status === 'now' ? 'Now' : status === 'later' ? 'Later' : status === 'past' ? 'Past' : '';
+  const timeStatusClass = (status: EntryTimeStatus) => {
+    if (status === 'now') return 'bg-red-500/20 text-red-300 border border-red-400/25';
+    if (status === 'later') return 'bg-indigo-500/20 text-brand border border-indigo-400/20';
+    if (status === 'past') return 'bg-slate-500/15 text-ink-subtle border border-white/10';
+    return '';
+  };
 
   const pageTitle = isSchoolAdmin ? 'School Timetable' : 'My Timetable';
 
@@ -235,13 +249,9 @@ const TimetableViewPage: React.FC = () => {
                       >
                         <div className="flex items-start justify-between gap-2">
                           <p className="text-sm font-medium text-ink">{entry.subject}</p>
-                          {entry.dayOfWeek === todayIndex && (
-                            <span className={`shrink-0 text-[10px] px-1.5 py-0.5 rounded-full ${
-                              isEntryNow(entry)
-                                ? 'bg-red-500/20 text-red-300 border border-red-400/25'
-                                : 'bg-indigo-500/20 text-brand'
-                            }`}>
-                              {isEntryNow(entry) ? 'Now' : 'Today'}
+                          {getEntryTimeStatus(entry) && (
+                            <span className={`shrink-0 text-[10px] px-1.5 py-0.5 rounded-full ${timeStatusClass(getEntryTimeStatus(entry))}`}>
+                              {timeStatusLabel(getEntryTimeStatus(entry))}
                             </span>
                           )}
                         </div>
@@ -282,13 +292,9 @@ const TimetableViewPage: React.FC = () => {
                       >
                         <td className="px-6 py-4 text-sm text-ink">
                           {DAYS[entry.dayOfWeek]}
-                          {entry.dayOfWeek === todayIndex && (
-                            <span className={`ml-2 text-[10px] px-1.5 py-0.5 rounded-full ${
-                              isEntryNow(entry)
-                                ? 'bg-red-500/20 text-red-300 border border-red-400/25'
-                                : 'bg-indigo-500/20 text-brand'
-                            }`}>
-                              {isEntryNow(entry) ? 'Now' : 'Today'}
+                          {getEntryTimeStatus(entry) && (
+                            <span className={`ml-2 text-[10px] px-1.5 py-0.5 rounded-full ${timeStatusClass(getEntryTimeStatus(entry))}`}>
+                              {timeStatusLabel(getEntryTimeStatus(entry))}
                             </span>
                           )}
                         </td>

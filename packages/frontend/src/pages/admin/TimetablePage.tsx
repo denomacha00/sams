@@ -53,6 +53,8 @@ function minutesFromTime(time: string): number {
   return hours * 60 + minutes;
 }
 
+type EntryTimeStatus = 'now' | 'later' | 'past' | null;
+
 function normalizeUsersList(data: unknown): { id: string; fullName: string }[] {
   if (Array.isArray(data)) return data;
   if (data && typeof data === 'object' && Array.isArray((data as { users?: unknown }).users)) {
@@ -259,10 +261,22 @@ const TimetablePage: React.FC = () => {
 
   const getEntriesForDay = (day: number) => filteredEntries.filter((e) => e.dayOfWeek === day);
   const todayIndex = (new Date().getDay() + 6) % 7;
-  const isEntryNow = (entry: TimetableEntry) =>
-    entry.dayOfWeek === todayIndex &&
-    currentMinutes >= minutesFromTime(entry.startTime) &&
-    currentMinutes < minutesFromTime(entry.endTime);
+  const getEntryTimeStatus = (entry: TimetableEntry): EntryTimeStatus => {
+    if (entry.dayOfWeek !== todayIndex) return null;
+    const start = minutesFromTime(entry.startTime);
+    const end = minutesFromTime(entry.endTime);
+    if (currentMinutes >= start && currentMinutes < end) return 'now';
+    if (currentMinutes < start) return 'later';
+    return 'past';
+  };
+  const timeStatusLabel = (status: EntryTimeStatus) =>
+    status === 'now' ? 'Now' : status === 'later' ? 'Later' : status === 'past' ? 'Past' : '';
+  const timeStatusClass = (status: EntryTimeStatus) => {
+    if (status === 'now') return 'bg-red-500/20 text-red-300 border border-red-400/25';
+    if (status === 'later') return 'bg-indigo-500/20 text-brand border border-indigo-400/20';
+    if (status === 'past') return 'bg-slate-500/15 text-ink-subtle border border-white/10';
+    return '';
+  };
   const effectiveDepartmentId = isHOD ? (user?.departmentId ?? '') : formData.departmentId;
   const modalClassOptions = effectiveDepartmentId
     ? classes.filter((c) => c.departmentId === effectiveDepartmentId)
@@ -355,13 +369,9 @@ const TimetablePage: React.FC = () => {
                         <tr key={entry.id} className="border-b border-white/5 hover:bg-white/5 transition-colors">
                           <td className="px-6 py-4 text-sm text-white">
                             {DAYS[entry.dayOfWeek]}
-                            {entry.dayOfWeek === todayIndex && (
-                              <span className={`ml-2 text-[10px] px-1.5 py-0.5 rounded-full ${
-                                isEntryNow(entry)
-                                  ? 'bg-red-500/20 text-red-300 border border-red-400/25'
-                                  : 'bg-indigo-500/20 text-brand'
-                              }`}>
-                                {isEntryNow(entry) ? 'Now' : 'Today'}
+                            {getEntryTimeStatus(entry) && (
+                              <span className={`ml-2 text-[10px] px-1.5 py-0.5 rounded-full ${timeStatusClass(getEntryTimeStatus(entry))}`}>
+                                {timeStatusLabel(getEntryTimeStatus(entry))}
                               </span>
                             )}
                           </td>
@@ -423,13 +433,9 @@ const TimetablePage: React.FC = () => {
                         >
                           <div className="flex items-start justify-between gap-2">
                             <p className="text-sm font-medium text-ink">{entry.subject}</p>
-                            {entry.dayOfWeek === todayIndex && (
-                              <span className={`shrink-0 text-[10px] px-1.5 py-0.5 rounded-full ${
-                                isEntryNow(entry)
-                                  ? 'bg-red-500/20 text-red-300 border border-red-400/25'
-                                  : 'bg-indigo-500/20 text-brand'
-                              }`}>
-                                {isEntryNow(entry) ? 'Now' : 'Today'}
+                            {getEntryTimeStatus(entry) && (
+                              <span className={`shrink-0 text-[10px] px-1.5 py-0.5 rounded-full ${timeStatusClass(getEntryTimeStatus(entry))}`}>
+                                {timeStatusLabel(getEntryTimeStatus(entry))}
                               </span>
                             )}
                           </div>
