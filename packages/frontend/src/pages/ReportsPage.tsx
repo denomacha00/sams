@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import apiClient from '../services/apiClient';
 import { useAuthStore } from '../store/authStore';
 import { UserRole } from '@sams/shared';
@@ -6,6 +6,7 @@ import { UserRole } from '@sams/shared';
 interface AttendanceRecordDetail {
   sessionId: string;
   recordId?: string | null;
+  studentName?: string;
   date: string;
   subject: string;
   className?: string | null;
@@ -22,6 +23,8 @@ interface StudentEntry {
   studentId: string;
   studentName: string;
   fullName?: string;
+  className?: string | null;
+  departmentName?: string | null;
   attendancePercentage: number;
   totalExpected: number;
   totalPresent: number;
@@ -30,6 +33,21 @@ interface StudentEntry {
   totalAbsent: number;
   records?: AttendanceRecordDetail[];
 }
+
+interface ReportClassOption {
+  id: string;
+  name: string;
+  departmentId?: string | null;
+  departmentName?: string | null;
+}
+
+interface ReportDepartmentOption {
+  id: string;
+  name: string;
+  classes?: ReportClassOption[];
+}
+
+type ReportScope = 'student' | 'class' | 'department' | 'school';
 
 interface ReportData {
   // Student report fields
@@ -55,6 +73,12 @@ interface ReportData {
 
 const ReportsPage: React.FC = () => {
   const user = useAuthStore((s) => s.user);
+  const initialScope: ReportScope =
+    user?.role === UserRole.STUDENT ? 'student' :
+    user?.role === UserRole.TEACHER ? 'class' :
+    user?.role === UserRole.HOD ? 'department' :
+    user?.role === UserRole.SCHOOL_ADMIN ? 'school' :
+    'student';
   const [dateFrom, setDateFrom] = useState(() => {
     const d = new Date();
     d.setMonth(d.getMonth() - 1);
@@ -69,16 +93,36 @@ const ReportsPage: React.FC = () => {
   const [studentDetail, setStudentDetail] = useState<ReportData | null>(null);
   const [studentDetailLoading, setStudentDetailLoading] = useState(false);
   const [studentDetailError, setStudentDetailError] = useState<string | null>(null);
+  const [reportScope, setReportScope] = useState<ReportScope>(initialScope);
+  const [reportDepartments, setReportDepartments] = useState<ReportDepartmentOption[]>([]);
+  const [reportClasses, setReportClasses] = useState<ReportClassOption[]>([]);
+  const [selectedDepartmentId, setSelectedDepartmentId] = useState('');
+  const [selectedClassId, setSelectedClassId] = useState('');
+  const [scopeLoading, setScopeLoading] = useState(true);
+
+  const selectedDepartment = reportDepartments.find((dept) => dept.id === selectedDepartmentId);
+  const selectableClasses = useMemo(() => {
+    if (user?.role === UserRole.SCHOOL_ADMIN) {
+      if (selectedDepartmentId) {
+        return selectedDepartment?.classes ?? [];
+      }
+      return [];
+    }
+    return reportClasses;
+  }, [reportClasses, reportDepartments, selectedDepartment, selectedDepartmentId, user?.role]);
 
   const getReportEndpoint = (): string | null => {
     switch (user?.role) {
       case UserRole.STUDENT:
         return user.id ? `/reports/student/${user.id}` : null;
       case UserRole.TEACHER:
-        return user.classId ? `/reports/class/${user.classId}` : null;
+        return selectedClassId ? `/reports/class/${selectedClassId}` : null;
       case UserRole.HOD:
+        if (reportScope === 'class') return selectedClassId ? `/reports/class/${selectedClassId}` : null;
         return user.departmentId ? `/reports/department/${user.departmentId}` : null;
       case UserRole.SCHOOL_ADMIN:
+        if (reportScope === 'class') return selectedClassId ? `/reports/class/${selectedClassId}` : null;
+        if (reportScope === 'department') return selectedDepartmentId ? `/reports/department/${selectedDepartmentId}` : null;
         return '/reports/school';
       default:
         return user?.id ? `/reports/student/${user.id}` : null;
@@ -90,10 +134,13 @@ const ReportsPage: React.FC = () => {
       case UserRole.STUDENT:
         return `student:${user.id}`;
       case UserRole.TEACHER:
-        return user.classId ? `class:${user.classId}` : '';
+        return selectedClassId ? `class:${selectedClassId}` : '';
       case UserRole.HOD:
+        if (reportScope === 'class') return selectedClassId ? `class:${selectedClassId}` : '';
         return user.departmentId ? `department:${user.departmentId}` : '';
       case UserRole.SCHOOL_ADMIN:
+        if (reportScope === 'class') return selectedClassId ? `class:${selectedClassId}` : '';
+        if (reportScope === 'department') return selectedDepartmentId ? `department:${selectedDepartmentId}` : '';
         return 'school';
       default:
         return `student:${user?.id}`;
@@ -105,11 +152,11 @@ const ReportsPage: React.FC = () => {
       case UserRole.STUDENT:
         return 'Personal Report';
       case UserRole.TEACHER:
-        return user?.classId ? 'Class Report' : 'Class assignment required';
+        return selectedClassId ? 'Class Session Report' : 'Teaching class required';
       case UserRole.HOD:
-        return 'Department Report';
+        return reportScope === 'class' ? 'Department Class Report' : 'Department Report';
       case UserRole.SCHOOL_ADMIN:
-        return 'School Report';
+        return reportScope === 'class' ? 'Class Report' : reportScope === 'department' ? 'Department Report' : 'School Report';
       default:
         return 'Report';
     }
@@ -119,6 +166,7 @@ const ReportsPage: React.FC = () => {
     (records ?? []).map((row) => ({
       sessionId: row.sessionId,
       recordId: row.recordId ?? null,
+      studentName: row.studentName,
       date: row.date,
       subject: row.subject,
       className: row.className ?? null,
@@ -130,6 +178,81 @@ const ReportsPage: React.FC = () => {
       sessionEndedAt: row.sessionEndedAt ?? null,
       note: row.note ?? null,
     }));
+
+  const normalizeClassOption = (row: any, departmentName?: string | null): ReportClassOption => ({
+    id: row.id,
+    name: row.name,
+    departmentId: row.departmentId ?? null,
+    departmentName: row.departmentName ?? row.department?.name ?? departmentName ?? null,
+  });
+
+  const loadReportScopeOptions = async () => {
+    if (!user) {
+      setScopeLoading(false);
+      return;
+    }
+
+    setScopeLoading(true);
+    try {
+      if (user.role === UserRole.STUDENT) {
+        setReportScope('student');
+        return;
+      }
+
+      if (user.role === UserRole.TEACHER) {
+        const { data } = await apiClient.get('/users/teaching-classes');
+        const classes = (Array.isArray(data) ? data : []).map((row: any) => normalizeClassOption(row));
+        setReportScope('class');
+        setReportClasses(classes);
+        setSelectedClassId((current) =>
+          current && classes.some((cls) => cls.id === current)
+            ? current
+            : classes[0]?.id ?? user.classId ?? '',
+        );
+        return;
+      }
+
+      if (user.role === UserRole.HOD) {
+        setReportScope((current) => (current === 'class' ? 'class' : 'department'));
+        setSelectedDepartmentId(user.departmentId ?? '');
+        if (user.departmentId) {
+          const { data } = await apiClient.get(`/departments/${user.departmentId}/classes`);
+          const classes = (Array.isArray(data) ? data : []).map((row: any) =>
+            normalizeClassOption(row, row.departmentName ?? null),
+          );
+          setReportClasses(classes);
+          setSelectedClassId((current) =>
+            current && classes.some((cls) => cls.id === current) ? current : classes[0]?.id ?? '',
+          );
+        }
+        return;
+      }
+
+      if (user.role === UserRole.SCHOOL_ADMIN) {
+        setReportScope((current) => (['school', 'department', 'class'].includes(current) ? current : 'school'));
+        const { data } = await apiClient.get('/departments');
+        const departments: ReportDepartmentOption[] = (Array.isArray(data) ? data : []).map((dept: any) => ({
+          id: dept.id,
+          name: dept.name,
+          classes: (dept.classes ?? []).map((cls: any) => normalizeClassOption(cls, dept.name)),
+        }));
+        setReportDepartments(departments);
+        setSelectedDepartmentId((current) =>
+          current && departments.some((dept) => dept.id === current) ? current : departments[0]?.id ?? '',
+        );
+        const firstClass = departments.flatMap((dept) => dept.classes ?? [])[0];
+        setSelectedClassId((current) =>
+          current && departments.some((dept) => (dept.classes ?? []).some((cls) => cls.id === current))
+            ? current
+            : firstClass?.id ?? '',
+        );
+      }
+    } catch (err: any) {
+      setError(err.response?.data?.error || err.response?.data?.message || 'Failed to load report filters');
+    } finally {
+      setScopeLoading(false);
+    }
+  };
 
   /** Normalise the various backend response shapes into a single display shape */
   const normaliseReport = (data: any): ReportData => {
@@ -153,6 +276,7 @@ const ReportsPage: React.FC = () => {
         studentId: s.studentId,
         studentName: s.studentName,
         fullName: s.studentName,
+        className: data.className,
         attendancePercentage: s.attendancePercentage ?? 0,
         totalExpected: s.totalExpected ?? 0,
         totalPresent: s.totalPresent ?? 0,
@@ -195,6 +319,8 @@ const ReportsPage: React.FC = () => {
           studentId: s.studentId,
           studentName: s.studentName,
           fullName: s.studentName,
+          className: cls.className,
+          departmentName: data.departmentName,
           attendancePercentage: s.attendancePercentage ?? 0,
           totalExpected: s.totalExpected ?? 0,
           totalPresent: s.totalPresent ?? 0,
@@ -242,6 +368,8 @@ const ReportsPage: React.FC = () => {
             studentId: s.studentId,
             studentName: s.studentName,
             fullName: s.studentName,
+            className: cls.className,
+            departmentName: dept.departmentName,
             attendancePercentage: s.attendancePercentage ?? 0,
             totalExpected: s.totalExpected ?? 0,
             totalPresent: s.totalPresent ?? 0,
@@ -311,8 +439,12 @@ const ReportsPage: React.FC = () => {
   };
 
   useEffect(() => {
-    fetchReport();
-  }, []);
+    void loadReportScopeOptions();
+  }, [user?.id, user?.role, user?.classId, user?.departmentId]);
+
+  useEffect(() => {
+    if (!scopeLoading) void fetchReport();
+  }, [scopeLoading]);
 
   const handleExport = async (format: 'pdf' | 'excel') => {
     const reportId = getExportReportId();
@@ -348,7 +480,21 @@ const ReportsPage: React.FC = () => {
   const displayExcused = report?._displayExcused ?? report?.totalExcused ?? 0;
   const displaySessions = report?._displaySessions ?? report?.totalExpected ?? 0;
   const displayAbsent = report?._displayAbsent ?? report?.totalAbsent ?? 0;
-  const dailyEvidence = studentDetail?.records ?? report?.records ?? [];
+  const classSessionEvidence: AttendanceRecordDetail[] =
+    !selectedStudent && report?.students
+      ? report.students.flatMap((student) =>
+          (student.records ?? []).map((row) => ({
+            ...row,
+            studentName: student.studentName || student.fullName,
+            className: row.className ?? student.className ?? null,
+          })),
+        )
+      : [];
+  const dailyEvidence = studentDetail?.records ?? report?.records ?? classSessionEvidence;
+  const showStudentEvidenceColumn = !selectedStudent && dailyEvidence.some((row) => !!row.studentName);
+  const canGenerateReport = !scopeLoading && !!getReportEndpoint();
+  const selectedClassName = selectableClasses.find((cls) => cls.id === selectedClassId)?.name;
+  const showClassBreakdownColumn = report?.students?.some((student) => student.className || student.departmentName) ?? false;
 
   const formatDateTime = (value?: string | null): string => {
     if (!value) return 'Not marked';
@@ -433,14 +579,122 @@ const ReportsPage: React.FC = () => {
                 className="w-full input-field focus:outline-none focus:ring-2 focus:ring-indigo-500/50 transition-all duration-200 "
               />
             </div>
+            {user?.role === UserRole.SCHOOL_ADMIN && (
+              <div className="flex-1">
+                <label htmlFor="reportScope" className="form-label">
+                  Report Level
+                </label>
+                <select
+                  id="reportScope"
+                  value={reportScope}
+                  onChange={(e) => {
+                    const next = e.target.value as ReportScope;
+                    setReportScope(next);
+                    setReport(null);
+                    setSelectedStudent(null);
+                    if (next === 'school') {
+                      setSelectedClassId('');
+                    }
+                  }}
+                  className="w-full input-field focus:outline-none focus:ring-2 focus:ring-indigo-500/50 transition-all duration-200"
+                >
+                  <option value="school" className="bg-slate-800">Whole school</option>
+                  <option value="department" className="bg-slate-800">Department</option>
+                  <option value="class" className="bg-slate-800">Specific class/session</option>
+                </select>
+              </div>
+            )}
+            {user?.role === UserRole.HOD && (
+              <div className="flex-1">
+                <label htmlFor="hodReportScope" className="form-label">
+                  Report Level
+                </label>
+                <select
+                  id="hodReportScope"
+                  value={reportScope === 'class' ? 'class' : 'department'}
+                  onChange={(e) => {
+                    setReportScope(e.target.value as ReportScope);
+                    setReport(null);
+                    setSelectedStudent(null);
+                  }}
+                  className="w-full input-field focus:outline-none focus:ring-2 focus:ring-indigo-500/50 transition-all duration-200"
+                >
+                  <option value="department" className="bg-slate-800">My department</option>
+                  <option value="class" className="bg-slate-800">Specific class/session</option>
+                </select>
+              </div>
+            )}
+            {user?.role === UserRole.SCHOOL_ADMIN && reportScope !== 'school' && (
+              <div className="flex-1">
+                <label htmlFor="reportDepartment" className="form-label">
+                  Department
+                </label>
+                <select
+                  id="reportDepartment"
+                  value={selectedDepartmentId}
+                  onChange={(e) => {
+                    const nextDepartmentId = e.target.value;
+                    const nextDepartment = reportDepartments.find((dept) => dept.id === nextDepartmentId);
+                    setSelectedDepartmentId(nextDepartmentId);
+                    setSelectedClassId(nextDepartment?.classes?.[0]?.id ?? '');
+                    setReport(null);
+                    setSelectedStudent(null);
+                  }}
+                  disabled={scopeLoading}
+                  className="w-full input-field focus:outline-none focus:ring-2 focus:ring-indigo-500/50 transition-all duration-200 disabled:opacity-60"
+                >
+                  <option value="" className="bg-slate-800">Select department</option>
+                  {reportDepartments.map((dept) => (
+                    <option key={dept.id} value={dept.id} className="bg-slate-800">{dept.name}</option>
+                  ))}
+                </select>
+              </div>
+            )}
+            {((user?.role === UserRole.TEACHER) ||
+              (user?.role === UserRole.HOD && reportScope === 'class') ||
+              (user?.role === UserRole.SCHOOL_ADMIN && reportScope === 'class')) && (
+              <div className="flex-1">
+                <label htmlFor="reportClass" className="form-label">
+                  Class / Session
+                </label>
+                <select
+                  id="reportClass"
+                  value={selectedClassId}
+                  onChange={(e) => {
+                    setSelectedClassId(e.target.value);
+                    setReport(null);
+                    setSelectedStudent(null);
+                  }}
+                  disabled={scopeLoading || (user?.role === UserRole.SCHOOL_ADMIN && !selectedDepartmentId)}
+                  className="w-full input-field focus:outline-none focus:ring-2 focus:ring-indigo-500/50 transition-all duration-200 disabled:opacity-60"
+                >
+                  <option value="" className="bg-slate-800">Select class</option>
+                  {selectableClasses.map((cls) => (
+                    <option key={cls.id} value={cls.id} className="bg-slate-800">
+                      {cls.name}{cls.departmentName ? ` - ${cls.departmentName}` : ''}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
             <button
               onClick={fetchReport}
-              disabled={loading}
+              disabled={loading || !canGenerateReport}
               className="bg-gradient-to-r from-indigo-600 to-indigo-700 text-white font-semibold py-3 px-6 rounded-xl shadow-lg shadow-indigo-500/25 hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50 transition-all duration-200"
             >
-              {loading ? 'Loading...' : 'Generate'}
+              {loading || scopeLoading ? 'Loading...' : 'Generate'}
             </button>
           </div>
+          {!scopeLoading && !canGenerateReport && (
+            <p className="mt-3 text-sm text-amber-300">
+              Select a valid {reportScope === 'class' ? 'class' : 'department'} before generating this report.
+            </p>
+          )}
+          {reportScope === 'class' && selectedClassName && (
+            <p className="mt-3 text-sm text-ink-subtle">
+              Showing class/session evidence for {selectedClassName}. Pick one day above to see that day&apos;s lesson rows.
+            </p>
+          )}
         </div>
 
         {/* Stats cards */}
@@ -503,6 +757,9 @@ const ReportsPage: React.FC = () => {
                     <thead>
                       <tr className="border-b border-white/10">
                         <th className="text-left text-xs font-semibold text-ink-muted uppercase tracking-wider py-3 px-2">Student</th>
+                        {showClassBreakdownColumn && (
+                          <th className="text-left text-xs font-semibold text-ink-muted uppercase tracking-wider py-3 px-2">Class</th>
+                        )}
                         <th className="text-right text-xs font-semibold text-ink-muted uppercase tracking-wider py-3 px-2">Expected</th>
                         <th className="text-right text-xs font-semibold text-ink-muted uppercase tracking-wider py-3 px-2">Present</th>
                         <th className="text-right text-xs font-semibold text-ink-muted uppercase tracking-wider py-3 px-2">Late</th>
@@ -524,6 +781,14 @@ const ReportsPage: React.FC = () => {
                               <span className="font-medium text-ink text-sm">{s.studentName || s.fullName}</span>
                             </div>
                           </td>
+                          {showClassBreakdownColumn && (
+                            <td className="py-3 px-2">
+                              <p className="text-sm font-medium text-ink-muted">{s.className ?? '-'}</p>
+                              {s.departmentName && (
+                                <p className="text-xs text-ink-subtle">{s.departmentName}</p>
+                              )}
+                            </td>
+                          )}
                           <td className="py-3 px-2 text-right text-sm text-ink-muted">{s.totalExpected}</td>
                           <td className="py-3 px-2 text-right text-sm text-emerald-300">{s.totalPresent}</td>
                           <td className="py-3 px-2 text-right text-sm text-amber-300">{s.totalLate}</td>
@@ -609,7 +874,11 @@ const ReportsPage: React.FC = () => {
                     <table className="w-full">
                       <thead>
                         <tr className="border-b border-white/10">
+                          {showStudentEvidenceColumn && (
+                            <th className="py-3 px-2 text-left text-xs font-semibold uppercase tracking-wider text-ink-muted">Student</th>
+                          )}
                           <th className="py-3 px-2 text-left text-xs font-semibold uppercase tracking-wider text-ink-muted">Date</th>
+                          <th className="py-3 px-2 text-left text-xs font-semibold uppercase tracking-wider text-ink-muted">Session</th>
                           <th className="py-3 px-2 text-left text-xs font-semibold uppercase tracking-wider text-ink-muted">Lesson</th>
                           <th className="py-3 px-2 text-left text-xs font-semibold uppercase tracking-wider text-ink-muted">Teacher</th>
                           <th className="py-3 px-2 text-right text-xs font-semibold uppercase tracking-wider text-ink-muted">Status</th>
@@ -619,8 +888,12 @@ const ReportsPage: React.FC = () => {
                       </thead>
                       <tbody className="divide-y divide-white/5">
                         {dailyEvidence.map((row) => (
-                          <tr key={`${row.sessionId}-${row.recordId ?? 'absent'}`} className="hover:bg-white/5">
+                          <tr key={`${row.sessionId}-${row.studentName ?? selectedStudent?.studentId ?? 'student'}-${row.recordId ?? 'absent'}`} className="hover:bg-white/5">
+                            {showStudentEvidenceColumn && (
+                              <td className="py-3 px-2 text-sm font-medium text-ink">{row.studentName ?? '-'}</td>
+                            )}
                             <td className="py-3 px-2 text-sm text-ink-muted">{row.date}</td>
+                            <td className="py-3 px-2 text-sm text-ink-muted">{formatDateTime(row.sessionStartedAt)}</td>
                             <td className="py-3 px-2">
                               <p className="text-sm font-medium text-ink">{row.subject}</p>
                               <p className="text-xs text-ink-subtle">{row.className ?? 'Class not set'}</p>

@@ -25,6 +25,12 @@ interface Department {
 
 const DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
 
+function minutesFromTime(time: string): number {
+  const [hours, minutes] = time.split(':').map((part) => Number(part));
+  if (!Number.isFinite(hours) || !Number.isFinite(minutes)) return 0;
+  return hours * 60 + minutes;
+}
+
 const TimetableViewPage: React.FC = () => {
   const user = useAuthStore((s) => s.user);
   const isSchoolAdmin = user?.role === UserRole.SCHOOL_ADMIN;
@@ -35,6 +41,18 @@ const TimetableViewPage: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [viewMode, setViewMode] = useState<'table' | 'grid'>('table');
   const [selectedEntryId, setSelectedEntryId] = useState<string | null>(null);
+  const [currentMinutes, setCurrentMinutes] = useState(() => {
+    const now = new Date();
+    return now.getHours() * 60 + now.getMinutes();
+  });
+
+  useEffect(() => {
+    const timer = window.setInterval(() => {
+      const now = new Date();
+      setCurrentMinutes(now.getHours() * 60 + now.getMinutes());
+    }, 30_000);
+    return () => window.clearInterval(timer);
+  }, []);
 
   useEffect(() => {
     const fetchEntries = async () => {
@@ -93,6 +111,10 @@ const TimetableViewPage: React.FC = () => {
     filteredEntries.filter((e) => e.dayOfWeek === day).sort((a, b) => a.startTime.localeCompare(b.startTime));
 
   const todayIndex = (new Date().getDay() + 6) % 7;
+  const isEntryNow = (entry: TimetableEntry) =>
+    entry.dayOfWeek === todayIndex &&
+    currentMinutes >= minutesFromTime(entry.startTime) &&
+    currentMinutes < minutesFromTime(entry.endTime);
 
   const pageTitle = isSchoolAdmin ? 'School Timetable' : 'My Timetable';
 
@@ -211,7 +233,18 @@ const TimetableViewPage: React.FC = () => {
                           selectedEntryId === entry.id ? 'timetable-slot--selected' : ''
                         }`}
                       >
-                        <p className="text-sm font-medium text-ink">{entry.subject}</p>
+                        <div className="flex items-start justify-between gap-2">
+                          <p className="text-sm font-medium text-ink">{entry.subject}</p>
+                          {entry.dayOfWeek === todayIndex && (
+                            <span className={`shrink-0 text-[10px] px-1.5 py-0.5 rounded-full ${
+                              isEntryNow(entry)
+                                ? 'bg-red-500/20 text-red-300 border border-red-400/25'
+                                : 'bg-indigo-500/20 text-brand'
+                            }`}>
+                              {isEntryNow(entry) ? 'Now' : 'Today'}
+                            </span>
+                          )}
+                        </div>
                         <p className="text-brand text-xs mt-1 font-mono">{entry.startTime} - {entry.endTime}</p>
                         {entry.class?.name && <p className="text-ink-muted text-xs mt-0.5">{entry.class.name}</p>}
                         {entry.teacher?.fullName && <p className="text-ink-subtle text-xs">{entry.teacher.fullName}</p>}
@@ -250,7 +283,13 @@ const TimetableViewPage: React.FC = () => {
                         <td className="px-6 py-4 text-sm text-ink">
                           {DAYS[entry.dayOfWeek]}
                           {entry.dayOfWeek === todayIndex && (
-                            <span className="ml-2 text-[10px] px-1.5 py-0.5 rounded-full bg-indigo-500/20 text-brand">Today</span>
+                            <span className={`ml-2 text-[10px] px-1.5 py-0.5 rounded-full ${
+                              isEntryNow(entry)
+                                ? 'bg-red-500/20 text-red-300 border border-red-400/25'
+                                : 'bg-indigo-500/20 text-brand'
+                            }`}>
+                              {isEntryNow(entry) ? 'Now' : 'Today'}
+                            </span>
                           )}
                         </td>
                         <td className="px-6 py-4 text-sm text-ink font-medium">{entry.subject}</td>

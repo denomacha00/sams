@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import apiClient from '../services/apiClient';
 import { getSuperAdminApiError } from '../utils/apiError';
+import AttachmentImageEditor from '../components/AttachmentImageEditor';
 
 interface School {
   id: string;
@@ -124,6 +125,7 @@ const NotificationsPage: React.FC = () => {
   const [title, setTitle] = useState('');
   const [message, setMessage] = useState('');
   const [selectedAttachments, setSelectedAttachments] = useState<File[]>([]);
+  const [editingAttachmentIndex, setEditingAttachmentIndex] = useState<number | null>(null);
   const [sending, setSending] = useState(false);
 
   const [editing, setEditing] = useState<SentNotification | null>(null);
@@ -267,6 +269,13 @@ const NotificationsPage: React.FC = () => {
 
   const removeAttachment = (index: number) => {
     setSelectedAttachments((prev) => prev.filter((_, i) => i !== index));
+  };
+
+  const saveEditedAttachment = (file: File) => {
+    setSelectedAttachments((prev) =>
+      prev.map((item, index) => (index === editingAttachmentIndex ? file : item)),
+    );
+    setEditingAttachmentIndex(null);
   };
 
   const handleSend = async (event: React.FormEvent) => {
@@ -482,6 +491,15 @@ const NotificationsPage: React.FC = () => {
                       <span key={`${file.name}-${file.size}-${index}`} className="inline-flex max-w-full items-center gap-2 rounded-lg border border-gray-700 bg-gray-800 px-2.5 py-1.5 text-xs text-gray-300">
                         <span className="max-w-[14rem] truncate">{file.name}</span>
                         <span className="text-gray-500">{formatFileSize(file.size)}</span>
+                        {file.type.startsWith('image/') && (
+                          <button
+                            type="button"
+                            onClick={() => setEditingAttachmentIndex(index)}
+                            className="rounded px-1.5 py-0.5 text-amber-200 hover:bg-amber-500/10 hover:text-amber-100"
+                          >
+                            Edit image
+                          </button>
+                        )}
                         <button type="button" onClick={() => removeAttachment(index)} className="rounded px-1 text-gray-500 hover:bg-red-950/50 hover:text-red-300">
                           x
                         </button>
@@ -749,6 +767,14 @@ const NotificationsPage: React.FC = () => {
             </div>
           </div>
         </div>
+      )}
+
+      {editingAttachmentIndex !== null && selectedAttachments[editingAttachmentIndex] && (
+        <AttachmentImageEditor
+          file={selectedAttachments[editingAttachmentIndex]}
+          onCancel={() => setEditingAttachmentIndex(null)}
+          onSave={saveEditedAttachment}
+        />
       )}
     </div>
   );

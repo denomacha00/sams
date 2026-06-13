@@ -47,6 +47,12 @@ const emptyForm: EntryFormData = {
 
 const DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
 
+function minutesFromTime(time: string): number {
+  const [hours, minutes] = time.split(':').map((part) => Number(part));
+  if (!Number.isFinite(hours) || !Number.isFinite(minutes)) return 0;
+  return hours * 60 + minutes;
+}
+
 function normalizeUsersList(data: unknown): { id: string; fullName: string }[] {
   if (Array.isArray(data)) return data;
   if (data && typeof data === 'object' && Array.isArray((data as { users?: unknown }).users)) {
@@ -88,6 +94,18 @@ const TimetablePage: React.FC = () => {
   const [departments, setDepartments] = useState<{id: string; name: string; classes?: {id: string; name: string; departmentId?: string}[]}[]>([]);
   const [classes, setClasses] = useState<SchoolClass[]>([]);
   const [teachers, setTeachers] = useState<{id: string; fullName: string}[]>([]);
+  const [currentMinutes, setCurrentMinutes] = useState(() => {
+    const now = new Date();
+    return now.getHours() * 60 + now.getMinutes();
+  });
+
+  useEffect(() => {
+    const timer = window.setInterval(() => {
+      const now = new Date();
+      setCurrentMinutes(now.getHours() * 60 + now.getMinutes());
+    }, 30_000);
+    return () => window.clearInterval(timer);
+  }, []);
 
   useEffect(() => {
     if (user?.role === UserRole.SCHOOL_ADMIN) {
@@ -240,6 +258,11 @@ const TimetablePage: React.FC = () => {
   };
 
   const getEntriesForDay = (day: number) => filteredEntries.filter((e) => e.dayOfWeek === day);
+  const todayIndex = (new Date().getDay() + 6) % 7;
+  const isEntryNow = (entry: TimetableEntry) =>
+    entry.dayOfWeek === todayIndex &&
+    currentMinutes >= minutesFromTime(entry.startTime) &&
+    currentMinutes < minutesFromTime(entry.endTime);
   const effectiveDepartmentId = isHOD ? (user?.departmentId ?? '') : formData.departmentId;
   const modalClassOptions = effectiveDepartmentId
     ? classes.filter((c) => c.departmentId === effectiveDepartmentId)
@@ -330,7 +353,18 @@ const TimetablePage: React.FC = () => {
                       .sort((a, b) => a.dayOfWeek - b.dayOfWeek || a.startTime.localeCompare(b.startTime))
                       .map((entry) => (
                         <tr key={entry.id} className="border-b border-white/5 hover:bg-white/5 transition-colors">
-                          <td className="px-6 py-4 text-sm text-white">{DAYS[entry.dayOfWeek]}</td>
+                          <td className="px-6 py-4 text-sm text-white">
+                            {DAYS[entry.dayOfWeek]}
+                            {entry.dayOfWeek === todayIndex && (
+                              <span className={`ml-2 text-[10px] px-1.5 py-0.5 rounded-full ${
+                                isEntryNow(entry)
+                                  ? 'bg-red-500/20 text-red-300 border border-red-400/25'
+                                  : 'bg-indigo-500/20 text-brand'
+                              }`}>
+                                {isEntryNow(entry) ? 'Now' : 'Today'}
+                              </span>
+                            )}
+                          </td>
                           <td className="px-6 py-4 text-sm text-ink font-medium">{entry.subject}</td>
                           <td className="px-6 py-4 text-sm text-ink-muted">{entry.class?.name || classes.find((c) => c.id === entry.classId)?.name || 'Unknown class'}</td>
                           <td className="px-6 py-4 text-sm text-ink-muted">{entry.teacher?.fullName || entry.teacherId}</td>
@@ -387,7 +421,18 @@ const TimetablePage: React.FC = () => {
                           role={canManage ? 'button' : undefined}
                           tabIndex={canManage ? 0 : undefined}
                         >
-                          <p className="text-sm font-medium text-ink">{entry.subject}</p>
+                          <div className="flex items-start justify-between gap-2">
+                            <p className="text-sm font-medium text-ink">{entry.subject}</p>
+                            {entry.dayOfWeek === todayIndex && (
+                              <span className={`shrink-0 text-[10px] px-1.5 py-0.5 rounded-full ${
+                                isEntryNow(entry)
+                                  ? 'bg-red-500/20 text-red-300 border border-red-400/25'
+                                  : 'bg-indigo-500/20 text-brand'
+                              }`}>
+                                {isEntryNow(entry) ? 'Now' : 'Today'}
+                              </span>
+                            )}
+                          </div>
                           <p className="text-ink-muted text-xs mt-1 font-mono">{entry.startTime} - {entry.endTime}</p>
                           <p className="text-ink-muted text-xs">{entry.class?.name || classes.find((c) => c.id === entry.classId)?.name || 'Unknown class'}</p>
                           {entry.room && <p className="text-ink-subtle text-xs">Room: {entry.room}</p>}
