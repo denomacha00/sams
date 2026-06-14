@@ -539,7 +539,7 @@ export class ReportService {
    * Accepts optional dateRange encoded as query params in the reportId or as a separate param.
    * Requirements: 10.6
    */
-  async exportReportById(reportId: string, format: 'pdf' | 'excel', dateRange?: DateRange): Promise<Buffer> {
+  async exportReportById(reportId: string, format: 'pdf' | 'excel' | 'csv', dateRange?: DateRange): Promise<Buffer> {
     const parts = reportId.split(':');
     if (parts.length < 2) {
       throw new AppError(400, 'INVALID_REPORT_ID', 'Report ID must be in format "type:schoolId:targetId"');
@@ -882,6 +882,32 @@ export class ReportService {
         absent: deptAbsent,
         percentage: data.averageAttendancePercentage,
       });
+
+      const detailSheet = workbook.addWorksheet('Student Details');
+      detailSheet.columns = [
+        { header: 'Class', key: 'className', width: 28 },
+        { header: 'Student', key: 'student', width: 30 },
+        { header: 'Expected', key: 'expected', width: 12 },
+        { header: 'Present', key: 'present', width: 12 },
+        { header: 'Late', key: 'late', width: 12 },
+        { header: 'Excused', key: 'excused', width: 12 },
+        { header: 'Absent', key: 'absent', width: 12 },
+        { header: 'Attendance %', key: 'percentage', width: 15 },
+      ];
+      for (const cls of data.classes) {
+        for (const student of cls.students ?? []) {
+          detailSheet.addRow({
+            className: cls.className,
+            student: student.studentName,
+            expected: student.totalExpected,
+            present: student.totalPresent,
+            late: student.totalLate,
+            excused: student.totalExcused,
+            absent: student.totalAbsent,
+            percentage: student.attendancePercentage,
+          });
+        }
+      }
     } else {
       // School report
       sheet.columns = [
@@ -929,6 +955,63 @@ export class ReportService {
         absent: schoolAbsent,
         percentage: data.averageAttendancePercentage,
       });
+
+      const classSheet = workbook.addWorksheet('Class Summary');
+      classSheet.columns = [
+        { header: 'Department', key: 'department', width: 28 },
+        { header: 'Class', key: 'className', width: 28 },
+        { header: 'Expected', key: 'expected', width: 12 },
+        { header: 'Present', key: 'present', width: 12 },
+        { header: 'Late', key: 'late', width: 12 },
+        { header: 'Excused', key: 'excused', width: 12 },
+        { header: 'Absent', key: 'absent', width: 12 },
+        { header: 'Average Attendance %', key: 'percentage', width: 20 },
+      ];
+      const detailSheet = workbook.addWorksheet('Student Details');
+      detailSheet.columns = [
+        { header: 'Department', key: 'department', width: 28 },
+        { header: 'Class', key: 'className', width: 28 },
+        { header: 'Student', key: 'student', width: 30 },
+        { header: 'Expected', key: 'expected', width: 12 },
+        { header: 'Present', key: 'present', width: 12 },
+        { header: 'Late', key: 'late', width: 12 },
+        { header: 'Excused', key: 'excused', width: 12 },
+        { header: 'Absent', key: 'absent', width: 12 },
+        { header: 'Attendance %', key: 'percentage', width: 15 },
+      ];
+      for (const dept of data.departments) {
+        for (const cls of dept.classes ?? []) {
+          let clsPresent = 0, clsLate = 0, clsExcused = 0, clsAbsent = 0, clsExpected = 0;
+          for (const student of cls.students ?? []) {
+            clsPresent += student.totalPresent ?? 0;
+            clsLate += student.totalLate ?? 0;
+            clsExcused += student.totalExcused ?? 0;
+            clsAbsent += student.totalAbsent ?? 0;
+            clsExpected += student.totalExpected ?? 0;
+            detailSheet.addRow({
+              department: dept.departmentName,
+              className: cls.className,
+              student: student.studentName,
+              expected: student.totalExpected,
+              present: student.totalPresent,
+              late: student.totalLate,
+              excused: student.totalExcused,
+              absent: student.totalAbsent,
+              percentage: student.attendancePercentage,
+            });
+          }
+          classSheet.addRow({
+            department: dept.departmentName,
+            className: cls.className,
+            expected: clsExpected,
+            present: clsPresent,
+            late: clsLate,
+            excused: clsExcused,
+            absent: clsAbsent,
+            percentage: cls.averageAttendancePercentage,
+          });
+        }
+      }
     }
 
     const buffer = await workbook.xlsx.writeBuffer();
@@ -993,15 +1076,109 @@ export class ReportService {
       }
     } else if ('departmentName' in data) {
       // Department report
-      lines.push('Class,Average Attendance %');
+      lines.push('Class,Expected,Present,Late,Excused,Absent,Average Attendance %');
+      let deptExpected = 0, deptPresent = 0, deptLate = 0, deptExcused = 0, deptAbsent = 0;
       for (const cls of data.classes) {
-        lines.push(`"${this._escapeCSV(cls.className)}",${cls.averageAttendancePercentage}`);
+        let clsExpected = 0, clsPresent = 0, clsLate = 0, clsExcused = 0, clsAbsent = 0;
+        for (const student of cls.students ?? []) {
+          clsExpected += student.totalExpected ?? 0;
+          clsPresent += student.totalPresent ?? 0;
+          clsLate += student.totalLate ?? 0;
+          clsExcused += student.totalExcused ?? 0;
+          clsAbsent += student.totalAbsent ?? 0;
+        }
+        deptExpected += clsExpected;
+        deptPresent += clsPresent;
+        deptLate += clsLate;
+        deptExcused += clsExcused;
+        deptAbsent += clsAbsent;
+        lines.push(`"${this._escapeCSV(cls.className)}",${clsExpected},${clsPresent},${clsLate},${clsExcused},${clsAbsent},${cls.averageAttendancePercentage}`);
+      }
+      lines.push(`"TOTAL",${deptExpected},${deptPresent},${deptLate},${deptExcused},${deptAbsent},${data.averageAttendancePercentage}`);
+
+      lines.push('');
+      lines.push('Class,Student,Expected,Present,Late,Excused,Absent,Attendance %');
+      for (const cls of data.classes) {
+        for (const student of cls.students ?? []) {
+          lines.push([
+            this._escapeCSV(cls.className),
+            this._escapeCSV(student.studentName),
+            student.totalExpected,
+            student.totalPresent,
+            student.totalLate,
+            student.totalExcused,
+            student.totalAbsent,
+            student.attendancePercentage,
+          ].map((value) => `"${value}"`).join(','));
+        }
       }
     } else {
       // School report
-      lines.push('Department,Average Attendance %');
+      lines.push('Department,Expected,Present,Late,Excused,Absent,Average Attendance %');
+      let schoolExpected = 0, schoolPresent = 0, schoolLate = 0, schoolExcused = 0, schoolAbsent = 0;
       for (const dept of data.departments) {
-        lines.push(`"${this._escapeCSV(dept.departmentName)}",${dept.averageAttendancePercentage}`);
+        let deptExpected = 0, deptPresent = 0, deptLate = 0, deptExcused = 0, deptAbsent = 0;
+        for (const cls of dept.classes ?? []) {
+          for (const student of cls.students ?? []) {
+            deptExpected += student.totalExpected ?? 0;
+            deptPresent += student.totalPresent ?? 0;
+            deptLate += student.totalLate ?? 0;
+            deptExcused += student.totalExcused ?? 0;
+            deptAbsent += student.totalAbsent ?? 0;
+          }
+        }
+        schoolExpected += deptExpected;
+        schoolPresent += deptPresent;
+        schoolLate += deptLate;
+        schoolExcused += deptExcused;
+        schoolAbsent += deptAbsent;
+        lines.push(`"${this._escapeCSV(dept.departmentName)}",${deptExpected},${deptPresent},${deptLate},${deptExcused},${deptAbsent},${dept.averageAttendancePercentage}`);
+      }
+      lines.push(`"SCHOOL TOTAL",${schoolExpected},${schoolPresent},${schoolLate},${schoolExcused},${schoolAbsent},${data.averageAttendancePercentage}`);
+
+      lines.push('');
+      lines.push('Department,Class,Expected,Present,Late,Excused,Absent,Average Attendance %');
+      for (const dept of data.departments) {
+        for (const cls of dept.classes ?? []) {
+          let clsExpected = 0, clsPresent = 0, clsLate = 0, clsExcused = 0, clsAbsent = 0;
+          for (const student of cls.students ?? []) {
+            clsExpected += student.totalExpected ?? 0;
+            clsPresent += student.totalPresent ?? 0;
+            clsLate += student.totalLate ?? 0;
+            clsExcused += student.totalExcused ?? 0;
+            clsAbsent += student.totalAbsent ?? 0;
+          }
+          lines.push([
+            this._escapeCSV(dept.departmentName),
+            this._escapeCSV(cls.className),
+            clsExpected,
+            clsPresent,
+            clsLate,
+            clsExcused,
+            clsAbsent,
+            cls.averageAttendancePercentage,
+          ].map((value) => `"${value}"`).join(','));
+        }
+      }
+
+      lines.push('');
+      lines.push('Department,Class,Student,Expected,Present,Late,Excused,Absent,Attendance %');
+      for (const dept of data.departments) {
+        for (const cls of dept.classes ?? []) {
+          for (const student of cls.students ?? []) {
+            lines.push([
+              this._escapeCSV(dept.departmentName),
+              this._escapeCSV(cls.className),
+              this._escapeCSV(student.studentName),
+              student.totalExpected,
+              student.totalPresent,
+              student.totalLate,
+              student.totalExcused,
+              student.totalAbsent,
+              student.attendancePercentage,
+            ].map((value) => `"${value}"`).join(','));
+          }
+        }
       }
     }
 

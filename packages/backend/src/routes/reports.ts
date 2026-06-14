@@ -15,7 +15,7 @@ const dateRangeSchema = z.object({
 }).optional();
 
 const exportSchema = z.object({
-  format: z.enum(['pdf', 'excel']),
+  format: z.enum(['pdf', 'excel', 'csv']),
   type: z.enum(['student', 'class', 'department', 'school']),
   targetId: z.string().optional(),
   from: z.string().datetime().optional(),
@@ -275,7 +275,7 @@ reportsRouter.get('/school', requirePermission('view:reports'), async (req: Requ
 
 /**
  * GET /api/v1/reports/export
- * Export a report as PDF or Excel (query-based approach).
+ * Export a report as PDF, Excel, or CSV (query-based approach).
  */
 reportsRouter.get('/export', requirePermission('view:reports'), async (req: Request, res: Response): Promise<void> => {
   const parsed = exportSchema.safeParse(req.query);
@@ -315,8 +315,12 @@ reportsRouter.get('/export', requirePermission('view:reports'), async (req: Requ
 
     const buffer = await reportService.exportReport(reportData, format);
 
-    const contentType = format === 'pdf' ? 'application/pdf' : 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
-    const extension = format === 'pdf' ? 'pdf' : 'xlsx';
+    const contentType = format === 'pdf'
+      ? 'application/pdf'
+      : format === 'csv'
+        ? 'text/csv; charset=utf-8'
+        : 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
+    const extension = format === 'pdf' ? 'pdf' : format === 'csv' ? 'csv' : 'xlsx';
 
     res.setHeader('Content-Type', contentType);
     res.setHeader('Content-Disposition', `attachment; filename="report.${extension}"`);
@@ -332,7 +336,7 @@ reportsRouter.get('/export', requirePermission('view:reports'), async (req: Requ
 
 /**
  * GET /api/v1/reports/:reportId/export
- * Export a report by reportId as PDF or Excel.
+ * Export a report by reportId as PDF, Excel, or CSV.
  * reportId format: "type:targetId" (e.g., "student:student-1", "class:class-1")
  * For school reports: "school"
  * Role-based scope:
@@ -344,16 +348,16 @@ reportsRouter.get('/export', requirePermission('view:reports'), async (req: Requ
  */
 reportsRouter.get('/:reportId/export', requirePermission('view:reports'), async (req: Request, res: Response): Promise<void> => {
   const formatParam = req.query.format as string | undefined;
-  if (!formatParam || !['pdf', 'excel'].includes(formatParam)) {
+  if (!formatParam || !['pdf', 'excel', 'csv'].includes(formatParam)) {
     res.status(400).json({
       error: 'Validation failed',
       code: 'VALIDATION_ERROR',
-      message: 'format query parameter must be "pdf" or "excel"',
+      message: 'format query parameter must be "pdf", "excel", or "csv"',
     });
     return;
   }
 
-  const format = formatParam as 'pdf' | 'excel';
+  const format = formatParam as 'pdf' | 'excel' | 'csv';
 
   try {
     const dateRange = parseDateRange(req.query as Record<string, unknown>);
@@ -379,8 +383,12 @@ reportsRouter.get('/:reportId/export', requirePermission('view:reports'), async 
 
     const buffer = await reportService.exportReportById(secureReportId, format, dateRange);
 
-    const contentType = format === 'pdf' ? 'application/pdf' : 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
-    const extension = format === 'pdf' ? 'pdf' : 'xlsx';
+    const contentType = format === 'pdf'
+      ? 'application/pdf'
+      : format === 'csv'
+        ? 'text/csv; charset=utf-8'
+        : 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
+    const extension = format === 'pdf' ? 'pdf' : format === 'csv' ? 'csv' : 'xlsx';
 
     res.setHeader('Content-Type', contentType);
     res.setHeader('Content-Disposition', `attachment; filename="report.${extension}"`);

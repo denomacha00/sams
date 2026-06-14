@@ -165,8 +165,11 @@ describe('ReportService.exportReport', () => {
       expect(result).toBeInstanceOf(Buffer);
       const csv = result.toString('utf-8');
       const lines = csv.split('\n');
-      expect(lines[0]).toBe('Class,Average Attendance %');
-      expect(lines[1]).toBe('"Form 1A",92.5');
+      expect(lines[0]).toBe('Class,Expected,Present,Late,Excused,Absent,Average Attendance %');
+      expect(lines[1]).toBe('"Form 1A",40,33,4,1,2,92.5');
+      expect(lines[2]).toBe('"TOTAL",40,33,4,1,2,92.5');
+      expect(lines[4]).toBe('Class,Student,Expected,Present,Late,Excused,Absent,Attendance %');
+      expect(lines[5]).toBe('"Form 1A","John Doe","20","15","3","1","1","90"');
     });
 
     it('should return a Buffer with correct CSV content for school report', async () => {
@@ -174,8 +177,13 @@ describe('ReportService.exportReport', () => {
       expect(result).toBeInstanceOf(Buffer);
       const csv = result.toString('utf-8');
       const lines = csv.split('\n');
-      expect(lines[0]).toBe('Department,Average Attendance %');
-      expect(lines[1]).toBe('"Science",92.5');
+      expect(lines[0]).toBe('Department,Expected,Present,Late,Excused,Absent,Average Attendance %');
+      expect(lines[1]).toBe('"Science",40,33,4,1,2,92.5');
+      expect(lines[2]).toBe('"SCHOOL TOTAL",40,33,4,1,2,92.5');
+      expect(lines[4]).toBe('Department,Class,Expected,Present,Late,Excused,Absent,Average Attendance %');
+      expect(lines[5]).toBe('"Science","Form 1A","40","33","4","1","2","92.5"');
+      expect(lines[7]).toBe('Department,Class,Student,Expected,Present,Late,Excused,Absent,Attendance %');
+      expect(lines[8]).toBe('"Science","Form 1A","John Doe","20","15","3","1","1","90"');
     });
 
     it('should properly escape double quotes in CSV values', async () => {

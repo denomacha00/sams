@@ -447,7 +447,7 @@ const ReportsPage: React.FC = () => {
     if (!scopeLoading) void fetchReport();
   }, [scopeLoading]);
 
-  const handleExport = async (format: 'pdf' | 'excel') => {
+  const handleExport = async (format: 'pdf' | 'excel' | 'csv') => {
     const reportId = getExportReportId();
     if (!reportId) {
       setError('Unable to determine report scope. Please ensure your account is properly configured.');
@@ -463,7 +463,7 @@ const ReportsPage: React.FC = () => {
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `attendance-report.${format === 'pdf' ? 'pdf' : 'xlsx'}`;
+      a.download = `attendance-report.${format === 'pdf' ? 'pdf' : format === 'csv' ? 'csv' : 'xlsx'}`;
       a.click();
       window.URL.revokeObjectURL(url);
     } catch (err: any) {
@@ -937,6 +937,16 @@ const ReportsPage: React.FC = () => {
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                 </svg>
                 Export Excel
+              </button>
+              <button
+                onClick={() => handleExport('csv')}
+                disabled={exporting || !report}
+                className="flex items-center gap-2 bg-white/10 border border-emerald-500/30 text-emerald-300 py-2.5 px-5 rounded-xl hover:bg-emerald-500/20 disabled:opacity-50 transition-all duration-200"
+              >
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                </svg>
+                Export CSV
               </button>
             </div>
           </>
