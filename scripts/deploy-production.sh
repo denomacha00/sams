@@ -134,8 +134,8 @@ bash "$ROOT/scripts/baseline-prisma-init.sh"
 cd "$ROOT/packages/backend"
 npx prisma generate
 npx prisma migrate deploy
-npm run create-super-admin || true
-npm run unlock-users || true
+SUPER_ADMIN_FORCE_RESET=true npm run create-super-admin || true
+SCHOOL_CODE=SAMS_PLATFORM npm run unlock-users || true
 cd "$ROOT"
 
 echo "==> Uploads directories (avatars)"
