@@ -1014,6 +1014,22 @@ export class ReportService {
       }
     }
 
+    // Style header rows for all sheets
+    workbook.eachSheet((ws) => {
+      const headerRow = ws.getRow(1);
+      if (headerRow.cellCount > 0) {
+        headerRow.font = { bold: true, color: { argb: 'FFFFFFFF' }, size: 11 };
+        headerRow.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1e3a5f' } };
+        headerRow.alignment = { vertical: 'middle', horizontal: 'center' };
+        headerRow.border = {
+          bottom: { style: 'medium', color: { argb: 'FF2563eb' } },
+        };
+      }
+      if (ws.columnCount > 1) {
+        ws.autoFilter = { from: { row: 1, column: 1 }, to: { row: 1, column: ws.columnCount } };
+      }
+    });
+
     const buffer = await workbook.xlsx.writeBuffer();
     return Buffer.from(buffer);
   }
