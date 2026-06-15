@@ -213,13 +213,14 @@ const ReportsPage: React.FC = () => {
       }
 
       if (user.role === UserRole.HOD) {
+        // Always set department as default scope
         setReportScope((current) => (current === 'class' ? 'class' : 'department'));
         setSelectedDepartmentId(user.departmentId ?? '');
         if (user.departmentId) {
-          // Show only classes the HOD personally teaches (like a teacher)
-          const { data } = await apiClient.get('/users/teaching-classes');
-          const classes = (Array.isArray(data) ? data : []).map((row: any) =>
-            normalizeClassOption(row, row.departmentName ?? null),
+          // Load ALL classes in the HOD's department for the class/session selector
+          const { data: deptClasses } = await apiClient.get(`/departments/${user.departmentId}/classes`);
+          const classes = (Array.isArray(deptClasses) ? deptClasses : []).map((row: any) =>
+            normalizeClassOption(row),
           );
           setReportClasses(classes);
           setSelectedClassId((current) =>
@@ -693,7 +694,7 @@ const ReportsPage: React.FC = () => {
           )}
           {reportScope === 'class' && selectedClassName && (
             <p className="mt-3 text-sm text-ink-subtle">
-              Showing class/session evidence for {selectedClassName}. Pick one day above to see that day&apos;s lesson rows.
+              Showing class/session evidence for {selectedClassName}. Pick one day above to see that day's lesson rows.
             </p>
           )}
         </div>
