@@ -590,156 +590,177 @@ export class ReportService {
 
   private _exportPDF(data: StudentReportData | ClassReportData | DepartmentReportData | SchoolReportData): Promise<Buffer> {
     return new Promise((resolve, reject) => {
-      const doc = new PDFDocument({ margin: 50 });
+      const doc = new PDFDocument({ margin: 50, size: 'A4' });
       const chunks: Buffer[] = [];
 
       doc.on('data', (chunk: Buffer) => chunks.push(chunk));
       doc.on('end', () => resolve(Buffer.concat(chunks)));
       doc.on('error', reject);
 
-      // Title
-      doc.fontSize(20).text('SAMS Attendance Report', { align: 'center' });
-      doc.moveDown();
+      const NAVY = '#1e3a5f';
+      const GRAY = '#4b5563';
+      const DARK = '#111827';
 
-      // Report content
+      // Helper: draw table header row with navy background
+      const drawHeader = (headers: string[], startX: number, y: number, widths: number[]) => {
+        doc.rect(50, y, 495, 18).fill(NAVY);
+        let cx = startX;
+        headers.forEach((h, i) => {
+          doc.fill('#ffffff').font('Helvetica-Bold').fontSize(7.5).text(h, cx + 3, y + 4, { width: widths[i] - 3, align: 'left' });
+          cx += widths[i];
+        });
+        doc.fill(DARK); // reset fill
+      };
+
+      // Helper: draw a table data row
+      const drawRow = (values: (string | number)[], startX: number, y: number, widths: number[]) => {
+        let cx = startX;
+        values.forEach((v, i) => {
+          doc.fill(DARK).font('Helvetica').fontSize(7).text(String(v), cx + 3, y + 3, { width: widths[i] - 3, align: i === values.length - 1 ? 'right' : 'left' });
+          cx += widths[i];
+        });
+      };
+
+      // Helper: page break check
+      const checkPage = (needed: number) => {
+        if (y + needed > 760) { doc.addPage(); y = 50; }
+      };
+
+      // -- Header banner --
+      doc.rect(50, 40, 495, 65).fill(NAVY);
+      doc.fill('#ffffff').fontSize(22).font('Helvetica-Bold').text('SAMS Attendance Report', 70, 55);
+      doc.fontSize(9).font('Helvetica').text('Smart Attendance Management System', 70, 80);
+
+      let y = 125;
+
       if ('studentName' in data) {
-        // Student report
-        doc.fontSize(14).text(`Student: ${data.studentName}`);
-        doc.moveDown(0.5);
-        doc.fontSize(12);
-        doc.text(`Total Expected: ${data.totalExpected}`);
-        doc.text(`Present: ${data.totalPresent}`);
-        doc.text(`Late: ${data.totalLate}`);
-        doc.text(`Excused: ${data.totalExcused}`);
-        doc.text(`Absent: ${data.totalAbsent}`);
-        doc.moveDown(0.5);
-        doc.fontSize(14).text(`Attendance: ${data.attendancePercentage}%`);
+        // ===== Student Report =====
+        checkPage(30);
+        doc.font('Helvetica-Bold').fontSize(15).fill(NAVY).text('Student Attendance Report', 50, y); y += 25;
+        doc.moveTo(50, y).lineTo(545, y).strokeColor('#d1d5db').stroke(); y += 12;
+        doc.font('Helvetica-Bold').fontSize(13).fill(DARK).text(data.studentName, 50, y); y += 22;
+
+        // Summary card
+        doc.roundedRect(50, y, 240, 75, 5).fill('#f0f7ff');
+        doc.fill(NAVY).font('Helvetica-Bold').fontSize(9).text('Attendance Summary', 62, y + 7);
+        doc.fill(DARK).font('Helvetica').fontSize(9);
+        doc.text('Present:  ' + data.totalPresent, 62, y + 24);
+        doc.text('Late:     ' + data.totalLate, 62, y + 37);
+        doc.text('Excused:  ' + data.totalExcused, 62, y + 50);
+        doc.text('Absent:   ' + data.totalAbsent, 62, y + 63);
+        doc.fill(DARK).font('Helvetica').fontSize(9).text('Total Expected:  ' + data.totalExpected, 310, y + 24);
+        doc.font('Helvetica-Bold').fontSize(13).fill(NAVY).text('Attendance:  ' + data.attendancePercentage + '%', 310, y + 42);
+        y += 95;
+
         if (data.records?.length) {
-          doc.moveDown();
-          doc.fontSize(13).text('Daily Evidence');
-          doc.moveDown(0.25);
-          for (const row of data.records.slice(0, 80)) {
-            const marked = row.scannedAt ? new Date(row.scannedAt).toLocaleString('en-GB') : 'Not marked';
-            doc.fontSize(9).text(
-              `${row.date} | ${row.subject} | ${row.status} | ${row.method ?? 'ABSENT'} | ${marked}`,
-            );
+          checkPage(30);
+          doc.font('Helvetica-Bold').fontSize(12).fill(NAVY).text('Daily Evidence', 50, y); y += 20;
+          const cw = [60, 185, 55, 50, 90];
+          drawHeader(['Date', 'Subject', 'Status', 'Method', 'Time'], 50, y, cw); y += 20;
+          for (const row of data.records.slice(0, 50)) {
+            checkPage(13);
+            const t = row.scannedAt ? new Date(row.scannedAt).toLocaleString('en-GB', { hour: '2-digit', minute: '2-digit' }) : '--';
+            drawRow([row.date, row.subject, row.status, row.method || '--', t], 50, y, cw); y += 13;
           }
-          if (data.records.length > 80) {
-            doc.fontSize(9).text(`...and ${data.records.length - 80} more row(s). Export Excel for the full detail.`);
+          if (data.records.length > 50) {
+            doc.fill(GRAY).font('Helvetica-Oblique').fontSize(8).text('...and ' + (data.records.length - 50) + ' more. Export Excel for full detail.', 50, y); y += 14;
           }
         }
       } else if ('className' in data) {
-        // Class report — includes student rows
-        doc.fontSize(14).text(`Class: ${data.className}`);
-        doc.text(`Total Sessions: ${data.totalSessions}`);
-        doc.text(`Average Attendance: ${data.averageAttendancePercentage}%`);
-        doc.moveDown();
-        doc.fontSize(11).text('Student Summary');
-        doc.moveDown(0.25);
-        for (const student of data.students) {
-          doc.fontSize(9).text(
-            `${student.studentName} | Expected ${student.totalExpected} | Present ${student.totalPresent} | Late ${student.totalLate} | Excused ${student.totalExcused} | Absent ${student.totalAbsent} | ${student.attendancePercentage}%`,
-          );
+        // ===== Class Report =====
+        checkPage(30);
+        doc.font('Helvetica-Bold').fontSize(15).fill(NAVY).text('Class Attendance Report', 50, y); y += 25;
+        doc.moveTo(50, y).lineTo(545, y).strokeColor('#d1d5db').stroke(); y += 12;
+        doc.font('Helvetica-Bold').fontSize(14).fill(DARK).text(data.className, 50, y); y += 10;
+        doc.font('Helvetica').fontSize(10).fill(GRAY).text('Sessions: ' + data.totalSessions + '  |  Avg Attendance: ' + data.averageAttendancePercentage + '%', 50, y); y += 24;
+
+        checkPage(30);
+        doc.font('Helvetica-Bold').fontSize(12).fill(NAVY).text('Student Summary', 50, y); y += 20;
+        const sw = [170, 48, 44, 38, 44, 38, 50];
+        drawHeader(['Student', 'Expected', 'Present', 'Late', 'Excused', 'Absent', '%'], 50, y, sw); y += 20;
+        for (const s of data.students) {
+          checkPage(13);
+          const sn = s.studentName.length > 26 ? s.studentName.slice(0, 23) + '...' : s.studentName;
+          drawRow([sn, s.totalExpected, s.totalPresent, s.totalLate, s.totalExcused, s.totalAbsent, s.attendancePercentage + '%'], 50, y, sw); y += 13;
         }
 
-        const evidenceRows = data.students.flatMap((student) =>
-          (student.records ?? []).map((row) => ({ studentName: student.studentName, row })),
-        );
-        if (evidenceRows.length) {
-          doc.moveDown();
-          doc.fontSize(11).text('Daily Evidence Preview');
-          doc.moveDown(0.25);
-          for (const { studentName, row } of evidenceRows.slice(0, 120)) {
-            const marked = row.scannedAt ? new Date(row.scannedAt).toLocaleString('en-GB') : 'Not marked';
-            doc.fontSize(8).text(
-              `${row.date} | ${studentName} | ${row.subject} | ${row.status} | ${row.method ?? 'ABSENT'} | ${marked}`,
-            );
-          }
-          if (evidenceRows.length > 120) {
-            doc.fontSize(8).text(`...and ${evidenceRows.length - 120} more row(s). Export Excel for the full detail.`);
+        const ev = data.students.flatMap(s => (s.records || []).map(r => ({ n: s.studentName, r })));
+        if (ev.length) {
+          checkPage(30);
+          doc.font('Helvetica-Bold').fontSize(12).fill(NAVY).text('Daily Evidence', 50, y); y += 20;
+          const ew = [110, 65, 100, 50, 45, 60];
+          drawHeader(['Student', 'Date', 'Subject', 'Status', 'Method', 'Time'], 50, y, ew); y += 20;
+          for (const { n, r } of ev.slice(0, 40)) {
+            checkPage(13);
+            const sn = n.length > 18 ? n.slice(0, 16) + '...' : n;
+            const t = r.scannedAt ? new Date(r.scannedAt).toLocaleString('en-GB', { hour: '2-digit', minute: '2-digit' }) : '--';
+            drawRow([sn, r.date, r.subject, r.status, r.method || '--', t], 50, y, ew); y += 13;
           }
         }
       } else if ('departmentName' in data) {
-        // Department report — includes per-student breakdown per class
-        doc.fontSize(14).text(`Department: ${data.departmentName}`);
-        doc.text(`Total Sessions: ${data.totalSessions}`);
-        doc.text(`Average Attendance: ${data.averageAttendancePercentage}%`);
-        doc.moveDown();
+        // ===== Department Report =====
+        checkPage(30);
+        doc.font('Helvetica-Bold').fontSize(15).fill(NAVY).text('Department Attendance Report', 50, y); y += 25;
+        doc.moveTo(50, y).lineTo(545, y).strokeColor('#d1d5db').stroke(); y += 12;
+        doc.font('Helvetica-Bold').fontSize(14).fill(DARK).text(data.departmentName, 50, y); y += 10;
+        let dp = 0, dl = 0, de = 0, da = 0;
+        for (const c of data.classes) for (const s of c.students || []) { dp += s.totalPresent||0; dl += s.totalLate||0; de += s.totalExcused||0; da += s.totalAbsent||0; }
+        doc.roundedRect(50, y, 495, 26, 4).fill('#f0f7ff');
+        doc.fill(NAVY).font('Helvetica-Bold').fontSize(9).text('Total  P:' + dp + '  L:' + dl + '  E:' + de + '  A:' + da + '  |  Avg: ' + data.averageAttendancePercentage + '%', 60, y + 8); y += 36;
 
-        // Compute aggregate counts
-        let deptPresent = 0, deptLate = 0, deptExcused = 0, deptAbsent = 0;
-        for (const cls of data.classes) {
-          for (const student of cls.students ?? []) {
-            deptPresent += student.totalPresent ?? 0;
-            deptLate += student.totalLate ?? 0;
-            deptExcused += student.totalExcused ?? 0;
-            deptAbsent += student.totalAbsent ?? 0;
-          }
-        }
-        doc.fontSize(12).text(`Total Present: ${deptPresent}`);
-        doc.text(`Total Late: ${deptLate}`);
-        doc.text(`Total Excused: ${deptExcused}`);
-        doc.text(`Total Absent: ${deptAbsent}`);
-        doc.moveDown();
-
-        // Per-class student breakdown
-        for (const cls of data.classes) {
-          doc.fontSize(13).text(`${cls.className} — Avg ${cls.averageAttendancePercentage}%`);
-          doc.moveDown(0.2);
-          if (cls.students?.length) {
-            for (const student of cls.students) {
-              doc.fontSize(8).text(
-                `${student.studentName} | Expected ${student.totalExpected} | Present ${student.totalPresent} | Late ${student.totalLate} | Excused ${student.totalExcused} | Absent ${student.totalAbsent} | ${student.attendancePercentage}%`,
-              );
+        for (const c of data.classes) {
+          checkPage(24);
+          doc.roundedRect(50, y, 495, 18, 3).fill('#e8f4fd');
+          doc.fill('#1e40af').font('Helvetica-Bold').fontSize(9).text(c.className + '  —  Avg ' + c.averageAttendancePercentage + '%', 60, y + 4); y += 24;
+          if (c.students?.length) {
+            const cw = [175, 48, 44, 38, 44, 38, 50];
+            drawHeader(['Student', 'Expected', 'Present', 'Late', 'Excused', 'Absent', '%'], 50, y, cw); y += 18;
+            for (const s of c.students) {
+              checkPage(12);
+              const sn = s.studentName.length > 26 ? s.studentName.slice(0, 23) + '...' : s.studentName;
+              drawRow([sn, s.totalExpected, s.totalPresent, s.totalLate, s.totalExcused, s.totalAbsent, s.attendancePercentage + '%'], 50, y, cw); y += 12;
             }
-          } else {
-            doc.fontSize(8).text('(No student records for this class)');
           }
-          doc.moveDown(0.5);
+          y += 4;
         }
       } else {
-        // School report — department + class + student breakdown
-        doc.fontSize(14).text(`School: ${data.schoolName}`);
-        doc.text(`Total Sessions: ${data.totalSessions}`);
-        doc.text(`Average Attendance: ${data.averageAttendancePercentage}%`);
-        doc.moveDown();
+        // ===== School Report =====
+        checkPage(30);
+        doc.font('Helvetica-Bold').fontSize(15).fill(NAVY).text('School Attendance Report', 50, y); y += 25;
+        doc.moveTo(50, y).lineTo(545, y).strokeColor('#d1d5db').stroke(); y += 12;
+        doc.font('Helvetica-Bold').fontSize(14).fill(DARK).text(data.schoolName, 50, y); y += 10;
+        let sp = 0, sl = 0, se = 0, sa = 0;
+        for (const d of data.departments) for (const c of d.classes || []) for (const s of c.students || []) { sp += s.totalPresent||0; sl += s.totalLate||0; se += s.totalExcused||0; sa += s.totalAbsent||0; }
+        doc.roundedRect(50, y, 495, 26, 4).fill('#f0f7ff');
+        doc.fill(NAVY).font('Helvetica-Bold').fontSize(9).text('Total  P:' + sp + '  L:' + sl + '  E:' + se + '  A:' + sa + '  |  Avg: ' + data.averageAttendancePercentage + '%', 60, y + 8); y += 36;
 
-        // Compute aggregate counts
-        let schoolPresent = 0, schoolLate = 0, schoolExcused = 0, schoolAbsent = 0;
-        for (const dept of data.departments) {
-          for (const cls of dept.classes ?? []) {
-            for (const student of cls.students ?? []) {
-              schoolPresent += student.totalPresent ?? 0;
-              schoolLate += student.totalLate ?? 0;
-              schoolExcused += student.totalExcused ?? 0;
-              schoolAbsent += student.totalAbsent ?? 0;
-            }
-          }
-        }
-        doc.fontSize(12).text(`Total Present: ${schoolPresent}`);
-        doc.text(`Total Late: ${schoolLate}`);
-        doc.text(`Total Excused: ${schoolExcused}`);
-        doc.text(`Total Absent: ${schoolAbsent}`);
-        doc.moveDown();
-
-        // Per-department → per-class → per-student breakdown
-        for (const dept of data.departments) {
-          doc.fontSize(13).text(`${dept.departmentName} — Avg ${dept.averageAttendancePercentage}%`);
-          doc.moveDown(0.2);
-          for (const cls of dept.classes ?? []) {
-            doc.fontSize(10).text(`  ${cls.className} — Avg ${cls.averageAttendancePercentage}%`);
-            if (cls.students?.length) {
-              for (const student of cls.students) {
-                doc.fontSize(7).text(
-                  `    ${student.studentName} | P${student.totalPresent} L${student.totalLate} E${student.totalExcused} A${student.totalAbsent} | ${student.attendancePercentage}%`,
-                );
+        for (const d of data.departments) {
+          checkPage(22);
+          doc.roundedRect(50, y, 495, 18, 3).fill('#e8f4fd');
+          doc.fill('#1e40af').font('Helvetica-Bold').fontSize(9).text(d.departmentName + '  —  Avg ' + d.averageAttendancePercentage + '%', 60, y + 4); y += 24;
+          for (const c of d.classes || []) {
+            checkPage(18);
+            doc.fill('#4b5563').font('Helvetica-Bold').fontSize(8).text('  ' + c.className + '  —  Avg ' + c.averageAttendancePercentage + '%', 55, y); y += 14;
+            if (c.students?.length) {
+              const cw = [130, 38, 34, 28, 34, 28, 36];
+              drawHeader(['Student', 'Exp', 'P', 'L', 'E', 'A', '%'], 60, y, cw); y += 16;
+              for (const s of c.students) {
+                checkPage(11);
+                const sn = s.studentName.length > 20 ? s.studentName.slice(0, 18) + '...' : s.studentName;
+                drawRow([sn, s.totalExpected, s.totalPresent, s.totalLate, s.totalExcused, s.totalAbsent, s.attendancePercentage + '%'], 60, y, cw); y += 11;
               }
             }
-            doc.moveDown(0.3);
+            y += 3;
           }
+          y += 4;
         }
       }
 
+      // Footer
+      doc.fontSize(7).fill('#9ca3af').font('Helvetica').text(
+        'SAMS  |  Report generated ' + new Date().toLocaleDateString('en-GB'),
+        50, 790, { align: 'center' },
+      );
       doc.end();
     });
   }
