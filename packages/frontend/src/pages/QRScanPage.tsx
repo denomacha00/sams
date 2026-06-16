@@ -235,36 +235,10 @@ const QRScanPage: React.FC = () => {
       } else if (errorCode === 'SESSION_ENDED' || errorCode === 'QR_EXPIRED') {
         setError('This QR session has ended or refreshed. Ask the teacher for the current code.');
       } else if (errorCode === 'GPS_OUT_OF_RANGE') {
-        // Re-acquire fresh GPS — the student may have moved closer
-        if (navigator.geolocation) {
-          setGpsStatus('acquiring');
-          try {
-            const pos = await getCurrentPosition({
-              enableHighAccuracy: true,
-              timeout: 8000,
-              maximumAge: 0,
-            });
-            const gpsCoords = { lat: pos.coords.latitude, lng: pos.coords.longitude };
-            lastGpsCoordsRef.current = gpsCoords;
-            setGpsStatus('success');
-            // Auto-retry with fresh GPS coords
-            await apiClient.post(
-              '/attendance/qr',
-              { qrToken, gpsCoords, deviceId: getAttendanceDeviceId() },
-              { timeout: QR_ATTENDANCE_TIMEOUT_MS },
-            );
-            setSuccess(true);
-            setError(null);
-            return;
-          } catch (gpsErr) {
-            setGpsStatus('failed');
-            lastGpsCoordsRef.current = null;
-            setError('You are outside the allowed class area. Move closer, then scan again.');
-          }
-        } else {
-          lastGpsCoordsRef.current = null;
-          setError('You are outside the allowed class area. Move closer, then scan again.');
-        }
+        // Clear stale GPS coords so the next scan/link tap gets fresh GPS
+        lastGpsCoordsRef.current = null;
+        setGpsStatus('idle');
+        setError('You are outside the allowed class area. Move closer to the classroom, then tap Retry to scan again.');
       } else if (errorCode === 'GPS_REQUIRED') {
         lastGpsCoordsRef.current = null;
         setGpsStatus('idle');
