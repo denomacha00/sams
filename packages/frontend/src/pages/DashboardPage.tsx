@@ -321,7 +321,7 @@ const ActiveSessionReminder: React.FC<{ role?: UserRole; userId?: string }> = ({
     const load = async () => {
       try {
         const params: Record<string, string | boolean> = { isActive: true };
-        if (role === UserRole.TEACHER) params.teacherId = userId;
+        if (role === UserRole.TEACHER || role === UserRole.HOD) params.teacherId = userId;
         const { data } = await apiClient.get('/sessions', { params });
         if (!cancelled) {
           setSessions(Array.isArray(data) ? data.filter((s) => s.isActive !== false) : []);
