@@ -7,6 +7,10 @@
 #
 # Safe to run after every `git pull` or let GitHub Actions run it for you.
 # Does NOT modify packages/backend/.env, .env.secrets, or secrets/providers.env (keys stay on disk).
+#
+# CRITICAL: This script auto-seeds the Super Admin user. If you skip this script
+# and run `pm2 restart` directly, the Super Admin may not exist in the database
+# and you will be locked out of super.smart-managment.com. Always deploy via this script.
 
 set -euo pipefail
 
@@ -210,6 +214,7 @@ echo "    App:         https://app.smart-managment.com"
 echo "    Super Admin: https://super.smart-managment.com"
 echo "    Env: packages/backend/.env was not overwritten by git (see restore_deploy_env_files above if shown)"
 echo "    After first deploy or weak JWT: bash scripts/set-production-env.sh"
+echo "    IMPORTANT: Super Admin was auto-seeded. NEVER run 'pm2 restart' without this script."
 
 echo "==> Running post-deploy verification"
 sleep 3
