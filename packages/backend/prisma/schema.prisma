@@ -105,6 +105,9 @@ model School {
   conversationThreads ConversationThread[]
   conversationRecords ConversationRecord[]
   guardians           Guardian[]
+  academicTerms       AcademicTerm[]
+  exams               Exam[]
+  gradeBoundaries     GradeBoundary[]
 
   @@index([isSuspended])
   @@index([licenseExpiresAt])
@@ -153,6 +156,8 @@ model User {
   classesAsTeacher    Class[]              @relation("ClassTeacher")
   guardiansAsGuardian Guardian[]           @relation("GuardianLink")
   guardiansAsStudent  Guardian[]           @relation("StudentLink")
+  examsCreated        Exam[]               @relation("ExamCreator")
+  examResults         ExamResult[]
 
   @@unique([schoolId, admissionNumber])
   @@unique([schoolId, phone])
@@ -184,8 +189,9 @@ model Guardian {
   relation   String?  @db.VarChar(50)
   createdAt  DateTime @default(now())
 
-  guardian User @relation("GuardianLink", fields: [guardianId], references: [id], onDelete: Cascade)
-  student  User @relation("StudentLink", fields: [studentId], references: [id], onDelete: Cascade)
+  guardian User   @relation("GuardianLink", fields: [guardianId], references: [id], onDelete: Cascade)
+  student  User   @relation("StudentLink", fields: [studentId], references: [id], onDelete: Cascade)
+  School   School @relation(fields: [schoolId], references: [id])
 
   @@unique([guardianId, studentId])
   @@index([guardianId])
@@ -214,22 +220,22 @@ model AcademicTerm {
 // ─── Exams ────────────────────────────────────────────────────────────────────
 
 model Exam {
-  id          String   @id @default(cuid())
+  id          String       @id @default(cuid())
   schoolId    String
-  school      School   @relation(fields: [schoolId], references: [id])
+  school      School       @relation(fields: [schoolId], references: [id])
   termId      String
   term        AcademicTerm @relation(fields: [termId], references: [id])
   classId     String
-  class       Class    @relation(fields: [classId], references: [id])
-  subject     String   @db.VarChar(100)
-  examType    String   @db.VarChar(20)
+  class       Class        @relation(fields: [classId], references: [id])
+  subject     String       @db.VarChar(100)
+  examType    String       @db.VarChar(20)
   maxScore    Int
   weight      Float
   date        DateTime
   createdById String
-  createdAt   DateTime @default(now())
+  createdAt   DateTime     @default(now())
 
-  creator User @relation(fields: [createdById], references: [id])
+  creator User         @relation("ExamCreator", fields: [createdById], references: [id])
   results ExamResult[]
 
   @@index([schoolId, termId])
@@ -296,6 +302,7 @@ model Class {
   timetableEntries  TimetableEntry[]
   sessions          AttendanceSession[]
   registrationLinks RegistrationLink[]
+  exams             Exam[]
 
   @@unique([schoolId, name])
   @@index([schoolId, departmentId])
