@@ -25,7 +25,7 @@ export class RiskService {
    * Formula: score = A*0.4 + G*0.4 + P*0.2
    * Where:
    *   A = attendance risk (0-100, higher = more at risk)
-   *   G = grade risk (0-100, placeholder — defaults to 50)
+   *   G = grade risk (0-100, dynamically computed from exam results, defaults to 50)
    *   P = pattern risk (0-100, based on consecutive absences)
    *
    * Classification:
@@ -51,8 +51,69 @@ export class RiskService {
     // Calculate attendance risk (A)
     const attendanceWeight = await this._computeAttendanceRisk(studentId, schoolId, student.classId);
 
-    // Grade risk (G) — placeholder, defaults to 50 (neutral)
-    const gradeWeight = 50;
+    // Grade risk (G) — dynamically computed from exam results, defaults to 50 (neutral)
+    let gradeWeight = 50;
+    try {
+      // Look up the active AcademicTerm for this school
+      const activeTerm = await prisma.academicTerm.findFirst({
+        where: { schoolId, isActive: true },
+        select: { id: true },
+      });
+
+      if (activeTerm && student.classId) {
+        // Find all exams for this term, class, and student's subjects (with their results)
+        const exams = await prisma.exam.findMany({
+          where: {
+            schoolId,
+            termId: activeTerm.id,
+            classId: student.classId,
+          },
+          select: {
+            id: true,
+            subject: true,
+            examType: true,
+            maxScore: true,
+            results: {
+              where: { studentId },
+              select: { score: true },
+            },
+          },
+        });
+
+        // Group exams by subject and compute final score per subject
+        const subjectScores: Record<string, number[]> = {};
+
+        for (const exam of exams) {
+          if (exam.results.length === 0) continue;
+          const rawScore = exam.results[0].score;
+          // Normalise score to 0-100 based on maxScore
+          const normalised = exam.maxScore > 0 ? (rawScore / exam.maxScore) * 100 : 0;
+          if (!subjectScores[exam.subject]) {
+            subjectScores[exam.subject] = [0, 0]; // [CAT, EndTerm]
+          }
+          if (exam.examType.startsWith('CAT')) {
+            subjectScores[exam.subject][0] = normalised;
+          } else if (exam.examType === 'END_TERM') {
+            subjectScores[exam.subject][1] = normalised;
+          }
+        }
+
+        const finalScores: number[] = [];
+        for (const [_, scores] of Object.entries(subjectScores)) {
+          const [cat, endTerm] = scores;
+          finalScores.push(cat * 0.3 + endTerm * 0.7);
+        }
+
+        if (finalScores.length > 0) {
+          const average = finalScores.reduce((a, b) => a + b, 0) / finalScores.length;
+          // Invert: high grades = low risk (100 - average), clamp to 0-100
+          gradeWeight = Math.max(0, Math.min(100, Math.round(100 - average)));
+        }
+      }
+    } catch {
+      // If exam data lookup fails, fall back to default 50
+      gradeWeight = 50;
+    }
 
     // Pattern risk (P) — based on recent consecutive absences
     const patternWeight = await this._computePatternRisk(studentId, schoolId);
@@ -125,16 +186,16 @@ export class RiskService {
       scores.map((s: any) => {
         const student = studentMap.get(s.studentId);
         return {
-        studentId: s.studentId,
-        studentName: student?.fullName ?? 'Unknown student',
-        admissionNumber: student?.admissionNumber ?? null,
-        attendanceWeight: s.attendanceWeight,
-        gradeWeight: s.gradeWeight,
-        patternWeight: s.patternWeight,
-        score: s.score,
-        riskLevel: s.riskLevel as RiskLevel,
-        computedAt: s.computedAt,
-      };
+          studentId: s.studentId,
+          studentName: student?.fullName ?? 'Unknown student',
+          admissionNumber: student?.admissionNumber ?? null,
+          attendanceWeight: s.attendanceWeight,
+          gradeWeight: s.gradeWeight,
+          patternWeight: s.patternWeight,
+          score: s.score,
+          riskLevel: s.riskLevel as RiskLevel,
+          computedAt: s.computedAt,
+        };
       });
 
     let students: RiskStudent[];

@@ -21,7 +21,7 @@ const DEFAULT_MAX_USES = 100;
 export interface GenerateLinkOptions {
   expiryDays?: number;
   maxUses?: number;
-  targetRole?: 'TEACHER' | 'STUDENT' | 'HOD';
+  targetRole?: 'TEACHER' | 'STUDENT' | 'HOD' | 'GUARDIAN';
 }
 
 export interface RegisterViaLinkData {

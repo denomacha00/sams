@@ -104,6 +104,7 @@ model School {
   notifications       Notification[]
   conversationThreads ConversationThread[]
   conversationRecords ConversationRecord[]
+  guardians           Guardian[]
 
   @@index([isSuspended])
   @@index([licenseExpiresAt])
@@ -150,6 +151,8 @@ model User {
   conversationRecords ConversationRecord[]
   knowledgeEntries    AIKnowledge[]
   classesAsTeacher    Class[]              @relation("ClassTeacher")
+  guardiansAsGuardian Guardian[]           @relation("GuardianLink")
+  guardiansAsStudent  Guardian[]           @relation("StudentLink")
 
   @@unique([schoolId, admissionNumber])
   @@unique([schoolId, phone])
@@ -169,6 +172,98 @@ model RefreshToken {
   createdAt DateTime @default(now())
 
   @@index([userId])
+}
+
+// ─── Guardians / Parents ─────────────────────────────────────────────────────
+
+model Guardian {
+  id         String   @id @default(cuid())
+  schoolId   String
+  guardianId String
+  studentId  String
+  relation   String?  @db.VarChar(50)
+  createdAt  DateTime @default(now())
+
+  guardian User @relation("GuardianLink", fields: [guardianId], references: [id], onDelete: Cascade)
+  student  User @relation("StudentLink", fields: [studentId], references: [id], onDelete: Cascade)
+
+  @@unique([guardianId, studentId])
+  @@index([guardianId])
+  @@index([studentId])
+  @@index([schoolId])
+}
+
+// ─── Academic Terms ───────────────────────────────────────────────────────────
+
+model AcademicTerm {
+  id        String   @id @default(cuid())
+  schoolId  String
+  school    School   @relation(fields: [schoolId], references: [id])
+  name      String   @db.VarChar(100)
+  startDate DateTime
+  endDate   DateTime
+  isActive  Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  exams Exam[]
+
+  @@unique([schoolId, name])
+  @@index([schoolId, isActive])
+}
+
+// ─── Exams ────────────────────────────────────────────────────────────────────
+
+model Exam {
+  id          String   @id @default(cuid())
+  schoolId    String
+  school      School   @relation(fields: [schoolId], references: [id])
+  termId      String
+  term        AcademicTerm @relation(fields: [termId], references: [id])
+  classId     String
+  class       Class    @relation(fields: [classId], references: [id])
+  subject     String   @db.VarChar(100)
+  examType    String   @db.VarChar(20)
+  maxScore    Int
+  weight      Float
+  date        DateTime
+  createdById String
+  createdAt   DateTime @default(now())
+
+  creator User @relation(fields: [createdById], references: [id])
+  results ExamResult[]
+
+  @@index([schoolId, termId])
+  @@index([schoolId, classId, subject])
+  @@index([schoolId, termId, classId, subject])
+}
+
+model ExamResult {
+  id        String   @id @default(cuid())
+  examId    String
+  exam      Exam     @relation(fields: [examId], references: [id], onDelete: Cascade)
+  studentId String
+  student   User     @relation(fields: [studentId], references: [id])
+  score     Float
+  comment   String?  @db.VarChar(500)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([examId, studentId])
+  @@index([examId])
+  @@index([studentId])
+}
+
+model GradeBoundary {
+  id       String @id @default(cuid())
+  schoolId String
+  school   School @relation(fields: [schoolId], references: [id])
+  grade    String @db.VarChar(5)
+  minScore Int
+  maxScore Int
+  points   Float
+
+  @@unique([schoolId, grade])
+  @@index([schoolId])
 }
 
 model Department {

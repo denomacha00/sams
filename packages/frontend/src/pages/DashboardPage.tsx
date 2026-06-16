@@ -96,6 +96,7 @@ function getRoleGreeting(role?: UserRole): string {
     case UserRole.HOD: return 'Your department is performing well. Monitor and manage from here.';
     case UserRole.TEACHER: return 'Ready to inspire today? Here\'s your teaching overview.';
     case UserRole.STUDENT: return 'Stay on track with your attendance and schedule.';
+    case UserRole.GUARDIAN: return 'Monitor your children\'s attendance and grades from the Parent Portal.';
     default: return 'Welcome to your personalized dashboard.';
   }
 }
@@ -720,6 +721,7 @@ function getQuickActionGroups(role?: UserRole): QuickActionGroup[] {
           actions: [
             { to: '/admin/links', label: 'Registration Links', subtitle: 'Main way to onboard students and staff', icon: ICONS.link, variant: 'signin' },
             { to: '/admin/users', label: 'User Management', subtitle: 'Manual add only if someone has no phone for SMS/link signup', icon: ICONS.users },
+            { to: '/admin/guardians', label: 'Guardian Management', subtitle: 'Link parents to students', icon: ICONS.users },
             { to: '/class/students', label: 'Student Workbench', subtitle: 'Classes, lessons & attendance gaps', icon: ICONS.users },
             { to: '/admin/departments', label: 'Departments', subtitle: 'Organize faculties', icon: ICONS.building },
             { to: '/class-roster', label: 'View Class Reps', subtitle: 'See assigned student leaders', icon: ICONS.users },
@@ -731,6 +733,7 @@ function getQuickActionGroups(role?: UserRole): QuickActionGroup[] {
             { to: '/reports', label: 'View Reports', subtitle: 'School-wide attendance', icon: ICONS.chart },
             { to: '/risk-scores', label: 'Risk Scores', subtitle: 'At-risk students and follow-up', icon: ICONS.warning },
             { to: '/timetable', label: 'View Timetable', subtitle: 'Master schedule', icon: ICONS.calendar },
+            { to: '/admin/exams', label: 'Exam & Grade Mgmt', subtitle: 'CATs, end-term, grade boundaries', icon: ICONS.book },
             { to: '/admin/knowledge', label: 'Knowledge Base', subtitle: 'Policies & guides', icon: ICONS.book },
           ],
         },
@@ -768,6 +771,7 @@ function getQuickActionGroups(role?: UserRole): QuickActionGroup[] {
             { to: '/timetable', label: 'My Timetable', subtitle: 'Your weekly schedule', icon: ICONS.calendar },
             { to: '/reports', label: 'View Reports', subtitle: 'Class attendance stats', icon: ICONS.chart },
             { to: '/risk-scores', label: 'Risk Scores', subtitle: 'Students who need follow-up', icon: ICONS.warning },
+            { to: '/admin/exams', label: 'Enter Marks', subtitle: 'CAT & end-term scores', icon: ICONS.clipboard },
             { to: '/admin/knowledge', label: 'Knowledge Base', subtitle: 'Teaching resources', icon: ICONS.book },
           ],
         },
@@ -832,6 +836,7 @@ function getQuickActionGroups(role?: UserRole): QuickActionGroup[] {
             { to: '/admin/timetable', label: 'Edit Timetable', subtitle: 'Build & publish slots', icon: ICONS.calendar },
             { to: '/reports', label: 'View Reports', subtitle: 'Dept. analytics', icon: ICONS.chart },
             { to: '/risk-scores', label: 'Risk Scores', subtitle: 'At-risk students', icon: ICONS.warning },
+            { to: '/admin/exams', label: 'Exam & Grade Mgmt', subtitle: 'CATs, end-term, grade boundaries', icon: ICONS.book },
             { to: '/admin/knowledge', label: 'Knowledge Base', subtitle: 'Dept. documentation', icon: ICONS.book },
           ],
         },

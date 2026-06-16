@@ -27,6 +27,8 @@ import { aiRouter } from './routes/ai';
 import { biometricRouter } from './routes/biometric';
 import { notificationsRouter } from './routes/notifications';
 import { knowledgeRouter } from './routes/knowledge';
+import { guardiansRouter } from './routes/guardians';
+import { examsRouter } from './routes/exams';
 import { registerSocketServer } from './lib/socket';
 import { setupAttendanceSocket } from './sockets/attendanceSocket';
 import { isApiReady } from './apiState';
@@ -172,6 +174,8 @@ export function registerApplication(app: express.Express, httpServer: HttpServer
   app.use('/api/v1/biometric', biometricRouter);
   app.use('/api/v1/notifications', notificationsRouter);
   app.use('/api/v1/knowledge', knowledgeRouter);
+  app.use('/api/v1/guardians', guardiansRouter);
+  app.use('/api/v1/exams', examsRouter);
   app.use('/api/v1/super', superAdminRouter);
 
   io = new SocketIOServer(httpServer, {

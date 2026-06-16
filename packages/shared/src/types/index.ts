@@ -13,6 +13,7 @@ export enum UserRole {
   HOD = 'HOD',
   TEACHER = 'TEACHER',
   STUDENT = 'STUDENT',
+  GUARDIAN = 'GUARDIAN',
 }
 
 export enum AttendanceStatus {
@@ -267,4 +268,56 @@ export interface UserContext {
   schoolId: string;
   departmentId?: string;
   classId?: string;
+}
+
+export interface GuardianLink {
+  id: string;
+  guardianId: string;
+  studentId: string;
+  relation?: string;
+}
+
+export enum ExamType {
+  CAT1 = 'CAT1',
+  CAT2 = 'CAT2',
+  CAT3 = 'CAT3',
+  END_TERM = 'END_TERM',
+}
+
+export interface AcademicTerm {
+  id: string;
+  schoolId: string;
+  name: string;
+  startDate: Date;
+  endDate: Date;
+  isActive: boolean;
+}
+
+export interface Exam {
+  id: string;
+  schoolId: string;
+  termId: string;
+  classId: string;
+  subject: string;
+  examType: ExamType;
+  maxScore: number;
+  weight: number;
+  date: Date;
+}
+
+export interface ExamResult {
+  id: string;
+  examId: string;
+  studentId: string;
+  score: number;
+  comment?: string;
+}
+
+export interface GradeBoundary {
+  id: string;
+  schoolId: string;
+  grade: string;
+  minScore: number;
+  maxScore: number;
+  points: number;
 }

@@ -39,6 +39,9 @@ import RegistrationLinksPage from './pages/admin/RegistrationLinksPage';
 import TimetablePage from './pages/admin/TimetablePage';
 import DepartmentsPage from './pages/admin/DepartmentsPage';
 import KnowledgeManagementPage from './pages/admin/KnowledgeManagementPage';
+import ExamsPage from './pages/admin/ExamsPage';
+import GuardianManagementPage from './pages/admin/GuardianManagementPage';
+import ParentDashboardPage from './pages/ParentDashboardPage';
 
 import { registerServiceWorker } from './workers/swRegistration';
 
@@ -122,6 +125,7 @@ ReactDOM.createRoot(document.getElementById('root') as HTMLElement).render(
         {/* School admin-only department administration */}
         <Route element={<AuthGuard allowedRoles={[UserRole.SCHOOL_ADMIN]} />}>
           <Route path="/admin/departments" element={<DepartmentsPage />} />
+          <Route path="/admin/guardians" element={<GuardianManagementPage />} />
         </Route>
 
         {/* Registration Links — accessible to SCHOOL_ADMIN, HOD, and TEACHER */}
@@ -132,6 +136,16 @@ ReactDOM.createRoot(document.getElementById('root') as HTMLElement).render(
         {/* HOD-only routes */}
         <Route element={<AuthGuard allowedRoles={[UserRole.HOD]} />}>
           <Route path="/hod/department" element={<DepartmentManagementPage />} />
+        </Route>
+
+        {/* Exam & Grade Management — accessible to SCHOOL_ADMIN, HOD, and TEACHER */}
+        <Route element={<AuthGuard allowedRoles={[UserRole.SCHOOL_ADMIN, UserRole.HOD, UserRole.TEACHER]} />}>
+          <Route path="/admin/exams" element={<ExamsPage />} />
+        </Route>
+
+        {/* Parent / Guardian routes */}
+        <Route element={<AuthGuard allowedRoles={[UserRole.GUARDIAN]} />}>
+          <Route path="/parent" element={<ParentDashboardPage />} />
         </Route>
 
         {/* Default redirect */}
