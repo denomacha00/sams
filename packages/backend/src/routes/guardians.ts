@@ -64,7 +64,7 @@ router.post('/link', async (req: Request, res: Response, next: NextFunction) => 
     if (guardian.schoolId !== req.user.schoolId || student.schoolId !== req.user.schoolId) {
       throw new AppError(403, 'CROSS_SCHOOL', 'Cannot link users from different schools');
     }
-    if (guardian.role !== UserRole.GUARDIAN) {
+    if (guardian.role !== 'GUARDIAN') {
       throw new AppError(400, 'INVALID_ROLE', 'User is not a guardian');
     }
     if (student.role !== 'STUDENT') {

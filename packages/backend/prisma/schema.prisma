@@ -24,6 +24,7 @@ enum UserRole {
   HOD
   TEACHER
   STUDENT
+  GUARDIAN
 }
 
 enum AttendanceStatus {
@@ -191,7 +192,7 @@ model Guardian {
 
   guardian User   @relation("GuardianLink", fields: [guardianId], references: [id], onDelete: Cascade)
   student  User   @relation("StudentLink", fields: [studentId], references: [id], onDelete: Cascade)
-  School   School @relation(fields: [schoolId], references: [id])
+  school   School @relation(fields: [schoolId], references: [id])
 
   @@unique([guardianId, studentId])
   @@index([guardianId])
