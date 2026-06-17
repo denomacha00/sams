@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { prisma } from '../lib/prisma';
 import { AppError } from '../middleware/errors';
 import { authenticate } from '../middleware/auth';
+import { UserRole } from '@prisma/client';
 
 export const examsRouter = Router();
 
