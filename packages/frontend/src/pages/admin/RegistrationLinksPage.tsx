@@ -350,6 +350,7 @@ const RegistrationLinksPage: React.FC = () => {
                         <option value="STUDENT" className="bg-slate-800">Students</option>
                         <option value="TEACHER" className="bg-slate-800">Teachers</option>
                         <option value="HOD" className="bg-slate-800">HODs (Heads of Department)</option>
+                        <option value="GUARDIAN" className="bg-slate-800">Parents / Guardians</option>
                       </>
                     )}
                   </select>

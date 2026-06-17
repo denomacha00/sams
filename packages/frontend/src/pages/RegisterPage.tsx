@@ -53,6 +53,7 @@ const RegisterPage: React.FC = () => {
   }, [token]);
 
   const isStudent = linkMeta?.targetRole === 'STUDENT';
+  const isGuardian = linkMeta?.targetRole === 'GUARDIAN';
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -67,6 +68,7 @@ const RegisterPage: React.FC = () => {
         email: email || undefined,
         password,
         admissionNumber: isStudent ? admissionNumber : undefined,
+        guardianStudentAdmission: isGuardian ? admissionNumber : undefined,
       });
       setSuccess(true);
       // Store credentials for optional biometric enrollment
@@ -420,6 +422,22 @@ const RegisterPage: React.FC = () => {
                   className="w-full input-field placeholder-ink-subtle focus:outline-none focus:ring-2 focus:ring-brand/40/40 focus:border-brand transition-all"
                   placeholder="e.g. ADM/2024/001"
                 />
+              </div>
+            )}
+
+            {/* Guardian: link to student by admission number */}
+            {linkMeta?.targetRole === 'GUARDIAN' && (
+              <div>
+                <label className="block text-sm font-semibold text-ink-muted mb-1.5">Student Admission Number *</label>
+                <input
+                  type="text"
+                  value={admissionNumber}
+                  onChange={(e) => setAdmissionNumber(e.target.value)}
+                  required
+                  className="w-full input-field placeholder-ink-subtle focus:outline-none focus:ring-2 focus:ring-brand/40/40 focus:border-brand transition-all"
+                  placeholder="Your child's admission number (e.g. ADM/2024/001)"
+                />
+                <p className="text-xs text-ink-subtle mt-1">Enter your child's admission number to link this guardian account to them.</p>
               </div>
             )}
 

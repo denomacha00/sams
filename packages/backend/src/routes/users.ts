@@ -88,7 +88,7 @@ const generateLinkSchema = z.object({
   departmentId: z.string().optional(),
   expiryDays: z.number().int().min(7).max(365).optional(),
   maxUses: z.number().int().min(1).optional(),
-  targetRole: z.enum(['TEACHER', 'STUDENT', 'HOD']).optional(),
+  targetRole: z.enum(['TEACHER', 'STUDENT', 'HOD', 'GUARDIAN']).optional(),
 });
 
 const registerViaLinkSchema = z.object({
@@ -98,6 +98,7 @@ const registerViaLinkSchema = z.object({
   email: z.string().email().optional(),
   password: z.string().min(8),
   admissionNumber: z.string().min(1).max(50).optional(),
+  guardianStudentAdmission: z.string().min(1).max(50).optional(),
 });
 
 const updateMeSchema = z.object({

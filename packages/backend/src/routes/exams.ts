@@ -18,6 +18,17 @@ const param = (req: Request, name: string): string => {
   return v ?? '';
 };
 
+// ─── Helper: HOD scope filter ────────────────────────────────────────────────
+// Returns an extra WHERE clause so HOD users only see their own department's data.
+// School admin sees everything. Teachers/Marks-access uses same filter.
+
+function hodScopeFilter(req: Request, userRole: string, departmentId?: string): Record<string, unknown> {
+  if (userRole === 'HOD' && departmentId) {
+    return { class: { departmentId } };
+  }
+  return {};
+}
+
 // ─── Validation Schemas ───────────────────────────────────────────────────────
 
 const createTermSchema = z.object({
@@ -97,7 +108,7 @@ examsRouter.get('/terms', async (req: Request, res: Response, next: NextFunction
   }
 });
 
-// ─── 2. POST /terms — Create AcademicTerm ─────────────────────────────────────
+// ─── 2. POST /terms — Create AcademicTerm (SCHOOL_ADMIN only) ────────────────
 
 examsRouter.post('/terms', requireRole('SCHOOL_ADMIN'), async (req: Request, res: Response, next: NextFunction): Promise<void> => {
   const parsed = createTermSchema.safeParse(req.body);
@@ -136,7 +147,7 @@ examsRouter.post('/terms', requireRole('SCHOOL_ADMIN'), async (req: Request, res
   }
 });
 
-// ─── 3. PATCH /terms/:id — Update AcademicTerm ────────────────────────────────
+// ─── 3. PATCH /terms/:id — Update AcademicTerm (SCHOOL_ADMIN only) ───────────
 
 examsRouter.patch('/terms/:id', requireRole('SCHOOL_ADMIN'), async (req: Request, res: Response, next: NextFunction): Promise<void> => {
   const parsed = updateTermSchema.safeParse(req.body);
@@ -184,7 +195,7 @@ examsRouter.patch('/terms/:id', requireRole('SCHOOL_ADMIN'), async (req: Request
   }
 });
 
-// ─── 4. DELETE /terms/:id — Delete AcademicTerm ───────────────────────────────
+// ─── 4. DELETE /terms/:id — Delete AcademicTerm (SCHOOL_ADMIN only) ──────────
 
 examsRouter.delete('/terms/:id', requireRole('SCHOOL_ADMIN'), async (req: Request, res: Response, next: NextFunction): Promise<void> => {
   try {
@@ -213,7 +224,7 @@ examsRouter.delete('/terms/:id', requireRole('SCHOOL_ADMIN'), async (req: Reques
   }
 });
 
-// ─── 5. GET / — List Exams ────────────────────────────────────────────────────
+// ─── 5. GET / — List Exams (HOD sees only their dept, SCHOOL_ADMIN sees all) ──
 
 examsRouter.get('/', async (req: Request, res: Response, next: NextFunction): Promise<void> => {
   try {
@@ -222,6 +233,10 @@ examsRouter.get('/', async (req: Request, res: Response, next: NextFunction): Pr
     const subject = typeof req.query.subject === 'string' ? req.query.subject : undefined;
 
     const where: Record<string, unknown> = { schoolId: req.user.schoolId };
+
+    // HOD scope: only exams for classes in their department
+    const scope = hodScopeFilter(req, req.user.role, req.user.departmentId);
+    if (scope.class) where.class = scope.class;
 
     if (termId) where.termId = termId;
     if (classId) where.classId = classId;
@@ -244,7 +259,7 @@ examsRouter.get('/', async (req: Request, res: Response, next: NextFunction): Pr
   }
 });
 
-// ─── 6. POST / — Create Exam ──────────────────────────────────────────────────
+// ─── 6. POST / — Create Exam (HOD → their dept, SCHOOL_ADMIN → any) ──────────
 
 examsRouter.post('/', requireRole('SCHOOL_ADMIN', 'HOD'), async (req: Request, res: Response, next: NextFunction): Promise<void> => {
   const parsed = createExamSchema.safeParse(req.body);
@@ -269,6 +284,13 @@ examsRouter.post('/', requireRole('SCHOOL_ADMIN', 'HOD'), async (req: Request, r
       where: { id: classId, schoolId: req.user.schoolId },
     });
     if (!cls) throw new AppError(404, 'CLASS_NOT_FOUND', 'Class not found');
+
+    // HOD can only create exams for classes in their own department
+    if (req.user.role === 'HOD') {
+      if (!req.user.departmentId || cls.departmentId !== req.user.departmentId) {
+        throw new AppError(403, 'FORBIDDEN', 'You can only create exams for classes in your department');
+      }
+    }
 
     const exam = await prisma.exam.create({
       data: {
@@ -307,9 +329,19 @@ examsRouter.put('/:id', async (req: Request, res: Response, next: NextFunction):
     const id = param(req, 'id');
     const existing = await prisma.exam.findFirst({
       where: { id, schoolId: req.user.schoolId },
+      include: { class: { select: { departmentId: true } } },
     });
 
     if (!existing) throw new AppError(404, 'EXAM_NOT_FOUND', 'Exam not found');
+
+    // HOD can only update exams in their department
+    if (req.user.role === 'HOD') {
+      if (!req.user.departmentId || existing.class.departmentId !== req.user.departmentId) {
+        throw new AppError(403, 'FORBIDDEN', 'You can only update exams in your department');
+      }
+    } else if (req.user.role !== 'SCHOOL_ADMIN') {
+      throw new AppError(403, 'FORBIDDEN', 'You do not have permission to update exams');
+    }
 
     const { termId, classId, subject, examType, maxScore, weight, date } = parsed.data;
 
@@ -320,6 +352,9 @@ examsRouter.put('/:id', async (req: Request, res: Response, next: NextFunction):
     if (classId) {
       const cls = await prisma.class.findFirst({ where: { id: classId, schoolId: req.user.schoolId } });
       if (!cls) throw new AppError(404, 'CLASS_NOT_FOUND', 'Class not found');
+      if (req.user.role === 'HOD' && (!req.user.departmentId || cls.departmentId !== req.user.departmentId)) {
+        throw new AppError(403, 'FORBIDDEN', 'Class is not in your department');
+      }
     }
 
     const exam = await prisma.exam.update({
@@ -353,9 +388,19 @@ examsRouter.delete('/:id', async (req: Request, res: Response, next: NextFunctio
     const id = param(req, 'id');
     const existing = await prisma.exam.findFirst({
       where: { id, schoolId: req.user.schoolId },
+      include: { class: { select: { departmentId: true } } },
     });
 
     if (!existing) throw new AppError(404, 'EXAM_NOT_FOUND', 'Exam not found');
+
+    // HOD can only delete exams in their department
+    if (req.user.role === 'HOD') {
+      if (!req.user.departmentId || existing.class.departmentId !== req.user.departmentId) {
+        throw new AppError(403, 'FORBIDDEN', 'You can only delete exams in your department');
+      }
+    } else if (req.user.role !== 'SCHOOL_ADMIN') {
+      throw new AppError(403, 'FORBIDDEN', 'You do not have permission to delete exams');
+    }
 
     const resultCount = await prisma.examResult.count({
       where: { examId: id },
@@ -460,7 +505,7 @@ examsRouter.get('/grade-boundaries', async (req: Request, res: Response, next: N
   }
 });
 
-// ─── 12. POST /grade-boundaries ───────────────────────────────────────────────
+// ─── 12. POST /grade-boundaries (SCHOOL_ADMIN only) ───────────────────────────
 
 examsRouter.post('/grade-boundaries', requireRole('SCHOOL_ADMIN'), async (req: Request, res: Response, next: NextFunction): Promise<void> => {
   const parsed = gradeBoundarySchema.safeParse(req.body);
