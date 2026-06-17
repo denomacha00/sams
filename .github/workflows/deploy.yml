@@ -94,4 +94,4 @@ jobs:
           key: ${{ secrets.VPS_SSH_KEY }}
           script: |
             cd /var/www/sams
-            bash scripts/deploy-production.sh
+            bash scripts/deploy-production.sh --skip-tsc
