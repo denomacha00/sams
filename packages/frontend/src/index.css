@@ -385,3 +385,167 @@
   from { opacity: 0; transform: translateY(4px); }
   to { opacity: 1; transform: translateY(0); }
 }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   SIDEBAR + APP LAYOUT
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+.app-layout {
+  @apply flex min-h-screen bg-canvas text-ink;
+}
+
+/* ─── Sidebar ──────────────────────────────────────────────────────────── */
+.app-sidebar {
+  @apply fixed top-0 left-0 z-40 h-screen flex flex-col
+    border-r border-line bg-surface shadow-card
+    transition-all duration-300 ease-in-out;
+  overflow-x: hidden;
+}
+
+.sidebar-expanded {
+  width: 240px;
+}
+
+.sidebar-collapsed {
+  width: 60px;
+}
+
+/* Sidebar header */
+.sidebar-header {
+  @apply flex items-center justify-between px-3 py-4 border-b border-line;
+}
+
+.sidebar-expanded .sidebar-header {
+  @apply px-4;
+}
+
+.sidebar-logo {
+  @apply flex items-center gap-2.5 no-underline;
+}
+
+.sidebar-logo-icon {
+  @apply w-8 h-8 rounded-lg bg-brand flex items-center justify-center shrink-0;
+}
+
+.sidebar-logo-text {
+  @apply text-base font-bold text-ink tracking-tight;
+}
+
+.sidebar-toggle {
+  @apply w-7 h-7 rounded-md flex items-center justify-center
+    bg-surface-muted border border-line text-ink-muted
+    hover:bg-surface-elevated hover:text-ink
+    transition-colors shrink-0;
+}
+
+/* Sidebar nav */
+.sidebar-nav {
+  @apply flex-1 overflow-y-auto overflow-x-hidden py-3;
+}
+
+.sidebar-section {
+  @apply mb-3;
+}
+
+.sidebar-section-title {
+  @apply px-4 mb-1 text-[10px] font-semibold text-ink-subtle uppercase tracking-widest;
+}
+
+.sidebar-item {
+  @apply mx-1.5 mb-0.5;
+}
+
+.sidebar-item-active {
+  @apply bg-brand-light rounded-lg;
+}
+
+.sidebar-link {
+  @apply flex items-center gap-3 px-3 py-2.5 rounded-lg no-underline
+    text-ink-muted hover:text-ink hover:bg-surface-elevated
+    transition-all duration-150;
+}
+
+.sidebar-collapsed .sidebar-link {
+  @apply justify-center px-0;
+}
+
+.sidebar-icon-wrapper {
+  @apply w-5 h-5 flex items-center justify-center shrink-0;
+}
+
+.sidebar-icon {
+  @apply w-4.5 h-4.5;
+}
+
+.sidebar-expanded .sidebar-label {
+  @apply text-sm font-medium leading-none truncate;
+}
+
+.sidebar-collapsed .sidebar-label {
+  @apply hidden;
+}
+
+/* Sidebar footer */
+.sidebar-footer {
+  @apply border-t border-line py-2;
+}
+
+.sidebar-logout {
+  cursor: pointer;
+}
+
+/* ─── Main content area ─────────────────────────────────────────────────── */
+.app-main {
+  @apply flex flex-col flex-1 min-h-screen transition-all duration-300 ease-in-out;
+}
+
+.app-main-expanded {
+  margin-left: 240px;
+}
+
+.app-main-collapsed {
+  margin-left: 60px;
+}
+
+/* Top bar */
+.app-topbar {
+  @apply sticky top-0 z-30 flex items-center justify-between
+    h-14 px-5 border-b border-line bg-surface/85 backdrop-blur-md;
+}
+
+.topbar-left {
+  @apply flex items-center gap-3;
+}
+
+.topbar-title {
+  @apply text-lg font-bold text-ink tracking-tight;
+}
+
+.topbar-right {
+  @apply flex items-center gap-2.5;
+}
+
+.topbar-btn {
+  @apply relative w-9 h-9 rounded-lg flex items-center justify-center
+    bg-surface-muted border border-line text-ink-muted
+    hover:bg-surface-elevated hover:text-ink hover:border-line-strong
+    transition-all duration-200;
+}
+
+.topbar-btn-active {
+  @apply bg-brand-light border-brand/60 text-brand;
+}
+
+.topbar-badge {
+  @apply absolute -top-1.5 -right-1.5 min-w-[1.1rem] h-[1.1rem] px-0.5
+    bg-red-500 rounded-full border-2 border-white shadow-md
+    flex items-center justify-center text-[9px] font-bold text-white;
+}
+
+.topbar-avatar {
+  @apply shrink-0;
+}
+
+.topbar-content {
+  @apply flex-1;
+}

@@ -1,7 +1,7 @@
 "use strict";
 // ─── Enums ───────────────────────────────────────────────────────────────────
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.PaymentStatus = exports.AuditEventType = exports.RiskLevel = exports.AttendanceStatus = exports.UserRole = exports.PlanTier = void 0;
+exports.ExamType = exports.PaymentStatus = exports.AuditEventType = exports.RiskLevel = exports.AttendanceStatus = exports.UserRole = exports.PlanTier = void 0;
 var PlanTier;
 (function (PlanTier) {
     PlanTier["TRIAL"] = "TRIAL";
@@ -16,6 +16,7 @@ var UserRole;
     UserRole["HOD"] = "HOD";
     UserRole["TEACHER"] = "TEACHER";
     UserRole["STUDENT"] = "STUDENT";
+    UserRole["GUARDIAN"] = "GUARDIAN";
 })(UserRole || (exports.UserRole = UserRole = {}));
 var AttendanceStatus;
 (function (AttendanceStatus) {
@@ -56,4 +57,11 @@ var PaymentStatus;
     PaymentStatus["FAILED"] = "FAILED";
     PaymentStatus["CANCELLED"] = "CANCELLED";
 })(PaymentStatus || (exports.PaymentStatus = PaymentStatus = {}));
+var ExamType;
+(function (ExamType) {
+    ExamType["CAT1"] = "CAT1";
+    ExamType["CAT2"] = "CAT2";
+    ExamType["CAT3"] = "CAT3";
+    ExamType["END_TERM"] = "END_TERM";
+})(ExamType || (exports.ExamType = ExamType = {}));
 //# sourceMappingURL=index.js.map

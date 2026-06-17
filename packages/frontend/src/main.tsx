@@ -6,6 +6,7 @@ import { UserRole } from '@sams/shared';
 
 import AuthGuard from './components/AuthGuard';
 import FloatingAI from './components/FloatingAI';
+import AppLayout from './components/AppLayout';
 import LoginPage from './pages/LoginPage';
 import ForgotPasswordPage from './pages/ForgotPasswordPage';
 import ResetPasswordPage from './pages/ResetPasswordPage';
@@ -58,7 +59,7 @@ ReactDOM.createRoot(document.getElementById('root') as HTMLElement).render(
     <BrowserRouter>
       <FloatingAIGuard />
       <Routes>
-        {/* Public routes */}
+        {/* Public routes — no sidebar layout */}
         <Route path="/login" element={<LoginPage />} />
         <Route path="/forgot-password" element={<ForgotPasswordPage />} />
         <Route path="/reset-password" element={<ResetPasswordPage />} />
@@ -66,89 +67,88 @@ ReactDOM.createRoot(document.getElementById('root') as HTMLElement).render(
         <Route path="/register/:token" element={<RegisterPage />} />
         <Route path="/attend/:token" element={<LinkAttendancePage />} />
 
-        {/* Protected routes — any authenticated user */}
+        {/* Protected routes — wrapped with sidebar + topbar layout */}
         <Route element={<AuthGuard />}>
-          <Route path="/dashboard" element={<DashboardPage />} />
-          <Route path="/timetable" element={<TimetableViewPage />} />
-          <Route path="/reports" element={<ReportsPage />} />
-          <Route path="/ai" element={<AIAssistantPage />} />
-          <Route path="/profile" element={<ProfilePage />} />
-          <Route path="/settings" element={<SettingsPage />} />
-          <Route path="/notifications" element={<NotificationsPage />} />
+          <Route element={<AppLayout />}>
+            {/* Common routes */}
+            <Route path="/dashboard" element={<DashboardPage />} />
+            <Route path="/timetable" element={<TimetableViewPage />} />
+            <Route path="/reports" element={<ReportsPage />} />
+            <Route path="/ai" element={<AIAssistantPage />} />
+            <Route path="/profile" element={<ProfilePage />} />
+            <Route path="/settings" element={<SettingsPage />} />
+            <Route path="/notifications" element={<NotificationsPage />} />
+            <Route path="/biometric/enroll" element={<BiometricEnrollPage />} />
+
+            {/* Teacher + HOD attendance routes */}
+            <Route element={<AuthGuard allowedRoles={[UserRole.HOD, UserRole.TEACHER]} />}>
+              <Route path="/sessions" element={<SessionPage />} />
+              <Route path="/attendance" element={<ManualAttendancePage />} />
+              <Route path="/biometric/attendance" element={<BiometricAttendancePage />} />
+              <Route path="/fingerprint/attendance" element={<FingerprintAttendancePage />} />
+            </Route>
+
+            {/* Student workbench */}
+            <Route element={<AuthGuard allowedRoles={[UserRole.SCHOOL_ADMIN, UserRole.HOD, UserRole.TEACHER]} />}>
+              <Route path="/class/students" element={<ClassStudentsPage />} />
+            </Route>
+
+            {/* Class representatives roster */}
+            <Route element={<AuthGuard allowedRoles={[UserRole.SCHOOL_ADMIN, UserRole.HOD, UserRole.TEACHER]} />}>
+              <Route path="/class-roster" element={<ClassRosterPage />} />
+            </Route>
+
+            {/* Knowledge management */}
+            <Route element={<AuthGuard allowedRoles={[UserRole.SCHOOL_ADMIN, UserRole.HOD, UserRole.TEACHER]} />}>
+              <Route path="/admin/knowledge" element={<KnowledgeManagementPage />} />
+            </Route>
+
+            {/* Student-only routes */}
+            <Route element={<AuthGuard allowedRoles={[UserRole.STUDENT]} />}>
+              <Route path="/sessions/scan" element={<QRScanPage />} />
+            </Route>
+
+            {/* Admin routes */}
+            <Route element={<AuthGuard allowedRoles={[UserRole.SCHOOL_ADMIN, UserRole.HOD]} />}>
+              <Route path="/admin" element={<AdminDashboardPage />} />
+              <Route path="/admin/users" element={<UserManagementPage />} />
+              <Route path="/admin/timetable" element={<TimetablePage />} />
+            </Route>
+
+            {/* Risk scores */}
+            <Route element={<AuthGuard allowedRoles={[UserRole.SCHOOL_ADMIN, UserRole.HOD, UserRole.TEACHER]} />}>
+              <Route path="/risk-scores" element={<RiskScorePage />} />
+            </Route>
+
+            {/* School admin-only */}
+            <Route element={<AuthGuard allowedRoles={[UserRole.SCHOOL_ADMIN]} />}>
+              <Route path="/admin/departments" element={<DepartmentsPage />} />
+              <Route path="/admin/guardians" element={<GuardianManagementPage />} />
+            </Route>
+
+            {/* Registration Links */}
+            <Route element={<AuthGuard allowedRoles={[UserRole.SCHOOL_ADMIN, UserRole.HOD, UserRole.TEACHER]} />}>
+              <Route path="/admin/links" element={<RegistrationLinksPage />} />
+            </Route>
+
+            {/* HOD-only */}
+            <Route element={<AuthGuard allowedRoles={[UserRole.HOD]} />}>
+              <Route path="/hod/department" element={<DepartmentManagementPage />} />
+            </Route>
+
+            {/* Exams & Grades */}
+            <Route element={<AuthGuard allowedRoles={[UserRole.SCHOOL_ADMIN, UserRole.HOD, UserRole.TEACHER]} />}>
+              <Route path="/admin/exams" element={<ExamsPage />} />
+            </Route>
+
+            {/* Parent / Guardian */}
+            <Route element={<AuthGuard allowedRoles={[UserRole.GUARDIAN]} />}>
+              <Route path="/parent" element={<ParentDashboardPage />} />
+            </Route>
+          </Route>
         </Route>
 
-        {/* Teacher + HOD attendance routes */}
-        <Route element={<AuthGuard allowedRoles={[UserRole.HOD, UserRole.TEACHER]} />}>
-          <Route path="/sessions" element={<SessionPage />} />
-          <Route path="/attendance" element={<ManualAttendancePage />} />
-          <Route path="/biometric/attendance" element={<BiometricAttendancePage />} />
-          <Route path="/fingerprint/attendance" element={<FingerprintAttendancePage />} />
-        </Route>
-
-        {/* Student workbench */}
-        <Route element={<AuthGuard allowedRoles={[UserRole.SCHOOL_ADMIN, UserRole.HOD, UserRole.TEACHER]} />}>
-          <Route path="/class/students" element={<ClassStudentsPage />} />
-        </Route>
-
-        {/* Class representatives roster */}
-        <Route element={<AuthGuard allowedRoles={[UserRole.SCHOOL_ADMIN, UserRole.HOD, UserRole.TEACHER]} />}>
-          <Route path="/class-roster" element={<ClassRosterPage />} />
-        </Route>
-
-        {/* Knowledge management routes */}
-        <Route element={<AuthGuard allowedRoles={[UserRole.SCHOOL_ADMIN, UserRole.HOD, UserRole.TEACHER]} />}>
-          <Route path="/admin/knowledge" element={<KnowledgeManagementPage />} />
-        </Route>
-
-        {/* Any authenticated role can enroll biometric for account login */}
-        <Route element={<AuthGuard />}>
-          <Route path="/biometric/enroll" element={<BiometricEnrollPage />} />
-        </Route>
-
-        {/* Student-only routes */}
-        <Route element={<AuthGuard allowedRoles={[UserRole.STUDENT]} />}>
-          <Route path="/sessions/scan" element={<QRScanPage />} />
-        </Route>
-
-        {/* Admin routes — restricted to SCHOOL_ADMIN and HOD roles */}
-        <Route element={<AuthGuard allowedRoles={[UserRole.SCHOOL_ADMIN, UserRole.HOD]} />}>
-          <Route path="/admin" element={<AdminDashboardPage />} />
-          <Route path="/admin/users" element={<UserManagementPage />} />
-          <Route path="/admin/timetable" element={<TimetablePage />} />
-        </Route>
-
-        {/* Scoped risk dashboard */}
-        <Route element={<AuthGuard allowedRoles={[UserRole.SCHOOL_ADMIN, UserRole.HOD, UserRole.TEACHER]} />}>
-          <Route path="/risk-scores" element={<RiskScorePage />} />
-        </Route>
-
-        {/* School admin-only department administration */}
-        <Route element={<AuthGuard allowedRoles={[UserRole.SCHOOL_ADMIN]} />}>
-          <Route path="/admin/departments" element={<DepartmentsPage />} />
-          <Route path="/admin/guardians" element={<GuardianManagementPage />} />
-        </Route>
-
-        {/* Registration Links — accessible to SCHOOL_ADMIN, HOD, and TEACHER */}
-        <Route element={<AuthGuard allowedRoles={[UserRole.SCHOOL_ADMIN, UserRole.HOD, UserRole.TEACHER]} />}>
-          <Route path="/admin/links" element={<RegistrationLinksPage />} />
-        </Route>
-
-        {/* HOD-only routes */}
-        <Route element={<AuthGuard allowedRoles={[UserRole.HOD]} />}>
-          <Route path="/hod/department" element={<DepartmentManagementPage />} />
-        </Route>
-
-        {/* Exam & Grade Management — accessible to SCHOOL_ADMIN, HOD, and TEACHER */}
-        <Route element={<AuthGuard allowedRoles={[UserRole.SCHOOL_ADMIN, UserRole.HOD, UserRole.TEACHER]} />}>
-          <Route path="/admin/exams" element={<ExamsPage />} />
-        </Route>
-
-        {/* Parent / Guardian routes */}
-        <Route element={<AuthGuard allowedRoles={[UserRole.GUARDIAN]} />}>
-          <Route path="/parent" element={<ParentDashboardPage />} />
-        </Route>
-
-        {/* Default redirect — guardians go to parent portal, everyone else to dashboard */}
+        {/* Default redirect */}
         <Route path="/" element={<Navigate to="/dashboard" replace />} />
         <Route path="*" element={<Navigate to="/dashboard" replace />} />
       </Routes>
