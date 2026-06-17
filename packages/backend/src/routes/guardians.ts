@@ -95,8 +95,9 @@ router.delete('/:id', async (req: Request, res: Response, next: NextFunction) =>
     if (req.user.role !== 'SCHOOL_ADMIN') {
       throw new AppError(403, 'FORBIDDEN', 'Only school admins can remove guardian links');
     }
+    const id = param(req, 'id');
     const link = await prisma.guardian.findUnique({
-      where: { id: req.params.id },
+      where: { id },
       select: { schoolId: true },
     });
     if (!link) {
@@ -105,7 +106,7 @@ router.delete('/:id', async (req: Request, res: Response, next: NextFunction) =>
     if (link.schoolId !== req.user.schoolId) {
       throw new AppError(403, 'FORBIDDEN', 'Access denied');
     }
-    await prisma.guardian.delete({ where: { id: req.params.id } });
+    await prisma.guardian.delete({ where: { id } });
     res.json({ success: true });
   } catch (err) {
     next(err);
@@ -118,9 +119,10 @@ router.get('/student/:studentId', async (req: Request, res: Response, next: Next
     if (!['SCHOOL_ADMIN', 'HOD'].includes(req.user.role)) {
       throw new AppError(403, 'FORBIDDEN', 'Access denied');
     }
+    const studentId = param(req, 'studentId');
     const links = await prisma.guardian.findMany({
       where: {
-        studentId: req.params.studentId,
+        studentId,
         schoolId: req.user.schoolId,
       },
       include: {
