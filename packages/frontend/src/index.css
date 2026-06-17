@@ -474,7 +474,7 @@
 }
 
 .sidebar-icon {
-  @apply w-4.5 h-4.5;
+  @apply w-4 h-4;
 }
 
 .sidebar-expanded .sidebar-label {
