@@ -1246,6 +1246,13 @@ const DashboardPage: React.FC = () => {
   const updateUser = useAuthStore((s) => s.updateUser);
   const navigate = useNavigate();
   const location = useLocation();
+
+  // Guardians don't belong on the main dashboard — redirect to parent portal
+  useEffect(() => {
+    if (user?.role === UserRole.GUARDIAN) {
+      navigate('/parent', { replace: true });
+    }
+  }, [user?.role, navigate]);
   const { theme, toggleTheme } = useTheme();
   const [currentTime, setCurrentTime] = useState(formatTime());
   const [unreadCount, setUnreadCount] = useState(0);

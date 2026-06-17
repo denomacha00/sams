@@ -421,8 +421,8 @@ const RegistrationLinksPage: React.FC = () => {
                 </div>
               )}
 
-              {/* SCHOOL_ADMIN: Department (for HODs, Students and Teachers) */}
-              {!isHOD && !isTeacher && (targetRole === 'HOD' || targetRole === 'STUDENT' || targetRole === 'TEACHER') && (
+              {/* SCHOOL_ADMIN: Department (for HODs, Students and Teachers) — skip for GUARDIAN */}
+              {!isHOD && !isTeacher && targetRole !== 'GUARDIAN' && (targetRole === 'HOD' || targetRole === 'STUDENT' || targetRole === 'TEACHER') && (
                 <div>
                   <label className="block text-sm text-ink-muted mb-1">
                     Department *
@@ -507,7 +507,9 @@ const RegistrationLinksPage: React.FC = () => {
                 <p className="text-xs text-indigo-300">
                   This link will allow up to <strong>{maxUses}</strong> {targetRole.toLowerCase()}s to self-register.
                   {targetRole === 'STUDENT' && selectedClass && ' They will be assigned to the selected class.'}
-                  {targetRole !== 'STUDENT' && ' They will need to provide their Work ID and phone number.'}
+                  {targetRole === 'STUDENT' && ' They must provide their admission number and phone number.'}
+                  {targetRole === 'GUARDIAN' && ' They must provide their child\'s admission number to auto-link as a parent.'}
+                  {(targetRole !== 'STUDENT' && targetRole !== 'GUARDIAN') && ' They will need to provide their Work ID and phone number.'}
                 </p>
               </div>
 

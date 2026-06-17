@@ -148,7 +148,7 @@ ReactDOM.createRoot(document.getElementById('root') as HTMLElement).render(
           <Route path="/parent" element={<ParentDashboardPage />} />
         </Route>
 
-        {/* Default redirect */}
+        {/* Default redirect — guardians go to parent portal, everyone else to dashboard */}
         <Route path="/" element={<Navigate to="/dashboard" replace />} />
         <Route path="*" element={<Navigate to="/dashboard" replace />} />
       </Routes>
