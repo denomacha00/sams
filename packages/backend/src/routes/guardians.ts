@@ -4,6 +4,12 @@ import { authenticate } from '../middleware/auth';
 import { AppError } from '../middleware/errors';
 import { UserRole } from '@prisma/client';
 
+const param = (req: Request, name: string): string => {
+  const v = req.params[name];
+  if (Array.isArray(v)) return v[0];
+  return v ?? '';
+};
+
 const router = Router();
 
 // All guardian routes require auth

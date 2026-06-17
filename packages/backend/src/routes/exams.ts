@@ -10,6 +10,14 @@ export const examsRouter = Router();
 // All routes require authentication
 examsRouter.use(authenticate);
 
+// ─── Helper: Extract string param safely ──────────────────────────────────────
+
+const param = (req: Request, name: string): string => {
+  const v = req.params[name];
+  if (Array.isArray(v)) return v[0];
+  return v ?? '';
+};
+
 // ─── Validation Schemas ───────────────────────────────────────────────────────
 
 const createTermSchema = z.object({
@@ -105,7 +113,6 @@ examsRouter.post('/terms', requireRole('SCHOOL_ADMIN'), async (req: Request, res
   try {
     const { isActive, startDate, endDate, name } = parsed.data;
 
-    // If isActive = true, deactivate all other terms for this school
     if (isActive) {
       await prisma.academicTerm.updateMany({
         where: { schoolId: req.user.schoolId, isActive: true },
@@ -143,9 +150,9 @@ examsRouter.patch('/terms/:id', requireRole('SCHOOL_ADMIN'), async (req: Request
   }
 
   try {
-    // Verify term exists and belongs to school
+    const id = param(req, 'id');
     const existing = await prisma.academicTerm.findFirst({
-      where: { id: req.params.id, schoolId: req.user.schoolId },
+      where: { id, schoolId: req.user.schoolId },
     });
 
     if (!existing) {
@@ -154,16 +161,15 @@ examsRouter.patch('/terms/:id', requireRole('SCHOOL_ADMIN'), async (req: Request
 
     const { isActive, startDate, endDate, name } = parsed.data;
 
-    // If setting isActive = true, deactivate all other terms for this school
     if (isActive) {
       await prisma.academicTerm.updateMany({
-        where: { schoolId: req.user.schoolId, id: { not: req.params.id }, isActive: true },
+        where: { schoolId: req.user.schoolId, id: { not: id }, isActive: true },
         data: { isActive: false },
       });
     }
 
     const term = await prisma.academicTerm.update({
-      where: { id: req.params.id },
+      where: { id },
       data: {
         ...(name !== undefined && { name }),
         ...(startDate !== undefined && { startDate: new Date(startDate) }),
@@ -182,25 +188,24 @@ examsRouter.patch('/terms/:id', requireRole('SCHOOL_ADMIN'), async (req: Request
 
 examsRouter.delete('/terms/:id', requireRole('SCHOOL_ADMIN'), async (req: Request, res: Response, next: NextFunction): Promise<void> => {
   try {
-    // Verify term exists and belongs to school
+    const id = param(req, 'id');
     const existing = await prisma.academicTerm.findFirst({
-      where: { id: req.params.id, schoolId: req.user.schoolId },
+      where: { id, schoolId: req.user.schoolId },
     });
 
     if (!existing) {
       throw new AppError(404, 'TERM_NOT_FOUND', 'Term not found');
     }
 
-    // Check no exams exist for this term
     const examCount = await prisma.exam.count({
-      where: { termId: req.params.id },
+      where: { termId: id },
     });
 
     if (examCount > 0) {
       throw new AppError(400, 'TERM_HAS_EXAMS', 'Cannot delete term with existing exams. Remove exams first.');
     }
 
-    await prisma.academicTerm.delete({ where: { id: req.params.id } });
+    await prisma.academicTerm.delete({ where: { id } });
 
     res.status(204).send();
   } catch (err) {
@@ -255,31 +260,20 @@ examsRouter.post('/', requireRole('SCHOOL_ADMIN', 'HOD'), async (req: Request, r
   try {
     const { termId, classId, subject, examType, maxScore, weight, date } = parsed.data;
 
-    // Verify term belongs to school
     const term = await prisma.academicTerm.findFirst({
       where: { id: termId, schoolId: req.user.schoolId },
     });
-    if (!term) {
-      throw new AppError(404, 'TERM_NOT_FOUND', 'Term not found');
-    }
+    if (!term) throw new AppError(404, 'TERM_NOT_FOUND', 'Term not found');
 
-    // Verify class belongs to school
     const cls = await prisma.class.findFirst({
       where: { id: classId, schoolId: req.user.schoolId },
     });
-    if (!cls) {
-      throw new AppError(404, 'CLASS_NOT_FOUND', 'Class not found');
-    }
+    if (!cls) throw new AppError(404, 'CLASS_NOT_FOUND', 'Class not found');
 
     const exam = await prisma.exam.create({
       data: {
         schoolId: req.user.schoolId,
-        termId,
-        classId,
-        subject,
-        examType,
-        maxScore,
-        weight,
+        termId, classId, subject, examType, maxScore, weight,
         date: new Date(date),
         createdById: req.user.sub,
       },
@@ -310,39 +304,26 @@ examsRouter.put('/:id', async (req: Request, res: Response, next: NextFunction):
   }
 
   try {
-    // Verify exam exists and belongs to school
+    const id = param(req, 'id');
     const existing = await prisma.exam.findFirst({
-      where: { id: req.params.id, schoolId: req.user.schoolId },
+      where: { id, schoolId: req.user.schoolId },
     });
 
-    if (!existing) {
-      throw new AppError(404, 'EXAM_NOT_FOUND', 'Exam not found');
-    }
+    if (!existing) throw new AppError(404, 'EXAM_NOT_FOUND', 'Exam not found');
 
     const { termId, classId, subject, examType, maxScore, weight, date } = parsed.data;
 
-    // Verify new term belongs to school if provided
     if (termId) {
-      const term = await prisma.academicTerm.findFirst({
-        where: { id: termId, schoolId: req.user.schoolId },
-      });
-      if (!term) {
-        throw new AppError(404, 'TERM_NOT_FOUND', 'Term not found');
-      }
+      const term = await prisma.academicTerm.findFirst({ where: { id: termId, schoolId: req.user.schoolId } });
+      if (!term) throw new AppError(404, 'TERM_NOT_FOUND', 'Term not found');
     }
-
-    // Verify new class belongs to school if provided
     if (classId) {
-      const cls = await prisma.class.findFirst({
-        where: { id: classId, schoolId: req.user.schoolId },
-      });
-      if (!cls) {
-        throw new AppError(404, 'CLASS_NOT_FOUND', 'Class not found');
-      }
+      const cls = await prisma.class.findFirst({ where: { id: classId, schoolId: req.user.schoolId } });
+      if (!cls) throw new AppError(404, 'CLASS_NOT_FOUND', 'Class not found');
     }
 
     const exam = await prisma.exam.update({
-      where: { id: req.params.id },
+      where: { id },
       data: {
         ...(termId !== undefined && { termId }),
         ...(classId !== undefined && { classId }),
@@ -369,25 +350,22 @@ examsRouter.put('/:id', async (req: Request, res: Response, next: NextFunction):
 
 examsRouter.delete('/:id', async (req: Request, res: Response, next: NextFunction): Promise<void> => {
   try {
-    // Verify exam exists and belongs to school
+    const id = param(req, 'id');
     const existing = await prisma.exam.findFirst({
-      where: { id: req.params.id, schoolId: req.user.schoolId },
+      where: { id, schoolId: req.user.schoolId },
     });
 
-    if (!existing) {
-      throw new AppError(404, 'EXAM_NOT_FOUND', 'Exam not found');
-    }
+    if (!existing) throw new AppError(404, 'EXAM_NOT_FOUND', 'Exam not found');
 
-    // Check no results exist
     const resultCount = await prisma.examResult.count({
-      where: { examId: req.params.id },
+      where: { examId: id },
     });
 
     if (resultCount > 0) {
       throw new AppError(400, 'EXAM_HAS_RESULTS', 'Cannot delete exam with existing results. Remove results first.');
     }
 
-    await prisma.exam.delete({ where: { id: req.params.id } });
+    await prisma.exam.delete({ where: { id } });
 
     res.status(204).send();
   } catch (err) {
@@ -409,23 +387,19 @@ examsRouter.post('/:id/results', async (req: Request, res: Response, next: NextF
   }
 
   try {
-    // Verify exam exists and belongs to school
+    const id = param(req, 'id');
     const exam = await prisma.exam.findFirst({
-      where: { id: req.params.id, schoolId: req.user.schoolId },
+      where: { id, schoolId: req.user.schoolId },
     });
 
-    if (!exam) {
-      throw new AppError(404, 'EXAM_NOT_FOUND', 'Exam not found');
-    }
+    if (!exam) throw new AppError(404, 'EXAM_NOT_FOUND', 'Exam not found');
 
     const { results } = parsed.data;
 
-    // Use transaction for atomic bulk insert/upsert
     await prisma.$transaction(async (tx) => {
-      // createMany with skipDuplicates acts like ON CONFLICT DO NOTHING
       await tx.examResult.createMany({
         data: results.map((r) => ({
-          examId: req.params.id,
+          examId: id,
           studentId: r.studentId,
           score: r.score,
           comment: r.comment ?? null,
@@ -434,9 +408,8 @@ examsRouter.post('/:id/results', async (req: Request, res: Response, next: NextF
       });
     });
 
-    // Return the updated list of results
     const updatedResults = await prisma.examResult.findMany({
-      where: { examId: req.params.id },
+      where: { examId: id },
       include: {
         student: { select: { id: true, fullName: true, admissionNumber: true } },
       },
@@ -452,17 +425,15 @@ examsRouter.post('/:id/results', async (req: Request, res: Response, next: NextF
 
 examsRouter.get('/:id/results', async (req: Request, res: Response, next: NextFunction): Promise<void> => {
   try {
-    // Verify exam exists and belongs to school
+    const id = param(req, 'id');
     const exam = await prisma.exam.findFirst({
-      where: { id: req.params.id, schoolId: req.user.schoolId },
+      where: { id, schoolId: req.user.schoolId },
     });
 
-    if (!exam) {
-      throw new AppError(404, 'EXAM_NOT_FOUND', 'Exam not found');
-    }
+    if (!exam) throw new AppError(404, 'EXAM_NOT_FOUND', 'Exam not found');
 
     const results = await prisma.examResult.findMany({
-      where: { examId: req.params.id },
+      where: { examId: id },
       include: {
         student: { select: { id: true, fullName: true, admissionNumber: true } },
       },
@@ -489,44 +460,22 @@ examsRouter.get('/grade-boundaries', async (req: Request, res: Response, next: N
   }
 });
 
-// ─── 12. POST /grade-boundaries — Create/Update GradeBoundary ─────────────────
+// ─── 12. POST /grade-boundaries ───────────────────────────────────────────────
 
 examsRouter.post('/grade-boundaries', requireRole('SCHOOL_ADMIN'), async (req: Request, res: Response, next: NextFunction): Promise<void> => {
   const parsed = gradeBoundarySchema.safeParse(req.body);
   if (!parsed.success) {
-    res.status(400).json({
-      error: 'Validation failed',
-      code: 'VALIDATION_ERROR',
-      details: parsed.error.flatten().fieldErrors,
-    });
+    res.status(400).json({ error: 'Validation failed', code: 'VALIDATION_ERROR', details: parsed.error.flatten().fieldErrors });
     return;
   }
 
   try {
     const { grade, minScore, maxScore, points } = parsed.data;
-
-    // Upsert on schoolId_grade unique constraint
     const boundary = await prisma.gradeBoundary.upsert({
-      where: {
-        schoolId_grade: {
-          schoolId: req.user.schoolId,
-          grade,
-        },
-      },
-      update: {
-        minScore,
-        maxScore,
-        points,
-      },
-      create: {
-        schoolId: req.user.schoolId,
-        grade,
-        minScore,
-        maxScore,
-        points,
-      },
+      where: { schoolId_grade: { schoolId: req.user.schoolId, grade } },
+      update: { minScore, maxScore, points },
+      create: { schoolId: req.user.schoolId, grade, minScore, maxScore, points },
     });
-
     res.status(200).json(boundary);
   } catch (err) {
     next(err instanceof AppError ? err : new AppError(500, 'INTERNAL_ERROR', 'Failed to upsert grade boundary'));
@@ -537,66 +486,38 @@ examsRouter.post('/grade-boundaries', requireRole('SCHOOL_ADMIN'), async (req: R
 
 examsRouter.get('/report-card/:studentId/:termId', async (req: Request, res: Response, next: NextFunction): Promise<void> => {
   try {
-    const { studentId, termId } = req.params;
+    const studentId = param(req, 'studentId');
+    const termId = param(req, 'termId');
     const schoolId = req.user.schoolId;
 
-    // Verify term belongs to school
-    const term = await prisma.academicTerm.findFirst({
-      where: { id: termId, schoolId },
-    });
-    if (!term) {
-      throw new AppError(404, 'TERM_NOT_FOUND', 'Term not found');
-    }
+    const term = await prisma.academicTerm.findFirst({ where: { id: termId, schoolId } });
+    if (!term) throw new AppError(404, 'TERM_NOT_FOUND', 'Term not found');
 
-    // Verify student exists in school
     const student = await prisma.user.findFirst({
-      where: { id: studentId, schoolId, role: 'STUDENT' },
+      where: { id: studentId, schoolId, role: UserRole.STUDENT },
     });
-    if (!student) {
-      throw new AppError(404, 'STUDENT_NOT_FOUND', 'Student not found');
-    }
+    if (!student) throw new AppError(404, 'STUDENT_NOT_FOUND', 'Student not found');
 
-    // Get all exams for this term with their results for the student
     const exams = await prisma.exam.findMany({
-      where: {
-        schoolId,
-        termId,
-        results: {
-          some: { studentId },
-        },
-      },
-      include: {
-        results: {
-          where: { studentId },
-        },
-      },
+      where: { schoolId, termId, results: { some: { studentId } } },
+      include: { results: { where: { studentId } } },
     });
 
     if (exams.length === 0) {
-      res.status(200).json({
-        subjects: [],
-        totalPoints: 0,
-        subjectCount: 0,
-        meanGrade: null,
-      });
+      res.status(200).json({ subjects: [], totalPoints: 0, subjectCount: 0, meanGrade: null });
       return;
     }
 
-    // Group by subject
     const subjectMap = new Map<string, { catScores: number[]; endTermScore: number | null }>();
 
     for (const exam of exams) {
       if (exam.results.length === 0) continue;
-
       const score = exam.results[0].score;
-      const subject = exam.subject;
-
-      let entry = subjectMap.get(subject);
+      let entry = subjectMap.get(exam.subject);
       if (!entry) {
         entry = { catScores: [], endTermScore: null };
-        subjectMap.set(subject, entry);
+        subjectMap.set(exam.subject, entry);
       }
-
       if (exam.examType.startsWith('CAT')) {
         entry.catScores.push(score);
       } else if (exam.examType === 'END_TERM') {
@@ -604,88 +525,41 @@ examsRouter.get('/report-card/:studentId/:termId', async (req: Request, res: Res
       }
     }
 
-    // Get grade boundaries
-    const gradeBoundaries = await prisma.gradeBoundary.findMany({
-      where: { schoolId },
-    });
+    const gradeBoundaries = await prisma.gradeBoundary.findMany({ where: { schoolId } });
 
-    function findGrade(finalScore: number): { grade: string; points: number } | null {
-      // Sort boundaries by minScore ascending, find the first where finalScore <= maxScore
-      // Boundaries are stored with minScore <= maxScore. We need minScore <= finalScore <= maxScore.
+    const findGrade = (finalScore: number): { grade: string; points: number } | null => {
       for (const gb of gradeBoundaries) {
-        if (finalScore >= gb.minScore && finalScore <= gb.maxScore) {
-          return { grade: gb.grade, points: gb.points };
-        }
+        if (finalScore >= gb.minScore && finalScore <= gb.maxScore) return { grade: gb.grade, points: gb.points };
       }
       return null;
-    }
+    };
 
-    const subjectsResult: Array<{
-      subject: string;
-      catAverage: number | null;
-      endTermScore: number | null;
-      finalScore: number;
-      grade: string | null;
-      points: number;
-    }> = [];
-
+    const subjectsResult: Array<{ subject: string; catAverage: number | null; endTermScore: number | null; finalScore: number; grade: string | null; points: number }> = [];
     let totalPoints = 0;
     let subjectCount = 0;
 
     for (const [subject, entry] of subjectMap) {
-      const catAverage = entry.catScores.length > 0
-        ? entry.catScores.reduce((a, b) => a + b, 0) / entry.catScores.length
-        : null;
+      const catAverage = entry.catScores.length > 0 ? entry.catScores.reduce((a, b) => a + b, 0) / entry.catScores.length : null;
       const endTermScore = entry.endTermScore ?? null;
-
-      // Compute final score
       let finalScore = 0;
-      if (catAverage !== null && endTermScore !== null) {
-        finalScore = catAverage * 0.3 + endTermScore * 0.7;
-      } else if (catAverage !== null) {
-        // Only CAT scores available — use them as final? The spec assumes both exist.
-        finalScore = catAverage;
-      } else if (endTermScore !== null) {
-        finalScore = endTermScore;
-      }
+      if (catAverage !== null && endTermScore !== null) finalScore = catAverage * 0.3 + endTermScore * 0.7;
+      else if (catAverage !== null) finalScore = catAverage;
+      else if (endTermScore !== null) finalScore = endTermScore;
 
       const gradeInfo = findGrade(finalScore);
       const points = gradeInfo?.points ?? 0;
-
-      subjectsResult.push({
-        subject,
-        catAverage,
-        endTermScore,
-        finalScore: Math.round(finalScore * 100) / 100,
-        grade: gradeInfo?.grade ?? null,
-        points,
-      });
-
+      subjectsResult.push({ subject, catAverage, endTermScore, finalScore: Math.round(finalScore * 100) / 100, grade: gradeInfo?.grade ?? null, points });
       totalPoints += points;
       subjectCount++;
     }
 
-    // Compute meanGrade: average of points mapped to grade
     let meanGrade: string | null = null;
     if (subjectCount > 0) {
-      const avgPoints = totalPoints / subjectCount;
-      // Find grade boundary that matches this average points
-      // Grade boundaries are on score ranges, not points. We'll find the grade based on points.
-      // Actually, mean grade = grade corresponding to average points.
-      // We'll look up the grade for the average points using the same logic (points map).
-      // But grade boundaries use scores, not points. For mean grade, we need to map points to a grade.
-      // Since no direct mapping, we'll compute the average finalScore across subjects and find its grade.
       const avgFinalScore = subjectsResult.reduce((sum, s) => sum + s.finalScore, 0) / subjectCount;
-      const gradeInfo = findGrade(avgFinalScore);
-      meanGrade = gradeInfo?.grade ?? null;
+      meanGrade = findGrade(avgFinalScore)?.grade ?? null;
     }
 
-    res.status(200).json({
-      subjects: subjectsResult,
-      totalPoints,
-      subjectCount,
-      meanGrade,
-    });
+    res.status(200).json({ subjects: subjectsResult, totalPoints, subjectCount, meanGrade });
   } catch (err) {
     next(err instanceof AppError ? err : new AppError(500, 'INTERNAL_ERROR', 'Failed to compute report card'));
   }
