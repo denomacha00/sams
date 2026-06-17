@@ -92,6 +92,8 @@ jobs:
           host: ${{ secrets.VPS_HOST }}
           username: ${{ secrets.VPS_USER }}
           key: ${{ secrets.VPS_SSH_KEY }}
+          timeout: 120s
           script: |
+            set -euo pipefail
             cd /var/www/sams
             bash scripts/deploy-production.sh --skip-tsc
