@@ -59,6 +59,7 @@ const ICONS = {
   profile: 'M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z',
   settings: 'M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.066 2.573c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.573 1.066c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.066-2.573c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z',
   academic: 'M12 14l9-5-9-5-9 5 9 5zm0 0l6.16-3.422a12.083 12.083 0 01.665 6.479A11.952 11.952 0 0012 20.055a11.952 11.952 0 00-6.824-2.998 12.078 12.078 0 01.665-6.479L12 14z',
+  ai: 'M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09zM18 9.75l-.259-1.035a3.375 3.375 0 00-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 002.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 002.456 2.456L21.75 6l-1.035.259a3.375 3.375 0 00-2.456 2.456L18 9.75z',
 };
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -328,6 +329,12 @@ const ParentDashboardPage: React.FC = () => {
               </svg>
             </Link>
 
+            <Link to="/ai" className="nav-icon-btn" title="AI Assistant">
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={ICONS.ai} />
+              </svg>
+            </Link>
+
             <Link to="/profile" className="nav-icon-btn" title="Profile">
               <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={ICONS.profile} />
@@ -357,6 +364,14 @@ const ParentDashboardPage: React.FC = () => {
             Here's an overview of your children's academic progress.
             {activeTermName && <span> Active term: <strong className="text-brand">{activeTermName}</strong></span>}
           </p>
+          <div className="mt-4">
+            <Link to="/ai" className="inline-flex items-center gap-2 rounded-xl border border-accent-orange/25 bg-accent-orange/10 px-4 py-2 text-sm font-semibold text-accent-orange hover:bg-accent-orange/15">
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={ICONS.ai} />
+              </svg>
+              Ask SAMS AI about attendance, grades, or school notices
+            </Link>
+          </div>
           <div className="mt-6 grid grid-cols-2 gap-3 lg:grid-cols-4">
             <div className="rounded-xl border border-line bg-surface-muted p-4">
               <p className="text-xs font-semibold uppercase tracking-wide text-ink-subtle">Linked Students</p>

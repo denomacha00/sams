@@ -349,6 +349,13 @@ If `CONVERSATION_MASTER_KEY` was rotated without keeping the old key:
 
 Users may see a **memory notice** in AI chat for unreadable older messages until threads are re-encrypted.
 
+### Parent/guardian AI and registration links
+
+- School Admin creates Guardian/Parent registration links from **Registration Links**.
+- A guardian registers with the child's admission number; SAMS auto-links the guardian to that existing student.
+- Parent/guardian accounts can use AI from the Parent Portal, sidebar, or floating AI button. AI answers only for linked children and cannot perform staff/admin actions.
+- If a parent sees no linked students, check `Guardian` links in the database or use the school admin Guardian Management page to link the parent manually.
+
 ---
 
 ## 11. School suspended / users can't login

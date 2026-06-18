@@ -204,10 +204,11 @@ Native client **`packages/mobile`** (display name **SAMS**) uses the same `/api/
 
 ### 5.3 AI Assistant
 - Floating chat widget on all pages
+- Authenticated School Admin, HOD, Teacher, Student, and Guardian/Parent accounts can use the AI assistant; parent/guardian data is limited to linked children.
 - Answers SAMS questions (local engine, no API needed)
 - Answers ANY question (Groq/OpenRouter for general knowledge)
-- Can generate/remake timetables
-- Can execute admin actions (Super Admin)
+- Helps with attendance, timetables, exams, grades, parent portal, registration links, notifications, and role-specific workflows
+- Can execute approved role actions with confirmation where required: Super Admin platform actions; school admin/HOD/teacher school actions such as registration links, notifications, session/attendance actions, and password-reset help
 - Voice input via Web Speech API
 - Handles misspellings via AI fallback
 
@@ -222,7 +223,7 @@ Native client **`packages/mobile`** (display name **SAMS**) uses the same `/api/
 ### 5.5 Risk Scoring
 - Formula: score = A×0.4 + G×0.4 + P×0.2
 - A = attendance risk (inverse of attendance %)
-- G = grade risk (placeholder, defaults to 50)
+- G = grade risk from active-term exam results when available; SAMS computes subject scores from CATs, optional practicals, and end-term results, then inverts the average score into risk. If no exam data exists yet, G defaults to neutral 50.
 - P = pattern risk (consecutive absences × 20)
 - Levels: LOW (<25), MEDIUM (25-50), HIGH (50-75), CRITICAL (≥75)
 - Auto-recomputed after every attendance record
@@ -398,6 +399,8 @@ Never run only `git pull` on the server without a build — that is what causes 
 - `GET /api/v1/registration-links/:token` — Resolve link
 - `POST /api/v1/registration-links/:token/register` — Self-register
 
+School Admin can generate HOD, Teacher, Student, and Guardian/Parent links. HOD can generate Teacher or Student links within their department; Teacher can generate Student links for classes they manage. Guardian/Parent links do not need department/class scope: the guardian registers with the child's admission number and SAMS auto-links them to that student when the student exists in the same school. Expired or exhausted registration links stop new signups only; they do not remove users who already registered.
+
 ### Timetable
 - `GET/POST /api/v1/timetable` — List/create entries
 - `PUT/DELETE /api/v1/timetable/:id` — Update/delete entry
@@ -515,6 +518,7 @@ School AI is scoped to the logged-in role and school:
 - **HOD:** department/class in-app notifications, department stats, registration links, teacher assignment, department class creation, and department attendance session start/end/manual marking.
 - **Teacher:** class in-app messages, registration links, session start/end, manual attendance marking, and class roster lookups.
 - **Student:** own attendance, timetable, teachers, HOD, department/class info, reminders, and class rep info.
+- **Guardian/Parent:** linked-child attendance summaries, report cards, school notices, and parent-portal guidance. Guardians cannot access unrelated students or staff/admin actions.
 - Destructive actions require confirmation where configured; AI never bypasses route/service RBAC.
 
 ---

@@ -32,6 +32,7 @@ const ICONS: Record<string, string> = {
   logout: 'M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1',
   parent: 'M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1',
   links: 'M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1',
+  ai: 'M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09zM18 9.75l-.259-1.035a3.375 3.375 0 00-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 002.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 002.456 2.456L21.75 6l-1.035.259a3.375 3.375 0 00-2.456 2.456L18 9.75z',
 };
 
 // ─── Navigation config ───────────────────────────────────────────────────────
@@ -40,6 +41,7 @@ const COMMON_ITEMS: SidebarItem[] = [
   { label: 'Dashboard', path: '/dashboard', icon: 'dashboard' },
   { label: 'Timetable', path: '/timetable', icon: 'timetable' },
   { label: 'Reports', path: '/reports', icon: 'reports' },
+  { label: 'AI Assistant', path: '/ai', icon: 'ai' },
   { label: 'Notifications', path: '/notifications', icon: 'notifications' },
   { label: 'Profile', path: '/profile', icon: 'profile' },
   { label: 'Settings', path: '/settings', icon: 'settings' },
@@ -91,6 +93,7 @@ function getSidebarItems(role?: UserRole): SidebarItem[] {
   const items: SidebarItem[] = role === UserRole.GUARDIAN
     ? [
         { label: 'Parent Dashboard', path: '/parent', icon: 'parent' },
+        { label: 'AI Assistant', path: '/ai', icon: 'ai' },
         { label: 'Notifications', path: '/notifications', icon: 'notifications' },
         { label: 'Profile', path: '/profile', icon: 'profile' },
         { label: 'Settings', path: '/settings', icon: 'settings' },

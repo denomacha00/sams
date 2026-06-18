@@ -648,18 +648,20 @@ function getRoleWorkflows(role?: UserRole): RoleWorkflow[] {
 
 function getPrimaryActions(role?: UserRole): QuickAction[] {
   if (role === UserRole.SCHOOL_ADMIN) return [
-    { to: '/admin/links', label: 'Registration Links', subtitle: 'Invite students and staff', icon: ICONS.link, variant: 'signin' },
+    { to: '/admin/links', label: 'Registration Links', subtitle: 'Students, staff, parents', icon: ICONS.link, variant: 'signin' },
     { to: '/class/students', label: 'Student Workbench', subtitle: 'Class lists and gaps', icon: ICONS.users },
     { to: '/reports', label: 'Attendance Reports', subtitle: 'School evidence', icon: ICONS.chart },
     { to: '/admin/departments', label: 'Departments', subtitle: 'Structure and HODs', icon: ICONS.building },
   ];
   if (role === UserRole.TEACHER) return [
+    { to: '/admin/links', label: 'Registration Links', subtitle: 'Class signup links', icon: ICONS.link, variant: 'signin' },
     { to: '/sessions', label: 'Open Session', subtitle: 'QR, link, manual, face', icon: ICONS.qr, variant: 'signin' },
     { to: '/class/students', label: 'My Students', subtitle: 'Class workbench', icon: ICONS.users },
     { to: '/admin/exams', label: 'Enter Marks', subtitle: 'CATs and practicals', icon: ICONS.clipboard },
     { to: '/reports', label: 'Class Reports', subtitle: 'After lesson follow-up', icon: ICONS.chart },
   ];
   if (role === UserRole.HOD) return [
+    { to: '/admin/links', label: 'Registration Links', subtitle: 'Dept signup links', icon: ICONS.link, variant: 'signin' },
     { to: '/hod/department', label: 'Department', subtitle: 'Classes and teachers', icon: ICONS.building },
     { to: '/sessions', label: 'Open Session', subtitle: 'Attendance tools', icon: ICONS.qr, variant: 'signin' },
     { to: '/admin/exams', label: 'Exam Plans', subtitle: 'CATs, practicals, end-term', icon: ICONS.book },
@@ -816,6 +818,7 @@ const DashboardPage: React.FC = () => {
       <div className="relative mb-8 dashboard-hero p-6 lg:p-7" style={{ animation: 'fadeInUp 0.5s ease-out forwards' }}>
         <div className="relative z-10 grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(320px,430px)] lg:items-center">
           <div className="min-w-0">
+            <span className="dashboard-kicker">SAMS Workbench</span>
             <div className="flex flex-col sm:flex-row sm:items-center gap-3 mb-1">
               <h2 className="text-2xl lg:text-3xl font-bold text-ink tracking-tight">
                 Welcome back, {user?.fullName?.split(' ')[0] || 'User'}
@@ -829,6 +832,13 @@ const DashboardPage: React.FC = () => {
             </div>
             <p className="text-ink-muted text-base max-w-lg">{getRoleGreeting(user?.role)}</p>
             <p className="text-xs text-ink-subtle mt-1">{todayLabel}</p>
+            <div className="dashboard-signal-row">
+              <span className="dashboard-signal">{quickActionGroups.length + (primaryActions.length > 0 ? 1 : 0)} work areas</span>
+              <span className="dashboard-signal">Role: {getRoleLabel(user?.role)}</span>
+              <Link to="/ai" className="dashboard-signal dashboard-signal--accent hover:border-accent-orange/45 hover:bg-accent-orange/15">
+                AI assistant ready
+              </Link>
+            </div>
             {user?.role === UserRole.TEACHER && !user?.classId && (
               <p className="mt-3 text-sm text-ink-muted max-w-lg">Taught classes come from timetable and class-teacher assignments. If a class is missing, ask your HOD to update the timetable.</p>
             )}

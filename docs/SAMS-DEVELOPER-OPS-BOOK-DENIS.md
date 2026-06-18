@@ -5,7 +5,7 @@
 | Item | Value |
 |------|--------|
 | **Version** | 1.0.0 |
-| **Last updated** | 2026-06-04 |
+| **Last updated** | 2026-06-18 |
 | **Author / owner** | Denis Macharia (Super Admin) |
 | **Production VPS** | `182.143.228.182` |
 | **Deploy path** | `/var/www/sams` |
@@ -826,8 +826,11 @@ School AI action execution is centralized in `services/ai/roleActionRegistry.ts`
 | HOD | department/class in-app notifications, department stats, registration links, teacher assignment, department class creation, department attendance session start/end/manual marking |
 | TEACHER | class in-app messages, registration links, session start/end, manual attendance marking, class roster |
 | STUDENT | own attendance/timetable/teachers/HOD/class/department/class-rep info and reminders |
+| GUARDIAN | linked-child attendance summaries, report cards, school notices, and parent-portal help; no unrelated student data and no staff/admin actions |
 
 Attendance AI actions must follow timetable/session rules: HODs are scoped to their department classes; teachers are scoped to taught classes. Destructive actions require confirmation where configured.
+
+Registration links remain a top workflow for school onboarding. School Admin can generate HOD, Teacher, Student, and Guardian links; HOD can generate Teacher/Student links in their department; Teacher can generate Student links only for classes they manage. Guardian links are school-scoped and require the child's admission number during registration so SAMS can auto-link the parent to the existing student. Expired/exhausted links block only future signups and never delete already registered users.
 
 ---
 
