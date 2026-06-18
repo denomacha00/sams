@@ -237,7 +237,6 @@ const ExamsTab: React.FC<{
   const [subject, setSubject] = useState('');
   const [examType, setExamType] = useState('CAT1');
   const [maxScore, setMaxScore] = useState(100);
-  const [weight, setWeight] = useState(1);
   const [date, setDate] = useState('');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
@@ -247,13 +246,12 @@ const ExamsTab: React.FC<{
     setError('');
     setSaving(true);
     try {
-      await apiClient.post('/exams', { termId, classId, subject, examType, maxScore, weight, date });
+      await apiClient.post('/exams', { termId, classId, subject, examType, maxScore, date });
       setTermId('');
       setClassId('');
       setSubject('');
       setExamType('CAT1');
       setMaxScore(100);
-      setWeight(1);
       setDate('');
       setShowForm(false);
       onRefresh();
@@ -320,10 +318,6 @@ const ExamsTab: React.FC<{
             <div>
               <label className="block text-sm text-ink-muted mb-1">Max Score</label>
               <input type="number" value={maxScore} onChange={(e) => setMaxScore(Number(e.target.value))} className="form-input w-full" min={1} required />
-            </div>
-            <div>
-              <label className="block text-sm text-ink-muted mb-1">Weight</label>
-              <input type="number" step="0.1" value={weight} onChange={(e) => setWeight(Number(e.target.value))} className="form-input w-full" min={0.1} required />
             </div>
             <div>
               <label className="block text-sm text-ink-muted mb-1">Exam Date</label>
@@ -523,7 +517,7 @@ const MarksTab: React.FC<{
             <div>
               <h4 className="font-semibold text-ink">{selectedExam.subject}</h4>
               <p className="text-sm text-ink-muted">
-                {examTypeLabel(selectedExam.examType)} · {selectedExam.class.name} · Max: {selectedExam.maxScore} · Weight: {selectedExam.weight}
+                {examTypeLabel(selectedExam.examType)} · {selectedExam.class.name} · Max: {selectedExam.maxScore}
               </p>
             </div>
             <button onClick={handleSave} disabled={saving} className="btn-primary px-6 py-2 text-sm">
