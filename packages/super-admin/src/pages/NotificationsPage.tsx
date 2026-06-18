@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import apiClient from '../services/apiClient';
 import { getSuperAdminApiError } from '../utils/apiError';
 import AttachmentImageEditor from '../components/AttachmentImageEditor';
@@ -20,12 +20,22 @@ interface SentNotification {
   schoolCount: number;
   createdAt: string;
   updatedAt?: string | null;
-  attachments?: Array<{
-    id: string;
-    fileName: string;
-    mimeType: string;
-    sizeBytes: number;
-  }>;
+  attachments?: NotificationAttachment[];
+}
+
+interface NotificationAttachment {
+  id: string;
+  fileName: string;
+  mimeType: string;
+  sizeBytes: number;
+  url?: string;
+  createdAt?: string;
+}
+
+interface AttachmentBlobState {
+  url?: string;
+  loading?: boolean;
+  error?: boolean;
 }
 
 interface SupportThread {
@@ -47,6 +57,7 @@ interface SupportMessage {
   senderName: string;
   senderRole: string;
   isMine: boolean;
+  attachments?: NotificationAttachment[];
 }
 
 interface SupportThreadDetail {
@@ -81,10 +92,37 @@ const ATTACHMENT_ACCEPT = [
   '.pptx',
 ].join(',');
 
+function superAttachmentPath(att: NotificationAttachment, download = false): string {
+  const suffix = download ? '?download=1' : '';
+  return `/super/notifications/attachments/${encodeURIComponent(att.id)}${suffix}`;
+}
+
+function collectAttachmentsFromSupport(thread: SupportThreadDetail | null): NotificationAttachment[] {
+  if (!thread) return [];
+  const seen = new Set<string>();
+  const attachments: NotificationAttachment[] = [];
+  for (const message of thread.messages) {
+    for (const attachment of message.attachments ?? []) {
+      if (seen.has(attachment.id)) continue;
+      seen.add(attachment.id);
+      attachments.push(attachment);
+    }
+  }
+  return attachments;
+}
+
 function formatFileSize(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+function isImageAttachment(att: NotificationAttachment): boolean {
+  return att.mimeType.startsWith('image/');
+}
+
+function isVideoAttachment(att: NotificationAttachment): boolean {
+  return att.mimeType.startsWith('video/');
 }
 
 function formatDateTime(value: string): string {
@@ -114,10 +152,15 @@ const NotificationsPage: React.FC = () => {
   const [sentLoading, setSentLoading] = useState(true);
   const [supportLoading, setSupportLoading] = useState(true);
   const [supportReply, setSupportReply] = useState('');
+  const [supportReplyAttachments, setSupportReplyAttachments] = useState<File[]>([]);
+  const [editingSupportAttachmentIndex, setEditingSupportAttachmentIndex] = useState<number | null>(null);
   const [supportReplying, setSupportReplying] = useState(false);
   const [clearingSupportThread, setClearingSupportThread] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
+  const [attachmentBlobs, setAttachmentBlobs] = useState<Record<string, AttachmentBlobState>>({});
+  const attachmentUrlsRef = useRef<Record<string, string>>({});
+  const attachmentLoadingRef = useRef<Set<string>>(new Set());
 
   const [audience, setAudience] = useState<Audience>('all_schools');
   const [schoolId, setSchoolId] = useState('');
@@ -174,22 +217,26 @@ const NotificationsPage: React.FC = () => {
       const { data } = await apiClient.get(`/super/notifications/support/${thread.schoolId}/${thread.adminUserId}`);
       setSelectedSupportThread(data);
       setSupportReply('');
+      setSupportReplyAttachments([]);
     } catch (err) {
       setError(getSuperAdminApiError(err, 'Failed to open support thread.'));
     }
   };
 
   const handleSupportReply = async () => {
-    if (!selectedSupportThread || !supportReply.trim()) return;
+    if (!selectedSupportThread || (!supportReply.trim() && supportReplyAttachments.length === 0)) return;
     setSupportReplying(true);
     setError(null);
     try {
-      await apiClient.post('/super/notifications/support/reply', {
-        schoolId: selectedSupportThread.schoolId,
-        adminUserId: selectedSupportThread.adminUserId,
-        message: supportReply.trim(),
-      });
+      const formData = new FormData();
+      formData.append('schoolId', selectedSupportThread.schoolId);
+      formData.append('adminUserId', selectedSupportThread.adminUserId);
+      if (supportReply.trim()) formData.append('message', supportReply.trim());
+      supportReplyAttachments.forEach((file) => formData.append('attachments', file));
+
+      await apiClient.post('/super/notifications/support/reply', formData, { timeout: 120_000 });
       setSupportReply('');
+      setSupportReplyAttachments([]);
       await openSupportThread({
         schoolId: selectedSupportThread.schoolId,
         schoolName: selectedSupportThread.schoolName,
@@ -225,6 +272,7 @@ const NotificationsPage: React.FC = () => {
       );
       setSelectedSupportThread(null);
       setSupportReply('');
+      setSupportReplyAttachments([]);
       await fetchSupportThreads();
       setSuccess('Support conversation cleared.');
     } catch (err) {
@@ -238,6 +286,68 @@ const NotificationsPage: React.FC = () => {
     Promise.all([fetchSchools(), fetchSent(), fetchSupportThreads()])
       .catch((err) => setError(getSuperAdminApiError(err, 'Failed to load notifications page.')))
       .finally(() => setLoading(false));
+  }, []);
+
+  const visibleSupportAttachments = useMemo(
+    () => collectAttachmentsFromSupport(selectedSupportThread),
+    [selectedSupportThread],
+  );
+
+  useEffect(() => {
+    const visibleIds = new Set(visibleSupportAttachments.map((att) => att.id));
+
+    Object.entries(attachmentUrlsRef.current).forEach(([id, url]) => {
+      if (!visibleIds.has(id)) {
+        URL.revokeObjectURL(url);
+        delete attachmentUrlsRef.current[id];
+        attachmentLoadingRef.current.delete(id);
+      }
+    });
+
+    setAttachmentBlobs((prev) => {
+      const next: Record<string, AttachmentBlobState> = {};
+      for (const id of visibleIds) {
+        if (prev[id]) next[id] = prev[id];
+      }
+      return next;
+    });
+
+    visibleSupportAttachments.forEach((att) => {
+      if (attachmentUrlsRef.current[att.id] || attachmentLoadingRef.current.has(att.id)) return;
+
+      attachmentLoadingRef.current.add(att.id);
+      setAttachmentBlobs((prev) => ({
+        ...prev,
+        [att.id]: { loading: true },
+      }));
+
+      apiClient.get<Blob>(superAttachmentPath(att), { responseType: 'blob' })
+        .then(({ data }) => {
+          const objectUrl = URL.createObjectURL(data);
+          attachmentUrlsRef.current[att.id] = objectUrl;
+          setAttachmentBlobs((prev) => ({
+            ...prev,
+            [att.id]: { url: objectUrl, loading: false },
+          }));
+        })
+        .catch(() => {
+          setAttachmentBlobs((prev) => ({
+            ...prev,
+            [att.id]: { loading: false, error: true },
+          }));
+        })
+        .finally(() => {
+          attachmentLoadingRef.current.delete(att.id);
+        });
+    });
+  }, [visibleSupportAttachments]);
+
+  useEffect(() => {
+    return () => {
+      Object.values(attachmentUrlsRef.current).forEach((url) => URL.revokeObjectURL(url));
+      attachmentUrlsRef.current = {};
+      attachmentLoadingRef.current.clear();
+    };
   }, []);
 
   const handleAttachmentSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -276,6 +386,44 @@ const NotificationsPage: React.FC = () => {
       prev.map((item, index) => (index === editingAttachmentIndex ? file : item)),
     );
     setEditingAttachmentIndex(null);
+  };
+
+  const handleSupportAttachmentSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(event.target.files || []);
+    if (files.length === 0) return;
+
+    const remaining = MAX_ATTACHMENT_FILES - supportReplyAttachments.length;
+    if (remaining <= 0) {
+      setError(`Attach up to ${MAX_ATTACHMENT_FILES} files.`);
+      event.target.value = '';
+      return;
+    }
+
+    const validFiles: File[] = [];
+    for (const file of files.slice(0, remaining)) {
+      if (file.size > MAX_ATTACHMENT_BYTES) {
+        setError(`${file.name} is too large. Each attachment must be 10MB or smaller.`);
+        continue;
+      }
+      validFiles.push(file);
+    }
+
+    if (validFiles.length > 0) {
+      setSupportReplyAttachments((prev) => [...prev, ...validFiles]);
+      setError(null);
+    }
+    event.target.value = '';
+  };
+
+  const removeSupportReplyAttachment = (index: number) => {
+    setSupportReplyAttachments((prev) => prev.filter((_, i) => i !== index));
+  };
+
+  const saveEditedSupportReplyAttachment = (file: File) => {
+    setSupportReplyAttachments((prev) =>
+      prev.map((item, index) => (index === editingSupportAttachmentIndex ? file : item)),
+    );
+    setEditingSupportAttachmentIndex(null);
   };
 
   const handleSend = async (event: React.FormEvent) => {
@@ -355,6 +503,93 @@ const NotificationsPage: React.FC = () => {
     } finally {
       setDeletingBatchId(null);
     }
+  };
+
+  const renderSupportAttachments = (attachments: NotificationAttachment[] | undefined, alignRight: boolean) => {
+    if (!attachments || attachments.length === 0) return null;
+
+    return (
+      <div className={`mt-3 grid gap-2 ${alignRight ? 'justify-items-end' : ''}`}>
+        {attachments.map((attachment) => {
+          const blob = attachmentBlobs[attachment.id];
+          const href = blob?.url;
+          const loadingAttachment = blob?.loading && !blob.url;
+          const failed = blob?.error && !blob.url;
+
+          if (isImageAttachment(attachment)) {
+            return (
+              <div key={attachment.id} className={`overflow-hidden rounded-xl border border-gray-700 bg-gray-900 ${alignRight ? 'ml-auto' : ''}`}>
+                {loadingAttachment ? (
+                  <div className="flex h-36 w-full max-w-xs items-center justify-center text-xs text-gray-500">
+                    Loading image...
+                  </div>
+                ) : failed || !href ? (
+                  <div className="flex h-36 w-full max-w-xs items-center justify-center px-4 text-center text-xs text-red-300">
+                    Image could not be loaded.
+                  </div>
+                ) : (
+                  <a href={href} target="_blank" rel="noreferrer" className="block">
+                    <img src={href} alt={attachment.fileName} className="max-h-56 w-full max-w-xs object-cover" loading="lazy" />
+                  </a>
+                )}
+                <div className="flex items-center justify-between gap-3 px-3 py-2 text-xs text-gray-400">
+                  <span className="min-w-0 truncate">{attachment.fileName} - {formatFileSize(attachment.sizeBytes)}</span>
+                  {href && <a href={href} download={attachment.fileName} className="shrink-0 text-amber-200 hover:text-amber-100">Download</a>}
+                </div>
+              </div>
+            );
+          }
+
+          if (isVideoAttachment(attachment)) {
+            return (
+              <div key={attachment.id} className={`overflow-hidden rounded-xl border border-gray-700 bg-gray-900 ${alignRight ? 'ml-auto' : ''}`}>
+                {loadingAttachment ? (
+                  <div className="flex h-44 w-full max-w-sm items-center justify-center text-xs text-gray-500">
+                    Loading video...
+                  </div>
+                ) : failed || !href ? (
+                  <div className="flex h-44 w-full max-w-sm items-center justify-center px-4 text-center text-xs text-red-300">
+                    Video could not be loaded.
+                  </div>
+                ) : (
+                  <video controls preload="metadata" src={href} className="max-h-72 w-full max-w-sm bg-black" />
+                )}
+                <div className="flex items-center justify-between gap-3 px-3 py-2 text-xs text-gray-400">
+                  <span className="min-w-0 truncate">{attachment.fileName} - {formatFileSize(attachment.sizeBytes)}</span>
+                  {href && <a href={href} download={attachment.fileName} className="shrink-0 text-amber-200 hover:text-amber-100">Download</a>}
+                </div>
+              </div>
+            );
+          }
+
+          return (
+            <div key={attachment.id} className={`flex max-w-full items-center gap-3 rounded-xl border border-gray-700 bg-gray-900 px-3 py-2 text-left ${alignRight ? 'ml-auto' : ''}`}>
+              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-amber-500/15 text-xs font-bold text-amber-100">
+                {attachment.mimeType === 'application/pdf' ? 'PDF' : 'FILE'}
+              </span>
+              <span className="min-w-0 flex-1">
+                <span className="block truncate text-sm font-medium text-gray-100">{attachment.fileName}</span>
+                <span className="block text-xs text-gray-500">
+                  {loadingAttachment ? 'Loading...' : failed ? 'Could not load file' : formatFileSize(attachment.sizeBytes)}
+                </span>
+              </span>
+              <span className="flex shrink-0 items-center gap-2 text-xs">
+                {href ? (
+                  <>
+                    <a href={href} target="_blank" rel="noreferrer" className="rounded-lg border border-gray-700 px-2 py-1 text-gray-300 hover:bg-gray-800 hover:text-white">Open</a>
+                    <a href={href} download={attachment.fileName} className="rounded-lg bg-amber-600 px-2 py-1 font-semibold text-white hover:bg-amber-500">Download</a>
+                  </>
+                ) : (
+                  <span className="rounded-lg border border-gray-700 px-2 py-1 text-gray-500">
+                    {failed ? 'Unavailable' : 'Loading'}
+                  </span>
+                )}
+              </span>
+            </div>
+          );
+        })}
+      </div>
+    );
   };
 
   if (loading) {
@@ -618,6 +853,7 @@ const NotificationsPage: React.FC = () => {
                             <span>{formatDateTime(item.createdAt)}</span>
                           </div>
                           <p className="whitespace-pre-wrap leading-relaxed">{item.message}</p>
+                          {renderSupportAttachments(item.attachments, item.isMine)}
                         </div>
                       </div>
                     ))}
@@ -629,14 +865,54 @@ const NotificationsPage: React.FC = () => {
                       onChange={(event) => setSupportReply(event.target.value)}
                       rows={3}
                       maxLength={2000}
-                      placeholder="Reply to this school admin..."
+                      placeholder="Reply to this school admin, or attach a file..."
                       className="w-full rounded-lg border border-gray-700 bg-gray-950 px-4 py-2 text-sm text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-amber-500"
                     />
+                    <div className="mt-3 rounded-xl border border-dashed border-gray-700 bg-gray-950/70 p-3">
+                      <input
+                        type="file"
+                        multiple
+                        accept={ATTACHMENT_ACCEPT}
+                        onChange={handleSupportAttachmentSelect}
+                        disabled={supportReplyAttachments.length >= MAX_ATTACHMENT_FILES}
+                        className="block w-full text-sm text-gray-400 file:mr-3 file:rounded-lg file:border-0 file:bg-amber-600 file:px-3 file:py-2 file:text-sm file:font-semibold file:text-white hover:file:bg-amber-500 disabled:opacity-60"
+                      />
+                      <p className="mt-2 text-xs text-gray-500">
+                        Attach screenshots, videos, PDFs, Office documents, or text files. Up to {MAX_ATTACHMENT_FILES} files, 10MB each.
+                      </p>
+                      {supportReplyAttachments.length > 0 && (
+                        <div className="mt-3 flex flex-wrap gap-2">
+                          {supportReplyAttachments.map((file, index) => (
+                            <span key={`${file.name}-${file.size}-${index}`} className="inline-flex max-w-full items-center gap-2 rounded-lg border border-gray-700 bg-gray-800 px-2.5 py-1.5 text-xs text-gray-300">
+                              <span className="max-w-[14rem] truncate">{file.name}</span>
+                              <span className="text-gray-500">{formatFileSize(file.size)}</span>
+                              {file.type.startsWith('image/') && (
+                                <button
+                                  type="button"
+                                  onClick={() => setEditingSupportAttachmentIndex(index)}
+                                  className="rounded px-1.5 py-0.5 text-amber-200 hover:bg-amber-500/10 hover:text-amber-100"
+                                >
+                                  Edit image
+                                </button>
+                              )}
+                              <button
+                                type="button"
+                                onClick={() => removeSupportReplyAttachment(index)}
+                                className="rounded px-1 text-gray-500 hover:bg-red-950/50 hover:text-red-300"
+                                aria-label={`Remove ${file.name}`}
+                              >
+                                x
+                              </button>
+                            </span>
+                          ))}
+                        </div>
+                      )}
+                    </div>
                     <div className="mt-3 flex justify-end">
                       <button
                         type="button"
                         onClick={() => void handleSupportReply()}
-                        disabled={supportReplying || !supportReply.trim()}
+                        disabled={supportReplying || (!supportReply.trim() && supportReplyAttachments.length === 0)}
                         className="rounded-xl bg-amber-600 px-4 py-2 text-sm font-bold text-white hover:bg-amber-500 disabled:cursor-not-allowed disabled:opacity-50"
                       >
                         {supportReplying ? 'Sending...' : 'Send reply'}
@@ -774,6 +1050,13 @@ const NotificationsPage: React.FC = () => {
           file={selectedAttachments[editingAttachmentIndex]}
           onCancel={() => setEditingAttachmentIndex(null)}
           onSave={saveEditedAttachment}
+        />
+      )}
+      {editingSupportAttachmentIndex !== null && supportReplyAttachments[editingSupportAttachmentIndex] && (
+        <AttachmentImageEditor
+          file={supportReplyAttachments[editingSupportAttachmentIndex]}
+          onCancel={() => setEditingSupportAttachmentIndex(null)}
+          onSave={saveEditedSupportReplyAttachment}
         />
       )}
     </div>

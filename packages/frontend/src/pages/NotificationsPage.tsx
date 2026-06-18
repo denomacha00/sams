@@ -211,6 +211,8 @@ const NotificationsPage: React.FC = () => {
   const [deleteError, setDeleteError] = useState<string | null>(null);
   const [supportMessages, setSupportMessages] = useState<SupportMessage[]>([]);
   const [supportDraft, setSupportDraft] = useState('');
+  const [supportAttachments, setSupportAttachments] = useState<File[]>([]);
+  const [editingSupportAttachmentIndex, setEditingSupportAttachmentIndex] = useState<number | null>(null);
   const [supportLoading, setSupportLoading] = useState(false);
   const [supportError, setSupportError] = useState<string | null>(null);
   const [supportSuccess, setSupportSuccess] = useState(false);
@@ -355,13 +357,17 @@ const NotificationsPage: React.FC = () => {
 
   const handleSupportSend = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!supportDraft.trim()) return;
+    if (!supportDraft.trim() && supportAttachments.length === 0) return;
     setSupportLoading(true);
     setSupportError(null);
     setSupportSuccess(false);
     try {
-      await apiClient.post('/notifications/support', { message: supportDraft.trim() });
+      const formData = new FormData();
+      if (supportDraft.trim()) formData.append('message', supportDraft.trim());
+      supportAttachments.forEach((file) => formData.append('attachments', file));
+      await apiClient.post('/notifications/support', formData, { timeout: 90_000 });
       setSupportDraft('');
+      setSupportAttachments([]);
       setSupportSuccess(true);
       await fetchSupportThread();
       setTimeout(() => setSupportSuccess(false), 2500);
@@ -377,8 +383,8 @@ const NotificationsPage: React.FC = () => {
   }, [folder, canSend]);
 
   const visibleAttachments = useMemo(
-    () => collectAttachments([...notifications, ...sentMessages]),
-    [notifications, sentMessages],
+    () => collectAttachments([...notifications, ...sentMessages, ...supportMessages]),
+    [notifications, sentMessages, supportMessages],
   );
 
   useEffect(() => {
@@ -520,6 +526,44 @@ const NotificationsPage: React.FC = () => {
       prev.map((item, index) => (index === editingAttachmentIndex ? file : item)),
     );
     setEditingAttachmentIndex(null);
+  };
+
+  const handleSupportAttachmentSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || []);
+    if (files.length === 0) return;
+
+    const remaining = MAX_ATTACHMENT_FILES - supportAttachments.length;
+    if (remaining <= 0) {
+      setSupportError(`Attach up to ${MAX_ATTACHMENT_FILES} files.`);
+      e.target.value = '';
+      return;
+    }
+
+    const validFiles: File[] = [];
+    for (const file of files.slice(0, remaining)) {
+      if (file.size > MAX_ATTACHMENT_BYTES) {
+        setSupportError(`${file.name} is too large. Each attachment must be 10MB or smaller.`);
+        continue;
+      }
+      validFiles.push(file);
+    }
+
+    if (validFiles.length > 0) {
+      setSupportAttachments((prev) => [...prev, ...validFiles]);
+      setSupportError(null);
+    }
+    e.target.value = '';
+  };
+
+  const removeSupportAttachment = (index: number) => {
+    setSupportAttachments((prev) => prev.filter((_, i) => i !== index));
+  };
+
+  const saveEditedSupportAttachment = (file: File) => {
+    setSupportAttachments((prev) =>
+      prev.map((item, index) => (index === editingSupportAttachmentIndex ? file : item)),
+    );
+    setEditingSupportAttachmentIndex(null);
   };
 
   const handleSend = async (e: React.FormEvent) => {
@@ -1105,7 +1149,7 @@ const NotificationsPage: React.FC = () => {
                 <p className="py-6 text-center text-sm text-ink-subtle">No support messages yet.</p>
               ) : (
                 supportMessages.map((item) => {
-                  const mine = item.senderId === user?.id || item.isMine;
+                  const mine = item.senderId === user?.id || !!item.isMine;
                   return (
                     <div key={item.id} className={`flex ${mine ? 'justify-end' : 'justify-start'}`}>
                       <div className={`max-w-[88%] rounded-2xl border px-4 py-3 text-sm ${
@@ -1128,6 +1172,7 @@ const NotificationsPage: React.FC = () => {
                           </button>
                         </div>
                         <p className="whitespace-pre-wrap leading-relaxed">{renderLinkedText(item.message)}</p>
+                        {renderAttachments(item.attachments, mine)}
                       </div>
                     </div>
                   );
@@ -1148,12 +1193,55 @@ const NotificationsPage: React.FC = () => {
                 rows={3}
                 maxLength={2000}
                 className="w-full input-field placeholder-ink-subtle focus:outline-none focus:ring-2 focus:ring-amber-500/35"
-                placeholder="Type your support message..."
+                placeholder="Type your support message, or attach a file..."
               />
+              <div className="rounded-xl border border-dashed border-amber-400/20 bg-surface/60 p-3">
+                <input
+                  type="file"
+                  multiple
+                  accept={ATTACHMENT_ACCEPT}
+                  onChange={handleSupportAttachmentSelect}
+                  disabled={supportAttachments.length >= MAX_ATTACHMENT_FILES}
+                  className="block w-full text-sm text-ink-muted file:mr-3 file:rounded-lg file:border-0 file:bg-amber-600 file:px-3 file:py-2 file:text-sm file:font-semibold file:text-white hover:file:bg-amber-500 disabled:opacity-60"
+                />
+                <p className="mt-2 text-xs text-ink-subtle">
+                  Send screenshots, videos, PDFs, links, or documents to Super Admin. Up to {MAX_ATTACHMENT_FILES} files, 10MB each.
+                </p>
+                {supportAttachments.length > 0 && (
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    {supportAttachments.map((file, index) => (
+                      <span
+                        key={`${file.name}-${file.size}-${index}`}
+                        className="inline-flex max-w-full items-center gap-2 rounded-lg border border-line bg-surface-elevated px-2.5 py-1.5 text-xs text-ink-muted"
+                      >
+                        <span className="truncate max-w-[14rem]">{file.name}</span>
+                        <span className="text-ink-subtle">{formatFileSize(file.size)}</span>
+                        {file.type.startsWith('image/') && (
+                          <button
+                            type="button"
+                            onClick={() => setEditingSupportAttachmentIndex(index)}
+                            className="rounded px-1.5 py-0.5 text-amber-300 hover:bg-amber-500/10 hover:text-amber-200"
+                          >
+                            Edit image
+                          </button>
+                        )}
+                        <button
+                          type="button"
+                          onClick={() => removeSupportAttachment(index)}
+                          className="rounded px-1 text-ink-subtle hover:bg-white/10 hover:text-red-300"
+                          aria-label={`Remove ${file.name}`}
+                        >
+                          x
+                        </button>
+                      </span>
+                    ))}
+                  </div>
+                )}
+              </div>
               <div className="flex justify-end">
                 <button
                   type="submit"
-                  disabled={supportLoading || !supportDraft.trim()}
+                  disabled={supportLoading || (!supportDraft.trim() && supportAttachments.length === 0)}
                   className="rounded-xl bg-amber-600 px-4 py-2 text-sm font-bold text-white hover:bg-amber-500 disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   {supportLoading ? 'Sending...' : 'Send to Super Admin'}
@@ -1526,6 +1614,13 @@ const NotificationsPage: React.FC = () => {
           file={selectedAttachments[editingAttachmentIndex]}
           onCancel={() => setEditingAttachmentIndex(null)}
           onSave={saveEditedAttachment}
+        />
+      )}
+      {editingSupportAttachmentIndex !== null && supportAttachments[editingSupportAttachmentIndex] && (
+        <AttachmentImageEditor
+          file={supportAttachments[editingSupportAttachmentIndex]}
+          onCancel={() => setEditingSupportAttachmentIndex(null)}
+          onSave={saveEditedSupportAttachment}
         />
       )}
     </div>

@@ -38,7 +38,7 @@ const replyNotificationSchema = z.object({
 });
 
 const supportNotificationSchema = z.object({
-  message: z.string().min(1).max(2000),
+  message: z.string().max(2000).optional(),
 });
 
 const testSmsSchema = z.object({
@@ -581,14 +581,20 @@ notificationsRouter.get('/support-thread', async (req: Request, res: Response): 
       })
     : [];
   const senderMap = new Map(senders.map((s) => [s.id, { name: s.fullName, role: s.role }]));
+  const attachmentMap = await loadAttachmentsByBatch(
+    notifications.map((n) => n.batchId ?? n.id).filter(Boolean),
+    req.schoolId,
+  );
 
   res.status(200).json(notifications.map((n) => {
     const sender = n.senderId ? senderMap.get(n.senderId) : null;
+    const attachmentKey = n.batchId ?? n.id;
     return {
       ...n,
       senderName: sender?.name ?? (n.senderId ? 'SAMS Super Admin' : 'System'),
       senderRole: sender?.role ?? (n.senderId ? 'SUPER_ADMIN' : null),
       isMine: n.senderId === req.user.sub,
+      attachments: attachmentMap.get(attachmentKey) ?? [],
     };
   }));
 });
@@ -597,7 +603,7 @@ notificationsRouter.get('/support-thread', async (req: Request, res: Response): 
  * POST /api/v1/notifications/support
  * School admins send a direct in-app support message to Super Admin.
  */
-notificationsRouter.post('/support', async (req: Request, res: Response): Promise<void> => {
+notificationsRouter.post('/support', uploadNotificationAttachments, async (req: Request, res: Response): Promise<void> => {
   if (req.user.role !== 'SCHOOL_ADMIN') {
     throw new AppError(403, 'FORBIDDEN', 'Only school admins can contact Super Admin support');
   }
@@ -608,6 +614,16 @@ notificationsRouter.post('/support', async (req: Request, res: Response): Promis
       error: 'Validation failed',
       code: 'VALIDATION_ERROR',
       details: parsed.error.flatten().fieldErrors,
+    });
+    return;
+  }
+
+  const files = uploadedNotificationFiles(req);
+  const message = parsed.data.message?.trim() ?? '';
+  if (!message && files.length === 0) {
+    res.status(400).json({
+      error: 'Message or attachment is required',
+      code: 'VALIDATION_ERROR',
     });
     return;
   }
@@ -631,15 +647,16 @@ notificationsRouter.post('/support', async (req: Request, res: Response): Promis
       senderId: req.user.sub,
       batchId,
       title,
-      message: parsed.data.message,
+      message: message || 'Attachment',
       type: SUPER_SUPPORT_NOTIFICATION_TYPE,
       scope: 'support',
       targetId: req.schoolId,
       targetRole: 'SUPER_ADMIN',
     },
   });
+  const attachments = await saveNotificationAttachments(files, req.schoolId, req.user.sub, batchId);
 
-  res.status(200).json({ success: true, notification });
+  res.status(200).json({ success: true, notification: { ...notification, attachments }, attachments });
 
   emitNotificationToUser(recipientId, {
     id: notification.id,
@@ -652,6 +669,7 @@ notificationsRouter.post('/support', async (req: Request, res: Response): Promis
     schoolName: sender?.school?.name,
     schoolCode: sender?.school?.schoolCode,
     batchId,
+    attachments,
   });
 });
 

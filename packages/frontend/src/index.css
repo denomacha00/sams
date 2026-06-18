@@ -501,7 +501,7 @@
   @apply fixed top-0 left-0 z-40 h-screen flex flex-col
     border-r border-line bg-surface shadow-card
     transition-all duration-300 ease-in-out;
-  overflow-x: hidden;
+  overflow: visible;
 }
 
 .sidebar-expanded {
@@ -514,7 +514,7 @@
 
 /* Sidebar header */
 .sidebar-header {
-  @apply flex items-center justify-between px-3 py-4 border-b border-line;
+  @apply relative flex items-center justify-between px-3 py-4 border-b border-line;
 }
 
 .sidebar-expanded .sidebar-header {
@@ -534,10 +534,14 @@
 }
 
 .sidebar-toggle {
-  @apply w-7 h-7 rounded-md flex items-center justify-center
-    bg-surface-muted border border-line text-ink-muted
-    hover:bg-surface-elevated hover:text-ink
-    transition-colors shrink-0;
+  @apply absolute -right-4 top-5 z-50 w-8 h-8 rounded-full flex items-center justify-center
+    bg-brand text-white border border-brand/40 shadow-card
+    hover:bg-brand-hover hover:border-brand hover:shadow-card-hover
+    transition-all shrink-0;
+}
+
+.sidebar-collapsed .sidebar-toggle {
+  @apply -right-4;
 }
 
 /* Sidebar nav */
@@ -617,6 +621,13 @@
 
 .topbar-left {
   @apply flex items-center gap-3;
+}
+
+.topbar-sidebar-toggle {
+  @apply relative w-10 h-10 rounded-xl flex items-center justify-center
+    bg-brand-light border border-brand/25 text-brand
+    hover:bg-brand hover:text-white hover:border-brand
+    transition-all duration-200 shadow-card-soft;
 }
 
 .topbar-title {
