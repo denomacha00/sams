@@ -68,7 +68,19 @@ const ICONS = {
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
-const EXAM_TYPES = ['CAT1', 'CAT2', 'CAT3', 'END_TERM'];
+const EXAM_TYPES = [
+  { value: 'CAT1', label: 'CAT 1' },
+  { value: 'CAT2', label: 'CAT 2' },
+  { value: 'CAT3', label: 'CAT 3' },
+  { value: 'PRACTICAL1', label: 'Practical 1' },
+  { value: 'PRACTICAL2', label: 'Practical 2' },
+  { value: 'PRACTICAL3', label: 'Practical 3' },
+  { value: 'END_TERM', label: 'End Term' },
+];
+
+function examTypeLabel(value: string): string {
+  return EXAM_TYPES.find((type) => type.value === value)?.label ?? value;
+}
 
 function formatDate(iso: string): string {
   return new Date(iso).toLocaleDateString('en-KE', { year: 'numeric', month: 'short', day: 'numeric' });
@@ -217,7 +229,8 @@ const ExamsTab: React.FC<{
   classes: { id: string; name: string }[];
   loading: boolean;
   onRefresh: () => void;
-}> = ({ exams, terms, classes, loading, onRefresh }) => {
+  canPlan: boolean;
+}> = ({ exams, terms, classes, loading, onRefresh, canPlan }) => {
   const [showForm, setShowForm] = useState(false);
   const [termId, setTermId] = useState('');
   const [classId, setClassId] = useState('');
@@ -270,12 +283,14 @@ const ExamsTab: React.FC<{
     <div>
       <div className="flex items-center justify-between mb-6">
         <h3 className="text-lg font-bold text-ink">Exams</h3>
-        <button onClick={() => setShowForm(!showForm)} className="btn-primary px-4 py-2 text-sm">
-          {showForm ? 'Cancel' : 'New Exam'}
-        </button>
+        {canPlan && (
+          <button onClick={() => setShowForm(!showForm)} className="btn-primary px-4 py-2 text-sm">
+            {showForm ? 'Cancel' : 'New Exam'}
+          </button>
+        )}
       </div>
 
-      {showForm && (
+      {canPlan && showForm && (
         <form onSubmit={handleCreate} className="surface-panel p-5 mb-6 space-y-4">
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             <div>
@@ -299,7 +314,7 @@ const ExamsTab: React.FC<{
             <div>
               <label className="block text-sm text-ink-muted mb-1">Exam Type</label>
               <select value={examType} onChange={(e) => setExamType(e.target.value)} className="form-input w-full">
-                {EXAM_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
+                {EXAM_TYPES.map((t) => <option key={t.value} value={t.value}>{t.label}</option>)}
               </select>
             </div>
             <div>
@@ -356,7 +371,7 @@ const ExamsTab: React.FC<{
                     <span className={`inline-block px-2 py-0.5 rounded text-xs font-semibold ${
                       exam.examType === 'END_TERM' ? 'bg-indigo-500/20 text-indigo-300' : 'bg-amber-500/20 text-amber-300'
                     }`}>
-                      {exam.examType}
+                      {examTypeLabel(exam.examType)}
                     </span>
                   </td>
                   <td className="py-3 px-3 text-ink-muted">{exam.class.name}</td>
@@ -373,9 +388,11 @@ const ExamsTab: React.FC<{
                       <Link to={`/exams/${exam.id}/marks`} className="text-xs px-3 py-1.5 rounded-lg border border-line text-ink-muted hover:bg-surface-muted">
                         Marks
                       </Link>
-                      <button onClick={() => handleDeleteExam(exam.id)} className="text-red-400 hover:text-red-300 p-1.5">
-                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={ICONS.trash} /></svg>
-                      </button>
+                      {canPlan && (
+                        <button onClick={() => handleDeleteExam(exam.id)} className="text-red-400 hover:text-red-300 p-1.5">
+                          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={ICONS.trash} /></svg>
+                        </button>
+                      )}
                     </div>
                   </td>
                 </tr>
@@ -702,12 +719,14 @@ const ExamsPage: React.FC = () => {
     void fetchData();
   }, [fetchData]);
 
-  const canManage = user?.role === UserRole.SCHOOL_ADMIN || user?.role === UserRole.HOD;
-  const canEnterMarks = user?.role === UserRole.TEACHER || user?.role === UserRole.HOD || user?.role === UserRole.SCHOOL_ADMIN;
+  const canManageTerms = user?.role === UserRole.SCHOOL_ADMIN;
+  const canPlanExams = user?.role === UserRole.HOD;
+  const canViewExams = user?.role === UserRole.SCHOOL_ADMIN || user?.role === UserRole.HOD || user?.role === UserRole.TEACHER;
+  const canEnterMarks = user?.role === UserRole.TEACHER || user?.role === UserRole.HOD;
 
   const tabs: { key: Tab; label: string; visible: boolean }[] = [
-    { key: 'terms', label: 'Terms', visible: canManage },
-    { key: 'exams', label: 'Exams', visible: canManage },
+    { key: 'terms', label: 'Terms', visible: canManageTerms },
+    { key: 'exams', label: 'Exams', visible: canViewExams },
     { key: 'marks', label: 'Enter Marks', visible: canEnterMarks },
     { key: 'boundaries', label: 'Grade Boundaries', visible: user?.role === UserRole.SCHOOL_ADMIN },
   ];
@@ -725,7 +744,7 @@ const ExamsPage: React.FC = () => {
             </Link>
             <div>
               <h1 className="text-lg font-bold text-ink tracking-tight">Exam & Grade Management</h1>
-              <p className="text-xs text-ink-muted font-medium">CATs, End-Term, report cards, and grade boundaries</p>
+              <p className="text-xs text-ink-muted font-medium">CATs, optional practicals, end-term, report cards, and grade boundaries</p>
             </div>
           </div>
         </div>
@@ -751,7 +770,7 @@ const ExamsPage: React.FC = () => {
 
         {/* Tab Content */}
         {tab === 'terms' && <TermsTab terms={terms} loading={loading} onRefresh={fetchData} />}
-        {tab === 'exams' && <ExamsTab exams={exams} terms={terms} classes={classes} loading={loading} onRefresh={fetchData} />}
+        {tab === 'exams' && <ExamsTab exams={exams} terms={terms} classes={classes} loading={loading} onRefresh={fetchData} canPlan={canPlanExams} />}
         {tab === 'marks' && <MarksTab exams={exams} terms={terms} classes={classes} onRefresh={fetchData} />}
         {tab === 'boundaries' && <BoundariesTab boundaries={boundaries} onRefresh={fetchData} />}
       </main>

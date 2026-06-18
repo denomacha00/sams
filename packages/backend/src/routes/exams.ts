@@ -4,6 +4,9 @@ import { prisma } from '../lib/prisma';
 import { AppError } from '../middleware/errors';
 import { authenticate } from '../middleware/auth';
 import { UserRole } from '@prisma/client';
+import { resolveTeacherTeachingClassIds } from '../lib/teacherScope';
+import { computeSubjectFinalScore } from '../lib/examScore';
+import { riskService } from '../services/riskService';
 
 export const examsRouter = Router();
 
@@ -45,11 +48,13 @@ const updateTermSchema = z.object({
   isActive: z.boolean().optional(),
 });
 
+const examTypeSchema = z.enum(['CAT1', 'CAT2', 'CAT3', 'PRACTICAL1', 'PRACTICAL2', 'PRACTICAL3', 'END_TERM']);
+
 const createExamSchema = z.object({
   termId: z.string().min(1),
   classId: z.string().min(1),
   subject: z.string().min(1).max(100),
-  examType: z.string().min(1).max(20),
+  examType: examTypeSchema,
   maxScore: z.number().int().positive(),
   weight: z.number().positive(),
   date: z.string().datetime({ offset: true }).or(z.string().regex(/^\d{4}-\d{2}-\d{2}$/)),
@@ -59,7 +64,7 @@ const updateExamSchema = z.object({
   termId: z.string().min(1).optional(),
   classId: z.string().min(1).optional(),
   subject: z.string().min(1).max(100).optional(),
-  examType: z.string().min(1).max(20).optional(),
+  examType: examTypeSchema.optional(),
   maxScore: z.number().int().positive().optional(),
   weight: z.number().positive().optional(),
   date: z.string().datetime({ offset: true }).or(z.string().regex(/^\d{4}-\d{2}-\d{2}$/)).optional(),
@@ -92,6 +97,96 @@ function requireRole(...roles: string[]) {
     }
     next();
   };
+}
+
+async function resolveExamForScope(schoolId: string, examId: string) {
+  return prisma.exam.findFirst({
+    where: { id: examId, schoolId },
+    include: { class: { select: { id: true, departmentId: true } } },
+  });
+}
+
+async function assertCanPlanExam(req: Request, classDepartmentId: string): Promise<void> {
+  if (req.user.role !== 'HOD') {
+    throw new AppError(403, 'FORBIDDEN', 'Exam plans are managed by HODs. School admins can follow reports and grade policy.');
+  }
+  if (!req.user.departmentId || classDepartmentId !== req.user.departmentId) {
+    throw new AppError(403, 'FORBIDDEN', 'HODs can only manage exam plans in their own department');
+  }
+}
+
+async function assertCanEnterExamResults(req: Request, exam: { classId: string; class: { departmentId: string } }): Promise<void> {
+  if (req.user.role === 'HOD') {
+    if (!req.user.departmentId || exam.class.departmentId !== req.user.departmentId) {
+      throw new AppError(403, 'FORBIDDEN', 'HODs can only enter marks for their own department');
+    }
+    return;
+  }
+
+  if (req.user.role === 'TEACHER') {
+    const classIds = await resolveTeacherTeachingClassIds(req.user.sub, req.user.classId);
+    if (classIds.includes(exam.classId)) return;
+    throw new AppError(403, 'FORBIDDEN', 'Teachers can only enter marks for classes they teach');
+  }
+
+  throw new AppError(403, 'FORBIDDEN', 'Only HODs and assigned teachers can enter marks');
+}
+
+async function assertCanViewExamResults(req: Request, exam: { classId: string; class: { departmentId: string } }): Promise<void> {
+  if (req.user.role === 'SCHOOL_ADMIN') return;
+  await assertCanEnterExamResults(req, exam);
+}
+
+async function assertCanViewReportCard(
+  req: Request,
+  student: { id: string; schoolId: string; classId: string | null; departmentId: string | null; class?: { departmentId: string } | null },
+): Promise<void> {
+  if (student.schoolId !== req.user.schoolId) {
+    throw new AppError(403, 'FORBIDDEN', 'Access to this resource is not allowed');
+  }
+
+  if (req.user.role === 'SCHOOL_ADMIN') return;
+  if (req.user.role === 'STUDENT' && req.user.sub === student.id) return;
+
+  if (req.user.role === 'GUARDIAN') {
+    const link = await prisma.guardian.findUnique({
+      where: { guardianId_studentId: { guardianId: req.user.sub, studentId: student.id } },
+      select: { id: true, schoolId: true },
+    });
+    if (link?.schoolId === req.user.schoolId) return;
+    throw new AppError(403, 'FORBIDDEN', 'Guardians can only view linked children');
+  }
+
+  if (req.user.role === 'HOD') {
+    const deptId = student.class?.departmentId ?? student.departmentId;
+    if (req.user.departmentId && deptId === req.user.departmentId) return;
+    throw new AppError(403, 'FORBIDDEN', 'HODs can only view report cards in their department');
+  }
+
+  if (req.user.role === 'TEACHER') {
+    const classIds = await resolveTeacherTeachingClassIds(req.user.sub, req.user.classId);
+    if (student.classId && classIds.includes(student.classId)) return;
+    throw new AppError(403, 'FORBIDDEN', 'Teachers can only view report cards for classes they teach');
+  }
+
+  throw new AppError(403, 'FORBIDDEN', 'Report-card access denied');
+}
+
+function roundReportScore(value: number): number {
+  return Math.round(value * 100) / 100;
+}
+
+function buildExamComponentMap(components: Array<{ examType: string; score: number; maxScore: number }>) {
+  const result: Record<string, { score: number; maxScore: number; percentage: number }> = {};
+  for (const component of components) {
+    const percentage = component.maxScore > 0 ? (component.score / component.maxScore) * 100 : 0;
+    result[component.examType] = {
+      score: roundReportScore(component.score),
+      maxScore: roundReportScore(component.maxScore),
+      percentage: roundReportScore(Math.max(0, Math.min(100, percentage))),
+    };
+  }
+  return result;
 }
 
 // ─── 1. GET /terms — List AcademicTerms ───────────────────────────────────────
@@ -234,13 +329,32 @@ examsRouter.get('/', async (req: Request, res: Response, next: NextFunction): Pr
 
     const where: Record<string, unknown> = { schoolId: req.user.schoolId };
 
-    // HOD scope: only exams for classes in their department
-    const scope = hodScopeFilter(req, req.user.role, req.user.departmentId);
-    if (scope.class) where.class = scope.class;
-
     if (termId) where.termId = termId;
-    if (classId) where.classId = classId;
     if (subject) where.subject = subject;
+
+    if (req.user.role === 'HOD') {
+      const scope = hodScopeFilter(req, req.user.role, req.user.departmentId);
+      if (scope.class) where.class = scope.class;
+      if (classId) where.classId = classId;
+    } else if (req.user.role === 'TEACHER') {
+      const classIds = await resolveTeacherTeachingClassIds(req.user.sub, req.user.classId);
+      if (classId && !classIds.includes(classId)) {
+        res.status(200).json([]);
+        return;
+      }
+      where.classId = classId ?? { in: classIds };
+    } else if (req.user.role === 'STUDENT') {
+      if (!req.user.classId || (classId && classId !== req.user.classId)) {
+        res.status(200).json([]);
+        return;
+      }
+      where.classId = req.user.classId;
+    } else if (req.user.role !== 'SCHOOL_ADMIN') {
+      res.status(200).json([]);
+      return;
+    } else if (classId) {
+      where.classId = classId;
+    }
 
     const exams = await prisma.exam.findMany({
       where,
@@ -261,7 +375,7 @@ examsRouter.get('/', async (req: Request, res: Response, next: NextFunction): Pr
 
 // ─── 6. POST / — Create Exam (HOD → their dept, SCHOOL_ADMIN → any) ──────────
 
-examsRouter.post('/', requireRole('SCHOOL_ADMIN', 'HOD'), async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+examsRouter.post('/', requireRole('HOD'), async (req: Request, res: Response, next: NextFunction): Promise<void> => {
   const parsed = createExamSchema.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({
@@ -285,12 +399,7 @@ examsRouter.post('/', requireRole('SCHOOL_ADMIN', 'HOD'), async (req: Request, r
     });
     if (!cls) throw new AppError(404, 'CLASS_NOT_FOUND', 'Class not found');
 
-    // HOD can only create exams for classes in their own department
-    if (req.user.role === 'HOD') {
-      if (!req.user.departmentId || cls.departmentId !== req.user.departmentId) {
-        throw new AppError(403, 'FORBIDDEN', 'You can only create exams for classes in your department');
-      }
-    }
+    await assertCanPlanExam(req, cls.departmentId);
 
     const exam = await prisma.exam.create({
       data: {
@@ -334,14 +443,7 @@ examsRouter.put('/:id', async (req: Request, res: Response, next: NextFunction):
 
     if (!existing) throw new AppError(404, 'EXAM_NOT_FOUND', 'Exam not found');
 
-    // HOD can only update exams in their department
-    if (req.user.role === 'HOD') {
-      if (!req.user.departmentId || existing.class.departmentId !== req.user.departmentId) {
-        throw new AppError(403, 'FORBIDDEN', 'You can only update exams in your department');
-      }
-    } else if (req.user.role !== 'SCHOOL_ADMIN') {
-      throw new AppError(403, 'FORBIDDEN', 'You do not have permission to update exams');
-    }
+    await assertCanPlanExam(req, existing.class.departmentId);
 
     const { termId, classId, subject, examType, maxScore, weight, date } = parsed.data;
 
@@ -352,9 +454,7 @@ examsRouter.put('/:id', async (req: Request, res: Response, next: NextFunction):
     if (classId) {
       const cls = await prisma.class.findFirst({ where: { id: classId, schoolId: req.user.schoolId } });
       if (!cls) throw new AppError(404, 'CLASS_NOT_FOUND', 'Class not found');
-      if (req.user.role === 'HOD' && (!req.user.departmentId || cls.departmentId !== req.user.departmentId)) {
-        throw new AppError(403, 'FORBIDDEN', 'Class is not in your department');
-      }
+      await assertCanPlanExam(req, cls.departmentId);
     }
 
     const exam = await prisma.exam.update({
@@ -393,14 +493,7 @@ examsRouter.delete('/:id', async (req: Request, res: Response, next: NextFunctio
 
     if (!existing) throw new AppError(404, 'EXAM_NOT_FOUND', 'Exam not found');
 
-    // HOD can only delete exams in their department
-    if (req.user.role === 'HOD') {
-      if (!req.user.departmentId || existing.class.departmentId !== req.user.departmentId) {
-        throw new AppError(403, 'FORBIDDEN', 'You can only delete exams in your department');
-      }
-    } else if (req.user.role !== 'SCHOOL_ADMIN') {
-      throw new AppError(403, 'FORBIDDEN', 'You do not have permission to delete exams');
-    }
+    await assertCanPlanExam(req, existing.class.departmentId);
 
     const resultCount = await prisma.examResult.count({
       where: { examId: id },
@@ -433,25 +526,54 @@ examsRouter.post('/:id/results', async (req: Request, res: Response, next: NextF
 
   try {
     const id = param(req, 'id');
-    const exam = await prisma.exam.findFirst({
-      where: { id, schoolId: req.user.schoolId },
-    });
+    const exam = await resolveExamForScope(req.user.schoolId, id);
 
     if (!exam) throw new AppError(404, 'EXAM_NOT_FOUND', 'Exam not found');
+    await assertCanEnterExamResults(req, exam);
 
     const { results } = parsed.data;
+    const uniqueStudentIds = [...new Set(results.map((r) => r.studentId))];
+    const validStudents = await prisma.user.findMany({
+      where: {
+        schoolId: req.user.schoolId,
+        classId: exam.classId,
+        role: UserRole.STUDENT,
+        id: { in: uniqueStudentIds },
+      },
+      select: { id: true },
+    });
+    const validStudentIds = new Set(validStudents.map((student) => student.id));
+
+    for (const result of results) {
+      if (!validStudentIds.has(result.studentId)) {
+        throw new AppError(400, 'STUDENT_NOT_IN_CLASS', 'All marks must belong to students in the exam class');
+      }
+      if (result.score < 0 || result.score > exam.maxScore) {
+        throw new AppError(400, 'INVALID_SCORE', `Scores must be between 0 and ${exam.maxScore}`);
+      }
+    }
 
     await prisma.$transaction(async (tx) => {
-      await tx.examResult.createMany({
-        data: results.map((r) => ({
-          examId: id,
-          studentId: r.studentId,
-          score: r.score,
-          comment: r.comment ?? null,
-        })),
-        skipDuplicates: true,
-      });
+      for (const result of results) {
+        await tx.examResult.upsert({
+          where: { examId_studentId: { examId: id, studentId: result.studentId } },
+          update: {
+            score: result.score,
+            comment: result.comment ?? null,
+          },
+          create: {
+            examId: id,
+            studentId: result.studentId,
+            score: result.score,
+            comment: result.comment ?? null,
+          },
+        });
+      }
     });
+
+    for (const studentId of uniqueStudentIds) {
+      riskService.computeRiskScore(req.user.schoolId, studentId).catch(() => {});
+    }
 
     const updatedResults = await prisma.examResult.findMany({
       where: { examId: id },
@@ -471,11 +593,10 @@ examsRouter.post('/:id/results', async (req: Request, res: Response, next: NextF
 examsRouter.get('/:id/results', async (req: Request, res: Response, next: NextFunction): Promise<void> => {
   try {
     const id = param(req, 'id');
-    const exam = await prisma.exam.findFirst({
-      where: { id, schoolId: req.user.schoolId },
-    });
+    const exam = await resolveExamForScope(req.user.schoolId, id);
 
     if (!exam) throw new AppError(404, 'EXAM_NOT_FOUND', 'Exam not found');
+    await assertCanViewExamResults(req, exam);
 
     const results = await prisma.examResult.findMany({
       where: { examId: id },
@@ -540,8 +661,10 @@ examsRouter.get('/report-card/:studentId/:termId', async (req: Request, res: Res
 
     const student = await prisma.user.findFirst({
       where: { id: studentId, schoolId, role: UserRole.STUDENT },
+      include: { class: { select: { departmentId: true } } },
     });
     if (!student) throw new AppError(404, 'STUDENT_NOT_FOUND', 'Student not found');
+    await assertCanViewReportCard(req, student);
 
     const exams = await prisma.exam.findMany({
       where: { schoolId, termId, results: { some: { studentId } } },
@@ -553,21 +676,17 @@ examsRouter.get('/report-card/:studentId/:termId', async (req: Request, res: Res
       return;
     }
 
-    const subjectMap = new Map<string, { catScores: number[]; endTermScore: number | null }>();
+    const subjectMap = new Map<string, Array<{ examType: string; score: number; maxScore: number }>>();
 
     for (const exam of exams) {
       if (exam.results.length === 0) continue;
       const score = exam.results[0].score;
       let entry = subjectMap.get(exam.subject);
       if (!entry) {
-        entry = { catScores: [], endTermScore: null };
+        entry = [];
         subjectMap.set(exam.subject, entry);
       }
-      if (exam.examType.startsWith('CAT')) {
-        entry.catScores.push(score);
-      } else if (exam.examType === 'END_TERM') {
-        entry.endTermScore = score;
-      }
+      entry.push({ examType: exam.examType, score, maxScore: exam.maxScore });
     }
 
     const gradeBoundaries = await prisma.gradeBoundary.findMany({ where: { schoolId } });
@@ -579,21 +698,33 @@ examsRouter.get('/report-card/:studentId/:termId', async (req: Request, res: Res
       return null;
     };
 
-    const subjectsResult: Array<{ subject: string; catAverage: number | null; endTermScore: number | null; finalScore: number; grade: string | null; points: number }> = [];
+    const subjectsResult: Array<{
+      subject: string;
+      components: Record<string, { score: number; maxScore: number; percentage: number }>;
+      catAverage: number | null;
+      practicalScore: number | null;
+      endTermScore: number | null;
+      finalScore: number;
+      grade: string | null;
+      points: number;
+    }> = [];
     let totalPoints = 0;
     let subjectCount = 0;
 
     for (const [subject, entry] of subjectMap) {
-      const catAverage = entry.catScores.length > 0 ? entry.catScores.reduce((a, b) => a + b, 0) / entry.catScores.length : null;
-      const endTermScore = entry.endTermScore ?? null;
-      let finalScore = 0;
-      if (catAverage !== null && endTermScore !== null) finalScore = catAverage * 0.3 + endTermScore * 0.7;
-      else if (catAverage !== null) finalScore = catAverage;
-      else if (endTermScore !== null) finalScore = endTermScore;
-
-      const gradeInfo = findGrade(finalScore);
+      const score = computeSubjectFinalScore(entry);
+      const gradeInfo = findGrade(score.finalScore);
       const points = gradeInfo?.points ?? 0;
-      subjectsResult.push({ subject, catAverage, endTermScore, finalScore: Math.round(finalScore * 100) / 100, grade: gradeInfo?.grade ?? null, points });
+      subjectsResult.push({
+        subject,
+        components: buildExamComponentMap(entry),
+        catAverage: score.catAverage,
+        practicalScore: score.practicalScore,
+        endTermScore: score.endTermScore,
+        finalScore: score.finalScore,
+        grade: gradeInfo?.grade ?? null,
+        points,
+      });
       totalPoints += points;
       subjectCount++;
     }

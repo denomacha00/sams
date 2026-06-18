@@ -2,6 +2,7 @@ import { prisma } from '../lib/prisma';
 import { AppError } from '../middleware/errors';
 import { RiskLevel } from '@sams/shared';
 import { notificationService } from './notificationService';
+import { computeSubjectFinalScore } from '../lib/examScore';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -80,28 +81,25 @@ export class RiskService {
           },
         });
 
-        // Group exams by subject and compute final score per subject
-        const subjectScores: Record<string, number[]> = {};
+        // Group exams by subject and compute final score per subject.
+        const subjectScores: Record<string, Array<{ examType: string; score: number; maxScore: number }>> = {};
 
         for (const exam of exams) {
           if (exam.results.length === 0) continue;
           const rawScore = exam.results[0].score;
-          // Normalise score to 0-100 based on maxScore
-          const normalised = exam.maxScore > 0 ? (rawScore / exam.maxScore) * 100 : 0;
           if (!subjectScores[exam.subject]) {
-            subjectScores[exam.subject] = [0, 0]; // [CAT, EndTerm]
+            subjectScores[exam.subject] = [];
           }
-          if (exam.examType.startsWith('CAT')) {
-            subjectScores[exam.subject][0] = normalised;
-          } else if (exam.examType === 'END_TERM') {
-            subjectScores[exam.subject][1] = normalised;
-          }
+          subjectScores[exam.subject].push({
+            examType: exam.examType,
+            score: rawScore,
+            maxScore: exam.maxScore,
+          });
         }
 
         const finalScores: number[] = [];
-        for (const [_, scores] of Object.entries(subjectScores)) {
-          const [cat, endTerm] = scores;
-          finalScores.push(cat * 0.3 + endTerm * 0.7);
+        for (const components of Object.values(subjectScores)) {
+          finalScores.push(computeSubjectFinalScore(components).finalScore);
         }
 
         if (finalScores.length > 0) {

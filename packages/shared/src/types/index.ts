@@ -281,6 +281,9 @@ export enum ExamType {
   CAT1 = 'CAT1',
   CAT2 = 'CAT2',
   CAT3 = 'CAT3',
+  PRACTICAL1 = 'PRACTICAL1',
+  PRACTICAL2 = 'PRACTICAL2',
+  PRACTICAL3 = 'PRACTICAL3',
   END_TERM = 'END_TERM',
 }
 

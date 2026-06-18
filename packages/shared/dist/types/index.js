@@ -62,6 +62,9 @@ var ExamType;
     ExamType["CAT1"] = "CAT1";
     ExamType["CAT2"] = "CAT2";
     ExamType["CAT3"] = "CAT3";
+    ExamType["PRACTICAL1"] = "PRACTICAL1";
+    ExamType["PRACTICAL2"] = "PRACTICAL2";
+    ExamType["PRACTICAL3"] = "PRACTICAL3";
     ExamType["END_TERM"] = "END_TERM";
 })(ExamType || (exports.ExamType = ExamType = {}));
 //# sourceMappingURL=index.js.map

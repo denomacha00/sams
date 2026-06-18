@@ -28,7 +28,9 @@ interface AttendanceSummary {
 
 interface ReportCardSubject {
   subject: string;
+  components?: Record<string, { score: number; maxScore: number; percentage: number }>;
   catAverage: number | null;
+  practicalScore: number | null;
   endTermScore: number | null;
   finalScore: number;
   grade: string | null;
@@ -69,6 +71,12 @@ function formatDate(): string {
 
 function formatTime(): string {
   return new Date().toLocaleTimeString('en-KE', { hour: '2-digit', minute: '2-digit' });
+}
+
+function formatComponent(subject: ReportCardSubject, key: string): string {
+  const component = subject.components?.[key];
+  if (!component) return '—';
+  return `${component.score}/${component.maxScore}`;
 }
 
 // ─── Ward Card ───────────────────────────────────────────────────────────────
@@ -150,6 +158,10 @@ const WardCard: React.FC<{
                         <tr className="border-b border-line">
                           <th className="text-left py-1.5 pr-2 text-ink-muted font-medium">Subject</th>
                           <th className="text-right py-1.5 px-2 text-ink-muted font-medium">CAT Avg</th>
+                          <th className="text-right py-1.5 px-2 text-ink-muted font-medium">Prac 1</th>
+                          <th className="text-right py-1.5 px-2 text-ink-muted font-medium">Prac 2</th>
+                          <th className="text-right py-1.5 px-2 text-ink-muted font-medium">Prac 3</th>
+                          <th className="text-right py-1.5 px-2 text-ink-muted font-medium">Prac Avg</th>
                           <th className="text-right py-1.5 px-2 text-ink-muted font-medium">End Term</th>
                           <th className="text-right py-1.5 px-2 text-ink-muted font-medium">Final</th>
                           <th className="text-right py-1.5 pl-2 text-ink-muted font-medium">Grade</th>
@@ -160,6 +172,10 @@ const WardCard: React.FC<{
                           <tr key={s.subject} className="border-b border-line/30">
                             <td className="py-1.5 pr-2 text-ink font-medium">{s.subject}</td>
                             <td className="py-1.5 px-2 text-right text-ink-muted">{s.catAverage?.toFixed(1) ?? '—'}</td>
+                            <td className="py-1.5 px-2 text-right text-ink-muted">{formatComponent(s, 'PRACTICAL1')}</td>
+                            <td className="py-1.5 px-2 text-right text-ink-muted">{formatComponent(s, 'PRACTICAL2')}</td>
+                            <td className="py-1.5 px-2 text-right text-ink-muted">{formatComponent(s, 'PRACTICAL3')}</td>
+                            <td className="py-1.5 px-2 text-right text-ink-muted">{s.practicalScore?.toFixed(1) ?? '—'}</td>
                             <td className="py-1.5 px-2 text-right text-ink-muted">{s.endTermScore?.toFixed(1) ?? '—'}</td>
                             <td className="py-1.5 px-2 text-right text-ink font-semibold">{s.finalScore.toFixed(1)}</td>
                             <td className="py-1.5 pl-2 text-right font-bold">{s.grade ?? '—'}</td>
