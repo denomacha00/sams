@@ -139,6 +139,48 @@
   }
 
   /* Dashboard stat cards */
+  .dashboard-hero {
+    @apply rounded-2xl border border-line bg-surface shadow-card;
+  }
+
+  .dashboard-command-card {
+    @apply flex min-h-[5rem] items-center gap-3 rounded-xl border border-line bg-surface-muted p-3
+      hover:border-brand/45 hover:bg-surface-elevated hover:shadow-card-soft transition-all duration-200;
+  }
+
+  .dashboard-command-card--attendance {
+    @apply hover:border-accent-orange/45;
+  }
+
+  .dashboard-workflow-grid {
+    @apply grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4;
+  }
+
+  .dashboard-workflow-card {
+    @apply flex min-h-[9rem] flex-col rounded-2xl border border-line bg-surface p-4 shadow-card-soft
+      hover:bg-surface-elevated hover:shadow-card-soft-hover transition-all duration-200;
+  }
+
+  .dashboard-workflow-card--indigo {
+    @apply hover:border-brand/45;
+  }
+
+  .dashboard-workflow-card--orange {
+    @apply hover:border-accent-orange/45;
+  }
+
+  .dashboard-workflow-step {
+    @apply inline-flex h-7 min-w-10 items-center justify-center rounded-full border px-2 text-[11px] font-bold tracking-wide;
+  }
+
+  .dashboard-workflow-step--indigo {
+    @apply border-brand/25 bg-brand-light text-brand;
+  }
+
+  .dashboard-workflow-step--orange {
+    @apply border-accent-orange/25 bg-accent-orange/10 text-accent-orange;
+  }
+
   .dash-card {
     @apply relative flex min-h-[5.5rem] flex-col gap-2 rounded-lg border border-line bg-surface p-4 shadow-card-soft
       hover:border-brand/40 hover:bg-surface-elevated hover:shadow-card-soft-hover transition-all duration-200;
@@ -256,10 +298,39 @@
       hover:bg-surface-muted transition-colors;
   }
 
-  .input-field {
+  .input-field,
+  .form-input {
     @apply w-full bg-surface-muted border border-line-strong rounded-lg px-4 py-3
       text-ink placeholder-ink-subtle
       focus:outline-none focus:ring-2 focus:ring-brand/30 focus:border-brand transition-colors;
+    color-scheme: light;
+    accent-color: var(--color-brand);
+  }
+
+  .dark .input-field,
+  .dark .form-input {
+    color-scheme: dark;
+  }
+
+  select.input-field,
+  select.form-input {
+    @apply cursor-pointer;
+  }
+
+  .input-field option,
+  .form-input option {
+    background-color: var(--color-surface);
+    color: var(--color-text);
+  }
+
+  .input-field:disabled,
+  .form-input:disabled {
+    @apply cursor-not-allowed opacity-60;
+  }
+
+  .input-field[type='date']::-webkit-calendar-picker-indicator,
+  .form-input[type='date']::-webkit-calendar-picker-indicator {
+    opacity: 0.75;
   }
 
   .page-title {

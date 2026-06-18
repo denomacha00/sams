@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuthStore } from '../../store/authStore';
-import { UserRole, ExamType } from '@sams/shared';
+import { UserRole } from '@sams/shared';
 import apiClient from '../../services/apiClient';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -511,7 +511,7 @@ const MarksTab: React.FC<{
           <option value="">Choose an exam...</option>
           {exams.map((e) => (
             <option key={e.id} value={e.id}>
-              {e.subject} - {e.examType} - {e.class.name} ({formatDate(e.date)})
+              {e.subject} - {examTypeLabel(e.examType)} - {e.class.name} ({formatDate(e.date)})
             </option>
           ))}
         </select>
@@ -523,7 +523,7 @@ const MarksTab: React.FC<{
             <div>
               <h4 className="font-semibold text-ink">{selectedExam.subject}</h4>
               <p className="text-sm text-ink-muted">
-                {selectedExam.examType} · {selectedExam.class.name} · Max: {selectedExam.maxScore} · Weight: {selectedExam.weight}
+                {examTypeLabel(selectedExam.examType)} · {selectedExam.class.name} · Max: {selectedExam.maxScore} · Weight: {selectedExam.weight}
               </p>
             </div>
             <button onClick={handleSave} disabled={saving} className="btn-primary px-6 py-2 text-sm">
@@ -730,6 +730,10 @@ const ExamsPage: React.FC = () => {
     { key: 'marks', label: 'Enter Marks', visible: canEnterMarks },
     { key: 'boundaries', label: 'Grade Boundaries', visible: user?.role === UserRole.SCHOOL_ADMIN },
   ];
+  const visibleTabs = tabs.filter((t) => t.visible);
+  const activeTerm = terms.find((term) => term.isActive);
+  const practicalPlans = exams.filter((exam) => exam.examType.startsWith('PRACTICAL')).length;
+  const recordedResults = exams.reduce((sum, exam) => sum + (exam._count?.results ?? 0), 0);
 
   return (
     <div className="page-shell">
@@ -751,28 +755,81 @@ const ExamsPage: React.FC = () => {
       </header>
 
       <main className="max-w-7xl mx-auto px-6 lg:px-8 py-10">
+        <section className="mb-8 dashboard-hero p-5 lg:p-6">
+          <div className="grid gap-4 md:grid-cols-4">
+            <div className="dash-stat dash-stat-accent-indigo">
+              <div className="dash-card-icon dash-card-icon-secondary">
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.7} d={ICONS.calendar} />
+                </svg>
+              </div>
+              <div>
+                <p className="dash-stat-label">Active Term</p>
+                <p className="text-sm font-semibold text-ink mt-1">{activeTerm?.name ?? 'Not set'}</p>
+              </div>
+            </div>
+            <div className="dash-stat dash-stat-accent-indigo">
+              <div className="dash-card-icon dash-card-icon-secondary">
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.7} d={ICONS.book} />
+                </svg>
+              </div>
+              <div>
+                <p className="dash-stat-label">Exam Plans</p>
+                <p className="dash-stat-value mt-1">{exams.length}</p>
+              </div>
+            </div>
+            <div className="dash-stat dash-stat-accent-orange">
+              <div className="dash-card-icon dash-card-icon-primary">
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.7} d={ICONS.clipboard} />
+                </svg>
+              </div>
+              <div>
+                <p className="dash-stat-label">Practical Plans</p>
+                <p className="dash-stat-value mt-1 text-accent-orange">{practicalPlans}</p>
+              </div>
+            </div>
+            <div className="dash-stat dash-stat-accent-indigo">
+              <div className="dash-card-icon dash-card-icon-secondary">
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.7} d={ICONS.check} />
+                </svg>
+              </div>
+              <div>
+                <p className="dash-stat-label">Recorded Marks</p>
+                <p className="dash-stat-value mt-1">{recordedResults}</p>
+              </div>
+            </div>
+          </div>
+        </section>
+
         {/* Tab Navigation */}
-        <div className="flex gap-2 mb-8 border-b border-line pb-4 overflow-x-auto">
-          {tabs.filter((t) => t.visible).map((t) => (
-            <button
-              key={t.key}
-              onClick={() => setTab(t.key)}
-              className={`px-5 py-2.5 text-sm font-semibold rounded-xl transition-colors whitespace-nowrap ${
-                tab === t.key
-                  ? 'bg-brand text-white shadow-sm'
-                  : 'text-ink-muted hover:text-ink hover:bg-surface-muted'
-              }`}
-            >
-              {t.label}
-            </button>
-          ))}
+        <div className="surface-card p-2 mb-8">
+          <div className="grid gap-2 sm:flex sm:overflow-x-auto">
+            {visibleTabs.map((t) => (
+              <button
+                key={t.key}
+                onClick={() => setTab(t.key)}
+                className={`px-5 py-2.5 text-sm font-semibold rounded-lg transition-colors whitespace-nowrap ${
+                  tab === t.key
+                    ? 'bg-brand text-white shadow-sm'
+                    : 'text-ink-muted hover:text-ink hover:bg-surface-muted'
+                }`}
+              >
+                {t.label}
+              </button>
+            ))}
+          </div>
         </div>
 
         {/* Tab Content */}
-        {tab === 'terms' && <TermsTab terms={terms} loading={loading} onRefresh={fetchData} />}
-        {tab === 'exams' && <ExamsTab exams={exams} terms={terms} classes={classes} loading={loading} onRefresh={fetchData} canPlan={canPlanExams} />}
-        {tab === 'marks' && <MarksTab exams={exams} terms={terms} classes={classes} onRefresh={fetchData} />}
-        {tab === 'boundaries' && <BoundariesTab boundaries={boundaries} onRefresh={fetchData} />}
+        <section>
+          {tab === 'terms' && <TermsTab terms={terms} loading={loading} onRefresh={fetchData} />}
+          {tab === 'exams' && <ExamsTab exams={exams} terms={terms} classes={classes} loading={loading} onRefresh={fetchData} canPlan={canPlanExams} />}
+          {tab === 'marks' && <MarksTab exams={exams} terms={terms} classes={classes} onRefresh={fetchData} />}
+          {tab === 'boundaries' && <BoundariesTab boundaries={boundaries} onRefresh={fetchData} />}
+        </section>
       </main>
     </div>
   );

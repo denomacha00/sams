@@ -287,6 +287,14 @@ const ParentDashboardPage: React.FC = () => {
     navigate('/login');
   };
 
+  const attendanceRows = Object.values(attendanceMap);
+  const averageAttendance = attendanceRows.length > 0
+    ? Math.round(attendanceRows.reduce((sum, row) => sum + row.attendancePercentage, 0) / attendanceRows.length)
+    : 0;
+  const totalAbsent = attendanceRows.reduce((sum, row) => sum + row.totalAbsent, 0);
+  const totalLate = attendanceRows.reduce((sum, row) => sum + row.totalLate, 0);
+  const reportCardsReady = Object.values(reportCardMap).filter((card) => card.subjects.length > 0).length;
+
   return (
     <div className="page-shell">
       <style>{`
@@ -349,6 +357,24 @@ const ParentDashboardPage: React.FC = () => {
             Here's an overview of your children's academic progress.
             {activeTermName && <span> Active term: <strong className="text-brand">{activeTermName}</strong></span>}
           </p>
+          <div className="mt-6 grid grid-cols-2 gap-3 lg:grid-cols-4">
+            <div className="rounded-xl border border-line bg-surface-muted p-4">
+              <p className="text-xs font-semibold uppercase tracking-wide text-ink-subtle">Linked Students</p>
+              <p className="mt-2 text-2xl font-bold text-ink">{wards.length}</p>
+            </div>
+            <div className="rounded-xl border border-line bg-surface-muted p-4">
+              <p className="text-xs font-semibold uppercase tracking-wide text-ink-subtle">Avg Attendance</p>
+              <p className="mt-2 text-2xl font-bold text-attendance-present">{averageAttendance}%</p>
+            </div>
+            <div className="rounded-xl border border-line bg-surface-muted p-4">
+              <p className="text-xs font-semibold uppercase tracking-wide text-ink-subtle">Late / Absent</p>
+              <p className="mt-2 text-2xl font-bold text-accent-orange">{totalLate}/{totalAbsent}</p>
+            </div>
+            <div className="rounded-xl border border-line bg-surface-muted p-4">
+              <p className="text-xs font-semibold uppercase tracking-wide text-ink-subtle">Report Cards</p>
+              <p className="mt-2 text-2xl font-bold text-brand">{reportCardsReady}</p>
+            </div>
+          </div>
         </div>
 
         {/* Wards */}

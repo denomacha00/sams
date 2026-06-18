@@ -26,6 +26,15 @@ interface QuickActionGroup {
   actions: QuickAction[];
 }
 
+interface RoleWorkflow {
+  step: string;
+  title: string;
+  detail: string;
+  to: string;
+  icon: string;
+  accent?: 'orange' | 'indigo';
+}
+
 interface DashboardStats {
   stats: StatCard[];
   loading: boolean;
@@ -205,6 +214,71 @@ const QuickActionButton: React.FC<{ action: QuickAction; index: number }> = ({ a
         </svg>
       </div>
     </Link>
+  );
+};
+
+const CommandActionCard: React.FC<{ action: QuickAction; index: number }> = ({ action, index }) => {
+  const isAttendance = action.variant === 'attendance';
+  return (
+    <Link
+      to={action.to}
+      className={`group dashboard-command-card ${isAttendance ? 'dashboard-command-card--attendance' : ''}`}
+      style={{ animationDelay: `${(index + 1) * 70}ms`, animation: 'fadeInUp 0.45s ease-out forwards', opacity: 0 }}
+    >
+      <span className={`dash-card-icon ${isAttendance ? 'dash-card-icon-primary' : 'dash-card-icon-secondary'}`}>
+        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.7} d={action.icon} />
+        </svg>
+      </span>
+      <span className="min-w-0 flex-1">
+        <span className="block text-sm font-semibold text-ink truncate">{action.label}</span>
+        <span className="block text-xs text-ink-muted truncate">{action.subtitle}</span>
+      </span>
+      <svg className="w-4 h-4 text-ink-subtle opacity-50 group-hover:opacity-100 group-hover:translate-x-0.5 transition-all" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+      </svg>
+    </Link>
+  );
+};
+
+const RoleWorkflowCard: React.FC<{ item: RoleWorkflow; index: number }> = ({ item, index }) => {
+  const isOrange = item.accent === 'orange';
+  return (
+    <Link
+      to={item.to}
+      className={`group dashboard-workflow-card ${isOrange ? 'dashboard-workflow-card--orange' : 'dashboard-workflow-card--indigo'}`}
+      style={{ animationDelay: `${(index + 1) * 70}ms`, animation: 'fadeInUp 0.45s ease-out forwards', opacity: 0 }}
+    >
+      <div className="flex items-start justify-between gap-3">
+        <span className={`dashboard-workflow-step ${isOrange ? 'dashboard-workflow-step--orange' : 'dashboard-workflow-step--indigo'}`}>
+          {item.step}
+        </span>
+        <span className={`dash-card-icon ${isOrange ? 'dash-card-icon-primary' : 'dash-card-icon-secondary'}`}>
+          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.7} d={item.icon} />
+          </svg>
+        </span>
+      </div>
+      <div className="mt-4 min-w-0">
+        <h3 className="text-sm font-semibold text-ink">{item.title}</h3>
+        <p className="mt-1 text-xs leading-5 text-ink-muted">{item.detail}</p>
+      </div>
+    </Link>
+  );
+};
+
+const RoleWorkflowBoard: React.FC<{ role?: UserRole }> = ({ role }) => {
+  const items = getRoleWorkflows(role);
+  if (items.length === 0) return null;
+  return (
+    <section className="mb-8">
+      <SectionHeader title="Workflow" icon={ICONS.clipboard} />
+      <div className="dashboard-workflow-grid">
+        {items.map((item, index) => (
+          <RoleWorkflowCard key={`${item.step}-${item.to}`} item={item} index={index} />
+        ))}
+      </div>
+    </section>
   );
 };
 
@@ -544,6 +618,62 @@ function getQuickActionGroups(role?: UserRole): QuickActionGroup[] {
   return [];
 }
 
+function getRoleWorkflows(role?: UserRole): RoleWorkflow[] {
+  if (role === UserRole.SCHOOL_ADMIN) return [
+    { step: '01', title: 'Set up the school', detail: 'Departments, HODs, registration links, users, and guardian links stay together.', to: '/admin/departments', icon: ICONS.building },
+    { step: '02', title: 'Run today', detail: 'Watch timetable activity, active sessions, and attendance movement during the day.', to: '/sessions', icon: ICONS.session, accent: 'orange' },
+    { step: '03', title: 'Check evidence', detail: 'Use reports and risk scores for names, counts, absences, and follow-up.', to: '/reports', icon: ICONS.chart },
+    { step: '04', title: 'Communicate', detail: 'Send in-app notices and keep school messages separate from attendance work.', to: '/notifications', icon: ICONS.bell },
+  ];
+  if (role === UserRole.HOD) return [
+    { step: '01', title: 'Plan department', detail: 'Manage department classes, teachers, class reps, timetable, and exam plans.', to: '/hod/department', icon: ICONS.building },
+    { step: '02', title: 'Open sessions', detail: 'Start only the active timetable lesson, then use QR, link, manual, face, or fingerprint.', to: '/sessions', icon: ICONS.qr, accent: 'orange' },
+    { step: '03', title: 'Track learners', detail: 'Review department students by class, attendance gaps, risk scores, and reports.', to: '/class/students', icon: ICONS.users },
+    { step: '04', title: 'Manage exams', detail: 'Create CAT, Practical, and End Term plans, then follow marks and report cards.', to: '/admin/exams', icon: ICONS.book },
+  ];
+  if (role === UserRole.TEACHER) return [
+    { step: '01', title: 'See today', detail: 'Start with your timetable and assigned classes before opening attendance.', to: '/timetable', icon: ICONS.calendar },
+    { step: '02', title: 'Start attendance', detail: 'Open the live lesson session and choose QR, link, manual, face, or fingerprint.', to: '/sessions', icon: ICONS.qr, accent: 'orange' },
+    { step: '03', title: 'Follow students', detail: 'Use the student workbench and reports to see present, late, absent, and excused learners.', to: '/class/students', icon: ICONS.users },
+    { step: '04', title: 'Enter marks', detail: 'Record CATs, optional practicals, and end-term marks for classes you teach.', to: '/admin/exams', icon: ICONS.clipboard },
+  ];
+  if (role === UserRole.STUDENT) return [
+    { step: '01', title: 'Attend class', detail: 'Scan the QR or open the attendance link when the class session is active.', to: '/sessions/scan', icon: ICONS.qr, accent: 'orange' },
+    { step: '02', title: 'Know your day', detail: 'Use the timetable to see now, later, and past classes clearly.', to: '/timetable', icon: ICONS.calendar },
+    { step: '03', title: 'Check records', detail: 'Review attendance history and any gaps before they become a problem.', to: '/reports', icon: ICONS.chart },
+    { step: '04', title: 'Stay updated', detail: 'Read school notices, class messages, and alerts in one place.', to: '/notifications', icon: ICONS.bell },
+  ];
+  return [];
+}
+
+function getPrimaryActions(role?: UserRole): QuickAction[] {
+  if (role === UserRole.SCHOOL_ADMIN) return [
+    { to: '/admin/links', label: 'Registration Links', subtitle: 'Invite students and staff', icon: ICONS.link, variant: 'signin' },
+    { to: '/class/students', label: 'Student Workbench', subtitle: 'Class lists and gaps', icon: ICONS.users },
+    { to: '/reports', label: 'Attendance Reports', subtitle: 'School evidence', icon: ICONS.chart },
+    { to: '/admin/departments', label: 'Departments', subtitle: 'Structure and HODs', icon: ICONS.building },
+  ];
+  if (role === UserRole.TEACHER) return [
+    { to: '/sessions', label: 'Open Session', subtitle: 'QR, link, manual, face', icon: ICONS.qr, variant: 'signin' },
+    { to: '/class/students', label: 'My Students', subtitle: 'Class workbench', icon: ICONS.users },
+    { to: '/admin/exams', label: 'Enter Marks', subtitle: 'CATs and practicals', icon: ICONS.clipboard },
+    { to: '/reports', label: 'Class Reports', subtitle: 'After lesson follow-up', icon: ICONS.chart },
+  ];
+  if (role === UserRole.HOD) return [
+    { to: '/hod/department', label: 'Department', subtitle: 'Classes and teachers', icon: ICONS.building },
+    { to: '/sessions', label: 'Open Session', subtitle: 'Attendance tools', icon: ICONS.qr, variant: 'signin' },
+    { to: '/admin/exams', label: 'Exam Plans', subtitle: 'CATs, practicals, end-term', icon: ICONS.book },
+    { to: '/reports', label: 'Dept Reports', subtitle: 'Attendance evidence', icon: ICONS.chart },
+  ];
+  if (role === UserRole.STUDENT) return [
+    { to: '/sessions/scan', label: 'Scan QR', subtitle: 'Mark attendance', icon: ICONS.qr, variant: 'attendance' },
+    { to: '/timetable', label: 'Timetable', subtitle: 'Now, later, past', icon: ICONS.calendar },
+    { to: '/reports', label: 'My Reports', subtitle: 'Attendance history', icon: ICONS.chart },
+    { to: '/notifications', label: 'Messages', subtitle: 'School updates', icon: ICONS.bell },
+  ];
+  return [];
+}
+
 function getDefaultStats(role?: UserRole): StatCard[] {
   switch (role) {
     case UserRole.SCHOOL_ADMIN: return [
@@ -657,7 +787,11 @@ const DashboardPage: React.FC = () => {
   }, [user?.role, navigate]);
 
   const { stats, loading: statsLoading } = useDashboardStats(user ?? undefined);
-  const quickActionGroups = getQuickActionGroups(user?.role);
+  const primaryActions = getPrimaryActions(user?.role);
+  const primaryActionPaths = new Set(primaryActions.map((action) => action.to));
+  const quickActionGroups = getQuickActionGroups(user?.role)
+    .map((group) => ({ ...group, actions: group.actions.filter((action) => !primaryActionPaths.has(action.to)) }))
+    .filter((group) => group.actions.length > 0);
   const todayLabel = `${new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}`;
   const [departmentName, setDepartmentName] = useState<string | null>(null);
 
@@ -679,9 +813,9 @@ const DashboardPage: React.FC = () => {
       <ActiveSessionReminder role={user?.role} userId={user?.id} />
 
       {/* Welcome Banner */}
-      <div className="relative mb-8 surface-card p-6 lg:p-8" style={{ animation: 'fadeInUp 0.5s ease-out forwards' }}>
-        <div className="relative z-10 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-          <div>
+      <div className="relative mb-8 dashboard-hero p-6 lg:p-7" style={{ animation: 'fadeInUp 0.5s ease-out forwards' }}>
+        <div className="relative z-10 grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(320px,430px)] lg:items-center">
+          <div className="min-w-0">
             <div className="flex flex-col sm:flex-row sm:items-center gap-3 mb-1">
               <h2 className="text-2xl lg:text-3xl font-bold text-ink tracking-tight">
                 Welcome back, {user?.fullName?.split(' ')[0] || 'User'}
@@ -699,10 +833,18 @@ const DashboardPage: React.FC = () => {
               <p className="mt-3 text-sm text-ink-muted max-w-lg">Taught classes come from timetable and class-teacher assignments. If a class is missing, ask your HOD to update the timetable.</p>
             )}
           </div>
+
+          {primaryActions.length > 0 && (
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              {primaryActions.map((action, index) => (
+                <CommandActionCard key={action.to} action={action} index={index} />
+              ))}
+            </div>
+          )}
         </div>
       </div>
 
-      <AttendanceWorkflowPanel role={user?.role} />
+      <RoleWorkflowBoard role={user?.role} />
 
       {/* Stats */}
       <section className="mb-8">

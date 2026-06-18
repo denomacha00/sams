@@ -84,24 +84,30 @@ const ADMIN_ITEMS: SidebarItem[] = [
 
 const STUDENT_ITEMS: SidebarItem[] = [
   { label: 'Scan QR', path: '/sessions/scan', icon: 'session' },
-  { label: 'My Reports', path: '/reports', icon: 'reports' },
   { label: 'Fingerprint Enroll', path: '/biometric/enroll', icon: 'attendance' },
 ];
 
-const GUARDIAN_ITEMS: SidebarItem[] = [
-  { label: 'Parent Dashboard', path: '/parent', icon: 'parent' },
-];
-
 function getSidebarItems(role?: UserRole): SidebarItem[] {
-  const items: SidebarItem[] = [...COMMON_ITEMS];
+  const items: SidebarItem[] = role === UserRole.GUARDIAN
+    ? [
+        { label: 'Parent Dashboard', path: '/parent', icon: 'parent' },
+        { label: 'Notifications', path: '/notifications', icon: 'notifications' },
+        { label: 'Profile', path: '/profile', icon: 'profile' },
+        { label: 'Settings', path: '/settings', icon: 'settings' },
+      ]
+    : [...COMMON_ITEMS];
 
   if (role === UserRole.SCHOOL_ADMIN) items.push(...ADMIN_ITEMS);
   else if (role === UserRole.HOD) items.push(...HOD_ITEMS);
   else if (role === UserRole.TEACHER) items.push(...TEACHER_ITEMS);
   else if (role === UserRole.STUDENT) items.push(...STUDENT_ITEMS);
-  else if (role === UserRole.GUARDIAN) items.push(...GUARDIAN_ITEMS);
 
-  return items;
+  const seen = new Set<string>();
+  return items.filter((item) => {
+    if (seen.has(item.path)) return false;
+    seen.add(item.path);
+    return true;
+  });
 }
 
 // ─── Sidebar Item Component ──────────────────────────────────────────────────
