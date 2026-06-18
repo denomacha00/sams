@@ -19,7 +19,11 @@ import { markMissingStudentsAbsentForSessions } from '../lib/attendanceFinalizer
 const QR_EXPIRY_SECONDS = 30;
 const DEFAULT_LATE_THRESHOLD_MIN = 15;
 const LATE_THRESHOLD_RATIO = 0.4;
-const SESSION_RESUME_LOOKBACK_MS = 12 * 60 * 60 * 1000;
+// Resume an ended session if it was ended within the last 30 minutes and
+// the teacher is starting again for the same timetable entry (same lesson slot).
+// This covers accidental page refreshes and brief network interruptions.
+// If a *different* lesson is now scheduled for this time, a fresh session is created.
+const SESSION_RESUME_LOOKBACK_MS = 30 * 60 * 1000;
 
 // ─── Interfaces ───────────────────────────────────────────────────────────────
 
@@ -202,7 +206,7 @@ export class SessionService {
       where: {
         timetableEntryId,
         isActive: false,
-        startedAt: { gte: new Date(Date.now() - SESSION_RESUME_LOOKBACK_MS) },
+        endedAt: { gte: new Date(Date.now() - SESSION_RESUME_LOOKBACK_MS) },
       },
       include: { class: { select: { name: true, departmentId: true } } },
       orderBy: { startedAt: 'desc' },

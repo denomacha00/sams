@@ -1064,9 +1064,24 @@ export class AttendanceService {
           synced.push(existing.id);
         }
       } else {
-        // No conflict — create new record from offline data
-        const newRecord = await prisma.attendanceRecord.create({
-          data: {
+        // No existing record - upsert to prevent duplicates on retry.
+        // The unique constraint (sessionId, studentId) ensures at most one
+        // record per student per session even if the teacher syncs twice.
+        const newRecord = await prisma.attendanceRecord.upsert({
+          where: {
+            sessionId_studentId: {
+              sessionId: offlineRecord.sessionId,
+              studentId: offlineRecord.studentId,
+            },
+          },
+          update: {
+            status: offlineRecord.status as AttendanceStatus,
+            method: offlineRecord.method,
+            note: offlineRecord.note,
+            scannedAt: new Date(offlineRecord.scannedAt),
+            syncedAt: new Date(),
+          },
+          create: {
             id: createId(),
             schoolId,
             sessionId: offlineRecord.sessionId,

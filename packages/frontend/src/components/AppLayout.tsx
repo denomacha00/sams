@@ -1,10 +1,11 @@
 import React, { useState } from 'react';
 import { Outlet, Link, useLocation } from 'react-router-dom';
 import { useAuthStore } from '../store/authStore';
-import { UserRole } from '@sams/shared';
 import { useTheme } from '../hooks/useTheme';
+import { useUnreadNotifications } from '../hooks/useUnreadNotifications';
 import { UserAvatar } from './UserAvatar';
 import AppSidebar from './AppSidebar';
+
 
 // ─── Icons ───────────────────────────────────────────────────────────────────
 
@@ -63,7 +64,7 @@ const AppLayout: React.FC = () => {
   const user = useAuthStore((s) => s.user);
   const { theme, toggleTheme } = useTheme();
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
-  const [unreadCount, setUnreadCount] = useState(0);
+  const { unreadCount } = useUnreadNotifications();
 
   const pageTitle = getPageTitle(location.pathname);
 

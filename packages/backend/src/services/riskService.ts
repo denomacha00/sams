@@ -351,7 +351,7 @@ export class RiskService {
 
   /**
    * Notify Teacher and HOD when a student's risk level changes.
-   * Requirement 11.5
+   * Requirement 11.5. Logs the change to audit trail.
    */
   private async _notifyRiskLevelChange(
     studentId: string,
@@ -369,6 +369,26 @@ export class RiskService {
     if (!student) return;
 
     const message = `Risk level change: ${student.fullName} (${student.admissionNumber ?? 'N/A'}) moved from ${previousLevel} to ${newLevel} (score: ${score.toFixed(1)})`;
+
+    // Log to audit trail
+    try {
+      const { auditService } = await import('./auditService');
+      await auditService.log({
+        eventType: 'AI_ACTION_EXECUTED',
+        schoolId,
+        resourceSnapshot: {
+          studentId,
+          studentName: student.fullName,
+          admissionNumber: student.admissionNumber,
+          previousLevel,
+          newLevel,
+          score: score.toFixed(1),
+          actor: 'system:riskService',
+        },
+      });
+    } catch {
+      // Non-critical - notifications are the priority
+    }
 
     // Find the student's Teacher (teacher assigned to the student's class)
     if (student.classId) {

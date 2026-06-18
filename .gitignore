@@ -65,6 +65,10 @@ Thumbs.db
 # Editor
 .vscode/
 
+# Dead code - root backend/ directory is a stale duplicate of packages/backend/
+# TODO: Remove once all imports are confirmed safe
+/backend/
+
 # Expo mobile
 packages/mobile/.expo/
 packages/mobile/android/

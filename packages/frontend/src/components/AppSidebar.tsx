@@ -1,7 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { UserRole } from '@sams/shared';
 import { useAuthStore } from '../store/authStore';
+import { useUnreadNotifications } from '../hooks/useUnreadNotifications';
 
 interface SidebarItem {
   label: string;
@@ -211,7 +212,7 @@ const AppSidebar: React.FC<AppSidebarProps> = ({ collapsed, onToggle }) => {
   const navigate = useNavigate();
   const user = useAuthStore((s) => s.user);
   const logout = useAuthStore((s) => s.logout);
-  const [unreadCount, setUnreadCount] = useState(0);
+  const { unreadCount } = useUnreadNotifications();
 
   const items = getSidebarItems(user?.role);
   const groups = groupItems(items);
