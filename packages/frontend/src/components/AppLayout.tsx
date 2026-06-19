@@ -5,6 +5,7 @@ import { useTheme } from '../hooks/useTheme';
 import { useUnreadNotifications } from '../hooks/useUnreadNotifications';
 import { UserAvatar } from './UserAvatar';
 import AppSidebar from './AppSidebar';
+import NewMessageToast from './NewMessageToast';
 
 
 // ─── Icons ───────────────────────────────────────────────────────────────────
@@ -147,6 +148,9 @@ const AppLayout: React.FC = () => {
           <Outlet />
         </main>
       </div>
+
+      {/* WhatsApp/Telegram-style new message toast — shows on any page */}
+      <NewMessageToast />
     </div>
   );
 };

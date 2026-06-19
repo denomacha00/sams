@@ -3,6 +3,7 @@ import { io, Socket } from 'socket.io-client';
 import apiClient from '../services/apiClient';
 import { useAuthStore } from '../store/authStore';
 import AttachmentImageEditor from '../components/AttachmentImageEditor';
+import { useNotificationLive } from '../hooks/useNotificationLive';
 
 interface Notification {
   id: string;
@@ -233,6 +234,8 @@ const NotificationsPage: React.FC = () => {
   const isTeacher = user?.role === 'TEACHER';
   const isHOD = user?.role === 'HOD';
   const notificationChannels: Channel[] = ['inapp'];
+
+  const { typingUsers, emitTyping, emitStopped } = useNotificationLive();
 
   const [departments, setDepartments] = useState<Department[]>([]);
   const [classes, setClasses] = useState<{ id: string; name: string }[]>([]);
@@ -1377,7 +1380,28 @@ const NotificationsPage: React.FC = () => {
               {/* Message */}
               <div>
                 <label className="block text-sm font-semibold text-ink-muted mb-1.5">Message *</label>
-                <textarea value={message} onChange={(e) => setMessage(e.target.value)} required rows={4}
+                <textarea value={message} onChange={(e) => {
+                    setMessage(e.target.value);
+                    if (e.target.value.length > 0 && user) {
+                      emitTyping({
+                        scope: scope,
+                        targetId: (scope !== 'school' ? (targetId || undefined) : undefined),
+                        senderName: user.fullName || 'Someone',
+                        senderRole: user.role,
+                      });
+                    }
+                  }}
+                  onBlur={() => {
+                    if (user) {
+                      emitStopped({
+                        scope: scope,
+                        targetId: (scope !== 'school' ? (targetId || undefined) : undefined),
+                        senderName: user.fullName || 'Someone',
+                        senderRole: user.role,
+                      });
+                    }
+                  }}
+                  required rows={4}
                   className="w-full input-field placeholder-ink-subtle focus:outline-none focus:ring-2 focus:ring-indigo-500/40 transition-all resize-none"
                   placeholder="Type your message..." />
               </div>
@@ -1459,6 +1483,32 @@ const NotificationsPage: React.FC = () => {
         )}
 
         {/* Message List */}
+        {/* WhatsApp/Telegram-style typing indicator — shows who is typing/recording */}
+        {typingUsers.length > 0 && folder !== 'sent' && (
+          <div className="mb-3 rounded-2xl border border-emerald-500/20 bg-emerald-500/5 px-4 py-2.5 shadow-card-soft">
+            <div className="flex items-center gap-4 flex-wrap">
+              {typingUsers.slice(0, 3).map((tu) => (
+                <span key={tu.userId} className="inline-flex items-center gap-1.5 text-xs text-emerald-300/80">
+                  <span className="flex gap-0.5">
+                    <span className="typing-dot w-1 h-1 rounded-full bg-emerald-400 inline-block" />
+                    <span className="typing-dot w-1 h-1 rounded-full bg-emerald-400 inline-block" />
+                    <span className="typing-dot w-1 h-1 rounded-full bg-emerald-400 inline-block" />
+                  </span>
+                  <span className="font-medium">{tu.senderName}</span>
+                  <span className="text-emerald-400/60 italic">
+                    {tu.action === 'recording' ? '🎤 recording...' : 'typing...'}
+                  </span>
+                </span>
+              ))}
+              {typingUsers.length > 3 && (
+                <span className="text-xs text-emerald-300/60">
+                  +{typingUsers.length - 3} more typing...
+                </span>
+              )}
+            </div>
+          </div>
+        )}
+
         {listLoading ? (
           <div className="flex items-center justify-center py-12">
             <svg className="animate-spin h-6 w-6 text-indigo-400" viewBox="0 0 24 24">

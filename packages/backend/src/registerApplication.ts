@@ -31,6 +31,7 @@ import { guardiansRouter } from './routes/guardians';
 import { examsRouter } from './routes/exams';
 import { registerSocketServer } from './lib/socket';
 import { setupAttendanceSocket } from './sockets/attendanceSocket';
+import { setupTypingSocket } from './sockets/typingSocket';
 import { isApiReady } from './apiState';
 import { getAIHealthSummary, probeAIProvider } from './services/ai/aiProviderConfig';
 
@@ -188,6 +189,7 @@ export function registerApplication(app: express.Express, httpServer: HttpServer
   setupSocketRedisAdapter(io);
   registerSocketServer(io);
   setupAttendanceSocket(io);
+  setupTypingSocket(io);
 
   app.get('/health/live', (_req, res) => {
     res.status(200).json({
