@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+  <!-- WhatsApp-style chat bubble icon -->
+  <defs>
+    <linearGradient id="whatsappGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#25D366;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#128C7E;stop-opacity:1" />
+    </linearGradient>
+    <linearGradient id="telegramGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#0088cc;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#005b8f;stop-opacity:1" />
+    </linearGradient>
+  </defs>
+  <!-- Chat bubble body -->
+  <rect x="8" y="15" width="84" height="62" rx="18" ry="18" fill="url(#whatsappGrad)"/>
+  <!-- Chat bubble tail -->
+  <path d="M22 77 L14 90 L28 77" fill="url(#whatsappGrad)"/>
+  <!-- Phone receiver -->
+  <path d="M40 40 L60 40 M40 48 L55 48 M40 56 L50 56" stroke="white" stroke-width="4" stroke-linecap="round"/>
+  <!-- Message dots -->
+  <circle cx="35" cy="40" r="2.5" fill="white" opacity="0.8"/>
+  <circle cx="43" cy="40" r="2.5" fill="white" opacity="0.8"/>
+  <circle cx="51" cy="40" r="2.5" fill="white" opacity="0.8"/>
+  <!-- Badge -->
+  <circle cx="82" cy="18" r="14" fill="#dc2626"/>
+  <text x="82" y="24" text-anchor="middle" fill="white" font-size="16" font-weight="bold" font-family="sans-serif">3</text>
+</svg>
