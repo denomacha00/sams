@@ -844,7 +844,12 @@ const DashboardPage: React.FC = () => {
               )}
             </div>
             <p className="text-ink-muted text-sm sm:text-base max-w-lg">{getRoleGreeting(user?.role)}</p>
-            <p className="text-xs text-ink-subtle mt-1">{todayLabel} - {timeLabel}</p>
+            <div className="mt-2 flex flex-wrap items-center gap-2 text-xs">
+              <span className="text-ink-subtle">{todayLabel}</span>
+              <span className="inline-flex items-center rounded-lg border border-brand/25 bg-brand-light px-2.5 py-1 font-bold text-brand shadow-card-soft">
+                {timeLabel}
+              </span>
+            </div>
             <div className="dashboard-signal-row">
               <span className="dashboard-signal">{quickActionGroups.length + (primaryActions.length > 0 ? 1 : 0)} work areas</span>
               <span className="dashboard-signal">Role: {getRoleLabel(user?.role)}</span>
