@@ -1,6 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { io, type Socket } from 'socket.io-client';
-import apiClient from '../services/apiClient';
 import { useAuthStore } from '../store/authStore';
 import { enqueueNewMessageToast } from '../components/NewMessageToast';
 
@@ -16,7 +15,7 @@ export interface TypingUser {
   timestamp: number;
 }
 
-type TypingListener = (typing: TypingUser) => void;
+type TypingListener = () => void;
 
 // ─── Global state ─────────────────────────────────────────────────────────────
 
@@ -24,17 +23,19 @@ let globalTypingUsers: TypingUser[] = [];
 let globalTypingListeners = new Set<TypingListener>();
 
 function updateTypingListeners(): void {
-  globalTypingListeners.forEach((listener) => {
-    // Give the listeners the full list
-    listener({} as TypingUser);
-  });
+  globalTypingListeners.forEach((listener) => listener());
+}
+
+function sameTypingTarget(a: TypingUser, b: TypingUser): boolean {
+  return (
+    a.userId === b.userId &&
+    a.scope === b.scope &&
+    (a.targetId ?? '') === (b.targetId ?? '')
+  );
 }
 
 function findAndUpdateTyping(update: TypingUser): void {
-  // Remove 'stopped' or older entries for this user
-  globalTypingUsers = globalTypingUsers.filter(
-    (t) => t.userId !== update.userId || t.action === 'stopped',
-  );
+  globalTypingUsers = globalTypingUsers.filter((t) => !sameTypingTarget(t, update));
 
   if (update.action !== 'stopped') {
     globalTypingUsers.push(update);
@@ -122,8 +123,6 @@ interface UseNotificationLiveResult {
     senderRole: string;
   }) => void;
 }
-
-const POLL_INTERVAL_MS = 60_000;
 
 export function useNotificationLive(): UseNotificationLiveResult {
   const [typingUsers, setTypingUsers] = useState<TypingUser[]>([]);

@@ -807,7 +807,7 @@ const DashboardPage: React.FC = () => {
 
   let qi = 0;
   return (
-    <div className="page-shell px-6 lg:px-8 py-6">
+    <div className="page-shell px-3 py-4 sm:px-4 sm:py-5 lg:px-6 xl:px-8">
       <style>{`
         @keyframes fadeInUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
       `}</style>
@@ -815,12 +815,12 @@ const DashboardPage: React.FC = () => {
       <ActiveSessionReminder role={user?.role} userId={user?.id} />
 
       {/* Welcome Banner */}
-      <div className="relative mb-8 dashboard-hero p-6 lg:p-7" style={{ animation: 'fadeInUp 0.5s ease-out forwards' }}>
-        <div className="relative z-10 grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(320px,430px)] lg:items-center">
+      <div className="relative mb-6 sm:mb-8 dashboard-hero p-4 sm:p-5 lg:p-7" style={{ animation: 'fadeInUp 0.5s ease-out forwards' }}>
+        <div className="relative z-10 grid gap-4 sm:gap-6 xl:grid-cols-[minmax(0,1fr)_minmax(320px,430px)] xl:items-center">
           <div className="min-w-0">
             <span className="dashboard-kicker">SAMS Workbench</span>
             <div className="flex flex-col sm:flex-row sm:items-center gap-3 mb-1">
-              <h2 className="text-2xl lg:text-3xl font-bold text-ink tracking-tight">
+              <h2 className="text-xl sm:text-2xl lg:text-3xl font-bold text-ink tracking-tight">
                 Welcome back, {user?.fullName?.split(' ')[0] || 'User'}
               </h2>
               <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold text-brand bg-brand-light border border-brand/20 w-fit">
@@ -830,7 +830,7 @@ const DashboardPage: React.FC = () => {
                 <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium text-brand bg-brand-light border border-brand/15 w-fit">{departmentName}</span>
               )}
             </div>
-            <p className="text-ink-muted text-base max-w-lg">{getRoleGreeting(user?.role)}</p>
+            <p className="text-ink-muted text-sm sm:text-base max-w-lg">{getRoleGreeting(user?.role)}</p>
             <p className="text-xs text-ink-subtle mt-1">{todayLabel}</p>
             <div className="dashboard-signal-row">
               <span className="dashboard-signal">{quickActionGroups.length + (primaryActions.length > 0 ? 1 : 0)} work areas</span>
@@ -871,7 +871,7 @@ const DashboardPage: React.FC = () => {
           {quickActionGroups.map((group) => (
             <div key={group.title}>
               <h4 className="dash-group-label">{group.title}</h4>
-              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4 gap-3 sm:gap-4">
                 {group.actions.map((action) => {
                   const idx = qi++;
                   return <QuickActionButton key={`${group.title}-${action.to}`} action={action} index={idx} />;

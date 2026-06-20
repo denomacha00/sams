@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 
 interface ToastMessage {
@@ -36,21 +36,38 @@ const NewMessageToast: React.FC = () => {
   const [message, setMessage] = useState<ToastMessage | null>(null);
   const [visible, setVisible] = useState(false);
   const [dismissing, setDismissing] = useState(false);
+  const dismissTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const clearTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const clearTimers = useCallback(() => {
+    if (dismissTimerRef.current) clearTimeout(dismissTimerRef.current);
+    if (clearTimerRef.current) clearTimeout(clearTimerRef.current);
+    dismissTimerRef.current = null;
+    clearTimerRef.current = null;
+  }, []);
+
+  const hideToast = useCallback(() => {
+    clearTimers();
+    setDismissing(true);
+    clearTimerRef.current = setTimeout(() => {
+      setVisible(false);
+      setMessage(null);
+      setDismissing(false);
+      clearTimerRef.current = null;
+    }, 300);
+  }, [clearTimers]);
 
   const showToast = useCallback((msg: ToastMessage) => {
+    clearTimers();
     setDismissing(false);
     setMessage(msg);
     setVisible(true);
 
-    // Auto-dismiss after 5 seconds
-    setTimeout(() => {
-      setDismissing(true);
-      setTimeout(() => {
-        setVisible(false);
-        setMessage(null);
-      }, 300);
+    dismissTimerRef.current = setTimeout(() => {
+      hideToast();
+      dismissTimerRef.current = null;
     }, 5000);
-  }, []);
+  }, [clearTimers, hideToast]);
 
   useEffect(() => {
     toastListener = showToast;
@@ -60,10 +77,12 @@ const NewMessageToast: React.FC = () => {
     }
     return () => {
       toastListener = null;
+      clearTimers();
     };
-  }, [showToast]);
+  }, [showToast, clearTimers]);
 
   const handleClick = () => {
+    clearTimers();
     setVisible(false);
     setMessage(null);
     navigate('/notifications');
@@ -125,11 +144,7 @@ const NewMessageToast: React.FC = () => {
         <button
           onClick={(e) => {
             e.stopPropagation();
-            setDismissing(true);
-            setTimeout(() => {
-              setVisible(false);
-              setMessage(null);
-            }, 300);
+            hideToast();
           }}
           className="p-1 rounded-lg text-[#8696a0] hover:text-[#e9edef] hover:bg-white/10 transition-all shrink-0 self-start"
           aria-label="Dismiss"

@@ -3,6 +3,7 @@ import { Outlet, Link, useLocation } from 'react-router-dom';
 import { useAuthStore } from '../store/authStore';
 import { useTheme } from '../hooks/useTheme';
 import { useUnreadNotifications } from '../hooks/useUnreadNotifications';
+import { useNotificationLive } from '../hooks/useNotificationLive';
 import { UserAvatar } from './UserAvatar';
 import AppSidebar from './AppSidebar';
 import NewMessageToast from './NewMessageToast';
@@ -69,6 +70,7 @@ const AppLayout: React.FC = () => {
   const { theme, toggleTheme } = useTheme();
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const { unreadCount } = useUnreadNotifications();
+  useNotificationLive();
 
   const pageTitle = getPageTitle(location.pathname);
 

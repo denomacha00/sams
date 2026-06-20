@@ -115,6 +115,14 @@ export function setupAttendanceSocket(io: SocketIOServer): void {
     // even when the user is not in a specific session room.
     socket.join(`user:${user.sub}`);
 
+    // Join organisational rooms used by notifications and typing indicators.
+    if (user.departmentId) {
+      socket.join(`department:${user.departmentId}`);
+    }
+    if (user.classId) {
+      socket.join(`class:${user.classId}`);
+    }
+
     // ─── Handle session:join ────────────────────────────────────────────
     // Join a specific session room. Verifies the teacher owns the session
     // and replays missed events from Redis since `lastSeen` timestamp.

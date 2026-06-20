@@ -494,6 +494,8 @@
 
 .app-layout {
   @apply flex min-h-screen bg-canvas text-ink;
+  max-width: 100vw;
+  overflow-x: hidden;
 }
 
 /* ─── Sidebar ──────────────────────────────────────────────────────────── */
@@ -602,7 +604,7 @@
 
 /* ─── Main content area ─────────────────────────────────────────────────── */
 .app-main {
-  @apply flex flex-col flex-1 min-h-screen transition-all duration-300 ease-in-out;
+  @apply flex flex-col flex-1 min-h-screen min-w-0 transition-all duration-300 ease-in-out;
 }
 
 .app-main-expanded {
@@ -616,26 +618,26 @@
 /* Top bar */
 .app-topbar {
   @apply sticky top-0 z-30 flex items-center justify-between
-    h-14 px-5 border-b border-line bg-surface/85 backdrop-blur-md;
+    min-h-14 h-auto px-3 py-2 sm:px-5 border-b border-line bg-surface/85 backdrop-blur-md;
 }
 
 .topbar-left {
-  @apply flex items-center gap-3;
+  @apply flex min-w-0 items-center gap-2 sm:gap-3;
 }
 
 .topbar-sidebar-toggle {
-  @apply relative w-10 h-10 rounded-xl flex items-center justify-center
+  @apply relative w-9 h-9 sm:w-10 sm:h-10 rounded-xl flex items-center justify-center
     bg-brand-light border border-brand/25 text-brand
     hover:bg-brand hover:text-white hover:border-brand
     transition-all duration-200 shadow-card-soft;
 }
 
 .topbar-title {
-  @apply text-lg font-bold text-ink tracking-tight;
+  @apply truncate text-base sm:text-lg font-bold text-ink tracking-tight;
 }
 
 .topbar-right {
-  @apply flex items-center gap-2.5;
+  @apply flex shrink-0 items-center gap-1.5 sm:gap-2.5;
 }
 
 .topbar-btn {
@@ -660,5 +662,39 @@
 }
 
 .topbar-content {
-  @apply flex-1;
+  @apply flex-1 min-w-0 overflow-x-hidden;
+}
+
+@media (max-width: 767px) {
+  .app-sidebar.sidebar-expanded,
+  .app-sidebar.sidebar-collapsed {
+    width: min(82vw, 280px);
+  }
+
+  .app-sidebar.sidebar-collapsed {
+    transform: translateX(-100%);
+  }
+
+  .app-main-expanded,
+  .app-main-collapsed {
+    margin-left: 0;
+  }
+
+  .sidebar-toggle {
+    right: -2.75rem;
+  }
+
+  .topbar-badge {
+    border-color: var(--color-surface);
+  }
+}
+
+@media (min-width: 768px) and (max-width: 1180px) {
+  .sidebar-expanded {
+    width: 220px;
+  }
+
+  .app-main-expanded {
+    margin-left: 220px;
+  }
 }
