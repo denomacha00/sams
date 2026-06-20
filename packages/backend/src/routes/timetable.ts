@@ -81,7 +81,7 @@ const updateTimetableSchema = z.object({
 const generateTimetableSchema = z.object({
   classIds: z.array(z.string()).min(1).max(100).optional(),
   remake: z.boolean().optional().default(false),
-  periodDuration: z.number().int().min(30).max(90).optional().default(40),
+  periodDuration: z.number().int().min(30).max(180).optional().default(40),
   startHour: z.number().int().min(6).max(10).optional().default(8),
   breakStart: z.string().regex(/^\d{2}:\d{2}$/).optional().default('10:00'),
   breakEnd: z.string().regex(/^\d{2}:\d{2}$/).optional().default('10:20'),

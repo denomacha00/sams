@@ -351,21 +351,22 @@ export const timetableGeneratorService = {
 
     const classes = await loadClasses(schoolId, departmentId, classIds);
     if (!classes.length) throw new Error('No classes found' + (departmentId ? ' in your department' : '') + '. Create classes first.');
+    const targetIds = classes.map((c) => c.id);
 
     const teachers = await loadTeachers(schoolId, departmentId);
     if (!teachers.length) throw new Error('No teachers found in the school. Add teachers first.');
 
     const catalog = await loadSubjectCatalog(schoolId, departmentId);
 
-    // Load ALL existing bookings (they aren't deleted in preview mode)
+    // Only load existing bookings for classes NOT being regenerated (same as generate with remake=false)
     const existing = await prisma.timetableEntry.findMany({
-      where: { schoolId, ...(departmentId ? { class: { departmentId } } : {}) },
+      where: { schoolId, classId: { notIn: targetIds }, ...(departmentId ? { class: { departmentId } } : {}) },
       select: { classId: true, teacherId: true, subject: true, dayOfWeek: true, startTime: true },
     });
 
     // Build teacher-subject knowledge
     const existingSubjRows = await prisma.timetableEntry.findMany({
-      where: { schoolId, ...(departmentId ? { class: { departmentId } } : {}) },
+      where: { schoolId, classId: { in: targetIds }, ...(departmentId ? { class: { departmentId } } : {}) },
       select: { teacherId: true, subject: true }, distinct: ['teacherId', 'subject'],
     });
     const tSubj = buildTeacherSubjectMap(teachers, teacherSubjectMapping, existingSubjRows);

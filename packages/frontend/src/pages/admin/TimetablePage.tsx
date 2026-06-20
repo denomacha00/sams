@@ -263,7 +263,7 @@ const TimetablePage: React.FC = () => {
     setGenRemake(false);
     setGenDurationUnit('min');
     setGenPeriodDuration(40);
-    setGenPeriodHours(1);
+    setGenPeriodHours(2);
     setLoadingGeneratorInfo(true);
     setShowGeneratorModal(true);
     try {
