@@ -183,7 +183,7 @@ const ProfilePage: React.FC = () => {
 
       useAuthStore.getState().updateUser({
         avatarUrl: data.avatarUrl,
-        avatarVersion: Date.now(),
+        avatarVersion: data.avatarVersion ?? Date.now(),
       });
       resetCrop();
       setSuccess('Profile picture updated!');

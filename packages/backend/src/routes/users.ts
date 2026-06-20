@@ -314,16 +314,15 @@ usersRouter.post('/me/avatar', uploadAvatar, async (req: Request, res: Response,
       .jpeg({ quality: 85 })
       .toFile(filepath);
 
-    // Store a cache-busting URL so other signed-in devices pick up replacements
-    // after /users/me refreshes, even though the avatar filename is stable.
-    const avatarUrl = `${avatarPublicUrl(req.user.sub)}?v=${Date.now()}`;
+    const avatarUrl = avatarPublicUrl(req.user.sub);
+    const avatarVersion = Date.now();
     await prisma.user.update({
       where: { id: req.user.sub, schoolId: req.schoolId },
       data: { avatarUrl },
     });
 
     res.setHeader('Cache-Control', 'no-store');
-    res.status(200).json({ avatarUrl });
+    res.status(200).json({ avatarUrl, avatarVersion });
   } catch (err) {
     if (err instanceof AppError) {
       next(err);
@@ -466,6 +465,7 @@ usersRouter.get('/class-roster', async (req: Request, res: Response, next: NextF
         email: true,
         phone: true,
         admissionNumber: true,
+        avatarUrl: true,
         classId: true,
         departmentId: true,
         isClassRep: true,

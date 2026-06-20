@@ -137,7 +137,7 @@ sessionsRouter.get('/', async (req: Request, res: Response): Promise<void> => {
       include: {
         class: { select: { name: true } },
         records: {
-          include: { student: { select: { fullName: true } } },
+          include: { student: { select: { fullName: true, avatarUrl: true } } },
           orderBy: { scannedAt: 'desc' },
         },
       },
@@ -266,7 +266,7 @@ sessionsRouter.get('/:id', async (req: Request, res: Response): Promise<void> =>
       include: {
         class: { select: { name: true, departmentId: true } },
         records: {
-          include: { student: { select: { fullName: true } } },
+          include: { student: { select: { fullName: true, avatarUrl: true } } },
           orderBy: { scannedAt: 'desc' },
         },
       },
@@ -302,7 +302,7 @@ sessionsRouter.get('/:id', async (req: Request, res: Response): Promise<void> =>
         role: UserRole.STUDENT,
         isLocked: false,
       },
-      select: { id: true, fullName: true, admissionNumber: true },
+      select: { id: true, fullName: true, admissionNumber: true, avatarUrl: true },
       orderBy: { fullName: 'asc' },
     });
 

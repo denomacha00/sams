@@ -3,11 +3,13 @@ import { Link } from 'react-router-dom';
 import apiClient from '../services/apiClient';
 import { useAuthStore } from '../store/authStore';
 import { UserRole } from '@sams/shared';
+import { UserAvatar } from '../components/UserAvatar';
 
 interface Student {
   id: string;
   fullName: string;
   username?: string;
+  avatarUrl?: string | null;
   admissionNumber?: string;
   isClassRep: boolean;
   classId?: string;
@@ -120,16 +122,23 @@ const ClassRosterPage: React.FC = () => {
                   <ul className="divide-y divide-white/5">
                     {classStudents.map((s) => (
                 <li key={s.id} className="flex items-center justify-between gap-4 px-6 py-4 hover:bg-white/5">
-                  <div>
-                    <p className="text-white font-medium">{s.fullName}</p>
-                    <p className="text-xs text-ink-muted">
-                      {s.admissionNumber || s.username || s.id.slice(0, 8)}
-                      {s.isClassRep && (
-                        <span className="ml-2 inline-flex px-2 py-0.5 rounded-full bg-indigo-500/20 text-brand text-xs font-medium">
-                          Class Rep
-                        </span>
-                      )}
-                    </p>
+                  <div className="flex min-w-0 items-center gap-3">
+                    <UserAvatar
+                      avatarUrl={s.avatarUrl}
+                      fullName={s.fullName}
+                      className="h-10 w-10 rounded-full"
+                    />
+                    <div className="min-w-0">
+                      <p className="truncate font-medium text-white">{s.fullName}</p>
+                      <p className="text-xs text-ink-muted">
+                        {s.admissionNumber || s.username || s.id.slice(0, 8)}
+                        {s.isClassRep && (
+                          <span className="ml-2 inline-flex px-2 py-0.5 rounded-full bg-indigo-500/20 text-brand text-xs font-medium">
+                            Class Rep
+                          </span>
+                        )}
+                      </p>
+                    </div>
                   </div>
                   {canAssign ? (
                     <button

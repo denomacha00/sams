@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import apiClient from '../../services/apiClient';
+import { UserAvatar } from '../../components/UserAvatar';
 
 interface Department {
   id: string;
@@ -26,6 +27,7 @@ interface TeacherItem {
   fullName: string;
   email: string | null;
   phone: string | null;
+  avatarUrl?: string | null;
 }
 
 const DepartmentsPage: React.FC = () => {
@@ -351,9 +353,11 @@ const DepartmentsPage: React.FC = () => {
                         <div className="flex flex-wrap gap-2">
                           {dept.teachers.map((teacher) => (
                             <div key={teacher.id} className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-indigo-500/10 border border-indigo-500/20">
-                              <div className="w-5 h-5 rounded-full bg-indigo-500/30 flex items-center justify-center">
-                                <span className="text-xs font-semibold text-brand">{teacher.fullName.charAt(0)}</span>
-                              </div>
+                              <UserAvatar
+                                avatarUrl={teacher.avatarUrl}
+                                fullName={teacher.fullName}
+                                className="h-6 w-6 rounded-full"
+                              />
                               <span className="text-xs text-indigo-200">{teacher.fullName}</span>
                             </div>
                           ))}

@@ -72,6 +72,7 @@ export const useAuthStore = create<AuthState>()(
           const { data: me } = await apiClient.get('/users/me');
           const current = get().user;
           if (!current) return;
+          const nextAvatarUrl = me.avatarUrl ?? undefined;
           set({
             user: {
               ...current,
@@ -79,7 +80,11 @@ export const useAuthStore = create<AuthState>()(
               username: me.username ?? current.username,
               email: me.email ?? current.email,
               phone: me.phone ?? current.phone,
-              avatarUrl: me.avatarUrl ?? undefined,
+              avatarUrl: nextAvatarUrl,
+              avatarVersion:
+                nextAvatarUrl && nextAvatarUrl !== current.avatarUrl
+                  ? Date.now()
+                  : current.avatarVersion,
               classId: me.classId ?? current.classId,
               departmentId: me.departmentId ?? current.departmentId,
             },
@@ -153,6 +158,7 @@ export const useAuthStore = create<AuthState>()(
                   email: me.email ?? state.user.email,
                   phone: me.phone,
                   avatarUrl: me.avatarUrl,
+                  avatarVersion: me.avatarUrl ? Date.now() : state.user.avatarVersion,
                   classId: me.classId ?? state.user.classId,
                   departmentId: me.departmentId ?? state.user.departmentId,
                 }

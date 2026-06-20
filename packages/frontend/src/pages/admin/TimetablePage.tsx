@@ -26,6 +26,13 @@ interface SchoolClass {
   departmentId?: string;
 }
 
+interface GeneratorInfo {
+  classes: SchoolClass[];
+  teachers: { id: string; fullName: string; departmentId: string | null }[];
+  subjects: string[];
+  existingEntryCount: number;
+}
+
 interface EntryFormData {
   departmentId: string;
   classId: string;
@@ -35,6 +42,46 @@ interface EntryFormData {
   startTime: string;
   endTime: string;
   room: string;
+}
+
+interface PreviewSlot {
+  classId: string;
+  className: string;
+  teacherId: string;
+  teacherName: string;
+  subject: string;
+  dayOfWeek: number;
+  dayName: string;
+  startTime: string;
+  endTime: string;
+  room?: string;
+}
+
+interface PreviewResult {
+  slots: PreviewSlot[];
+  stats: Record<string, number>;
+  teacherAssignments: Record<string, number>;
+  classNames: string[];
+  teacherNames: string[];
+  roomsUsed: string[];
+  doubleLessons: number;
+  skippedSlots: number;
+}
+
+interface GenerateResult {
+  entriesCreated: number;
+  classesProcessed: number;
+  teachersUsed: number;
+  skippedSlots: number;
+  remake: boolean;
+  elapsed: number;
+  stats: Record<string, number>;
+  teacherAssignments: Record<string, number>;
+  classNames: string[];
+  teacherNames: string[];
+  roomsUsed: string[];
+  doubleLessons: number;
+  warning?: string;
 }
 
 const emptyForm: EntryFormData = {
@@ -104,6 +151,23 @@ const TimetablePage: React.FC = () => {
     return now.getHours() * 60 + now.getMinutes();
   });
 
+  // Auto-generator state
+  const [showGeneratorModal, setShowGeneratorModal] = useState(false);
+  const [generatorInfo, setGeneratorInfo] = useState<GeneratorInfo | null>(null);
+  const [loadingGeneratorInfo, setLoadingGeneratorInfo] = useState(false);
+  const [genClassIds, setGenClassIds] = useState<string[]>([]);
+  const [genRemake, setGenRemake] = useState(false);
+  const [genDurationUnit, setGenDurationUnit] = useState<'min' | 'hr'>('min');
+  const [genPeriodDuration, setGenPeriodDuration] = useState(40);
+  const [genPeriodHours, setGenPeriodHours] = useState(1);
+  const [genStartHour, setGenStartHour] = useState(8);
+  const [genRooms, setGenRooms] = useState('');
+  const [generating, setGenerating] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [genPreview, setGenPreview] = useState<PreviewResult | null>(null);
+  const [genResult, setGenResult] = useState<GenerateResult | null>(null);
+  const [genError, setGenError] = useState('');
+
   useEffect(() => {
     const timer = window.setInterval(() => {
       const now = new Date();
@@ -153,7 +217,6 @@ const TimetablePage: React.FC = () => {
 
   const fetchTeachers = async () => {
     try {
-      // For HODs, only fetch teachers in their own department to avoid "FORBIDDEN" from backend
       if (user?.role === UserRole.HOD && user.departmentId) {
         const { data } = await apiClient.get(`/departments/${user.departmentId}/teachers`);
         let users = normalizeUsersList(data);
@@ -190,6 +253,87 @@ const TimetablePage: React.FC = () => {
     } finally {
       setLoading(false);
     }
+  };
+
+  const openGeneratorModal = async () => {
+    setGenResult(null);
+    setGenPreview(null);
+    setGenError('');
+    setGenClassIds([]);
+    setGenRemake(false);
+    setGenDurationUnit('min');
+    setGenPeriodDuration(40);
+    setGenPeriodHours(1);
+    setLoadingGeneratorInfo(true);
+    setShowGeneratorModal(true);
+    try {
+      const { data } = await apiClient.get('/timetable/generator-info');
+      setGeneratorInfo(data);
+      setGenClassIds(data.classes.map((c: SchoolClass) => c.id));
+    } catch (err: any) {
+      setGenError(err.response?.data?.error || 'Failed to load generator info');
+    } finally {
+      setLoadingGeneratorInfo(false);
+    }
+  };
+
+  /** Compute period duration in minutes based on unit */
+  const getDurationMinutes = () => {
+    if (genDurationUnit === 'hr') return genPeriodHours * 60;
+    return genPeriodDuration;
+  };
+
+  const handlePreview = async () => {
+    if (genClassIds.length === 0) {
+      setGenError('Select at least one class to generate a timetable for.');
+      return;
+    }
+    setGenerating(true);
+    setGenError('');
+    setGenPreview(null);
+    setGenResult(null);
+    try {
+      const roomsList = genRooms.split(',').map((r) => r.trim()).filter(Boolean);
+      const { data } = await apiClient.post('/timetable/generate-preview', {
+        classIds: genClassIds,
+        periodDuration: getDurationMinutes(),
+        startHour: genStartHour,
+        rooms: roomsList,
+      });
+      setGenPreview(data);
+    } catch (err: any) {
+      setGenError(err.response?.data?.error || err.response?.data?.message || 'Preview generation failed');
+    } finally {
+      setGenerating(false);
+    }
+  };
+
+  const handleConfirmSave = async () => {
+    setSaving(true);
+    setGenError('');
+    try {
+      const roomsList = genRooms.split(',').map((r) => r.trim()).filter(Boolean);
+      const { data } = await apiClient.post('/timetable/generate', {
+        classIds: genClassIds,
+        remake: genRemake,
+        periodDuration: getDurationMinutes(),
+        startHour: genStartHour,
+        rooms: roomsList,
+      });
+      setGenResult(data);
+      setGenPreview(null);
+      fetchEntries();
+    } catch (err: any) {
+      setGenError(err.response?.data?.error || err.response?.data?.message || 'Save failed');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleRegenerate = () => {
+    setGenPreview(null);
+    setGenResult(null);
+    setGenError('');
   };
 
   const filteredEntries = entries.filter((e) => {
@@ -302,6 +446,15 @@ const TimetablePage: React.FC = () => {
     ? classes.filter((c) => c.departmentId === effectiveDepartmentId)
     : [];
 
+  // Group preview slots by day for better reading
+  const previewByDay = genPreview
+    ? genPreview.slots.reduce<Record<number, PreviewSlot[]>>((acc, s) => {
+        if (!acc[s.dayOfWeek]) acc[s.dayOfWeek] = [];
+        acc[s.dayOfWeek].push(s);
+        return acc;
+      }, {})
+    : {};
+
   return (
     <div className="page-shell">
       {/* Header */}
@@ -321,12 +474,20 @@ const TimetablePage: React.FC = () => {
               {viewMode === 'table' ? '📅 Grid View' : '📋 Table View'}
             </button>
             {canManage && (
-            <button
-              onClick={openAddModal}
-              className="px-4 py-2 rounded-xl bg-indigo-600 text-white text-sm font-semibold hover:bg-indigo-500 transition-colors"
-            >
-              + Add Entry
-            </button>
+              <>
+                <button
+                  onClick={openGeneratorModal}
+                  className="px-4 py-2 rounded-xl bg-emerald-600 text-white text-sm font-semibold hover:bg-emerald-500 transition-colors"
+                >
+                  ⚡ Auto Generate
+                </button>
+                <button
+                  onClick={openAddModal}
+                  className="px-4 py-2 rounded-xl bg-indigo-600 text-white text-sm font-semibold hover:bg-indigo-500 transition-colors"
+                >
+                  + Add Entry
+                </button>
+              </>
             )}
           </div>
         </div>
@@ -334,7 +495,7 @@ const TimetablePage: React.FC = () => {
 
       <main className="max-w-7xl mx-auto px-6 py-8">
         {/* Filters */}
-        <div className="flex gap-4 mb-6">
+        <div className="flex gap-4 mb-6 flex-wrap">
           <select
             value={filterClass}
             onChange={(e) => setFilterClass(e.target.value)}
@@ -487,7 +648,7 @@ const TimetablePage: React.FC = () => {
         )}
       </main>
 
-      {/* Modal */}
+      {/* Add/Edit Entry Modal */}
       {showModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
           <div className="input-field rounded-2xl p-8 w-full max-w-lg mx-4 shadow-2xl">
@@ -637,6 +798,313 @@ const TimetablePage: React.FC = () => {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Auto-Generator Modal */}
+      {showGeneratorModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
+          <div className="input-field rounded-2xl p-8 w-full max-w-4xl mx-4 shadow-2xl max-h-[90vh] overflow-y-auto">
+            <h3 className="text-xl font-bold text-ink mb-2">⚡ Auto-Generate Timetable</h3>
+            <p className="text-ink-muted text-sm mb-6">
+              Configure your lesson period length and rooms. Preview the schedule first, then confirm to save.
+              {generatorInfo?.existingEntryCount && generatorInfo.existingEntryCount > 0
+                ? ` Existing entries (${generatorInfo.existingEntryCount}) will remain — use "Remake" to replace them.`
+                : ''}
+            </p>
+
+            {genError && (
+              <div className="mb-4 p-3 rounded-lg bg-red-500/10 border border-red-500/20 text-red-300 text-sm">
+                {genError}
+              </div>
+            )}
+
+            {/* ─── Success result (saved to DB) ─── */}
+            {genResult && !genPreview && (
+              <div className="mb-4 p-4 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-emerald-200 text-sm">
+                <p className="font-semibold text-base mb-2">✅ Timetable Saved!</p>
+                <p>• {genResult.entriesCreated} lessons created across {genResult.classNames.length} class(es)</p>
+                <p>• {genResult.teachersUsed} teacher(s) assigned ({genResult.skippedSlots} slots skipped)</p>
+                <p>• Generated in {genResult.elapsed.toFixed(1)}s</p>
+                {genResult.warning && (
+                  <p className="mt-2 text-amber-300">⚠️ {genResult.warning}</p>
+                )}
+                {Object.keys(genResult.stats).length > 0 && (
+                  <div className="mt-2">
+                    <p className="font-semibold text-xs text-emerald-300 mb-1">Per class:</p>
+                    {Object.entries(genResult.stats).map(([name, count]) => (
+                      <p key={name} className="text-xs">• {name}: {count} lessons</p>
+                    ))}
+                  </div>
+                )}
+                <div className="flex gap-3 mt-4">
+                  <button
+                    onClick={() => { setShowGeneratorModal(false); setGenResult(null); }}
+                    className="px-4 py-2 rounded-xl bg-slate-600 text-white text-sm hover:bg-slate-500 transition-colors"
+                  >
+                    Close
+                  </button>
+                  <button
+                    onClick={handleRegenerate}
+                    className="px-4 py-2 rounded-xl bg-indigo-600 text-white text-sm hover:bg-indigo-500 transition-colors"
+                  >
+                    Generate Again
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* ─── Preview result (not yet saved) ─── */}
+            {!genResult && genPreview && (
+              <div className="mb-4">
+                <div className="flex items-center justify-between mb-3">
+                  <p className="text-emerald-300 font-semibold text-sm">
+                    👀 Preview — {genPreview.slots.length} lesson(s) generated across {genPreview.classNames.length} class(es)
+                    {genPreview.skippedSlots > 0 && (
+                      <span className="text-amber-300 ml-2">({genPreview.skippedSlots} slots skipped)</span>
+                    )}
+                  </p>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={handleRegenerate}
+                      className="px-3 py-1.5 rounded-lg bg-slate-600 text-white text-xs hover:bg-slate-500 transition-colors"
+                    >
+                      ← Back & Retry
+                    </button>
+                    <button
+                      onClick={handleConfirmSave}
+                      disabled={saving}
+                      className="px-4 py-1.5 rounded-lg bg-emerald-600 text-white text-sm font-semibold hover:bg-emerald-500 transition-colors disabled:opacity-50"
+                    >
+                      {saving ? '⏳ Saving...' : '✅ Confirm & Save'}
+                    </button>
+                  </div>
+                </div>
+
+                {/* Preview table grouped by day */}
+                <div className="overflow-x-auto rounded-xl border border-white/10">
+                  <table className="w-full text-xs">
+                    <thead>
+                      <tr className="bg-surface-muted border-b border-white/10">
+                        <th className="text-left px-3 py-2 font-semibold text-ink">Day</th>
+                        <th className="text-left px-3 py-2 font-semibold text-ink">Subject</th>
+                        <th className="text-left px-3 py-2 font-semibold text-ink">Class</th>
+                        <th className="text-left px-3 py-2 font-semibold text-ink">Teacher</th>
+                        <th className="text-left px-3 py-2 font-semibold text-ink">Time</th>
+                        <th className="text-left px-3 py-2 font-semibold text-ink">Room</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {DAYS.slice(0, 5).map((day, idx) => {
+                        const daySlots = previewByDay[idx] || [];
+                        return daySlots.length === 0 ? null : (
+                          <React.Fragment key={day}>
+                            <tr className="bg-slate-800/30 border-b border-white/5">
+                              <td colSpan={6} className="px-3 py-1.5 text-xs font-bold text-ink-muted">{day}</td>
+                            </tr>
+                            {daySlots
+                              .sort((a, b) => a.startTime.localeCompare(b.startTime))
+                              .map((slot, si) => (
+                                <tr key={si} className="border-b border-white/5 hover:bg-white/5">
+                                  <td className="px-3 py-2 text-ink-muted">{slot.dayName}</td>
+                                  <td className="px-3 py-2 font-medium text-ink">{slot.subject}</td>
+                                  <td className="px-3 py-2 text-ink-muted">{slot.className}</td>
+                                  <td className="px-3 py-2 text-ink-muted">{slot.teacherName}</td>
+                                  <td className="px-3 py-2 text-ink-muted font-mono">{slot.startTime} – {slot.endTime}</td>
+                                  <td className="px-3 py-2 text-ink-muted">{slot.room || '—'}</td>
+                                </tr>
+                              ))}
+                          </React.Fragment>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+
+                {genPreview.skippedSlots > 0 && (
+                  <p className="text-xs text-amber-300 mt-2">⚠️ {genPreview.skippedSlots} slot(s) could not be filled — try different settings.</p>
+                )}
+              </div>
+            )}
+
+            {/* ─── Configuration form (shown when no preview and no result) ─── */}
+            {!genPreview && !genResult && (
+              <>
+                {loadingGeneratorInfo ? (
+                  <div className="text-center py-8 text-ink-muted">Loading classes & teachers...</div>
+                ) : generatorInfo ? (
+                  <>
+                    {/* Class Selection */}
+                    <div className="mb-4">
+                      <label className="block text-sm font-semibold text-ink mb-2">
+                        Classes to schedule ({genClassIds.length} selected)
+                      </label>
+                      <div className="max-h-40 overflow-y-auto space-y-1.5">
+                        {generatorInfo.classes.map((cls) => (
+                          <label key={cls.id} className="flex items-center gap-2 cursor-pointer hover:bg-white/5 rounded px-2 py-1 transition-colors">
+                            <input
+                              type="checkbox"
+                              className="accent-indigo-500"
+                              checked={genClassIds.includes(cls.id)}
+                              onChange={(e) => {
+                                if (e.target.checked) {
+                                  setGenClassIds([...genClassIds, cls.id]);
+                                } else {
+                                  setGenClassIds(genClassIds.filter((id) => id !== cls.id));
+                                }
+                              }}
+                            />
+                            <span className="text-sm text-ink">{cls.name}</span>
+                          </label>
+                        ))}
+                        {generatorInfo.classes.length === 0 && (
+                          <p className="text-ink-muted text-sm">No classes found. Create classes first.</p>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Teacher count */}
+                    <div className="mb-4 rounded-lg bg-surface-muted px-4 py-3">
+                      <p className="text-sm text-ink-muted">
+                        <span className="font-semibold text-ink">{generatorInfo.teachers.length}</span> teacher(s) available
+                        {generatorInfo.subjects.length > 0 && (
+                          <> · <span className="font-semibold text-ink">{generatorInfo.subjects.length}</span> subject(s) from existing timetable</>
+                        )}
+                      </p>
+                    </div>
+
+                    {/* Rooms Input */}
+                    <div className="mb-4">
+                      <label className="block text-sm text-ink-muted mb-1">
+                        Rooms <span className="text-xs text-ink-subtle">(comma-separated — list all available rooms)</span>
+                      </label>
+                      <input
+                        type="text"
+                        value={genRooms}
+                        onChange={(e) => setGenRooms(e.target.value)}
+                        className="w-full px-4 py-2.5 rounded-xl input-field placeholder-ink-subtle text-sm"
+                        placeholder="Room 1, Room 2, Lab A, Lab B"
+                      />
+                      <p className="text-xs text-ink-subtle mt-1">
+                        Leave empty to skip room assignment. The system distributes rooms evenly across lessons.
+                      </p>
+                    </div>
+
+                    {/* Period Length — with unit toggle */}
+                    <div className="grid grid-cols-3 gap-3 mb-4">
+                      <div>
+                        <label className="block text-sm text-ink-muted mb-1">
+                          Period length
+                        </label>
+                        <div className="flex gap-1">
+                          {genDurationUnit === 'min' ? (
+                            <select
+                              value={genPeriodDuration}
+                              onChange={(e) => setGenPeriodDuration(Number(e.target.value))}
+                              className="flex-1 px-3 py-2.5 rounded-xl input-field text-sm"
+                            >
+                              <option value={20}>20 min</option>
+                              <option value={30}>30 min</option>
+                              <option value={35}>35 min</option>
+                              <option value={40}>40 min</option>
+                              <option value={45}>45 min</option>
+                              <option value={50}>50 min</option>
+                              <option value={60}>60 min</option>
+                              <option value={80}>80 min</option>
+                              <option value={90}>90 min</option>
+                              <option value={120}>120 min</option>
+                            </select>
+                          ) : (
+                            <select
+                              value={genPeriodHours}
+                              onChange={(e) => setGenPeriodHours(Number(e.target.value))}
+                              className="flex-1 px-3 py-2.5 rounded-xl input-field text-sm"
+                            >
+                              <option value={1}>1 hour</option>
+                              <option value={1.5}>1.5 hours</option>
+                              <option value={2}>2 hours</option>
+                              <option value={2.5}>2.5 hours</option>
+                              <option value={3}>3 hours</option>
+                            </select>
+                          )}
+                          <button
+                            type="button"
+                            onClick={() => {
+                              if (genDurationUnit === 'min') {
+                                setGenDurationUnit('hr');
+                                setGenPeriodHours(1);
+                              } else {
+                                setGenDurationUnit('min');
+                                setGenPeriodDuration(60);
+                              }
+                            }}
+                            className="px-2.5 py-2.5 rounded-xl input-field text-xs font-medium text-ink-muted hover:text-ink transition-colors shrink-0"
+                            title="Toggle between minutes and hours"
+                          >
+                            {genDurationUnit === 'min' ? '⏱ min' : '⏱ hr'}
+                          </button>
+                        </div>
+                        <p className="text-xs text-ink-subtle mt-1">
+                          {getDurationMinutes()} min per lesson
+                        </p>
+                      </div>
+                      <div>
+                        <label className="block text-sm text-ink-muted mb-1">Start</label>
+                        <select
+                          value={genStartHour}
+                          onChange={(e) => setGenStartHour(Number(e.target.value))}
+                          className="w-full px-3 py-2.5 rounded-xl input-field text-sm"
+                        >
+                          <option value={6}>06:00</option>
+                          <option value={7}>07:00</option>
+                          <option value={8}>08:00</option>
+                          <option value={9}>09:00</option>
+                          <option value={10}>10:00</option>
+                        </select>
+                      </div>
+                    </div>
+
+                    {/* Toggle Remake */}
+                    <label className="flex items-center gap-3 mb-6 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        className="accent-amber-500"
+                        checked={genRemake}
+                        onChange={(e) => setGenRemake(e.target.checked)}
+                      />
+                      <div>
+                        <p className="text-sm font-medium text-ink">Remake mode</p>
+                        <p className="text-xs text-ink-muted">
+                          Deletes existing entries for selected classes before generating
+                        </p>
+                      </div>
+                    </label>
+
+                    {/* Actions */}
+                    <div className="flex gap-3 pt-2">
+                      <button
+                        type="button"
+                        onClick={() => setShowGeneratorModal(false)}
+                        className="flex-1 px-4 py-2.5 rounded-xl input-field text-ink-muted hover:bg-surface-elevated transition-colors"
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        type="button"
+                        onClick={handlePreview}
+                        disabled={generating || genClassIds.length === 0}
+                        className="flex-1 px-4 py-2.5 rounded-xl bg-indigo-600 text-white font-semibold hover:bg-indigo-500 transition-colors disabled:opacity-50"
+                      >
+                        {generating ? '⏳ Generating preview...' : '👀 Preview'}
+                      </button>
+                    </div>
+                  </>
+                ) : (
+                  <div className="text-center py-8 text-red-300">Failed to load data. Check your connection.</div>
+                )}
+              </>
+            )}
           </div>
         </div>
       )}

@@ -5,11 +5,13 @@ import { saveAttendanceRecord } from '../services/offlineStore';
 import { AttendanceStatus, UserRole } from '@sams/shared';
 import { useAuthStore } from '../store/authStore';
 import { getApiErrorMessage } from '../lib/apiError';
+import { UserAvatar } from '../components/UserAvatar';
 
 interface Student {
   id: string;
   fullName: string;
   admissionNumber?: string | null;
+  avatarUrl?: string | null;
 }
 
 interface SessionOption {
@@ -369,20 +371,21 @@ const ManualAttendancePage: React.FC = () => {
                             onClick={() => togglePresent(student.id)}
                             className="flex items-center gap-3 flex-1 min-w-0 text-left rounded-lg focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/50"
                           >
-                            <div
-                              className={`w-11 h-11 rounded-full flex items-center justify-center text-sm font-bold flex-shrink-0 transition-colors ${
-                                isPresent
-                                  ? 'bg-emerald-600 text-white'
-                                  : 'bg-indigo-600/80 text-white'
-                              }`}
-                            >
+                            <div className="relative h-11 w-11 flex-shrink-0">
+                              <UserAvatar
+                                avatarUrl={student.avatarUrl}
+                                fullName={student.fullName}
+                                className={`h-11 w-11 rounded-full transition-colors ${
+                                  isPresent ? 'ring-emerald-500/60' : ''
+                                }`}
+                              />
                               {isPresent ? (
-                                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                                <span className="absolute -bottom-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full bg-emerald-600 text-white ring-2 ring-slate-950">
+                                  <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
                                   <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-                                </svg>
-                              ) : (
-                                student.fullName.charAt(0)
-                              )}
+                                  </svg>
+                                </span>
+                              ) : null}
                             </div>
                             <div className="min-w-0 flex-1">
                               <p className="font-medium text-ink truncate">{student.fullName}</p>

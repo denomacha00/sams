@@ -124,7 +124,7 @@ departmentsRouter.get('/:id/teachers', async (req: Request, res: Response): Prom
     }
     const teachers = await prisma.user.findMany({
       where: { schoolId: req.schoolId, departmentId: deptId, role: 'TEACHER' },
-      select: { id: true, fullName: true, email: true, phone: true },
+      select: { id: true, fullName: true, email: true, phone: true, avatarUrl: true },
     });
     res.json(teachers);
   } catch (err) {

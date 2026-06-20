@@ -5,7 +5,7 @@ type SessionWithClass = AttendanceSession & {
 };
 
 type RecordWithStudent = Pick<AttendanceRecord, 'id' | 'studentId' | 'status' | 'method' | 'scannedAt' | 'note'> & {
-  student?: Pick<User, 'fullName'> | null;
+  student?: Pick<User, 'fullName' | 'avatarUrl'> | null;
 };
 
 export interface ClientSessionResponse {
@@ -34,12 +34,14 @@ export interface ClientStudentPreview {
   id: string;
   fullName: string;
   admissionNumber: string | null;
+  avatarUrl: string | null;
 }
 
 export interface ClientAttendanceRecordPreview {
   id: string;
   studentId: string;
   studentName: string;
+  studentAvatarUrl: string | null;
   status: string;
   method: string;
   scannedAt: Date;
@@ -71,12 +73,13 @@ export function formatSessionForClient(session: SessionWithClass): ClientSession
 }
 
 export function formatStudentsForClient(
-  students: Array<Pick<User, 'id' | 'fullName' | 'admissionNumber'>>,
+  students: Array<Pick<User, 'id' | 'fullName' | 'admissionNumber' | 'avatarUrl'>>,
 ): ClientStudentPreview[] {
   return students.map((s) => ({
     id: s.id,
     fullName: s.fullName,
     admissionNumber: s.admissionNumber,
+    avatarUrl: s.avatarUrl,
   }));
 }
 
@@ -87,6 +90,7 @@ export function formatAttendanceRecordsForClient(
     id: record.id,
     studentId: record.studentId,
     studentName: record.student?.fullName ?? 'Student',
+    studentAvatarUrl: record.student?.avatarUrl ?? null,
     status: record.status,
     method: record.method,
     scannedAt: record.scannedAt,

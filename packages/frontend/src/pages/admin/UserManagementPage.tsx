@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { useAuthStore } from '../../store/authStore';
 import { UserRole } from '@sams/shared';
 import apiClient from '../../services/apiClient';
+import { UserAvatar } from '../../components/UserAvatar';
 
 interface User {
   id: string;
@@ -10,6 +11,7 @@ interface User {
   username?: string;
   email?: string;
   phone?: string;
+  avatarUrl?: string | null;
   role: string;
   admissionNumber?: string;
   departmentId?: string;
@@ -344,7 +346,21 @@ const UserManagementPage: React.FC = () => {
                 ) : (
                   filteredUsers.map((u) => (
                     <tr key={u.id} className="border-b border-white/5 hover:bg-white/5 transition-colors">
-                      <td className="px-6 py-4 text-sm text-white">{u.fullName}</td>
+                      <td className="px-6 py-4 text-sm text-white">
+                        <div className="flex items-center gap-3 min-w-[14rem]">
+                          <UserAvatar
+                            avatarUrl={u.avatarUrl}
+                            fullName={u.fullName}
+                            className="h-10 w-10 rounded-full"
+                          />
+                          <div className="min-w-0">
+                            <p className="truncate font-semibold text-ink">{u.fullName}</p>
+                            <p className="truncate text-xs text-ink-muted">
+                              {u.phone || u.email || u.admissionNumber || 'No contact saved'}
+                            </p>
+                          </div>
+                        </div>
+                      </td>
                       <td className="px-6 py-4 text-sm text-indigo-300">{u.username || '—'}</td>
                       <td className="px-6 py-4 text-sm text-ink-muted">{u.email || '—'}</td>
                       <td className="px-6 py-4">

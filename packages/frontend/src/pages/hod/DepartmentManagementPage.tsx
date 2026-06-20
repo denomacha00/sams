@@ -2,12 +2,14 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuthStore } from '../../store/authStore';
 import apiClient from '../../services/apiClient';
+import { UserAvatar } from '../../components/UserAvatar';
 
 interface Teacher {
   id: string;
   fullName: string;
   email: string | null;
   phone: string | null;
+  avatarUrl?: string | null;
 }
 
 interface ClassWithTeacher {
@@ -22,6 +24,7 @@ interface Student {
   id: string;
   fullName: string;
   admissionNumber: string | null;
+  avatarUrl?: string | null;
   classId: string | null;
   email: string | null;
   phone: string | null;
@@ -313,9 +316,11 @@ const DepartmentManagementPage: React.FC = () => {
               <div className="text-center text-ink-muted py-8">No teachers in this department yet.</div>
             ) : teachers.map((teacher) => (
               <div key={teacher.id} className="rounded-2xl border border-white/10 bg-white/5 p-4 flex items-center gap-3">
-                <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-indigo-500/30 to-indigo-600/30 border border-indigo-500/20 flex items-center justify-center shrink-0">
-                  <span className="text-sm font-semibold text-brand">{teacher.fullName.charAt(0)}</span>
-                </div>
+                <UserAvatar
+                  avatarUrl={teacher.avatarUrl}
+                  fullName={teacher.fullName}
+                  className="h-10 w-10 rounded-full shrink-0"
+                />
                 <div>
                   <p className="text-sm font-semibold text-ink">{teacher.fullName}</p>
                   <p className="text-xs text-ink-muted">{teacher.email || teacher.phone || '—'}</p>
@@ -444,9 +449,11 @@ const DepartmentManagementPage: React.FC = () => {
                       <div className="divide-y divide-white/5">
                         {group.students.map((student) => (
                           <div key={student.id} className="flex items-center gap-3 px-4 py-3 hover:bg-white/5">
-                            <div className="w-8 h-8 rounded-full bg-gradient-to-br from-indigo-500/30 to-indigo-600/30 flex items-center justify-center shrink-0">
-                              <span className="text-xs font-semibold text-indigo-300">{student.fullName.charAt(0)}</span>
-                            </div>
+                            <UserAvatar
+                              avatarUrl={student.avatarUrl}
+                              fullName={student.fullName}
+                              className="h-9 w-9 rounded-full shrink-0"
+                            />
                             <div className="flex-1 min-w-0">
                               <p className="truncate text-sm font-medium text-ink">{student.fullName}</p>
                               <p className="text-xs text-ink-muted">

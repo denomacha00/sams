@@ -4,11 +4,13 @@ import { UserRole } from '@sams/shared';
 import apiClient from '../services/apiClient';
 import { getApiErrorMessage } from '../lib/apiError';
 import { useAuthStore } from '../store/authStore';
+import { UserAvatar } from '../components/UserAvatar';
 
 interface Student {
   id: string;
   fullName: string;
   admissionNumber?: string | null;
+  avatarUrl?: string | null;
 }
 
 interface SessionOption {
@@ -368,9 +370,16 @@ const FingerprintAttendancePage: React.FC = () => {
                     const alreadyMarked = markedIds.has(student.id);
                     return (
                       <div key={student.id} className="flex flex-col gap-3 py-4 sm:flex-row sm:items-center sm:justify-between">
-                        <div>
-                          <p className="font-medium text-ink">{student.fullName}</p>
-                          <p className="text-xs text-ink-subtle">{student.admissionNumber ?? 'No admission number'}</p>
+                        <div className="flex min-w-0 items-center gap-3">
+                          <UserAvatar
+                            avatarUrl={student.avatarUrl}
+                            fullName={student.fullName}
+                            className="h-10 w-10 rounded-full shrink-0"
+                          />
+                          <div className="min-w-0">
+                            <p className="truncate font-medium text-ink">{student.fullName}</p>
+                            <p className="text-xs text-ink-subtle">{student.admissionNumber ?? 'No admission number'}</p>
+                          </div>
                         </div>
                         <button
                           type="button"
