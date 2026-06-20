@@ -131,7 +131,7 @@
   }
 
   .surface-panel {
-    @apply rounded-lg border border-line bg-surface shadow-card p-6 min-h-[280px];
+    @apply rounded-lg border border-line bg-surface shadow-card p-4 sm:p-5 min-h-[200px];
   }
 
   .surface-muted-row {
@@ -174,7 +174,7 @@
   }
 
   .dashboard-command-card {
-    @apply flex min-h-[5rem] items-center gap-3 rounded-lg border border-line bg-surface-muted/90 p-3
+    @apply flex min-h-[4.25rem] items-center gap-2.5 rounded-lg border border-line bg-surface-muted/90 p-3
       hover:border-brand/45 hover:bg-surface-elevated hover:shadow-card-soft transition-all duration-200;
   }
 
@@ -183,11 +183,11 @@
   }
 
   .dashboard-workflow-grid {
-    @apply grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4;
+    @apply grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4;
   }
 
   .dashboard-workflow-card {
-    @apply flex min-h-[9rem] flex-col rounded-lg border border-line bg-surface p-4 shadow-card-soft
+    @apply flex min-h-[7rem] flex-col rounded-lg border border-line bg-surface p-3.5 shadow-card-soft
       hover:bg-surface-elevated hover:shadow-card-soft-hover transition-all duration-200;
   }
 
@@ -200,7 +200,7 @@
   }
 
   .dashboard-workflow-step {
-    @apply inline-flex h-7 min-w-10 items-center justify-center rounded-full border px-2 text-[11px] font-bold tracking-wide;
+    @apply inline-flex h-6 min-w-9 items-center justify-center rounded-full border px-2 text-[10px] font-bold tracking-wide;
   }
 
   .dashboard-workflow-step--indigo {
@@ -212,7 +212,7 @@
   }
 
   .dash-card {
-    @apply relative flex min-h-[5.5rem] flex-col gap-2 rounded-lg border border-line bg-surface p-4 shadow-card-soft
+    @apply relative flex min-h-[4.5rem] flex-col gap-1.5 rounded-lg border border-line bg-surface p-3 shadow-card-soft
       hover:border-brand/40 hover:bg-surface-elevated hover:shadow-card-soft-hover transition-all duration-200;
   }
 
@@ -225,7 +225,7 @@
   }
 
   .dash-card-icon {
-    @apply w-9 h-9 rounded-md flex items-center justify-center shrink-0 border border-line bg-surface-muted;
+    @apply w-8 h-8 rounded-md flex items-center justify-center shrink-0 border border-line bg-surface-muted;
   }
 
   .dash-card-icon-primary {
@@ -237,7 +237,7 @@
   }
 
   .dash-stat {
-    @apply flex items-center gap-4 rounded-lg border border-line bg-surface px-4 py-3 shadow-card-soft
+    @apply flex items-center gap-3 rounded-lg border border-line bg-surface px-3 py-2.5 shadow-card-soft
       hover:border-brand/35 hover:bg-surface-elevated hover:shadow-card-soft-hover transition-all duration-200 cursor-default;
   }
 
@@ -250,7 +250,7 @@
   }
 
   .dash-stat-value {
-    @apply text-2xl font-bold text-ink tabular-nums leading-none;
+    @apply text-xl sm:text-2xl font-bold text-ink tabular-nums leading-none;
   }
 
   .dash-stat-label {
@@ -262,7 +262,7 @@
   }
 
   .dash-group-label {
-    @apply text-xs font-semibold text-ink-subtle uppercase tracking-wider mb-3;
+    @apply text-xs font-semibold text-ink-subtle uppercase tracking-wider mb-2;
   }
 
   /* Floating AI FAB */
@@ -426,7 +426,7 @@
   }
 
   .dashboard-insights-panel {
-    @apply rounded-2xl border border-line bg-surface shadow-card p-6;
+    @apply rounded-lg border border-line bg-surface shadow-card p-4 sm:p-5;
   }
 
   /* Login */
@@ -515,7 +515,7 @@
 
 /* Sidebar header */
 .sidebar-header {
-  @apply relative flex items-center justify-between px-3 py-4 border-b border-line;
+  @apply relative flex items-center justify-between px-3 py-3 border-b border-line;
 }
 
 .sidebar-expanded .sidebar-header {
@@ -536,11 +536,11 @@
 
 /* Sidebar nav */
 .sidebar-nav {
-  @apply flex-1 overflow-y-auto overflow-x-hidden py-3;
+  @apply flex-1 overflow-y-auto overflow-x-hidden py-2;
 }
 
 .sidebar-section {
-  @apply mb-3;
+  @apply mb-2;
 }
 
 .sidebar-section-title {
@@ -556,7 +556,7 @@
 }
 
 .sidebar-link {
-  @apply flex items-center gap-3 px-3 py-2.5 rounded-lg no-underline
+  @apply flex w-full items-center gap-3 px-3 py-2 rounded-lg no-underline
     text-ink-muted hover:text-ink hover:bg-surface-elevated
     transition-all duration-150;
 }
@@ -581,13 +581,12 @@
   @apply hidden;
 }
 
-/* Sidebar footer */
-.sidebar-footer {
-  @apply border-t border-line py-2;
+.sidebar-session-section {
+  @apply mt-2 border-t border-line pt-2;
 }
 
-.sidebar-logout {
-  cursor: pointer;
+.sidebar-logout-button {
+  @apply cursor-pointer bg-transparent text-left hover:bg-red-500/10;
 }
 
 /* ─── Main content area ─────────────────────────────────────────────────── */

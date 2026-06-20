@@ -181,7 +181,7 @@ const AnimatedStatCard: React.FC<{ stat: StatCard; index: number }> = ({ stat, i
       </div>
       <div className="min-w-0 flex-1">
         <p className="dash-stat-label">{stat.label}</p>
-        <p className={`dash-stat-value mt-1 ${isOrange ? 'text-accent-orange' : 'text-ink'}`}>{stat.value}</p>
+        <p className="dash-stat-value mt-1 text-ink">{stat.value}</p>
       </div>
     </div>
   );
@@ -204,7 +204,7 @@ const QuickActionButton: React.FC<{ action: QuickAction; index: number }> = ({ a
           </svg>
         </div>
         <div className="min-w-0 flex-1">
-          <h3 className={`text-sm font-semibold text-ink ${useIndigo ? 'group-hover:text-indigo-300' : 'group-hover:text-accent-orange'} transition-colors`}>
+          <h3 className="text-sm font-semibold text-ink transition-colors group-hover:text-brand">
             {action.label}
           </h3>
           <p className="text-xs text-ink-muted mt-0.5 line-clamp-2">{action.subtitle}</p>
@@ -259,9 +259,9 @@ const RoleWorkflowCard: React.FC<{ item: RoleWorkflow; index: number }> = ({ ite
           </svg>
         </span>
       </div>
-      <div className="mt-4 min-w-0">
+      <div className="mt-3 min-w-0">
         <h3 className="text-sm font-semibold text-ink">{item.title}</h3>
-        <p className="mt-1 text-xs leading-5 text-ink-muted">{item.detail}</p>
+        <p className="mt-1 text-xs leading-4 text-ink-muted">{item.detail}</p>
       </div>
     </Link>
   );
@@ -271,7 +271,7 @@ const RoleWorkflowBoard: React.FC<{ role?: UserRole }> = ({ role }) => {
   const items = getRoleWorkflows(role);
   if (items.length === 0) return null;
   return (
-    <section className="mb-8">
+    <section className="mb-6">
       <SectionHeader title="Workflow" icon={ICONS.clipboard} />
       <div className="dashboard-workflow-grid">
         {items.map((item, index) => (
@@ -295,7 +295,7 @@ const AttendanceWorkflowPanel: React.FC<{ role?: UserRole }> = ({ role }) => {
     { to: '/reports', label: 'Reports', detail: 'After class', icon: ICONS.chart },
   ];
   return (
-    <section className="mb-8 surface-panel rounded-2xl p-5">
+    <section className="mb-6 surface-panel p-4">
       <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h3 className="text-sm font-semibold text-ink">Attendance workflow</h3>
@@ -807,7 +807,7 @@ const DashboardPage: React.FC = () => {
 
   let qi = 0;
   return (
-    <div className="page-shell px-3 py-4 sm:px-4 sm:py-5 lg:px-6 xl:px-8">
+    <div className="page-shell px-3 py-3 sm:px-4 sm:py-4 lg:px-5 xl:px-6">
       <style>{`
         @keyframes fadeInUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
       `}</style>
@@ -815,12 +815,12 @@ const DashboardPage: React.FC = () => {
       <ActiveSessionReminder role={user?.role} userId={user?.id} />
 
       {/* Welcome Banner */}
-      <div className="relative mb-6 sm:mb-8 dashboard-hero p-4 sm:p-5 lg:p-7" style={{ animation: 'fadeInUp 0.5s ease-out forwards' }}>
-        <div className="relative z-10 grid gap-4 sm:gap-6 xl:grid-cols-[minmax(0,1fr)_minmax(320px,430px)] xl:items-center">
+      <div className="relative mb-5 dashboard-hero p-4 sm:p-5" style={{ animation: 'fadeInUp 0.5s ease-out forwards' }}>
+        <div className="relative z-10 grid gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(300px,400px)] xl:items-center">
           <div className="min-w-0">
             <span className="dashboard-kicker">SAMS Workbench</span>
-            <div className="flex flex-col sm:flex-row sm:items-center gap-3 mb-1">
-              <h2 className="text-xl sm:text-2xl lg:text-3xl font-bold text-ink tracking-tight">
+            <div className="flex flex-col sm:flex-row sm:items-center gap-2 mb-1">
+              <h2 className="text-lg sm:text-xl lg:text-2xl font-bold text-ink tracking-tight">
                 Welcome back, {user?.fullName?.split(' ')[0] || 'User'}
               </h2>
               <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold text-brand bg-brand-light border border-brand/20 w-fit">
@@ -835,7 +835,7 @@ const DashboardPage: React.FC = () => {
             <div className="dashboard-signal-row">
               <span className="dashboard-signal">{quickActionGroups.length + (primaryActions.length > 0 ? 1 : 0)} work areas</span>
               <span className="dashboard-signal">Role: {getRoleLabel(user?.role)}</span>
-              <Link to="/ai" className="dashboard-signal dashboard-signal--accent hover:border-accent-orange/45 hover:bg-accent-orange/15">
+              <Link to="/ai" className="dashboard-signal dashboard-signal--accent hover:border-brand/45 hover:bg-brand-light">
                 AI assistant ready
               </Link>
             </div>
@@ -857,7 +857,7 @@ const DashboardPage: React.FC = () => {
       <RoleWorkflowBoard role={user?.role} />
 
       {/* Stats */}
-      <section className="mb-8">
+      <section className="mb-6">
         <SectionHeader title="Overview" icon={ICONS.chart} />
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
           {statsLoading ? [1, 2, 3, 4].map((i) => <SkeletonCard key={i} />) : stats.map((stat, i) => <AnimatedStatCard key={stat.label} stat={stat} index={i} />)}
@@ -865,9 +865,9 @@ const DashboardPage: React.FC = () => {
       </section>
 
       {/* Quick Actions */}
-      <section className="mb-8">
+      <section className="mb-6">
         <SectionHeader title="Quick Actions" icon={ICONS.trending} />
-        <div className="space-y-6">
+        <div className="space-y-4">
           {quickActionGroups.map((group) => (
             <div key={group.title}>
               <h4 className="dash-group-label">{group.title}</h4>
@@ -885,7 +885,7 @@ const DashboardPage: React.FC = () => {
       {/* Bottom Insights */}
       <section>
         <SectionHeader title={user?.role === UserRole.STUDENT ? 'My day' : user?.role === UserRole.TEACHER ? 'Teaching today' : user?.role === UserRole.HOD ? 'Department today' : user?.role === UserRole.SCHOOL_ADMIN ? 'School today' : 'At a glance'} icon={ICONS.trending} />
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
           <AtAGlancePanel role={user?.role} userId={user?.id} departmentId={user?.departmentId} classId={user?.classId} />
           {user?.role === UserRole.SCHOOL_ADMIN && <SchoolAdminInsightsPanel />}
           {user?.role === UserRole.STUDENT && (

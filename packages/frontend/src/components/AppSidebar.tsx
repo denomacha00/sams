@@ -2,7 +2,6 @@ import React from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { UserRole } from '@sams/shared';
 import { useAuthStore } from '../store/authStore';
-import { useUnreadNotifications } from '../hooks/useUnreadNotifications';
 
 interface SidebarItem {
   label: string;
@@ -221,7 +220,6 @@ const AppSidebar: React.FC<AppSidebarProps> = ({ collapsed }) => {
   const navigate = useNavigate();
   const user = useAuthStore((s) => s.user);
   const logout = useAuthStore((s) => s.logout);
-  const { unreadCount } = useUnreadNotifications();
 
   const items = getSidebarItems(user?.role);
   const groups = groupItems(items);
@@ -256,25 +254,25 @@ const AppSidebar: React.FC<AppSidebarProps> = ({ collapsed }) => {
             activePath={location.pathname}
           />
         ))}
-      </nav>
 
-      {/* Logout at bottom */}
-      <div className="sidebar-footer">
-        <div
-          className="sidebar-item sidebar-logout"
-          onClick={handleLogout}
-          title="Sign Out"
-        >
-          <div className="sidebar-link">
-            <span className="sidebar-icon-wrapper">
-              <svg className="sidebar-icon text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-                <path strokeLinecap="round" strokeLinejoin="round" d={ICONS.logout} />
-              </svg>
-            </span>
-            {!collapsed && <span className="sidebar-label text-red-400">Sign Out</span>}
+        <div className="sidebar-section sidebar-session-section">
+          {!collapsed && <div className="sidebar-section-title">Session</div>}
+          <div className="sidebar-item" title="Sign Out">
+            <button
+              type="button"
+              onClick={handleLogout}
+              className="sidebar-link sidebar-logout-button"
+            >
+              <span className="sidebar-icon-wrapper">
+                <svg className="sidebar-icon text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d={ICONS.logout} />
+                </svg>
+              </span>
+              {!collapsed && <span className="sidebar-label text-red-400">Sign Out</span>}
+            </button>
           </div>
         </div>
-      </div>
+      </nav>
     </aside>
   );
 };
