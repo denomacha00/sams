@@ -182,22 +182,54 @@ function generate(
   let ri = 0;
   const nextRoom = rooms.length > 0 ? () => rooms[ri++ % rooms.length] : () => undefined as string | undefined;
 
-  // PERIOD-FIRST approach: for each day, for each period, give EVERY class a shot
-  // before moving to the next period. Classes are shuffled each pass for fairness.
-  for (const day of days) {
-    for (const p of periods) {
-      const shuffledClasses = shuffle(classes);
+  // GUARANTEED MINIMUM approach: each class gets at least MIN_PER_DAY lessons per day.
+  // Phase 1: ensure baseline coverage first (2 lessons per class per day)
+  // Phase 2: fill remaining periods with whatever is left
+  const MIN_PER_DAY = 2;
 
-      for (const cls of shuffledClasses) {
+  // Phase 1: Baseline — each class gets MIN_PER_DAY lessons per day
+  for (const day of days) {
+    for (const cls of shuffle(classes)) {
+      let placed = 0;
+      // Try to place MIN_PER_DAY lessons spread across the day
+      for (const p of shuffle(periods)) {
+        if (placed >= MIN_PER_DAY) break;
         if (!tr.classFree(cls.id, day, p.startTime)) continue;
 
         const cand = shuffle(classCandidates.get(cls.id) ?? teachers);
         const subs = shuffle(getSubjects(cls, catalog));
-
-        // Pick a subject not already studied today, or any subject
         const subj = subs.find((s) => !tr.hasSubject(cls.id, day, s)) ?? subs[Math.floor(Math.random() * subs.length)];
 
-        // Find a qualified teacher who is free at this time
+        // Pick the LEAST loaded teacher
+        const qual = cand
+          .filter((t) => {
+            const ts = tSubj.get(t.id);
+            return (!ts || ts.size === 0 || ts.has(subj)) && tr.teacherFree(t.id, day, p.startTime) && tr.teacherUnderLimit(t.id, day, maxDay);
+          })
+          .sort((a, b) => tr.teacherLoad(a.id, day) - tr.teacherLoad(b.id, day));
+
+        if (qual.length === 0) { skipped++; continue; }
+
+        const tch = qual[0];
+        tr.book(tch.id, cls.id, day, p.startTime, subj);
+        slots.push({ schoolId, classId: cls.id, teacherId: tch.id, subject: subj, dayOfWeek: day, startTime: p.startTime, endTime: p.endTime, room: nextRoom() });
+        (assignments[tch.id] ??= 0);
+        assignments[tch.id] += 1;
+        placed++;
+      }
+    }
+  }
+
+  // Phase 2: Fill remaining periods with any class that still has free slots
+  for (const day of days) {
+    for (const p of shuffle(periods)) {
+      for (const cls of shuffle(classes)) {
+        if (!tr.classFree(cls.id, day, p.startTime)) continue;
+
+        const cand = shuffle(classCandidates.get(cls.id) ?? teachers);
+        const subs = shuffle(getSubjects(cls, catalog));
+        const subj = subs.find((s) => !tr.hasSubject(cls.id, day, s)) ?? subs[Math.floor(Math.random() * subs.length)];
+
         const qual = cand.filter((t) => {
           const ts = tSubj.get(t.id);
           return (!ts || ts.size === 0 || ts.has(subj)) && tr.teacherFree(t.id, day, p.startTime) && tr.teacherUnderLimit(t.id, day, maxDay);
@@ -206,34 +238,21 @@ function generate(
         if (qual.length === 0) { skipped++; continue; }
 
         const tch = qual[Math.floor(Math.random() * qual.length)];
-
-        // Try double lesson (30% chance) — only if teacher and class both have the next consecutive period free
-        const next = nextPeriod(periods, p);
-        const doDouble = next && Math.random() < 0.3
-          && tr.consecutiveFree(cls.id, tch.id, day, p.startTime, next.startTime)
-          && tr.teacherLoad(tch.id, day) + 2 <= maxDay;
-
-        if (doDouble) {
-          tr.book(tch.id, cls.id, day, p.startTime, subj);
-          tr.book(tch.id, cls.id, day, next.startTime, subj);
-          slots.push({ schoolId, classId: cls.id, teacherId: tch.id, subject: subj, dayOfWeek: day, startTime: p.startTime, endTime: next.endTime, room: nextRoom() });
-          doubles++;
-          (assignments[tch.id] ??= 0);
-          assignments[tch.id] += 2;
-          continue;
-        }
-
         tr.book(tch.id, cls.id, day, p.startTime, subj);
         slots.push({ schoolId, classId: cls.id, teacherId: tch.id, subject: subj, dayOfWeek: day, startTime: p.startTime, endTime: p.endTime, room: nextRoom() });
         (assignments[tch.id] ??= 0);
         assignments[tch.id] += 1;
       }
     }
+  }
 
-    // After all periods for this day, count filled slots per class
-    for (const cls of classes) {
-      stats[cls.name] = (stats[cls.name] ?? 0) + (slots.filter((s) => s.classId === cls.id && s.dayOfWeek === day).length);
+  // Calculate stats after both passes
+  for (const cls of classes) {
+    let total = 0;
+    for (const day of days) {
+      total += slots.filter((s) => s.classId === cls.id && s.dayOfWeek === day).length;
     }
+    stats[cls.name] = total;
   }
 
   return { slots, skipped, stats, assignments, doubles };
