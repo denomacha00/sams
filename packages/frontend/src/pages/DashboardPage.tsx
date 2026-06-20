@@ -794,8 +794,21 @@ const DashboardPage: React.FC = () => {
   const quickActionGroups = getQuickActionGroups(user?.role)
     .map((group) => ({ ...group, actions: group.actions.filter((action) => !primaryActionPaths.has(action.to)) }))
     .filter((group) => group.actions.length > 0);
-  const todayLabel = `${new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}`;
+  const [now, setNow] = useState(() => new Date());
+  const todayLabel = useMemo(
+    () => now.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' }),
+    [now],
+  );
+  const timeLabel = useMemo(
+    () => now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+    [now],
+  );
   const [departmentName, setDepartmentName] = useState<string | null>(null);
+
+  useEffect(() => {
+    const timer = window.setInterval(() => setNow(new Date()), 30_000);
+    return () => window.clearInterval(timer);
+  }, []);
 
   useEffect(() => {
     if (user?.role !== UserRole.HOD || !user?.departmentId) { setDepartmentName(null); return; }
@@ -831,7 +844,7 @@ const DashboardPage: React.FC = () => {
               )}
             </div>
             <p className="text-ink-muted text-sm sm:text-base max-w-lg">{getRoleGreeting(user?.role)}</p>
-            <p className="text-xs text-ink-subtle mt-1">{todayLabel}</p>
+            <p className="text-xs text-ink-subtle mt-1">{todayLabel} - {timeLabel}</p>
             <div className="dashboard-signal-row">
               <span className="dashboard-signal">{quickActionGroups.length + (primaryActions.length > 0 ? 1 : 0)} work areas</span>
               <span className="dashboard-signal">Role: {getRoleLabel(user?.role)}</span>
