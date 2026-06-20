@@ -96,6 +96,7 @@ const AppLayout: React.FC = () => {
     <div className="app-layout">
       <AppSidebar
         collapsed={sidebarCollapsed}
+        onToggle={() => setSidebarCollapsed((c) => !c)}
       />
       {!sidebarCollapsed && (
         <button

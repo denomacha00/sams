@@ -183,11 +183,11 @@
   }
 
   .dashboard-workflow-grid {
-    @apply grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4;
+    @apply grid grid-cols-1 gap-2.5 md:grid-cols-2 xl:grid-cols-4;
   }
 
   .dashboard-workflow-card {
-    @apply flex min-h-[7rem] flex-col rounded-lg border border-line bg-surface p-3.5 shadow-card-soft
+    @apply flex min-h-[5.25rem] flex-col rounded-lg border border-line bg-surface p-3 shadow-card-soft
       hover:bg-surface-elevated hover:shadow-card-soft-hover transition-all duration-200;
   }
 
@@ -514,8 +514,8 @@
 }
 
 .sidebar-collapsed {
-  width: 240px;
-  transform: translateX(-100%);
+  width: 60px;
+  transform: translateX(0);
 }
 
 /* Sidebar header */
@@ -537,6 +537,12 @@
 
 .sidebar-logo-text {
   @apply text-base font-bold text-ink tracking-tight;
+}
+
+.sidebar-header-toggle {
+  @apply h-8 w-8 shrink-0 rounded-lg border border-line bg-surface-muted text-ink-muted
+    flex items-center justify-center hover:border-brand/45 hover:bg-surface-elevated hover:text-ink
+    transition-all duration-200;
 }
 
 /* Sidebar nav */
@@ -604,7 +610,7 @@
 }
 
 .app-main-collapsed {
-  margin-left: 0;
+  margin-left: 60px;
 }
 
 /* Top bar */
@@ -667,14 +673,17 @@
     backdrop-filter: blur(1px);
   }
 
-  .app-sidebar.sidebar-expanded,
-  .app-sidebar.sidebar-collapsed {
+  .app-sidebar.sidebar-expanded {
     width: min(82vw, 280px);
+  }
+
+  .app-sidebar.sidebar-collapsed {
+    width: 56px;
   }
 
   .app-main-expanded,
   .app-main-collapsed {
-    margin-left: 0;
+    margin-left: 56px;
   }
 
   .topbar-badge {
@@ -692,6 +701,6 @@
   }
 
   .sidebar-collapsed {
-    width: 220px;
+    width: 60px;
   }
 }

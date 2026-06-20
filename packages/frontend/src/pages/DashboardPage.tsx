@@ -249,19 +249,19 @@ const RoleWorkflowCard: React.FC<{ item: RoleWorkflow; index: number }> = ({ ite
       className={`group dashboard-workflow-card ${isOrange ? 'dashboard-workflow-card--orange' : 'dashboard-workflow-card--indigo'}`}
       style={{ animationDelay: `${(index + 1) * 70}ms`, animation: 'fadeInUp 0.45s ease-out forwards', opacity: 0 }}
     >
-      <div className="flex items-start justify-between gap-3">
+      <div className="flex items-center gap-3">
         <span className={`dashboard-workflow-step ${isOrange ? 'dashboard-workflow-step--orange' : 'dashboard-workflow-step--indigo'}`}>
           {item.step}
         </span>
+        <div className="min-w-0 flex-1">
+          <h3 className="truncate text-sm font-semibold text-ink">{item.title}</h3>
+          <p className="mt-0.5 line-clamp-2 text-xs leading-4 text-ink-muted">{item.detail}</p>
+        </div>
         <span className={`dash-card-icon ${isOrange ? 'dash-card-icon-primary' : 'dash-card-icon-secondary'}`}>
           <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.7} d={item.icon} />
           </svg>
         </span>
-      </div>
-      <div className="mt-3 min-w-0">
-        <h3 className="text-sm font-semibold text-ink">{item.title}</h3>
-        <p className="mt-1 text-xs leading-4 text-ink-muted">{item.detail}</p>
       </div>
     </Link>
   );
@@ -829,7 +829,7 @@ const DashboardPage: React.FC = () => {
 
       {/* Welcome Banner */}
       <div className="relative mb-5 dashboard-hero p-4 sm:p-5" style={{ animation: 'fadeInUp 0.5s ease-out forwards' }}>
-        <div className="relative z-10 grid gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(300px,400px)] xl:items-center">
+        <div className="relative z-10">
           <div className="min-w-0">
             <span className="dashboard-kicker">SAMS Workbench</span>
             <div className="flex flex-col sm:flex-row sm:items-center gap-2 mb-1">
@@ -857,15 +857,19 @@ const DashboardPage: React.FC = () => {
             )}
           </div>
 
-          {primaryActions.length > 0 && (
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              {primaryActions.map((action, index) => (
-                <CommandActionCard key={action.to} action={action} index={index} />
-              ))}
-            </div>
-          )}
         </div>
       </div>
+
+      {primaryActions.length > 0 && (
+        <section className="mb-5">
+          <SectionHeader title="Priority Actions" icon={ICONS.clipboard} />
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
+            {primaryActions.map((action, index) => (
+              <CommandActionCard key={action.to} action={action} index={index} />
+            ))}
+          </div>
+        </section>
+      )}
 
       <RoleWorkflowBoard role={user?.role} />
 
