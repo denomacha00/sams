@@ -214,10 +214,9 @@ function groupItems(items: SidebarItem[]): CategoryGroup[] {
 
 interface AppSidebarProps {
   collapsed: boolean;
-  onToggle: () => void;
 }
 
-const AppSidebar: React.FC<AppSidebarProps> = ({ collapsed, onToggle }) => {
+const AppSidebar: React.FC<AppSidebarProps> = ({ collapsed }) => {
   const location = useLocation();
   const navigate = useNavigate();
   const user = useAuthStore((s) => s.user);
@@ -234,7 +233,7 @@ const AppSidebar: React.FC<AppSidebarProps> = ({ collapsed, onToggle }) => {
 
   return (
     <aside className={`app-sidebar ${collapsed ? 'sidebar-collapsed' : 'sidebar-expanded'}`}>
-      {/* Sidebar Header with logo & toggle */}
+      {/* Sidebar Header */}
       <div className="sidebar-header">
         <Link to="/dashboard" className="sidebar-logo">
           <div className="sidebar-logo-icon">
@@ -244,19 +243,6 @@ const AppSidebar: React.FC<AppSidebarProps> = ({ collapsed, onToggle }) => {
           </div>
           {!collapsed && <span className="sidebar-logo-text">SAMS</span>}
         </Link>
-        <button
-          onClick={onToggle}
-          className="sidebar-toggle"
-          aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-          title={collapsed ? 'Expand' : 'Collapse'}
-        >
-          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-            {collapsed
-              ? <path strokeLinecap="round" strokeLinejoin="round" d="M13 5l7 7-7 7M5 5l7 7-7 7" />
-              : <path strokeLinecap="round" strokeLinejoin="round" d="M11 19l-7-7 7-7m8 14l-7-7 7-7" />
-            }
-          </svg>
-        </button>
       </div>
 
       {/* Navigation items */}

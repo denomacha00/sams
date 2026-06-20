@@ -140,21 +140,20 @@
 
   /* Dashboard stat cards */
   .dashboard-hero {
-    @apply relative overflow-hidden rounded-2xl border border-line bg-surface shadow-card;
+    @apply relative overflow-hidden rounded-xl border border-line bg-surface shadow-card;
   }
 
   .dashboard-hero::before {
     content: '';
-    @apply absolute left-0 right-0 top-0 h-1;
-    background: linear-gradient(90deg, var(--color-brand), var(--color-accent-orange), var(--color-attendance-green));
+    @apply absolute left-0 right-0 top-0 h-[3px];
+    background: var(--color-brand);
   }
 
   .dashboard-hero::after {
     content: '';
     @apply pointer-events-none absolute inset-0;
     background:
-      linear-gradient(135deg, rgb(var(--color-brand-rgb) / 0.12), transparent 38%),
-      linear-gradient(315deg, rgb(var(--color-accent-orange-rgb) / 0.09), transparent 42%);
+      linear-gradient(180deg, rgb(var(--color-surface-elevated-rgb) / 0.28), transparent 48%);
   }
 
   .dashboard-kicker {
@@ -171,16 +170,16 @@
   }
 
   .dashboard-signal--accent {
-    @apply border-accent-orange/25 bg-accent-orange/10 text-accent-orange;
+    @apply border-brand/25 bg-brand-light text-brand;
   }
 
   .dashboard-command-card {
-    @apply flex min-h-[5rem] items-center gap-3 rounded-xl border border-line bg-surface-muted/90 p-3
+    @apply flex min-h-[5rem] items-center gap-3 rounded-lg border border-line bg-surface-muted/90 p-3
       hover:border-brand/45 hover:bg-surface-elevated hover:shadow-card-soft transition-all duration-200;
   }
 
   .dashboard-command-card--attendance {
-    @apply hover:border-accent-orange/45;
+    @apply hover:border-brand/45;
   }
 
   .dashboard-workflow-grid {
@@ -188,7 +187,7 @@
   }
 
   .dashboard-workflow-card {
-    @apply flex min-h-[9rem] flex-col rounded-2xl border border-line bg-surface p-4 shadow-card-soft
+    @apply flex min-h-[9rem] flex-col rounded-lg border border-line bg-surface p-4 shadow-card-soft
       hover:bg-surface-elevated hover:shadow-card-soft-hover transition-all duration-200;
   }
 
@@ -197,7 +196,7 @@
   }
 
   .dashboard-workflow-card--orange {
-    @apply hover:border-accent-orange/45;
+    @apply hover:border-brand/35;
   }
 
   .dashboard-workflow-step {
@@ -209,7 +208,7 @@
   }
 
   .dashboard-workflow-step--orange {
-    @apply border-accent-orange/25 bg-accent-orange/10 text-accent-orange;
+    @apply border-brand/20 bg-brand-light text-brand;
   }
 
   .dash-card {
@@ -218,7 +217,7 @@
   }
 
   .dash-card-primary {
-    @apply border-l-[4px] border-l-accent-orange pl-[calc(1rem-4px)];
+    @apply border-l-[4px] border-l-brand pl-[calc(1rem-4px)];
   }
 
   .dash-card-secondary {
@@ -230,7 +229,7 @@
   }
 
   .dash-card-icon-primary {
-    @apply text-accent-orange border-accent-orange/25 bg-accent-orange/10;
+    @apply text-brand border-brand/25 bg-brand-light;
   }
 
   .dash-card-icon-secondary {
@@ -243,7 +242,7 @@
   }
 
   .dash-stat-accent-orange {
-    @apply border-l-[3px] border-l-accent-orange;
+    @apply border-l-[3px] border-l-brand;
   }
 
   .dash-stat-accent-indigo {
@@ -535,17 +534,6 @@
   @apply text-base font-bold text-ink tracking-tight;
 }
 
-.sidebar-toggle {
-  @apply absolute -right-4 top-5 z-50 w-8 h-8 rounded-full flex items-center justify-center
-    bg-brand text-white border border-brand/40 shadow-card
-    hover:bg-brand-hover hover:border-brand hover:shadow-card-hover
-    transition-all shrink-0;
-}
-
-.sidebar-collapsed .sidebar-toggle {
-  @apply -right-4;
-}
-
 /* Sidebar nav */
 .sidebar-nav {
   @apply flex-1 overflow-y-auto overflow-x-hidden py-3;
@@ -625,10 +613,10 @@
   @apply flex min-w-0 items-center gap-2 sm:gap-3;
 }
 
-.topbar-sidebar-toggle {
-  @apply relative w-9 h-9 sm:w-10 sm:h-10 rounded-xl flex items-center justify-center
-    bg-brand-light border border-brand/25 text-brand
-    hover:bg-brand hover:text-white hover:border-brand
+.topbar-nav-toggle {
+  @apply relative h-9 w-9 shrink-0 rounded-lg flex items-center justify-center
+    bg-surface-muted border border-line-strong text-ink-muted
+    hover:bg-surface-elevated hover:text-ink hover:border-brand/45
     transition-all duration-200 shadow-card-soft;
 }
 
@@ -678,10 +666,6 @@
   .app-main-expanded,
   .app-main-collapsed {
     margin-left: 0;
-  }
-
-  .sidebar-toggle {
-    right: -2.75rem;
   }
 
   .topbar-badge {

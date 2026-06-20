@@ -18,8 +18,7 @@ const ICONS = {
   moon: 'M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z',
   profile: 'M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z',
   settings: 'M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.066 2.573c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.573 1.066c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.066-2.573c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z',
-  menuOpen: 'M4 6h16M4 12h10M4 18h16',
-  menuClose: 'M6 18L18 6M6 6l12 12',
+  sidebar: 'M4 5a2 2 0 012-2h12a2 2 0 012 2v14a2 2 0 01-2 2H6a2 2 0 01-2-2V5zm5-1v16',
 };
 
 // ─── Page title mapping ──────────────────────────────────────────────────────
@@ -78,25 +77,24 @@ const AppLayout: React.FC = () => {
     <div className="app-layout">
       <AppSidebar
         collapsed={sidebarCollapsed}
-        onToggle={() => setSidebarCollapsed((c) => !c)}
       />
 
       <div className={`app-main ${sidebarCollapsed ? 'app-main-collapsed' : 'app-main-expanded'}`}>
         {/* Top bar */}
         <header className="app-topbar">
           <div className="topbar-left">
+            <h1 className="topbar-title">{pageTitle}</h1>
             <button
               type="button"
               onClick={() => setSidebarCollapsed((c) => !c)}
-              className="topbar-sidebar-toggle"
+              className="topbar-nav-toggle"
               aria-label={sidebarCollapsed ? 'Open navigation' : 'Minimize navigation'}
               title={sidebarCollapsed ? 'Open navigation' : 'Minimize navigation'}
             >
               <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d={sidebarCollapsed ? ICONS.menuOpen : ICONS.menuClose} />
+                <path strokeLinecap="round" strokeLinejoin="round" d={ICONS.sidebar} />
               </svg>
             </button>
-            <h1 className="topbar-title">{pageTitle}</h1>
           </div>
 
           <div className="topbar-right">
