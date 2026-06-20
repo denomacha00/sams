@@ -261,8 +261,8 @@ const TimetablePage: React.FC = () => {
     setGenError('');
     setGenClassIds([]);
     setGenRemake(false);
-    setGenDurationUnit('min');
-    setGenPeriodDuration(40);
+    setGenDurationUnit('hr');
+    setGenPeriodDuration(120);
     setGenPeriodHours(2);
     setLoadingGeneratorInfo(true);
     setShowGeneratorModal(true);
@@ -315,7 +315,7 @@ const TimetablePage: React.FC = () => {
       const roomsList = genRooms.split(',').map((r) => r.trim()).filter(Boolean);
       const { data } = await apiClient.post('/timetable/generate', {
         classIds: genClassIds,
-        remake: genRemake,
+        remake: true,
         periodDuration: getDurationMinutes(),
         startHour: genStartHour,
         rooms: roomsList,
@@ -1030,13 +1030,13 @@ const TimetablePage: React.FC = () => {
                           )}
                           <button
                             type="button"
-                            onClick={() => {
+                    onClick={() => {
                               if (genDurationUnit === 'min') {
                                 setGenDurationUnit('hr');
-                                setGenPeriodHours(1);
+                                setGenPeriodHours(2);
                               } else {
                                 setGenDurationUnit('min');
-                                setGenPeriodDuration(60);
+                                setGenPeriodDuration(120);
                               }
                             }}
                             className="px-2.5 py-2.5 rounded-xl input-field text-xs font-medium text-ink-muted hover:text-ink transition-colors shrink-0"

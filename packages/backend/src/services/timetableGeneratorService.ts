@@ -182,40 +182,47 @@ function generate(
   let ri = 0;
   const nextRoom = rooms.length > 0 ? () => rooms[ri++ % rooms.length] : () => undefined as string | undefined;
 
-  // GUARANTEED MINIMUM approach: each class gets at least MIN_PER_DAY lessons per day.
-  // Phase 1: ensure baseline coverage first (2 lessons per class per day)
-  // Phase 2: fill remaining periods with whatever is left
+  // PHASE 1: Round-robin baseline — each period, give every class a turn
+  // This ensures every class gets fair access to teachers, not just the first ones
   const MIN_PER_DAY = 2;
 
-  // Phase 1: Baseline — each class gets MIN_PER_DAY lessons per day
   for (const day of days) {
-    for (const cls of shuffle(classes)) {
-      let placed = 0;
-      // Try to place MIN_PER_DAY lessons spread across the day
+    // Track how many we've placed for each class on this day
+    const classProgress = new Map<string, number>();
+    for (const cls of classes) classProgress.set(cls.id, 0);
+
+    let anyPlaced = true;
+    // Keep looping until every class has MIN_PER_DAY or no more slots possible
+    while (anyPlaced) {
+      anyPlaced = false;
+      // For each period, try classes that still need more lessons
       for (const p of shuffle(periods)) {
-        if (placed >= MIN_PER_DAY) break;
-        if (!tr.classFree(cls.id, day, p.startTime)) continue;
+        for (const cls of shuffle(classes)) {
+          const progress = classProgress.get(cls.id) ?? 0;
+          if (progress >= MIN_PER_DAY) continue; // already has enough
+          if (!tr.classFree(cls.id, day, p.startTime)) continue;
 
-        const cand = shuffle(classCandidates.get(cls.id) ?? teachers);
-        const subs = shuffle(getSubjects(cls, catalog));
-        const subj = subs.find((s) => !tr.hasSubject(cls.id, day, s)) ?? subs[Math.floor(Math.random() * subs.length)];
+          const cand = shuffle(classCandidates.get(cls.id) ?? teachers);
+          const subs = shuffle(getSubjects(cls, catalog));
+          const subj = subs.find((s) => !tr.hasSubject(cls.id, day, s)) ?? subs[Math.floor(Math.random() * subs.length)];
 
-        // Pick the LEAST loaded teacher
-        const qual = cand
-          .filter((t) => {
-            const ts = tSubj.get(t.id);
-            return (!ts || ts.size === 0 || ts.has(subj)) && tr.teacherFree(t.id, day, p.startTime) && tr.teacherUnderLimit(t.id, day, maxDay);
-          })
-          .sort((a, b) => tr.teacherLoad(a.id, day) - tr.teacherLoad(b.id, day));
+          const qual = cand
+            .filter((t) => {
+              const ts = tSubj.get(t.id);
+              return (!ts || ts.size === 0 || ts.has(subj)) && tr.teacherFree(t.id, day, p.startTime) && tr.teacherUnderLimit(t.id, day, maxDay);
+            })
+            .sort((a, b) => tr.teacherLoad(a.id, day) - tr.teacherLoad(b.id, day));
 
-        if (qual.length === 0) { skipped++; continue; }
+          if (qual.length === 0) { skipped++; continue; }
 
-        const tch = qual[0];
-        tr.book(tch.id, cls.id, day, p.startTime, subj);
-        slots.push({ schoolId, classId: cls.id, teacherId: tch.id, subject: subj, dayOfWeek: day, startTime: p.startTime, endTime: p.endTime, room: nextRoom() });
-        (assignments[tch.id] ??= 0);
-        assignments[tch.id] += 1;
-        placed++;
+          const tch = qual[0];
+          tr.book(tch.id, cls.id, day, p.startTime, subj);
+          slots.push({ schoolId, classId: cls.id, teacherId: tch.id, subject: subj, dayOfWeek: day, startTime: p.startTime, endTime: p.endTime, room: nextRoom() });
+          (assignments[tch.id] ??= 0);
+          assignments[tch.id] += 1;
+          classProgress.set(cls.id, progress + 1);
+          anyPlaced = true;
+        }
       }
     }
   }
