@@ -172,47 +172,67 @@ function generate(
     }
   }
 
+  // Build candidate pool per class: department teachers + no-dept teachers
+  const classCandidates = new Map<string, TeacherInfo[]>();
+  for (const cls of classes) {
+    const deptT = byDept.get(cls.departmentId) ?? [];
+    classCandidates.set(cls.id, deptT.length > 0 ? [...deptT, ...noDept] : [...teachers]);
+  }
+
   let ri = 0;
   const nextRoom = rooms.length > 0 ? () => rooms[ri++ % rooms.length] : () => undefined as string | undefined;
 
-  for (const cls of classes) {
-    const deptT = byDept.get(cls.departmentId) ?? [];
-    const cand = deptT.length > 0 ? shuffle([...deptT, ...noDept]) : shuffle(teachers);
-    const subs = shuffle(getSubjects(cls, catalog));
+  // PERIOD-FIRST approach: for each day, for each period, give EVERY class a shot
+  // before moving to the next period. Classes are shuffled each pass for fairness.
+  for (const day of days) {
+    for (const p of periods) {
+      const shuffledClasses = shuffle(classes);
 
-    for (const day of days) {
-      let filled = 0;
-      for (const p of periods) {
-        if (!tr.classFree(cls.id, day, p.startTime)) { skipped++; continue; }
+      for (const cls of shuffledClasses) {
+        if (!tr.classFree(cls.id, day, p.startTime)) continue;
 
-        // Pick subject
-        let subj = subs.find((s) => !tr.hasSubject(cls.id, day, s)) ?? subs[Math.floor(Math.random() * subs.length)];
+        const cand = shuffle(classCandidates.get(cls.id) ?? teachers);
+        const subs = shuffle(getSubjects(cls, catalog));
 
-        // Find qualified teacher
-        const qual = cand.filter((t) => { const ts = tSubj.get(t.id); return !ts || ts.size === 0 || ts.has(subj); });
-        const tch = findTeacher(qual, day, p, tr, maxDay);
-        if (!tch) { skipped++; continue; }
+        // Pick a subject not already studied today, or any subject
+        const subj = subs.find((s) => !tr.hasSubject(cls.id, day, s)) ?? subs[Math.floor(Math.random() * subs.length)];
 
-        // Try double lesson (30% chance)
+        // Find a qualified teacher who is free at this time
+        const qual = cand.filter((t) => {
+          const ts = tSubj.get(t.id);
+          return (!ts || ts.size === 0 || ts.has(subj)) && tr.teacherFree(t.id, day, p.startTime) && tr.teacherUnderLimit(t.id, day, maxDay);
+        });
+
+        if (qual.length === 0) { skipped++; continue; }
+
+        const tch = qual[Math.floor(Math.random() * qual.length)];
+
+        // Try double lesson (30% chance) — only if teacher and class both have the next consecutive period free
         const next = nextPeriod(periods, p);
-        const doDouble = next && Math.random() < 0.3 && tr.consecutiveFree(cls.id, tch.id, day, p.startTime, next.startTime)
+        const doDouble = next && Math.random() < 0.3
+          && tr.consecutiveFree(cls.id, tch.id, day, p.startTime, next.startTime)
           && tr.teacherLoad(tch.id, day) + 2 <= maxDay;
 
         if (doDouble) {
           tr.book(tch.id, cls.id, day, p.startTime, subj);
           tr.book(tch.id, cls.id, day, next.startTime, subj);
           slots.push({ schoolId, classId: cls.id, teacherId: tch.id, subject: subj, dayOfWeek: day, startTime: p.startTime, endTime: next.endTime, room: nextRoom() });
-          doubles++; filled += 2; (assignments[tch.id] ??= 0, assignments[tch.id] += 2);
+          doubles++;
+          (assignments[tch.id] ??= 0);
+          assignments[tch.id] += 2;
           continue;
         }
 
         tr.book(tch.id, cls.id, day, p.startTime, subj);
         slots.push({ schoolId, classId: cls.id, teacherId: tch.id, subject: subj, dayOfWeek: day, startTime: p.startTime, endTime: p.endTime, room: nextRoom() });
-        filled++; (assignments[tch.id] ??= 0, assignments[tch.id] += 1);
-
-        if (next && !tr.classFree(cls.id, day, next.startTime)) { /* consumed by double */ }
+        (assignments[tch.id] ??= 0);
+        assignments[tch.id] += 1;
       }
-      stats[cls.name] = (stats[cls.name] ?? 0) + filled;
+    }
+
+    // After all periods for this day, count filled slots per class
+    for (const cls of classes) {
+      stats[cls.name] = (stats[cls.name] ?? 0) + (slots.filter((s) => s.classId === cls.id && s.dayOfWeek === day).length);
     }
   }
 
