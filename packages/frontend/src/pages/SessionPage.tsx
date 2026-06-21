@@ -8,6 +8,7 @@ import { useAuthStore } from '../store/authStore';
 import { AttendanceStatus, UserRole } from '@sams/shared';
 import { getApiErrorMessage } from '../lib/apiError';
 import { getGpsErrorMessage, getTeacherLocation } from '../lib/geolocation';
+import { UserAvatar } from '../components/UserAvatar';
 
 const SESSION_START_TIMEOUT_MS = 18_000;
 const ACTIVE_SESSION_REFRESH_MS = 10_000;
@@ -39,6 +40,7 @@ interface AttendanceRecord {
   id: string;
   studentId?: string;
   studentName: string;
+  studentAvatarUrl?: string | null;
   status: AttendanceStatus;
   method: string;
   scannedAt: string;
@@ -417,11 +419,13 @@ const SessionPage: React.FC = () => {
         ]);
         if (cancelled) return;
 
-        const students: Array<{ id: string; fullName: string }> = sessionRes.data.students ?? [];
+        const students: Array<{ id: string; fullName: string; avatarUrl?: string | null }> = sessionRes.data.students ?? [];
         const nameByStudent = new Map(students.map((student) => [student.id, student.fullName]));
+        const avatarByStudent = new Map(students.map((student) => [student.id, student.avatarUrl ?? null]));
         const records = (Array.isArray(recordsRes.data) ? recordsRes.data : []).map((record: {
           id: string;
           studentId: string;
+          studentAvatarUrl?: string | null;
           status: AttendanceStatus;
           method: string;
           scannedAt: string;
@@ -429,6 +433,7 @@ const SessionPage: React.FC = () => {
           id: record.id,
           studentId: record.studentId,
           studentName: nameByStudent.get(record.studentId) ?? 'Student',
+          studentAvatarUrl: record.studentAvatarUrl ?? avatarByStudent.get(record.studentId) ?? null,
           status: record.status,
           method: record.method,
           scannedAt: record.scannedAt,
@@ -1235,9 +1240,11 @@ const SessionPage: React.FC = () => {
                   className="flex items-center justify-between p-3 surface-muted-row"
                 >
                   <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 rounded-full bg-gradient-to-br from-indigo-500 to-indigo-700 flex items-center justify-center text-xs font-bold text-ink">
-                      {record.studentName.charAt(0)}
-                    </div>
+                    <UserAvatar
+                      avatarUrl={record.studentAvatarUrl}
+                      fullName={record.studentName}
+                      className="h-8 w-8 rounded-full shrink-0"
+                    />
                     <div>
                       <p className="font-medium text-ink text-sm">{record.studentName}</p>
                       <p className="text-xs text-ink-subtle">
