@@ -348,12 +348,18 @@ export const timetableGeneratorService = {
       select: { classId: true, teacherId: true, subject: true, dayOfWeek: true, startTime: true },
     });
 
-    // Build teacher-subject knowledge
-    const existingSubjRows = await prisma.timetableEntry.findMany({
-      where: { schoolId, classId: { in: targetIds }, ...(departmentId ? { class: { departmentId } } : {}) },
-      select: { teacherId: true, subject: true }, distinct: ['teacherId', 'subject'],
-    });
-    const tSubj = buildTeacherSubjectMap(teachers, teacherSubjectMapping, existingSubjRows);
+    // Build teacher-subject knowledge from TeacherSubject table + existing entries
+    const [dbSubjectRows, existingSubjRows] = await Promise.all([
+      prisma.teacherSubject.findMany({
+        where: { schoolId },
+        select: { teacherId: true, subject: true },
+      }),
+      prisma.timetableEntry.findMany({
+        where: { schoolId, classId: { in: targetIds }, ...(departmentId ? { class: { departmentId } } : {}) },
+        select: { teacherId: true, subject: true }, distinct: ['teacherId', 'subject'],
+      }),
+    ]);
+    const tSubj = buildTeacherSubjectMap(teachers, teacherSubjectMapping, [...dbSubjectRows, ...existingSubjRows]);
 
     // Delete existing if remake
     if (remake) {

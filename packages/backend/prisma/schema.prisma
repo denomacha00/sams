@@ -590,6 +590,23 @@ model ConversationRecord {
   @@index([threadId, createdAt])
 }
 
+// ─── Teacher Subject Mapping ──────────────────────────────────────────────────
+
+model TeacherSubject {
+  id        String   @id @default(cuid())
+  schoolId  String
+  teacherId String
+  subject   String   @db.VarChar(200)
+  createdAt DateTime @default(now())
+
+  teacher User   @relation(fields: [teacherId], references: [id], onDelete: Cascade)
+  school  School @relation(fields: [schoolId], references: [id])
+
+  @@unique([teacherId, subject])
+  @@index([schoolId])
+  @@index([teacherId])
+}
+
 // ─── WebAuthn Credentials ─────────────────────────────────────────────────────
 
 model WebAuthnCredential {

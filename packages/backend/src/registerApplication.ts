@@ -29,6 +29,7 @@ import { notificationsRouter } from './routes/notifications';
 import { knowledgeRouter } from './routes/knowledge';
 import { guardiansRouter } from './routes/guardians';
 import { examsRouter } from './routes/exams';
+import { teacherSubjectsRouter } from './routes/teacherSubjects';
 import { registerSocketServer } from './lib/socket';
 import { setupAttendanceSocket } from './sockets/attendanceSocket';
 import { setupTypingSocket } from './sockets/typingSocket';
@@ -178,6 +179,7 @@ export function registerApplication(app: express.Express, httpServer: HttpServer
   app.use('/api/v1/guardians', guardiansRouter);
   app.use('/api/v1/exams', examsRouter);
   app.use('/api/v1/super', superAdminRouter);
+  app.use('/api/v1/teacher-subjects', teacherSubjectsRouter);
 
   io = new SocketIOServer(httpServer, {
     cors: {

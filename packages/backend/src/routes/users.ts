@@ -70,6 +70,7 @@ const createUserSchema = z.object({
   password: z.string().min(8),
   departmentId: z.string().optional(),
   classId: z.string().optional(),
+  subjects: z.string().optional(), // comma-separated: "Mathematics, Physics, Chemistry"
 });
 
 const updateUserSchema = z.object({
@@ -899,7 +900,13 @@ usersRouter.post('/', requirePermission('manage:users'), async (req: Request, re
       parsed.data.departmentId = req.user.departmentId;
     }
 
-    const user = await userService.createUser(req.schoolId, parsed.data);
+    const createData = {
+      ...parsed.data,
+      subjects: parsed.data.subjects
+        ? parsed.data.subjects.split(',').map((s) => s.trim()).filter(Boolean)
+        : undefined,
+    };
+    const user = await userService.createUser(req.schoolId, createData);
     res.status(201).json(user);
   } catch (err) {
     next(err instanceof AppError ? err : new AppError(500, 'INTERNAL_ERROR', 'Failed to create user'));

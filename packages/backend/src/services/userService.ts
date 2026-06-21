@@ -21,6 +21,7 @@ export interface CreateUserData {
   password: string;
   departmentId?: string;
   classId?: string;
+  subjects?: string[];
 }
 
 export interface UpdateUserData {
@@ -104,6 +105,17 @@ export class UserService {
         classId: data.classId || null,
       },
     });
+
+    // Save teacher subjects if provided
+    if (data.subjects?.length && (data.role === UserRole.TEACHER || data.role === UserRole.HOD)) {
+      await prisma.teacherSubject.createMany({
+        data: data.subjects.map((subject) => ({
+          schoolId,
+          teacherId: user.id,
+          subject,
+        })),
+      });
+    }
 
     if (phone) {
       onboardPhoneForSms(phone, data.fullName);
