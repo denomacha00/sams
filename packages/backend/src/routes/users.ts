@@ -314,8 +314,8 @@ usersRouter.post('/me/avatar', uploadAvatar, async (req: Request, res: Response,
       .jpeg({ quality: 85 })
       .toFile(filepath);
 
-    const avatarUrl = avatarPublicUrl(req.user.sub);
     const avatarVersion = Date.now();
+    const avatarUrl = `${avatarPublicUrl(req.user.sub)}?v=${avatarVersion}`;
     await prisma.user.update({
       where: { id: req.user.sub, schoolId: req.schoolId },
       data: { avatarUrl },

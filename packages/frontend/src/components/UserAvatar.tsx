@@ -9,6 +9,8 @@ interface UserAvatarProps {
   cacheKey?: number;
 }
 
+const DEFAULT_UPLOAD_AVATAR_REVISION = '20260621';
+
 export const UserAvatar: React.FC<UserAvatarProps> = ({
   avatarUrl,
   fullName,
@@ -22,8 +24,11 @@ export const UserAvatar: React.FC<UserAvatarProps> = ({
   }, [avatarUrl, cacheKey]);
 
   let src = !failed ? resolveAvatarUrl(avatarUrl) : null;
-  if (src && cacheKey != null) {
-    src = `${src}${src.includes('?') ? '&' : '?'}v=${cacheKey}`;
+  const versionKey =
+    cacheKey ??
+    (src?.includes('/uploads/avatars/') ? DEFAULT_UPLOAD_AVATAR_REVISION : undefined);
+  if (src && versionKey != null) {
+    src = `${src}${src.includes('?') ? '&' : '?'}v=${versionKey}`;
   }
   const initial = fullName?.charAt(0)?.toUpperCase() || 'U';
 

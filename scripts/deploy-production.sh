@@ -206,6 +206,16 @@ if [[ -d /etc/nginx/sites-enabled ]]; then
     sudo rm -f "$bak"
   done < <(sudo find /etc/nginx/sites-enabled -maxdepth 1 -name '*.bak' -type f -print0 2>/dev/null || true)
 fi
+if [[ -f "$ROOT/nginx/sams.conf" && -d /etc/nginx/sites-available ]]; then
+  if [[ -f /etc/nginx/sites-available/sams.conf ]]; then
+    sudo cp /etc/nginx/sites-available/sams.conf "/etc/nginx/sites-available/sams.conf.bak.$(date +%Y%m%d%H%M%S)"
+  fi
+  sudo cp "$ROOT/nginx/sams.conf" /etc/nginx/sites-available/sams.conf
+  if [[ -d /etc/nginx/sites-enabled ]]; then
+    sudo ln -sfn /etc/nginx/sites-available/sams.conf /etc/nginx/sites-enabled/sams.conf
+  fi
+  echo "    Applied nginx/sams.conf (uploads protected from static asset regex)"
+fi
 sudo nginx -t
 sudo systemctl reload nginx
 
