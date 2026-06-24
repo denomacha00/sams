@@ -109,6 +109,7 @@ model School {
   academicTerms       AcademicTerm[]
   exams               Exam[]
   gradeBoundaries     GradeBoundary[]
+  teacherSubjects     TeacherSubject[]
 
   @@index([isSuspended])
   @@index([licenseExpiresAt])
@@ -159,6 +160,7 @@ model User {
   guardiansAsStudent  Guardian[]           @relation("StudentLink")
   examsCreated        Exam[]               @relation("ExamCreator")
   examResults         ExamResult[]
+  teacherSubjects     TeacherSubject[]
 
   @@unique([schoolId, admissionNumber])
   @@unique([schoolId, phone])
