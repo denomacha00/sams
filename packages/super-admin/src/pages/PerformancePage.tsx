@@ -183,7 +183,7 @@ const PerformancePage: React.FC = () => {
         <section className="rounded-2xl border border-gray-700/80 bg-gray-800/80 p-6 shadow-lg">
           <div className="mb-4 border-b border-gray-700/80 pb-3">
             <h2 className="text-lg font-semibold text-white">Slow Requests</h2>
-            <p className="text-sm text-gray-400">Duration > 1 second</p>
+            <p className="text-sm text-gray-400">Duration {'>'} 1 second</p>
           </div>
           <div className="overflow-x-auto max-h-80 overflow-y-auto">
             <table className="w-full text-sm">
