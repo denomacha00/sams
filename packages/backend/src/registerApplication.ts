@@ -22,6 +22,7 @@ import { paymentsRouter } from './routes/payments';
 import { reportsRouter } from './routes/reports';
 import { riskScoresRouter } from './routes/riskScores';
 import { superAdminRouter } from './routes/superAdmin';
+import { superAdminFeaturesRouter } from './routes/superAdminFeatures';
 import { departmentsRouter, classesRouter } from './routes/departments';
 import { aiRouter } from './routes/ai';
 import { biometricRouter } from './routes/biometric';
@@ -179,6 +180,7 @@ export function registerApplication(app: express.Express, httpServer: HttpServer
   app.use('/api/v1/guardians', guardiansRouter);
   app.use('/api/v1/exams', examsRouter);
   app.use('/api/v1/super', superAdminRouter);
+  app.use('/api/v1/super', superAdminFeaturesRouter);
   app.use('/api/v1/teacher-subjects', teacherSubjectsRouter);
 
   io = new SocketIOServer(httpServer, {

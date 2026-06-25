@@ -609,6 +609,119 @@ model TeacherSubject {
   @@index([teacherId])
 }
 
+// ─── Super Admin Feature Tables ───────────────────────────────────────────────
+
+model SchoolFeatureFlag {
+  id         String   @id @default(cuid())
+  schoolId   String
+  school     School   @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  featureKey String
+  enabled    Boolean  @default(true)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@unique([schoolId, featureKey])
+  @@index([schoolId])
+  @@index([featureKey])
+}
+
+model BrandTemplate {
+  id             String   @id @default(cuid())
+  name           String   @default("Default")
+  logoUrl        String?
+  faviconUrl     String?
+  primaryColor   String?  @default("#4F46E5")
+  secondaryColor String?  @default("#6366F1")
+  isActive       Boolean  @default(true)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+}
+
+model ScheduledJob {
+  id              String    @id @default(cuid())
+  name            String
+  description     String?
+  cronExpression  String
+  handler         String
+  enabled         Boolean   @default(true)
+  lastRunAt       DateTime?
+  lastRunStatus   String?
+  lastRunError    String?
+  lastRunDurationMs Int?
+  nextRunAt       DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  @@index([enabled])
+  @@index([nextRunAt])
+}
+
+model SecurityEvent {
+  id        String   @id @default(cuid())
+  schoolId  String?
+  eventType String
+  severity  String   @default("INFO")
+  ipAddress String?
+  userId    String?
+  metadata  Json?    @default("{}")
+  createdAt DateTime @default(now())
+
+  @@index([schoolId])
+  @@index([eventType])
+  @@index([severity])
+  @@index([ipAddress])
+  @@index([userId])
+  @@index([createdAt])
+}
+
+model ApiMetric {
+  id         String   @id @default(cuid())
+  path       String
+  method     String
+  statusCode Int
+  durationMs Int
+  schoolId   String?
+  createdAt  DateTime @default(now())
+
+  @@index([createdAt])
+  @@index([path])
+  @@index([statusCode])
+  @@index([schoolId])
+}
+
+model DataExport {
+  id          String    @id @default(cuid())
+  exportType  String
+  format      String    @default("csv")
+  filters     Json?     @default("{}")
+  status      String    @default("PENDING")
+  fileUrl     String?
+  fileSize    Int?
+  rowCount    Int?
+  error       String?
+  createdById String?
+  createdAt   DateTime  @default(now())
+  completedAt DateTime?
+
+  @@index([createdById])
+  @@index([status])
+  @@index([createdAt])
+}
+
+model BackupRecord {
+  id           String    @id @default(cuid())
+  status       String    @default("PENDING")
+  fileUrl      String?
+  fileSize     Int?
+  error        String?
+  triggeredById String?
+  triggeredAt  DateTime  @default(now())
+  completedAt  DateTime?
+
+  @@index([status])
+  @@index([triggeredAt])
+}
+
 // ─── WebAuthn Credentials ─────────────────────────────────────────────────────
 
 model WebAuthnCredential {
