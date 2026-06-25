@@ -117,18 +117,18 @@ superAdminFeaturesRouter.use(requirePermission('super:admin'));
 // GET /super/features/flags/:schoolId    - getFeatureFlags(schoolId)
 // PUT /super/features/flags/:schoolId    - setFeatureFlag(schoolId, featureKey, enabled)
 
-superAdminFeaturesRouter.get('/features/flags', async (_req: Request, res: Response): Promise<void> => {
+superAdminFeaturesRouter.get('/features/flags', asyncHandler(async (_req: Request, res: Response): Promise<void> => {
   const flags = await superAdminFeaturesService.getAllFeatureFlags();
   res.json(flags);
-});
+}));
 
-superAdminFeaturesRouter.get('/features/flags/:schoolId', async (req: Request, res: Response): Promise<void> => {
+superAdminFeaturesRouter.get('/features/flags/:schoolId', asyncHandler(async (req: Request, res: Response): Promise<void> => {
   const { schoolId } = req.params as { schoolId: string };
   const flags = await superAdminFeaturesService.getFeatureFlags(schoolId);
   res.json(flags);
-});
+}));
 
-superAdminFeaturesRouter.put('/features/flags/:schoolId', async (req: Request, res: Response): Promise<void> => {
+superAdminFeaturesRouter.put('/features/flags/:schoolId', asyncHandler(async (req: Request, res: Response): Promise<void> => {
   const { schoolId } = req.params as { schoolId: string };
   const parsed = setFeatureFlagSchema.safeParse(req.body);
   if (!parsed.success) {
@@ -142,7 +142,7 @@ superAdminFeaturesRouter.put('/features/flags/:schoolId', async (req: Request, r
   const { featureKey, enabled } = parsed.data;
   const result = await superAdminFeaturesService.setFeatureFlag(schoolId, featureKey, enabled);
   res.json(result);
-});
+}));
 
 // ─── Performance ──────────────────────────────────────────────────────────────
 // GET /super/performance/metrics         - getPerformanceMetrics(query.hours)
