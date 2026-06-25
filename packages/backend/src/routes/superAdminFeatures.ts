@@ -4,6 +4,7 @@ import { prisma } from '../lib/prisma';
 import { auditService } from '../services/auditService';
 import { requirePermission } from '../middleware/rbac';
 import { AppError } from '../middleware/errors';
+import { asyncHandler } from '../middleware/asyncHandler';
 import { superAdminFeaturesService } from '../services/superAdminFeaturesService';
 
 // ─── Host Restriction Middleware (mirrors superAdmin.ts) ──────────────────────
@@ -248,12 +249,12 @@ superAdminFeaturesRouter.get('/backup/:id', async (req: Request, res: Response):
 // PUT    /super/jobs/:id                    - updateScheduledJob(req.params.id, body)
 // POST   /super/jobs/:id/run                - runScheduledJobNow(req.params.id)
 
-superAdminFeaturesRouter.get('/jobs', async (_req: Request, res: Response): Promise<void> => {
+superAdminFeaturesRouter.get('/jobs', asyncHandler(async (_req: Request, res: Response): Promise<void> => {
   const jobs = await superAdminFeaturesService.getScheduledJobs();
   res.json(jobs);
-});
+}));
 
-superAdminFeaturesRouter.put('/jobs/:id', async (req: Request, res: Response): Promise<void> => {
+superAdminFeaturesRouter.put('/jobs/:id', asyncHandler(async (req: Request, res: Response): Promise<void> => {
   const { id } = req.params as { id: string };
   const parsed = updateScheduledJobSchema.safeParse(req.body);
   if (!parsed.success) {
@@ -266,13 +267,13 @@ superAdminFeaturesRouter.put('/jobs/:id', async (req: Request, res: Response): P
   }
   const result = await superAdminFeaturesService.updateScheduledJob(id, parsed.data);
   res.json(result);
-});
+}));
 
-superAdminFeaturesRouter.post('/jobs/:id/run', async (req: Request, res: Response): Promise<void> => {
+superAdminFeaturesRouter.post('/jobs/:id/run', asyncHandler(async (req: Request, res: Response): Promise<void> => {
   const { id } = req.params as { id: string };
   const result = await superAdminFeaturesService.runScheduledJobNow(id);
   res.json(result);
-});
+}));
 
 // ─── Brand Templates ──────────────────────────────────────────────────────────
 // GET    /super/brand-templates             - getBrandTemplates()

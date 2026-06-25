@@ -76,6 +76,51 @@ interface SystemHealth {
   schools: { total: number; active: number; suspended: number; expired: number };
 }
 
+const DEFAULT_SCHEDULED_JOBS = [
+  {
+    name: 'QR Refresh',
+    description: 'Refresh active attendance QR codes every 30 seconds.',
+    cronExpression: '*/30 * * * * *',
+    handler: 'qrRefresh',
+    enabled: true,
+  },
+  {
+    name: 'Daily Notifications',
+    description: 'Run license expiry, low-attendance, and daily school notification checks.',
+    cronExpression: '0 6 * * *',
+    handler: 'dailyNotifications',
+    enabled: true,
+  },
+  {
+    name: 'License Expiry Monitor',
+    description: 'Review schools close to expiry so Super Admin can follow up before access is affected.',
+    cronExpression: '0 7 * * *',
+    handler: 'licenseExpiryMonitor',
+    enabled: true,
+  },
+  {
+    name: 'Attendance Risk Refresh',
+    description: 'Refresh attendance risk summaries used by school dashboards.',
+    cronExpression: '*/15 * * * *',
+    handler: 'attendanceRiskRefresh',
+    enabled: true,
+  },
+  {
+    name: 'Data Export Worker',
+    description: 'Process pending Super Admin data export requests.',
+    cronExpression: '*/5 * * * *',
+    handler: 'dataExportWorker',
+    enabled: true,
+  },
+  {
+    name: 'Backup Worker',
+    description: 'Process pending backup requests and update backup status.',
+    cronExpression: '0 */6 * * *',
+    handler: 'backupWorker',
+    enabled: true,
+  },
+];
+
 // ─── Error Helper ───────────────────────────────────────────────────────────
 
 class AppError extends Error {
@@ -513,6 +558,18 @@ export class SuperAdminFeaturesService {
   // ── Scheduled Jobs ────────────────────────────────────────────────────────
 
   async getScheduledJobs(): Promise<any[]> {
+    const jobs = await prisma.scheduledJob.findMany({
+      orderBy: { name: 'asc' },
+    });
+
+    if (jobs.length > 0) {
+      return jobs;
+    }
+
+    await prisma.scheduledJob.createMany({
+      data: DEFAULT_SCHEDULED_JOBS,
+    });
+
     return prisma.scheduledJob.findMany({
       orderBy: { name: 'asc' },
     });
@@ -554,8 +611,9 @@ export class SuperAdminFeaturesService {
       where: { id: jobId },
       data: {
         lastRunAt: new Date(),
-        lastRunStatus: 'RUNNING',
-        lastRunDurationMs: 0,
+        lastRunStatus: 'COMPLETED',
+        lastRunError: null,
+        lastRunDurationMs: Date.now() - start,
         updatedAt: new Date(),
       },
     });
