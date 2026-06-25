@@ -37,6 +37,10 @@ import {
   getHodDepartmentBlocker,
   resolveHodDepartmentId,
 } from '../lib/hodScope';
+import {
+  listTerminalCommandHelp,
+  resolveTerminalCommand,
+} from './superAdminTerminalOps';
 
 export type { PendingAction };
 
@@ -519,6 +523,17 @@ export class AIService {
     );
     if (hodBlock) {
       return { answer: hodBlock, intent: 'action_denied', engine: 'openai' };
+    }
+
+    if (action === 'run_terminal_command') {
+      const requestedCommand = String(params.command ?? '').trim();
+      if (!requestedCommand.startsWith('@') || !resolveTerminalCommand(requestedCommand)) {
+        return {
+          answer: `That terminal command is not allowed.\n\n${listTerminalCommandHelp()}`,
+          intent: 'action_denied',
+          engine: 'local',
+        };
+      }
     }
 
     const missingSlot = await getNextMissingSlot(scopedUser, action, params);

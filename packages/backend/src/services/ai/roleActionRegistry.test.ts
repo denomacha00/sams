@@ -34,7 +34,9 @@ describe('roleActionRegistry permissions', () => {
     expect(isActionPermitted(UserRole.SUPER_ADMIN, 'suspend_school')).toBe(true);
     expect(isActionPermitted(UserRole.SUPER_ADMIN, 'get_system_stats')).toBe(true);
     expect(isActionPermitted(UserRole.SUPER_ADMIN, 'reset_user_password')).toBe(true);
+    expect(isActionPermitted(UserRole.SUPER_ADMIN, 'run_terminal_command')).toBe(true);
     expect(findAction(UserRole.SUPER_ADMIN, 'reset_user_password')?.destructive).toBe(true);
+    expect(findAction(UserRole.SUPER_ADMIN, 'run_terminal_command')?.destructive).toBe(true);
   });
 
   it('SCHOOL_ADMIN has school management and password reset in own school', () => {
@@ -42,6 +44,7 @@ describe('roleActionRegistry permissions', () => {
     expect(isActionPermitted(UserRole.SCHOOL_ADMIN, 'reset_user_password')).toBe(true);
     expect(findAction(UserRole.SCHOOL_ADMIN, 'reset_user_password')?.destructive).toBe(true);
     expect(isActionPermitted(UserRole.SCHOOL_ADMIN, 'suspend_school')).toBe(false);
+    expect(isActionPermitted(UserRole.SCHOOL_ADMIN, 'run_terminal_command')).toBe(false);
   });
 
   it('TEACHER cannot reset passwords', () => {

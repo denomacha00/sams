@@ -1,5 +1,10 @@
 import type { ActionDefinition, ActionHandler } from '../roleActionRegistry';
 import { getLicenseSecret } from '../../../config/secrets';
+import {
+  listTerminalCommandHelp,
+  resolveTerminalCommand,
+  runSafeTerminalCommand,
+} from '../../superAdminTerminalOps';
 
 // ─── Helper Utilities (migrated from actionIntentDetector.ts) ─────────────────
 
@@ -362,7 +367,158 @@ const runSystemReadinessCheckHandler: ActionHandler = async () => {
   };
 };
 
+const databaseOverviewHandler: ActionHandler = async () => {
+  const { prisma } = await import('../../../index');
+
+  const now = new Date();
+  const [
+    schools,
+    totalSchools,
+    suspendedSchools,
+    totalUsers,
+    unlockedUsers,
+    lockedUsers,
+    totalDepartments,
+    totalClasses,
+    activeSessions,
+    todayAttendance,
+    notificationCount,
+    attachmentCount,
+    conversationThreads,
+    auditCount,
+  ] = await Promise.all([
+    prisma.school.findMany({
+      orderBy: { createdAt: 'desc' },
+      take: 10,
+      select: {
+        name: true,
+        schoolCode: true,
+        planTier: true,
+        isSuspended: true,
+        licenseExpiresAt: true,
+        _count: { select: { users: true, sessions: true } },
+      },
+    }),
+    prisma.school.count(),
+    prisma.school.count({ where: { isSuspended: true } }),
+    prisma.user.count(),
+    prisma.user.count({ where: { isLocked: false } }),
+    prisma.user.count({ where: { isLocked: true } }),
+    prisma.department.count(),
+    prisma.class.count(),
+    prisma.attendanceSession.count({ where: { isActive: true } }),
+    prisma.attendanceRecord.count({
+      where: {
+        scannedAt: {
+          gte: new Date(now.getFullYear(), now.getMonth(), now.getDate()),
+        },
+      },
+    }),
+    prisma.notification.count(),
+    prisma.notificationAttachment.count(),
+    prisma.conversationThread.count(),
+    prisma.auditLog.count(),
+  ]);
+
+  const schoolLines = schools.map((school) => {
+    const expiry = school.licenseExpiresAt.toISOString().slice(0, 10);
+    return `- ${school.name} (${school.schoolCode}) - ${school.planTier}, users ${school._count.users}, sessions ${school._count.sessions}, expires ${expiry}${school.isSuspended ? ', SUSPENDED' : ''}`;
+  });
+
+  return {
+    answer: [
+      'Live database overview',
+      '',
+      `Schools: ${totalSchools} (${suspendedSchools} suspended)`,
+      `Users: ${totalUsers} (${unlockedUsers} unlocked, ${lockedUsers} locked)`,
+      `Departments/classes: ${totalDepartments} departments, ${totalClasses} classes`,
+      `Attendance: ${activeSessions} active session(s), ${todayAttendance} record(s) today`,
+      `Notifications: ${notificationCount} messages, ${attachmentCount} attachment(s)`,
+      `AI memory/audit: ${conversationThreads} conversation thread(s), ${auditCount} audit log record(s)`,
+      '',
+      'Recent schools:',
+      ...(schoolLines.length ? schoolLines : ['- No schools found']),
+    ].join('\n'),
+    data: {
+      totalSchools,
+      suspendedSchools,
+      totalUsers,
+      unlockedUsers,
+      lockedUsers,
+      totalDepartments,
+      totalClasses,
+      activeSessions,
+      todayAttendance,
+      notificationCount,
+      attachmentCount,
+      conversationThreads,
+      auditCount,
+      recentSchools: schools,
+    },
+  };
+};
+
+const runTerminalCommandHandler: ActionHandler = async (params) => {
+  const requestedCommand = String(params.command ?? '').trim();
+  const resolved = resolveTerminalCommand(requestedCommand);
+  if (!resolved) {
+    return {
+      answer: `That terminal command is not allowed.\n\n${listTerminalCommandHelp()}`,
+    };
+  }
+
+  const result = await runSafeTerminalCommand(requestedCommand);
+  return {
+    answer: [
+      `Command: ${result.label}`,
+      `Executed: ${result.commandPreview}`,
+      '',
+      '```text',
+      result.output,
+      '```',
+    ].join('\n'),
+    data: {
+      key: result.key,
+      label: result.label,
+      commandPreview: result.commandPreview,
+    },
+  };
+};
+
 export const superAdminActions: ActionDefinition[] = [
+  {
+    action: 'database_overview',
+    description: 'Read a safe live database overview for the whole SAMS platform',
+    destructive: false,
+    patterns: [
+      /^@\s*(?:db|database)(?:\s+(?:summary|overview|status))?\s*$/i,
+      /\b(?:database|db)\s+(?:summary|overview|status)\b/i,
+    ],
+    extractParams: () => ({}),
+    descriptionTemplate: () =>
+      'Read live SAMS database overview: schools, users, attendance sessions, notifications, AI memory, and audit counts.',
+    handler: databaseOverviewHandler,
+  },
+  {
+    action: 'run_terminal_command',
+    description:
+      'Run an allowlisted SAMS terminal operation. Only works when the Super Admin message starts with @.',
+    destructive: true,
+    patterns: [/^@\s*(.+)$/i],
+    extractParams: (_message: string, match: RegExpMatchArray | null) => {
+      const command = match && match[1] ? `@${match[1].trim()}` : '';
+      return { command };
+    },
+    descriptionTemplate: (params) => {
+      const command = String(params.command ?? '');
+      const resolved = resolveTerminalCommand(command);
+      if (!resolved) {
+        return `Refuse blocked terminal command "${command}".`;
+      }
+      return `Run terminal operation "${resolved.label}" (${resolved.command} ${resolved.args.join(' ')}).`;
+    },
+    handler: runTerminalCommandHandler,
+  },
   {
     action: 'unsuspend_school',
     description: 'Unsuspend a school, restoring user access',

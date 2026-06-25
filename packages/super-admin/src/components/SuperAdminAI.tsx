@@ -42,11 +42,13 @@ function createWelcomeMessage(): ChatMessage {
       'â€¢ **System stats** â€” "how many schools", "total revenue", "platform overview"\n' +
       'â€¢ **School ops** â€” "school info for X", "suspend school Y", "extend license for Z"\n' +
       'â€¢ **Password reset** â€” "reset password for user at school CODE" (temp password or OTP)\n' +
+      'â€¢ **Live database** â€” "@db" for platform database overview\n' +
+      'â€¢ **Server ops** â€” "@status", "@logs", "@verify", "@diagnose-ai", "@traffic", "@restart-api", "@git-pull", "@deploy"\n' +
       'â€¢ **Troubleshooting** â€” "why is a school not working", "common problems"\n' +
       'â€¢ **How-to guides** â€” "how to generate a license", "how to suspend a school"\n' +
       'â€¢ **Platform docs** â€” architecture and features from DOCUMENTATION.md + Knowledge Base\n\n' +
       'I use documentation, knowledge base, live stats, and executable actions â€” **not** source code or repository access. I cannot expose API keys or secrets.\n\n' +
-      'Say an action directly â€” destructive actions will ask you to confirm.',
+      'Say normal actions directly. For terminal/server commands, start with @. Every server command asks you to confirm before it runs.',
     timestamp: new Date(),
   };
 }
@@ -138,11 +140,13 @@ const SuperAdminAI: React.FC = () => {
         '• **System stats** — "how many schools", "total revenue", "platform overview"\n' +
         '• **School ops** — "school info for X", "suspend school Y", "extend license for Z"\n' +
         '• **Password reset** — "reset password for user at school CODE" (temp password or OTP)\n' +
+        '• **Live database** — "@db" for platform database overview\n' +
+        '• **Server ops** — "@status", "@logs", "@verify", "@diagnose-ai", "@traffic", "@restart-api", "@git-pull", "@deploy"\n' +
         '• **Troubleshooting** — "why is a school not working", "common problems"\n' +
         '• **How-to guides** — "how to generate a license", "how to suspend a school"\n' +
         '• **Platform docs** — architecture and features from DOCUMENTATION.md + Knowledge Base\n\n' +
         'I use documentation, knowledge base, live stats, and executable actions — **not** source code or repository access. I cannot expose API keys or secrets.\n\n' +
-        'Say an action directly — destructive actions will ask you to confirm.',
+        'Say normal actions directly. For terminal/server commands, start with @. Every server command asks you to confirm before it runs.',
       timestamp: new Date(),
     },
   ]);

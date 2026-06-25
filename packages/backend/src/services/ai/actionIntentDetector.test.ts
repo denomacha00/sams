@@ -228,6 +228,22 @@ describe('actionIntentDetector role scoping (regex path)', () => {
     expect(result.params?.schoolName).toBe('Test Academy');
   });
 
+  it('detects @ terminal commands for super admin only', async () => {
+    const result = await actionIntentDetector.detect('@status', UserRole.SUPER_ADMIN);
+    expect(result.isAction).toBe(true);
+    expect(result.action).toBe('run_terminal_command');
+    expect(result.params?.command).toBe('@status');
+
+    const schoolAdminResult = await actionIntentDetector.detect('@status', UserRole.SCHOOL_ADMIN);
+    expect(schoolAdminResult.isAction).toBe(false);
+  });
+
+  it('detects @db as a super admin database overview action', async () => {
+    const result = await actionIntentDetector.detect('@db', UserRole.SUPER_ADMIN);
+    expect(result.isAction).toBe(true);
+    expect(result.action).toBe('database_overview');
+  });
+
   it('does not throw when an action definition has no patterns array', async () => {
     const spy = vi.spyOn(roleActionRegistry, 'getActionsForRole').mockReturnValue([
       {
