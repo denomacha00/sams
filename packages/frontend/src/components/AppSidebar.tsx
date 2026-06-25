@@ -67,7 +67,6 @@ const HOD_ITEMS: SidebarItem[] = [
   { label: 'Dept. Management', path: '/hod/department', icon: 'departments' },
   { label: 'Manage Users', path: '/admin/users', icon: 'users' },
   { label: 'Dept. Students', path: '/class/students', icon: 'users' },
-  { label: 'Teacher Subjects', path: '/admin/teacher-subjects', icon: 'knowledge' },
   { label: 'Edit Timetable', path: '/admin/timetable', icon: 'timetable' },
   { label: 'Exams & Grades', path: '/admin/exams', icon: 'exams' },
   { label: 'Risk Scores', path: '/risk-scores', icon: 'risk' },
