@@ -86,6 +86,15 @@ const hodUser = {
   exp: 9999999999,
 };
 
+const teacherUser = {
+  sub: 'teacher-1',
+  schoolId: 'school-1',
+  role: UserRole.TEACHER,
+  classId: 'class-1',
+  iat: 0,
+  exp: 9999999999,
+};
+
 const superAdminUser = {
   sub: 'super-1',
   schoolId: 'platform',
@@ -193,6 +202,39 @@ describe('AIService anti-hallucination routing', () => {
 
     expect(openaiQueryWithHistory).toHaveBeenCalled();
     expect(r.engine).toBe('openai');
+  });
+
+  it('does not pretend to clear notifications when no backend action matched', async () => {
+    localQuery.mockResolvedValue({ answer: 'help', intent: 'unknown' });
+
+    const service = new AIService();
+    const r = await service.query(studentUser as never, 'clear notifications');
+
+    expect(openaiQueryWithHistory).not.toHaveBeenCalled();
+    expect(r.intent).toBe('unsupported_action');
+    expect(r.answer).toMatch(/did not clear/i);
+  });
+
+  it('does not pretend to change theme when no backend action matched', async () => {
+    localQuery.mockResolvedValue({ answer: 'help', intent: 'unknown' });
+
+    const service = new AIService();
+    const r = await service.query(studentUser as never, 'change to light mode');
+
+    expect(openaiQueryWithHistory).not.toHaveBeenCalled();
+    expect(r.intent).toBe('unsupported_action');
+    expect(r.answer).toMatch(/did not change/i);
+  });
+
+  it('does not pretend to start a session when no real action matched', async () => {
+    localQuery.mockResolvedValue({ answer: 'help', intent: 'unknown' });
+
+    const service = new AIService();
+    const r = await service.query(teacherUser as never, 'start sesson');
+
+    expect(openaiQueryWithHistory).not.toHaveBeenCalled();
+    expect(r.intent).toBe('unsupported_action');
+    expect(r.answer).toMatch(/did not start/i);
   });
 
   it('blocks fake license keys from LLM answers', async () => {

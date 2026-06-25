@@ -110,6 +110,39 @@ function containsGeneratedSecretLikeText(answer: string): boolean {
   );
 }
 
+function getUnsupportedOperationResponse(question: string): AIServiceResponse | null {
+  const q = question.trim().toLowerCase();
+
+  if (/\b(clear|delete|remove)\b.*\b(alerts?|notifications?|messages?|inbox|sent|outbox)\b/.test(q)) {
+    return {
+      answer:
+        'I did not clear any notifications. I can only say an action is done after SAMS runs a real backend action. Please use Notifications or Settings to delete messages, or ask an admin to add a supported AI action for clearing them.',
+      intent: 'unsupported_action',
+      engine: 'local',
+    };
+  }
+
+  if (/\b(change|switch|turn|set|activate)\b.*\b(light|dark)\s+(mode|theme)\b/.test(q) || /\b(light|dark)\s+(mode|theme)\b/.test(q)) {
+    return {
+      answer:
+        'I did not change the theme. Theme changes happen in the app UI on this device; SAMS AI cannot switch your browser theme unless a real theme action is added.',
+      intent: 'unsupported_action',
+      engine: 'local',
+    };
+  }
+
+  if (/\b(start|open|begin)\b.*\b(sessions?|sessons?|lessons?|attendance)\b/.test(q)) {
+    return {
+      answer:
+        'I did not start a session. Sessions only start when SAMS runs the real attendance action and returns a session ID. If you are a teacher or HOD, say which class/lesson to start; if SAMS asks for confirmation or details, reply there.',
+      intent: 'unsupported_action',
+      engine: 'local',
+    };
+  }
+
+  return null;
+}
+
 // ─── AI Service ───────────────────────────────────────────────────────────────
 
 /**
@@ -187,6 +220,12 @@ export class AIService {
         });
         threadId = await this.safelyPersist(user, question, actionResult.answer, threadId);
         return { ...actionResult, threadId };
+      }
+
+      const unsupportedOperation = getUnsupportedOperationResponse(question);
+      if (unsupportedOperation) {
+        threadId = await this.safelyPersist(user, question, unsupportedOperation.answer, threadId);
+        return { ...unsupportedOperation, threadId };
       }
     }
 

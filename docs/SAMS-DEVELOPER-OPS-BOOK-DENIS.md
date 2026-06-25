@@ -812,6 +812,7 @@ Supported commands:
 | AI command | Server operation |
 |------------|------------------|
 | `@db` | Safe Prisma database overview: schools, users, sessions, today's attendance, notifications, AI memory, audit count |
+| `@school <name or code>` | Safe one-school database overview: license, users, sessions, payments, suspension status |
 | `@status` | `pm2 status` |
 | `@logs` | `pm2 logs sams-api --lines 120 --nostream` |
 | `@verify` | `bash scripts/post-deploy-verify.sh` |

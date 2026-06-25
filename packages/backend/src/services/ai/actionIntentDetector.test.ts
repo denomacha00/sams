@@ -228,6 +228,13 @@ describe('actionIntentDetector role scoping (regex path)', () => {
     expect(result.params?.schoolName).toBe('Test Academy');
   });
 
+  it('detects @school as a safe school database overview before terminal fallback', async () => {
+    const result = await actionIntentDetector.detect('@school greenwood', UserRole.SUPER_ADMIN);
+    expect(result.isAction).toBe(true);
+    expect(result.action).toBe('get_school_info');
+    expect(result.params?.schoolName).toBe('greenwood');
+  });
+
   it('detects @ terminal commands for super admin only', async () => {
     const result = await actionIntentDetector.detect('@status', UserRole.SUPER_ADMIN);
     expect(result.isAction).toBe(true);

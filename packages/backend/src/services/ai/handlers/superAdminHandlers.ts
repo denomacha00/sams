@@ -180,7 +180,12 @@ const getSchoolInfoHandler: ActionHandler = async (params) => {
   if (!schoolName) return { answer: 'School name is required.' };
 
   const school = await prisma.school.findFirst({
-    where: { name: { contains: schoolName, mode: 'insensitive' } },
+    where: {
+      OR: [
+        { name: { contains: schoolName, mode: 'insensitive' } },
+        { schoolCode: { contains: schoolName, mode: 'insensitive' } },
+      ],
+    },
     include: { _count: { select: { users: true, sessions: true, payments: true } } },
   });
   if (!school) return { answer: `School "${schoolName}" not found.` };
@@ -500,6 +505,27 @@ export const superAdminActions: ActionDefinition[] = [
     handler: databaseOverviewHandler,
   },
   {
+    action: 'get_school_info',
+    description: 'Get detailed information about a school',
+    destructive: false,
+    patterns: [
+      /^@\s*school\s+(.+)/i,
+      /(?:info|information)\s+(?:about|on|for)\s+(.+)/i,
+      /details?\s+(?:of|about|for)\s+(.+)/i,
+      /show\s+(.+?)\s+info/i,
+      /what\s+about\s+(.+)/i,
+      /tell\s+me\s+about\s+(.+?)\s+school/i,
+      /school\s+info\s+(?:for\s+)?(.+)/i,
+    ],
+    extractParams: (_message: string, match: RegExpMatchArray | null) => {
+      const schoolName = match && match[1] ? extractSchoolName(match[1]) : '';
+      return { schoolName };
+    },
+    descriptionTemplate: (params) =>
+      `Get information about school "${params.schoolName}".`,
+    handler: getSchoolInfoHandler,
+  },
+  {
     action: 'run_terminal_command',
     description:
       'Run an allowlisted SAMS terminal operation. Only works when the Super Admin message starts with @.',
@@ -613,26 +639,6 @@ export const superAdminActions: ActionDefinition[] = [
     descriptionTemplate: (params) =>
       `Extend license for "${params.schoolName}" by ${params.daysToAdd} days.`,
     handler: extendLicenseHandler,
-  },
-  {
-    action: 'get_school_info',
-    description: 'Get detailed information about a school',
-    destructive: false,
-    patterns: [
-      /(?:info|information)\s+(?:about|on|for)\s+(.+)/i,
-      /details?\s+(?:of|about|for)\s+(.+)/i,
-      /show\s+(.+?)\s+info/i,
-      /what\s+about\s+(.+)/i,
-      /tell\s+me\s+about\s+(.+?)\s+school/i,
-      /school\s+info\s+(?:for\s+)?(.+)/i,
-    ],
-    extractParams: (_message: string, match: RegExpMatchArray | null) => {
-      const schoolName = match && match[1] ? extractSchoolName(match[1]) : '';
-      return { schoolName };
-    },
-    descriptionTemplate: (params) =>
-      `Get information about school "${params.schoolName}".`,
-    handler: getSchoolInfoHandler,
   },
   {
     action: 'get_system_stats',

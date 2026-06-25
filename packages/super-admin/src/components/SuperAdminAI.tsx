@@ -42,7 +42,7 @@ function createWelcomeMessage(): ChatMessage {
       'â€¢ **System stats** â€” "how many schools", "total revenue", "platform overview"\n' +
       'â€¢ **School ops** â€” "school info for X", "suspend school Y", "extend license for Z"\n' +
       'â€¢ **Password reset** â€” "reset password for user at school CODE" (temp password or OTP)\n' +
-      'â€¢ **Live database** â€” "@db" for platform database overview\n' +
+      'â€¢ **Live database** â€” "@db" for platform overview, "@school greenwood" for one school\n' +
       'â€¢ **Server ops** â€” "@status", "@logs", "@verify", "@diagnose-ai", "@traffic", "@restart-api", "@git-pull", "@deploy"\n' +
       'â€¢ **Troubleshooting** â€” "why is a school not working", "common problems"\n' +
       'â€¢ **How-to guides** â€” "how to generate a license", "how to suspend a school"\n' +
@@ -140,7 +140,7 @@ const SuperAdminAI: React.FC = () => {
         '• **System stats** — "how many schools", "total revenue", "platform overview"\n' +
         '• **School ops** — "school info for X", "suspend school Y", "extend license for Z"\n' +
         '• **Password reset** — "reset password for user at school CODE" (temp password or OTP)\n' +
-        '• **Live database** — "@db" for platform database overview\n' +
+        '• **Live database** — "@db" for platform overview, "@school greenwood" for one school\n' +
         '• **Server ops** — "@status", "@logs", "@verify", "@diagnose-ai", "@traffic", "@restart-api", "@git-pull", "@deploy"\n' +
         '• **Troubleshooting** — "why is a school not working", "common problems"\n' +
         '• **How-to guides** — "how to generate a license", "how to suspend a school"\n' +

@@ -264,6 +264,7 @@ bash scripts/restart-api.sh
 - Use explicit commands: `unsuspend school [name]`, `suspend school [name]`
 - For a safe live overview, ask Super Admin AI: `run system readiness check` or `check system`. It reads database/config signals.
 - For live platform database counts, use Super Admin AI: `@db`.
+- For one school overview, use Super Admin AI: `@school <name or code>`.
 - For VPS/server operations from the Super Admin portal, start with `@`. Supported safe operations:
   - `@status` — PM2 process status
   - `@logs` — last SAMS API logs
