@@ -2,22 +2,21 @@ import React, { useEffect, useState } from 'react';
 import apiClient from '../services/apiClient';
 import { getSuperAdminApiError } from '../utils/apiError';
 
-interface SecuritySummary {
-  failedLogins24h: number;
-  failedLogins7d: number;
-  suspendedAccounts: number;
-  uniqueIPs: number;
-  suspiciousEvents: number;
-}
-
 interface SecurityEvent {
   id: string;
-  type: string;
+  eventType: string;
   severity: 'CRITICAL' | 'HIGH' | 'MEDIUM' | 'INFO';
-  message: string;
-  ipAddress: string;
-  userId?: string;
-  timestamp: string;
+  ipAddress: string | null;
+  userId: string | null;
+  metadata: Record<string, unknown> | null;
+  createdAt: string;
+}
+
+interface SecuritySummary {
+  byType: Record<string, number>;
+  bySeverity: Record<string, number>;
+  recentCount: number;
+  timeRangeHours: number;
 }
 
 const SEVERITY_STYLES: Record<string, string> = {
@@ -43,7 +42,8 @@ const SecurityDashboardPage: React.FC = () => {
           apiClient.get('/super/security/events'),
         ]);
         setSummary(summaryRes.data);
-        setEvents(Array.isArray(eventsRes.data.events) ? eventsRes.data.events : []);
+        const eventsData = eventsRes.data;
+        setEvents(Array.isArray(eventsData.events) ? eventsData.events : []);
         setApiError(null);
       } catch (err: unknown) {
         setApiError(getSuperAdminApiError(err, 'Failed to load security data.'));
@@ -54,13 +54,17 @@ const SecurityDashboardPage: React.FC = () => {
     fetchData();
   }, []);
 
+  const totalCritical = (summary?.bySeverity?.CRITICAL ?? 0) + (summary?.bySeverity?.HIGH ?? 0);
+  const totalInfo = summary?.bySeverity?.INFO ?? 0;
+  const totalMedium = summary?.bySeverity?.MEDIUM ?? 0;
+
   const filteredEvents = events.filter((e) => {
     if (severityFilter && e.severity !== severityFilter) return false;
-    if (typeFilter && e.type !== typeFilter) return false;
+    if (typeFilter && e.eventType !== typeFilter) return false;
     return true;
   });
 
-  const eventTypes = [...new Set(events.map((e) => e.type))];
+  const eventTypes = [...new Set(events.map((e) => e.eventType))];
 
   if (loading) {
     return (
@@ -90,28 +94,24 @@ const SecurityDashboardPage: React.FC = () => {
       {/* Summary cards */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
         <div className="rounded-2xl border border-gray-700/80 bg-gray-800/80 p-5 shadow-lg">
-          <p className="text-xs font-semibold uppercase tracking-wider text-gray-400">Failed logins (24h)</p>
-          <p className={`mt-2 text-2xl font-bold ${(summary?.failedLogins24h ?? 0) > 10 ? 'text-red-400' : 'text-gray-200'}`}>
-            {summary?.failedLogins24h.toLocaleString() ?? '—'}
-          </p>
+          <p className="text-xs font-semibold uppercase tracking-wider text-gray-400">Total Events</p>
+          <p className="mt-2 text-2xl font-bold text-gray-200">{summary?.recentCount.toLocaleString() ?? '—'}</p>
+        </div>
+        <div className="rounded-2xl border border-red-500/40 bg-red-950/40 p-5 shadow-lg">
+          <p className="text-xs font-semibold uppercase tracking-wider text-red-300">Critical/High</p>
+          <p className="mt-2 text-2xl font-bold text-red-400">{totalCritical.toLocaleString()}</p>
+        </div>
+        <div className="rounded-2xl border border-amber-500/30 bg-amber-950/30 p-5 shadow-lg">
+          <p className="text-xs font-semibold uppercase tracking-wider text-amber-300">Medium</p>
+          <p className="mt-2 text-2xl font-bold text-amber-400">{totalMedium.toLocaleString()}</p>
+        </div>
+        <div className="rounded-2xl border border-blue-500/30 bg-blue-950/30 p-5 shadow-lg">
+          <p className="text-xs font-semibold uppercase tracking-wider text-blue-300">Info</p>
+          <p className="mt-2 text-2xl font-bold text-blue-400">{totalInfo.toLocaleString()}</p>
         </div>
         <div className="rounded-2xl border border-gray-700/80 bg-gray-800/80 p-5 shadow-lg">
-          <p className="text-xs font-semibold uppercase tracking-wider text-gray-400">Failed logins (7d)</p>
-          <p className="mt-2 text-2xl font-bold text-gray-200">{summary?.failedLogins7d.toLocaleString() ?? '—'}</p>
-        </div>
-        <div className="rounded-2xl border border-gray-700/80 bg-gray-800/80 p-5 shadow-lg">
-          <p className="text-xs font-semibold uppercase tracking-wider text-gray-400">Suspended accounts</p>
-          <p className="mt-2 text-2xl font-bold text-amber-400">{summary?.suspendedAccounts.toLocaleString() ?? '—'}</p>
-        </div>
-        <div className="rounded-2xl border border-gray-700/80 bg-gray-800/80 p-5 shadow-lg">
-          <p className="text-xs font-semibold uppercase tracking-wider text-gray-400">Unique IPs</p>
-          <p className="mt-2 text-2xl font-bold text-blue-400">{summary?.uniqueIPs.toLocaleString() ?? '—'}</p>
-        </div>
-        <div className="rounded-2xl border border-gray-700/80 bg-gray-800/80 p-5 shadow-lg">
-          <p className="text-xs font-semibold uppercase tracking-wider text-gray-400">Suspicious events</p>
-          <p className={`mt-2 text-2xl font-bold ${(summary?.suspiciousEvents ?? 0) > 0 ? 'text-red-400' : 'text-gray-200'}`}>
-            {summary?.suspiciousEvents.toLocaleString() ?? '—'}
-          </p>
+          <p className="text-xs font-semibold uppercase tracking-wider text-gray-400">Time Range</p>
+          <p className="mt-2 text-2xl font-bold text-gray-200">{summary?.timeRangeHours ?? '—'}h</p>
         </div>
       </div>
 
@@ -152,8 +152,8 @@ const SecurityDashboardPage: React.FC = () => {
               <tr className="border-b border-gray-700/80">
                 <th className="px-3 py-2 text-left text-xs font-semibold uppercase tracking-wider text-gray-400">Severity</th>
                 <th className="px-3 py-2 text-left text-xs font-semibold uppercase tracking-wider text-gray-400">Type</th>
-                <th className="px-3 py-2 text-left text-xs font-semibold uppercase tracking-wider text-gray-400">Message</th>
                 <th className="px-3 py-2 text-left text-xs font-semibold uppercase tracking-wider text-gray-400">IP</th>
+                <th className="px-3 py-2 text-left text-xs font-semibold uppercase tracking-wider text-gray-400">User</th>
                 <th className="px-3 py-2 text-right text-xs font-semibold uppercase tracking-wider text-gray-400">Timestamp</th>
               </tr>
             </thead>
@@ -170,10 +170,10 @@ const SecurityDashboardPage: React.FC = () => {
                       {e.severity}
                     </span>
                   </td>
-                  <td className="px-3 py-2 text-xs text-gray-300">{e.type}</td>
-                  <td className="px-3 py-2 text-xs text-gray-200 max-w-[300px] truncate">{e.message}</td>
-                  <td className="px-3 py-2 font-mono text-xs text-gray-400">{e.ipAddress}</td>
-                  <td className="px-3 py-2 text-right text-xs text-gray-400">{new Date(e.timestamp).toLocaleString()}</td>
+                  <td className="px-3 py-2 text-xs text-gray-300">{e.eventType}</td>
+                  <td className="px-3 py-2 font-mono text-xs text-gray-400">{e.ipAddress ?? '—'}</td>
+                  <td className="px-3 py-2 text-xs text-gray-400">{e.userId ?? '—'}</td>
+                  <td className="px-3 py-2 text-right text-xs text-gray-400">{new Date(e.createdAt).toLocaleString()}</td>
                 </tr>
               ))}
             </tbody>

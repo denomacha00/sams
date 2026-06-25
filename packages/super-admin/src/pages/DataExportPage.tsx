@@ -2,16 +2,14 @@ import React, { useEffect, useState } from 'react';
 import apiClient from '../services/apiClient';
 import { getSuperAdminApiError } from '../utils/apiError';
 
-type ExportType = 'users' | 'schools' | 'sessions' | 'payments' | 'attendance';
 type ExportFormat = 'csv' | 'xlsx';
-type ExportStatus = 'PENDING' | 'PROCESSING' | 'COMPLETED' | 'FAILED';
 
 interface ExportRecord {
   id: string;
-  type: ExportType;
-  format: ExportFormat;
-  status: ExportStatus;
-  requestedBy: string;
+  exportType: string;
+  format: string;
+  status: string;
+  createdById: string | null;
   createdAt: string;
   completedAt?: string;
   fileUrl?: string;
@@ -19,24 +17,24 @@ interface ExportRecord {
 
 interface BackupRecord {
   id: string;
-  size: string;
+  fileSize: number | null;
   status: string;
-  createdAt: string;
+  triggeredAt: string;
   completedAt?: string;
 }
 
-const STATUS_STYLES: Record<ExportStatus, string> = {
+const STATUS_STYLES: Record<string, string> = {
   PENDING: 'bg-gray-600/30 text-gray-300',
   PROCESSING: 'bg-blue-500/20 text-blue-300',
   COMPLETED: 'bg-emerald-500/20 text-emerald-300',
   FAILED: 'bg-red-500/20 text-red-300',
 };
 
-const EXPORT_TYPES: ExportType[] = ['users', 'schools', 'sessions', 'payments', 'attendance'];
+const EXPORT_TYPES = ['users', 'schools', 'sessions', 'payments', 'attendance'];
 const EXPORT_FORMATS: ExportFormat[] = ['csv', 'xlsx'];
 
 const DataExportPage: React.FC = () => {
-  const [exportType, setExportType] = useState<ExportType>('users');
+  const [exportType, setExportType] = useState('users');
   const [exportFormat, setExportFormat] = useState<ExportFormat>('csv');
   const [exports, setExports] = useState<ExportRecord[]>([]);
   const [backups, setBackups] = useState<BackupRecord[]>([]);
@@ -51,8 +49,8 @@ const DataExportPage: React.FC = () => {
         apiClient.get('/super/export/list'),
         apiClient.get('/super/backup/list'),
       ]);
-      setExports(exportsRes.data);
-      setBackups(backupsRes.data);
+      setExports(Array.isArray(exportsRes.data) ? exportsRes.data : exportsRes.data.exports ?? []);
+      setBackups(Array.isArray(backupsRes.data) ? backupsRes.data : backupsRes.data.backups ?? []);
       setApiError(null);
     } catch (err: unknown) {
       setApiError(getSuperAdminApiError(err, 'Failed to load exports data.'));
@@ -126,7 +124,7 @@ const DataExportPage: React.FC = () => {
             <label className="mb-1 block text-xs font-semibold uppercase tracking-wider text-gray-400">Data Type</label>
             <select
               value={exportType}
-              onChange={(e) => setExportType(e.target.value as ExportType)}
+              onChange={(e) => setExportType(e.target.value)}
               className="rounded-xl border border-gray-700/80 bg-gray-700/50 px-3 py-2 text-sm text-gray-200 focus:border-indigo-500/50 focus:outline-none"
             >
               {EXPORT_TYPES.map((t) => (
@@ -180,12 +178,12 @@ const DataExportPage: React.FC = () => {
               )}
               {exports.map((e) => (
                 <tr key={e.id} className="border-b border-gray-700/30 last:border-0 hover:bg-gray-700/30">
-                  <td className="px-3 py-2 text-gray-200">{e.type}</td>
+                  <td className="px-3 py-2 text-gray-200">{e.exportType}</td>
                   <td className="px-3 py-2 text-xs text-gray-400">{e.format.toUpperCase()}</td>
                   <td className="px-3 py-2">
-                    <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${STATUS_STYLES[e.status]}`}>{e.status}</span>
+                    <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${STATUS_STYLES[e.status] ?? 'bg-gray-600/30 text-gray-300'}`}>{e.status}</span>
                   </td>
-                  <td className="px-3 py-2 text-xs text-gray-400">{e.requestedBy}</td>
+                  <td className="px-3 py-2 text-xs text-gray-400">{e.createdById ?? '—'}</td>
                   <td className="px-3 py-2 text-right text-xs text-gray-400">{new Date(e.createdAt).toLocaleString()}</td>
                 </tr>
               ))}
@@ -227,7 +225,7 @@ const DataExportPage: React.FC = () => {
               )}
               {backups.map((b) => (
                 <tr key={b.id} className="border-b border-gray-700/30 last:border-0 hover:bg-gray-700/30">
-                  <td className="px-3 py-2 text-xs text-gray-200">{b.size || '—'}</td>
+                  <td className="px-3 py-2 text-xs text-gray-200">{b.fileSize ? `${(b.fileSize / 1024 / 1024).toFixed(1)} MB` : '—'}</td>
                   <td className="px-3 py-2">
                     <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${
                       b.status === 'COMPLETED' ? 'bg-emerald-500/20 text-emerald-300' :
@@ -235,7 +233,7 @@ const DataExportPage: React.FC = () => {
                       'bg-gray-600/30 text-gray-300'
                     }`}>{b.status}</span>
                   </td>
-                  <td className="px-3 py-2 text-right text-xs text-gray-400">{new Date(b.createdAt).toLocaleString()}</td>
+                  <td className="px-3 py-2 text-right text-xs text-gray-400">{new Date(b.triggeredAt).toLocaleString()}</td>
                   <td className="px-3 py-2 text-right text-xs text-gray-400">
                     {b.completedAt ? new Date(b.completedAt).toLocaleString() : '—'}
                   </td>

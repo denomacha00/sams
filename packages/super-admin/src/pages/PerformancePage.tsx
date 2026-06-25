@@ -2,37 +2,26 @@ import React, { useEffect, useState, useCallback, useRef } from 'react';
 import apiClient from '../services/apiClient';
 import { getSuperAdminApiError } from '../utils/apiError';
 
-interface Metrics {
-  avgResponseTime: number;
+interface BackendMetrics {
+  totalRequests: number;
+  avgDurationMs: number;
   errorRate: number;
-  p50: number;
-  p95: number;
-  p99: number;
-}
-
-interface EndpointStats {
-  endpoint: string;
-  callCount: number;
-  avgLatency: number;
-}
-
-interface SlowRequest {
-  id: string;
-  endpoint: string;
-  duration: number;
-  method: string;
-  timestamp: string;
-  statusCode: number;
-}
-
-interface PerformanceData {
-  metrics: Metrics;
-  topEndpoints: EndpointStats[];
-  slowRequests: SlowRequest[];
+  p50Ms: number;
+  p95Ms: number;
+  p99Ms: number;
+  byEndpoint: Array<{
+    path: string;
+    method: string;
+    count: number;
+    avgDurationMs: number;
+    errorRate: number;
+  }>;
+  timeRangeHours: number;
+  sampledPeriod: { from: string; to: string };
 }
 
 const PerformancePage: React.FC = () => {
-  const [data, setData] = useState<PerformanceData | null>(null);
+  const [data, setData] = useState<BackendMetrics | null>(null);
   const [loading, setLoading] = useState(true);
   const [apiError, setApiError] = useState<string | null>(null);
   const [autoRefresh, setAutoRefresh] = useState(false);
@@ -66,7 +55,8 @@ const PerformancePage: React.FC = () => {
     };
   }, [autoRefresh, fetchData]);
 
-  const maxCallCount = Math.max(1, ...(data?.topEndpoints ?? []).map((e) => e.callCount));
+  const endpoints = data?.byEndpoint ?? [];
+  const maxCallCount = Math.max(1, ...endpoints.map((e) => e.count));
 
   if (loading) {
     return (
@@ -77,8 +67,6 @@ const PerformancePage: React.FC = () => {
       </div>
     );
   }
-
-  const m = data?.metrics;
 
   return (
     <div className="space-y-6">
@@ -126,25 +114,25 @@ const PerformancePage: React.FC = () => {
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
         <div className="rounded-2xl border border-gray-700/80 bg-gray-800/80 p-5 shadow-lg">
           <p className="text-xs font-semibold uppercase tracking-wider text-gray-400">Avg Response Time</p>
-          <p className="mt-2 text-2xl font-bold text-white">{m?.avgResponseTime.toFixed(1) ?? '—'} ms</p>
+          <p className="mt-2 text-2xl font-bold text-white">{data?.avgDurationMs.toFixed(1) ?? '—'} ms</p>
         </div>
         <div className="rounded-2xl border border-gray-700/80 bg-gray-800/80 p-5 shadow-lg">
           <p className="text-xs font-semibold uppercase tracking-wider text-gray-400">Error Rate</p>
-          <p className={`mt-2 text-2xl font-bold ${(m?.errorRate ?? 0) > 5 ? 'text-red-400' : 'text-emerald-400'}`}>
-            {m?.errorRate.toFixed(2) ?? '—'}%
+          <p className={`mt-2 text-2xl font-bold ${(data?.errorRate ?? 0) > 5 ? 'text-red-400' : 'text-emerald-400'}`}>
+            {data?.errorRate.toFixed(2) ?? '—'}%
           </p>
         </div>
         <div className="rounded-2xl border border-gray-700/80 bg-gray-800/80 p-5 shadow-lg">
           <p className="text-xs font-semibold uppercase tracking-wider text-gray-400">p50 Latency</p>
-          <p className="mt-2 text-2xl font-bold text-white">{m?.p50.toFixed(1) ?? '—'} ms</p>
+          <p className="mt-2 text-2xl font-bold text-white">{data?.p50Ms.toFixed(1) ?? '—'} ms</p>
         </div>
         <div className="rounded-2xl border border-gray-700/80 bg-gray-800/80 p-5 shadow-lg">
           <p className="text-xs font-semibold uppercase tracking-wider text-gray-400">p95 Latency</p>
-          <p className="mt-2 text-2xl font-bold text-amber-400">{m?.p95.toFixed(1) ?? '—'} ms</p>
+          <p className="mt-2 text-2xl font-bold text-amber-400">{data?.p95Ms.toFixed(1) ?? '—'} ms</p>
         </div>
         <div className="rounded-2xl border border-gray-700/80 bg-gray-800/80 p-5 shadow-lg">
           <p className="text-xs font-semibold uppercase tracking-wider text-gray-400">p99 Latency</p>
-          <p className="mt-2 text-2xl font-bold text-red-400">{m?.p99.toFixed(1) ?? '—'} ms</p>
+          <p className="mt-2 text-2xl font-bold text-red-400">{data?.p99Ms.toFixed(1) ?? '—'} ms</p>
         </div>
       </div>
 
@@ -156,22 +144,22 @@ const PerformancePage: React.FC = () => {
             <p className="text-sm text-gray-400">By call count</p>
           </div>
           <div className="space-y-3">
-            {(data?.topEndpoints ?? []).length === 0 && (
+            {endpoints.length === 0 && (
               <p className="py-6 text-center text-sm text-gray-500">No data yet</p>
             )}
-            {(data?.topEndpoints ?? []).map((ep) => {
-              const width = `${Math.max(4, Math.round((ep.callCount / maxCallCount) * 100))}%`;
+            {endpoints.map((ep) => {
+              const width = `${Math.max(4, Math.round((ep.count / maxCallCount) * 100))}%`;
               return (
-                <div key={ep.endpoint} className="rounded-xl border border-gray-700 bg-gray-900/45 p-3">
+                <div key={ep.path} className="rounded-xl border border-gray-700 bg-gray-900/45 p-3">
                   <div className="flex items-center justify-between text-sm">
-                    <span className="text-gray-200 font-mono text-xs truncate max-w-[60%]">{ep.endpoint}</span>
-                    <span className="text-gray-400 font-mono text-xs">{ep.callCount.toLocaleString()} calls</span>
+                    <span className="text-gray-200 font-mono text-xs truncate max-w-[60%]">{ep.path}</span>
+                    <span className="text-gray-400 font-mono text-xs">{ep.count.toLocaleString()} calls</span>
                   </div>
                   <div className="mt-2 flex items-center gap-2">
                     <div className="flex-1 h-2 overflow-hidden rounded-full bg-gray-700/70">
                       <div className="h-full rounded-full bg-indigo-500" style={{ width }} />
                     </div>
-                    <span className="text-xs text-gray-500 font-mono">{ep.avgLatency.toFixed(0)}ms avg</span>
+                    <span className="text-xs text-gray-500 font-mono">{ep.avgDurationMs.toFixed(0)}ms avg</span>
                   </div>
                 </div>
               );
@@ -179,45 +167,13 @@ const PerformancePage: React.FC = () => {
           </div>
         </section>
 
-        {/* Slow requests table */}
+        {/* No slow requests page */}
         <section className="rounded-2xl border border-gray-700/80 bg-gray-800/80 p-6 shadow-lg">
           <div className="mb-4 border-b border-gray-700/80 pb-3">
             <h2 className="text-lg font-semibold text-white">Slow Requests</h2>
             <p className="text-sm text-gray-400">Duration {'>'} 1 second</p>
           </div>
-          <div className="overflow-x-auto max-h-80 overflow-y-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-gray-700/80">
-                  <th className="px-3 py-2 text-left text-xs font-semibold uppercase tracking-wider text-gray-400">Method</th>
-                  <th className="px-3 py-2 text-left text-xs font-semibold uppercase tracking-wider text-gray-400">Endpoint</th>
-                  <th className="px-3 py-2 text-right text-xs font-semibold uppercase tracking-wider text-gray-400">Duration</th>
-                  <th className="px-3 py-2 text-right text-xs font-semibold uppercase tracking-wider text-gray-400">Status</th>
-                </tr>
-              </thead>
-              <tbody>
-                {(data?.slowRequests ?? []).length === 0 && (
-                  <tr>
-                    <td colSpan={4} className="px-3 py-8 text-center text-sm text-gray-500">No slow requests</td>
-                  </tr>
-                )}
-                {(data?.slowRequests ?? []).map((r) => (
-                  <tr key={r.id} className="border-b border-gray-700/30 last:border-0 hover:bg-gray-700/30">
-                    <td className="px-3 py-2 font-mono text-xs text-gray-300">{r.method}</td>
-                    <td className="px-3 py-2 font-mono text-xs text-gray-200 truncate max-w-[200px]">{r.endpoint}</td>
-                    <td className="px-3 py-2 text-right font-mono text-xs text-red-400">{r.duration.toFixed(0)}ms</td>
-                    <td className="px-3 py-2 text-right">
-                      <span className={`rounded px-1.5 py-0.5 text-xs font-medium ${
-                        r.statusCode >= 500 ? 'bg-red-900/50 text-red-300' :
-                        r.statusCode >= 400 ? 'bg-amber-900/50 text-amber-300' :
-                        'bg-gray-700 text-gray-300'
-                      }`}>{r.statusCode}</span>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          <p className="py-6 text-center text-sm text-gray-500">Not available in this version</p>
         </section>
       </div>
     </div>

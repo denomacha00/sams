@@ -4,16 +4,22 @@ import { getSuperAdminApiError } from '../utils/apiError';
 
 const FEATURES = ['OTP_LOGIN', 'BIOMETRIC', 'CUSTOM_BRANDING', 'API_ACCESS', 'QR_ONLY', 'GUARDIAN_PORTAL', 'EXAM_MODULE'] as const;
 
-interface SchoolFeature {
+interface BackendFlag {
+  id: string;
   schoolId: string;
-  schoolName: string;
-  features: Record<string, boolean>;
+  featureKey: string;
+  enabled: boolean;
+  updatedAt: string;
 }
 
-interface FeatureFlagsPageProps {}
+interface BackendSchoolFlags {
+  schoolId: string;
+  schoolName: string;
+  flags: BackendFlag[];
+}
 
-const FeatureFlagsPage: React.FC<FeatureFlagsPageProps> = () => {
-  const [schools, setSchools] = useState<SchoolFeature[]>([]);
+const FeatureFlagsPage: React.FC = () => {
+  const [schools, setSchools] = useState<BackendSchoolFlags[]>([]);
   const [search, setSearch] = useState('');
   const [loading, setLoading] = useState(true);
   const [apiError, setApiError] = useState<string | null>(null);
@@ -23,7 +29,7 @@ const FeatureFlagsPage: React.FC<FeatureFlagsPageProps> = () => {
     const fetchData = async () => {
       try {
         const res = await apiClient.get('/super/features/flags');
-        setSchools(res.data);
+        setSchools(Array.isArray(res.data) ? res.data : []);
         setApiError(null);
       } catch (err: unknown) {
         setApiError(getSuperAdminApiError(err, 'Failed to load feature flags.'));
@@ -34,13 +40,30 @@ const FeatureFlagsPage: React.FC<FeatureFlagsPageProps> = () => {
     fetchData();
   }, []);
 
-  const handleToggle = async (schoolId: string, feature: string, current: boolean) => {
-    setToggling(`${schoolId}-${feature}`);
+  const isEnabled = (schoolId: string, featureKey: string): boolean => {
+    const school = schools.find((s) => s.schoolId === schoolId);
+    if (!school) return false;
+    const flag = school.flags.find((f) => f.featureKey === featureKey);
+    return flag?.enabled ?? false;
+  };
+
+  const handleToggle = async (schoolId: string, featureKey: string, current: boolean) => {
+    const key = `${schoolId}-${featureKey}`;
+    setToggling(key);
     try {
-      await apiClient.put(`/super/features/flags/${schoolId}`, { featureKey: feature, enabled: !current });
+      await apiClient.put(`/super/features/flags/${schoolId}`, { featureKey, enabled: !current });
       setSchools((prev) =>
         prev.map((s) =>
-          s.schoolId === schoolId ? { ...s, features: { ...s.features, [feature]: !current } } : s,
+          s.schoolId === schoolId
+            ? {
+                ...s,
+                flags: s.flags.some((f) => f.featureKey === featureKey)
+                  ? s.flags.map((f) =>
+                      f.featureKey === featureKey ? { ...f, enabled: !current } : f,
+                    )
+                  : [...s.flags, { id: '', schoolId, featureKey, enabled: !current, updatedAt: new Date().toISOString() }],
+              }
+            : s,
         ),
       );
       setApiError(null);
@@ -108,7 +131,7 @@ const FeatureFlagsPage: React.FC<FeatureFlagsPageProps> = () => {
               <tr key={school.schoolId} className="border-b border-gray-700/50 last:border-0 hover:bg-gray-700/30">
                 <td className="px-4 py-3 font-medium text-white">{school.schoolName}</td>
                 {FEATURES.map((feature) => {
-                  const enabled = school.features[feature] ?? false;
+                  const enabled = isEnabled(school.schoolId, feature);
                   const isToggling = toggling === `${school.schoolId}-${feature}`;
                   return (
                     <td key={feature} className="px-3 py-3 text-center">
