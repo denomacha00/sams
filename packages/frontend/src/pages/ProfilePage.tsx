@@ -5,6 +5,8 @@ import { getApiErrorMessage } from '../lib/apiError';
 import { UserRole } from '@sams/shared';
 import { UserAvatar } from '../components/UserAvatar';
 
+const AVATAR_EXPORT_SIZE = 768;
+
 const ProfilePage: React.FC = () => {
   const user = useAuthStore((s) => s.user);
   const refreshProfile = useAuthStore((s) => s.refreshProfile);
@@ -148,22 +150,26 @@ const ProfilePage: React.FC = () => {
     clearMessages();
 
     try {
-      // Draw cropped image to canvas
+      // Draw cropped image to canvas. At zoom 1, use the largest centered
+      // square from the original image; higher zoom crops tighter.
       const canvas = document.createElement('canvas');
-      canvas.width = 400;
-      canvas.height = 400;
+      canvas.width = AVATAR_EXPORT_SIZE;
+      canvas.height = AVATAR_EXPORT_SIZE;
       const ctx = canvas.getContext('2d');
       if (!ctx) throw new Error('Canvas is not available');
       const img = cropImgRef.current;
+      const previewSize = img.getBoundingClientRect().width || 192;
+      const baseSourceSize = Math.min(img.naturalWidth, img.naturalHeight);
 
-      const size = 200 / cropScale;
-      const centerX = (img.naturalWidth / 2) - (cropPosition.x / cropScale);
-      const centerY = (img.naturalHeight / 2) - (cropPosition.y / cropScale);
+      const size = baseSourceSize / cropScale;
+      const sourcePxPerPreviewPx = baseSourceSize / previewSize / cropScale;
+      const centerX = (img.naturalWidth / 2) - (cropPosition.x * sourcePxPerPreviewPx);
+      const centerY = (img.naturalHeight / 2) - (cropPosition.y * sourcePxPerPreviewPx);
 
       ctx.drawImage(
         img,
         centerX - size / 2, centerY - size / 2, size, size,
-        0, 0, 400, 400
+        0, 0, AVATAR_EXPORT_SIZE, AVATAR_EXPORT_SIZE
       );
 
       // Convert to blob
@@ -171,7 +177,7 @@ const ProfilePage: React.FC = () => {
         canvas.toBlob(
           (b) => (b ? resolve(b) : reject(new Error('Could not prepare profile picture'))),
           'image/jpeg',
-          0.9,
+          0.95,
         ),
       );
 

@@ -23,6 +23,7 @@ import {
 // ─── Avatar Upload Config ─────────────────────────────────────────────────────
 
 const AVATAR_MAX_BYTES = 5 * 1024 * 1024;
+const AVATAR_OUTPUT_SIZE = 768;
 const AVATAR_MIME_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp', 'image/gif']);
 
 const upload = multer({
@@ -292,7 +293,7 @@ usersRouter.post('/me/password', async (req: Request, res: Response, next: NextF
 
 /**
  * POST /api/v1/users/me/avatar
- * Upload and resize profile picture (200x200 JPEG).
+ * Upload and resize profile picture (768x768 JPEG).
  */
 usersRouter.post('/me/avatar', uploadAvatar, async (req: Request, res: Response, next: NextFunction): Promise<void> => {
   try {
@@ -305,15 +306,15 @@ usersRouter.post('/me/avatar', uploadAvatar, async (req: Request, res: Response,
       fs.mkdirSync(AVATARS_DIR, { recursive: true });
     }
 
-    // Resize to 200x200 and convert to JPEG. Sharp verifies the actual file bytes,
+    // Resize to a high-resolution square and convert to JPEG. Sharp verifies the actual file bytes,
     // so spoofed image MIME types fail here instead of being persisted.
     const filename = `${req.user.sub}.jpg`;
     const filepath = path.join(AVATARS_DIR, filename);
 
     await sharp(req.file.buffer, { failOn: 'error' })
       .rotate()
-      .resize(200, 200, { fit: 'cover', position: 'center' })
-      .jpeg({ quality: 85 })
+      .resize(AVATAR_OUTPUT_SIZE, AVATAR_OUTPUT_SIZE, { fit: 'cover', position: 'center' })
+      .jpeg({ quality: 92, mozjpeg: true })
       .toFile(filepath);
 
     const avatarVersion = Date.now();
