@@ -14,6 +14,7 @@ import {
   messagesToAiHistory,
   saveAiThreadId,
   threadRecordsToMessages,
+  type AiActionData,
   type AiChatMessage,
 } from '../lib/aiChat';
 import { prepareImagesForAiUpload } from '../lib/aiImageUpload';
@@ -30,6 +31,7 @@ interface Message extends AiChatMessage {
   imageUrl?: string;
   userImages?: string[];
   pendingAction?: PendingAction;
+  actionData?: AiActionData;
   isError?: boolean;
 }
 
@@ -133,6 +135,29 @@ const FloatingAI: React.FC = () => {
 
   const clearImages = () => { setSelectedImages([]); setImagePreviews([]); };
 
+  const downloadAiFile = async (download: NonNullable<AiActionData['download']>) => {
+    if (!download.endpoint.startsWith('/reports/')) {
+      setMessages((prev) => [...prev, {
+        id: crypto.randomUUID(),
+        role: 'assistant',
+        content: 'I blocked that download because it is not a supported SAMS report export.',
+        timestamp: new Date(),
+        isError: true,
+      }]);
+      return;
+    }
+
+    const { data } = await apiClient.get(download.endpoint, { responseType: 'blob' });
+    const url = URL.createObjectURL(data);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = download.filename;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+  };
+
   // Restore encrypted thread history after refresh (thread id alone is not enough for UI).
   useEffect(() => {
     if (!threadId || historyLoaded) return;
@@ -212,6 +237,7 @@ const FloatingAI: React.FC = () => {
         role: 'assistant',
         content: data.answer,
         timestamp: new Date(),
+        actionData: data.data,
       }]);
     } catch {
       setMessages((prev) => [...prev, {
@@ -258,6 +284,7 @@ const FloatingAI: React.FC = () => {
           role: 'assistant',
           content: data.answer,
           timestamp: new Date(),
+          actionData: data.data,
           isError:
             isAiUploadErrorIntent(data.intent) ||
             isAiVisionFailureIntent(data.intent) ||
@@ -304,6 +331,7 @@ const FloatingAI: React.FC = () => {
           content: data.answer,
           timestamp: new Date(),
           pendingAction: data.pendingAction,
+          actionData: data.data,
         }]);
         return;
       }
@@ -315,6 +343,7 @@ const FloatingAI: React.FC = () => {
         role: 'assistant',
         content: authHint ?? data.answer,
         timestamp: new Date(),
+        actionData: data.data,
         isError: isAiUnavailableIntent(data.intent) || isAiAuthIntent(data.intent),
       }]);
     } catch (err) {
@@ -436,6 +465,15 @@ const FloatingAI: React.FC = () => {
                     className="mt-2 w-full bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white text-xs font-medium py-1.5 px-3 rounded-lg transition-colors"
                   >
                     Confirm: {msg.pendingAction.description}
+                  </button>
+                )}
+                {msg.actionData?.download && (
+                  <button
+                    type="button"
+                    onClick={() => void downloadAiFile(msg.actionData!.download!)}
+                    className="mt-2 w-full bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-medium py-1.5 px-3 rounded-lg transition-colors"
+                  >
+                    {msg.actionData.download.label}
                   </button>
                 )}
                 {/* AI generated image */}

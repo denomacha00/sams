@@ -1,3 +1,4 @@
+import { UserRole } from '@sams/shared';
 import type { ActionDefinition, ActionHandler } from '../roleActionRegistry';
 import { TIMETABLE_VIEW_PATTERNS } from '../timetableQuery';
 import { listSchoolAdminHandler } from '../../../lib/schoolAdminLookup';
@@ -20,6 +21,7 @@ import {
   jsDateToSchemaDayOfWeek,
   schemaDayName,
 } from '../../../lib/studentScheduleHelpers';
+import { buildExportReportActionDefForRole } from './reportExportAction';
 
 // ─── Handlers ─────────────────────────────────────────────────────────────────
 
@@ -292,6 +294,7 @@ const TODAY_SCHEDULE_PATTERNS: RegExp[] = [
 // ─── Action Definitions ───────────────────────────────────────────────────────
 
 export const studentActions: ActionDefinition[] = [
+  buildExportReportActionDefForRole(UserRole.STUDENT),
   {
     action: 'explain_reminders',
     description:

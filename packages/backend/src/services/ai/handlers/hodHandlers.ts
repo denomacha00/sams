@@ -6,6 +6,7 @@ import { fetchDepartmentStats, formatDepartmentStatsAnswer } from '../department
 import { extractMessageBody, parseNotificationTargetRole } from '../notificationActionParams';
 import { SCHOOL_ADMIN_QUERY_PATTERNS } from '../studentContextQuery';
 import { createRegistrationLinkActionDef } from './registrationLinkAction';
+import { buildExportReportActionDefForRole } from './reportExportAction';
 
 // ─── Handlers ─────────────────────────────────────────────────────────────────
 
@@ -458,6 +459,7 @@ export const DEPARTMENT_STATS_PATTERNS: RegExp[] = [
 // ─── Action Definitions ───────────────────────────────────────────────────────
 
 export const hodActions: ActionDefinition[] = [
+  buildExportReportActionDefForRole(UserRole.HOD),
   createRegistrationLinkActionDef,
   {
     action: 'start_session',

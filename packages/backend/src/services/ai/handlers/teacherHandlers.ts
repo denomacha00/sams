@@ -1,7 +1,9 @@
+import { UserRole } from '@sams/shared';
 import type { ActionDefinition, ActionHandler, ActionScope } from '../roleActionRegistry';
 import { listSchoolAdminHandler } from '../../../lib/schoolAdminLookup';
 import { SCHOOL_ADMIN_QUERY_PATTERNS } from '../studentContextQuery';
 import { createRegistrationLinkActionDef } from './registrationLinkAction';
+import { buildExportReportActionDefForRole } from './reportExportAction';
 
 async function listTeacherClasses(scope: ActionScope): Promise<Array<{ id: string; name: string }>> {
   const { prisma } = await import('../../../lib/prisma');
@@ -307,6 +309,7 @@ const sendClassMessageHandler: ActionHandler = async (params, scope) => {
 // ─── Action Definitions ───────────────────────────────────────────────────────
 
 export const teacherActions: ActionDefinition[] = [
+  buildExportReportActionDefForRole(UserRole.TEACHER),
   createRegistrationLinkActionDef,
   {
     action: 'start_session',

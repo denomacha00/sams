@@ -228,6 +228,23 @@ describe('actionIntentDetector role scoping (regex path)', () => {
     expect(result.params?.schoolName).toBe('Test Academy');
   });
 
+  it('detects report export requests for students and staff', async () => {
+    const student = await actionIntentDetector.detect('download my attendance report pdf', UserRole.STUDENT);
+    expect(student.isAction).toBe(true);
+    expect(student.action).toBe('export_attendance_report');
+    expect(student.params?.format).toBe('pdf');
+
+    const teacher = await actionIntentDetector.detect('export class report as excel', UserRole.TEACHER);
+    expect(teacher.isAction).toBe(true);
+    expect(teacher.action).toBe('export_attendance_report');
+    expect(teacher.params?.format).toBe('excel');
+
+    const admin = await actionIntentDetector.detect('export school attendance report csv', UserRole.SCHOOL_ADMIN);
+    expect(admin.isAction).toBe(true);
+    expect(admin.action).toBe('export_attendance_report');
+    expect(admin.params?.reportType).toBe('school');
+  });
+
   it('detects @school as a safe school database overview before terminal fallback', async () => {
     const result = await actionIntentDetector.detect('@school greenwood', UserRole.SUPER_ADMIN);
     expect(result.isAction).toBe(true);

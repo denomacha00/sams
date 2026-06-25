@@ -29,6 +29,17 @@ export interface AiChatMessage {
   isSystemNotice?: boolean;
 }
 
+export interface AiDownloadAction {
+  kind: 'report';
+  endpoint: string;
+  filename: string;
+  label: string;
+}
+
+export interface AiActionData {
+  download?: AiDownloadAction;
+}
+
 export interface AiApiHistoryMessage {
   role: 'user' | 'assistant';
   content: string;

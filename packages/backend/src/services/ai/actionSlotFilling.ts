@@ -214,6 +214,17 @@ function getRegistrationLinkSlotOrder(
   return ['classId', 'maxUses'];
 }
 
+function getReportExportSlotOrder(
+  user: AccessTokenPayload,
+  params: Record<string, unknown>,
+): SlotName[] {
+  const target = String(params.reportType ?? '').toLowerCase();
+  if (user.role === UserRole.TEACHER) return ['classId'];
+  if (user.role === UserRole.HOD && target !== 'department') return ['classId'];
+  if (user.role === UserRole.SCHOOL_ADMIN && target === 'class') return ['classId'];
+  return [];
+}
+
 async function resolveDepartmentByName(
   schoolId: string,
   name: string,
@@ -238,7 +249,7 @@ export async function resolveActionParams(
 
   if (
     user.role === UserRole.TEACHER &&
-    (action === 'send_class_message' || action === 'start_session')
+    (action === 'send_class_message' || action === 'start_session' || action === 'export_attendance_report')
   ) {
     if (!resolved.classId) {
       const classes = await listTeacherClasses(user, 'teaching');
@@ -297,7 +308,7 @@ export async function resolveActionParams(
       user.role === UserRole.TEACHER && action === 'create_registration_link'
         ? 'managed'
         : user.role === UserRole.TEACHER &&
-            (action === 'send_class_message' || action === 'start_session')
+            (action === 'send_class_message' || action === 'start_session' || action === 'export_attendance_report')
           ? 'teaching'
           : null;
     const cls = teacherMode
@@ -458,6 +469,8 @@ export async function getNextMissingSlot(
   const order =
     action === 'create_registration_link'
       ? getRegistrationLinkSlotOrder(user, resolved)
+      : action === 'export_attendance_report'
+        ? getReportExportSlotOrder(user, resolved)
       : getActionSlotOrder(user, action);
 
   if (needsNotifyScopePrompt(user.role, action, resolved) && !isFilled(resolved.notifyScope)) {
@@ -504,9 +517,12 @@ export async function getNextMissingSlot(
       if (action === 'create_registration_link') {
         const target = String(resolved.targetRole ?? '').toUpperCase();
         if (target !== 'STUDENT') continue;
+      } else if (action === 'export_attendance_report') {
+        const target = String(resolved.reportType ?? '').toLowerCase();
+        if (target !== 'class') continue;
       } else if (
         user.role === UserRole.TEACHER &&
-        (action === 'send_class_message' || action === 'start_session')
+        (action === 'send_class_message' || action === 'start_session' || action === 'export_attendance_report')
       ) {
         // Teacher class actions use managed/timetable-aware class lists below.
       } else if (
@@ -522,7 +538,7 @@ export async function getNextMissingSlot(
         classes = await listTeacherClasses(user, 'managed');
       } else if (
         user.role === UserRole.TEACHER &&
-        (action === 'send_class_message' || action === 'start_session')
+        (action === 'send_class_message' || action === 'start_session' || action === 'export_attendance_report')
       ) {
         classes = await listTeacherClasses(user, 'teaching');
       } else {
@@ -607,7 +623,7 @@ export async function buildSlotQuestion(
         user.role === UserRole.TEACHER && action === 'create_registration_link'
           ? 'managed'
           : user.role === UserRole.TEACHER &&
-              (action === 'send_class_message' || action === 'start_session')
+              (action === 'send_class_message' || action === 'start_session' || action === 'export_attendance_report')
             ? 'teaching'
             : null;
       const deptId =
@@ -642,6 +658,9 @@ export async function buildSlotQuestion(
       }
       if (action === 'start_session') {
         return `Which class should this attendance session be for? Reply with one of: ${names}`;
+      }
+      if (action === 'export_attendance_report') {
+        return `Which class report should I export? Reply with one of: ${names}`;
       }
       return `Which class should receive this? Reply with one of: ${names}`;
     }

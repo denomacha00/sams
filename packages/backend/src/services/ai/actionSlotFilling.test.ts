@@ -116,6 +116,25 @@ describe('actionSlotFilling', () => {
     expect(slot).toBe('maxUses');
   });
 
+  it('teacher export_attendance_report asks class when multiple taught classes exist', async () => {
+    vi.mocked(prisma.class.findMany).mockResolvedValue([
+      { id: 'c1', name: 'Form 1A' },
+      { id: 'c2', name: 'Form 2A' },
+    ] as any);
+
+    const teacher = {
+      sub: 't1',
+      role: UserRole.TEACHER,
+      schoolId: 'school-1',
+      departmentId: 'dept-1',
+      classId: 'class-1',
+    };
+    const slot = await getNextMissingSlot(teacher as any, 'export_attendance_report', {
+      reportType: 'class',
+    });
+    expect(slot).toBe('classId');
+  });
+
   it('Super Admin generate_license asks for schoolName when missing', async () => {
     const superAdmin = {
       sub: 'super-1',

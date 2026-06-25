@@ -14,6 +14,7 @@ import {
   messagesToAiHistory,
   saveAiThreadId,
   threadRecordsToMessages,
+  type AiActionData,
   type AiChatMessage,
 } from '../lib/aiChat';
 import { prepareImagesForAiUpload } from '../lib/aiImageUpload';
@@ -30,6 +31,7 @@ interface PendingAction {
 interface Message extends AiChatMessage {
   userImages?: string[];
   pendingAction?: PendingAction;
+  actionData?: AiActionData;
   isError?: boolean;
 }
 
@@ -95,6 +97,29 @@ const AIAssistantPage: React.FC = () => {
   const clearImages = () => {
     setSelectedImages([]);
     setImagePreviews([]);
+  };
+
+  const downloadAiFile = async (download: NonNullable<AiActionData['download']>) => {
+    if (!download.endpoint.startsWith('/reports/')) {
+      setMessages((prev) => [...prev, {
+        id: crypto.randomUUID(),
+        role: 'assistant',
+        content: 'I blocked that download because it is not a supported SAMS report export.',
+        timestamp: new Date(),
+        isError: true,
+      }]);
+      return;
+    }
+
+    const { data } = await apiClient.get(download.endpoint, { responseType: 'blob' });
+    const url = URL.createObjectURL(data);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = download.filename;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
   };
 
   useEffect(() => {
@@ -181,6 +206,7 @@ const AIAssistantPage: React.FC = () => {
         role: 'assistant',
         content: data.answer,
         timestamp: new Date(),
+        actionData: data.data,
       }]);
     } catch {
       setMessages((prev) => [...prev, {
@@ -225,6 +251,7 @@ const AIAssistantPage: React.FC = () => {
           role: 'assistant',
           content: data.answer,
           timestamp: new Date(),
+          actionData: data.data,
           isError:
             isAiUploadErrorIntent(data.intent) ||
             isAiVisionFailureIntent(data.intent) ||
@@ -272,6 +299,7 @@ const AIAssistantPage: React.FC = () => {
           content: data.answer,
           timestamp: new Date(),
           pendingAction: data.pendingAction,
+          actionData: data.data,
         }]);
         return;
       }
@@ -283,6 +311,7 @@ const AIAssistantPage: React.FC = () => {
         role: 'assistant',
         content: authHint ?? data.answer,
         timestamp: new Date(),
+        actionData: data.data,
         isError: isAiUnavailableIntent(data.intent) || isAiAuthIntent(data.intent),
       };
       setMessages((prev) => [...prev, assistantMessage]);
@@ -405,6 +434,15 @@ const AIAssistantPage: React.FC = () => {
                     className="mt-3 w-full px-3 py-2 text-xs font-semibold rounded-xl bg-orange-500/90 hover:bg-orange-600 text-white disabled:opacity-50"
                   >
                     Confirm: {msg.pendingAction.description}
+                  </button>
+                )}
+                {msg.actionData?.download && (
+                  <button
+                    type="button"
+                    onClick={() => void downloadAiFile(msg.actionData!.download!)}
+                    className="mt-3 w-full px-3 py-2 text-xs font-semibold rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white"
+                  >
+                    {msg.actionData.download.label}
                   </button>
                 )}
                 <p
