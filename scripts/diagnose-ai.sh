@@ -80,6 +80,7 @@ FALLBACK_MODEL="$(read_merged_env OPENAI_FALLBACK_MODEL)"
 ATOMESUS_KEY="$(read_merged_env ATOMESUS_API_KEY)"
 ATOMESUS_BASE_URL="$(read_merged_env ATOMESUS_BASE_URL)"
 ATOMESUS_MODEL="$(read_merged_env ATOMESUS_MODEL)"
+ATOMESUS_VISION_MODEL="$(read_merged_env ATOMESUS_VISION_MODEL)"
 
 probe_provider() {
   local label="$1" key="$2" url="$3" model="$4"
@@ -98,6 +99,11 @@ probe_provider() {
 probe_provider "primary" "$PRIMARY_KEY" "$BASE_URL" "$MODEL"
 probe_provider "fallback" "$FALLBACK_KEY" "$FALLBACK_URL" "$FALLBACK_MODEL"
 probe_provider "atomesus" "$ATOMESUS_KEY" "${ATOMESUS_BASE_URL:-https://api.atomesus.com/v1}" "${ATOMESUS_MODEL:-cipher}"
+if [[ -n "$ATOMESUS_VISION_MODEL" ]]; then
+  echo "  INFO atomesus vision model configured: ${ATOMESUS_VISION_MODEL}"
+else
+  echo "  INFO atomesus vision model not configured; image reading uses OpenRouter/OpenAI vision only"
+fi
 
 echo "==> Done. Fix FAIL from verify-secrets, then: bash scripts/restart-api.sh"
 echo "    Live probe: AI_PROBE=1 bash scripts/diagnose-ai.sh"

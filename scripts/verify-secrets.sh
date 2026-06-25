@@ -95,6 +95,7 @@ FALLBACK_MODEL="$(read_merged_env OPENAI_FALLBACK_MODEL)"
 ATOMESUS_KEY="$(read_merged_env ATOMESUS_API_KEY)"
 ATOMESUS_BASE_URL="$(read_merged_env ATOMESUS_BASE_URL)"
 ATOMESUS_MODEL="$(read_merged_env ATOMESUS_MODEL)"
+ATOMESUS_VISION_MODEL="$(read_merged_env ATOMESUS_VISION_MODEL)"
 VISION_MODEL="$(read_merged_env VISION_MODEL)"
 
 echo "--- AI (Groq / OpenRouter / Atomesus) ---"
@@ -136,6 +137,11 @@ if is_real_key "$ATOMESUS_KEY"; then
   echo "OK   ATOMESUS_API_KEY is set (third backup)"
   echo "OK   ATOMESUS_BASE_URL=${ATOMESUS_BASE_URL:-https://api.atomesus.com/v1}"
   echo "OK   ATOMESUS_MODEL=${ATOMESUS_MODEL:-cipher}"
+  if [[ -n "$ATOMESUS_VISION_MODEL" ]]; then
+    echo "OK   ATOMESUS_VISION_MODEL=$ATOMESUS_VISION_MODEL (image upload backup)"
+  else
+    echo "INFO ATOMESUS_VISION_MODEL unset — Atomesus is text-chat backup only"
+  fi
 else
   echo "INFO ATOMESUS_API_KEY not set — optional third backup"
 fi

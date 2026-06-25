@@ -10,6 +10,7 @@ import { asyncHandler } from '../middleware/asyncHandler';
 import {
   formatProviderError,
   getMissingAIKeyMessage,
+  hasAtomesusAIKey,
   hasFallbackAIKey,
   hasPrimaryAIKey,
   getVisionClientConfigs,
@@ -387,7 +388,7 @@ aiRouter.post('/query-with-image', aiUploadMiddleware(aiUpload, 'images', 4), as
       image_url: { url: `data:${file.mimetype};base64,${file.buffer.toString('base64')}` },
     }));
 
-    if (!hasPrimaryAIKey() && !hasFallbackAIKey()) {
+    if (!hasPrimaryAIKey() && !hasFallbackAIKey() && !hasAtomesusAIKey()) {
       throw new AppError(503, 'CONFIG_ERROR', getMissingAIKeyMessage());
     }
 
@@ -396,7 +397,7 @@ aiRouter.post('/query-with-image', aiUploadMiddleware(aiUpload, 'images', 4), as
       throw new AppError(
         503,
         'CONFIG_ERROR',
-        'Image analysis requires OPENAI_API_KEY or OPENAI_FALLBACK_KEY (OpenRouter) with VISION_MODEL set on the server.',
+        'Image analysis requires OpenRouter/OpenAI with VISION_MODEL, or Atomesus with ATOMESUS_VISION_MODEL set to an image-capable model.',
       );
     }
 

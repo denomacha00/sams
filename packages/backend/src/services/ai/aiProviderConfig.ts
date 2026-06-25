@@ -57,6 +57,14 @@ export function resolveAtomesusChatModel(): string {
   return process.env.ATOMESUS_MODEL?.trim() || DEFAULT_ATOMESUS_MODEL;
 }
 
+/**
+ * Atomesus vision is opt-in because not every Atomesus model/account may accept
+ * OpenAI-style image_url content. Set this only after the provider confirms it.
+ */
+export function resolveAtomesusVisionModel(): string | null {
+  return process.env.ATOMESUS_VISION_MODEL?.trim() || null;
+}
+
 /** True when the value looks like a real provider key (not .env.example placeholders). */
 export function isRealProviderKey(value: string | undefined): boolean {
   const val = value?.trim();
@@ -100,6 +108,7 @@ export interface AIHealthSummary {
   model: string;
   fallbackModel: string;
   atomesusModel: string;
+  atomesusVisionModel: string | null;
   modelMismatch: boolean;
   secretsFilesHint: string;
 }
@@ -114,6 +123,7 @@ export function getAIHealthSummary(): AIHealthSummary {
     model: resolveChatModel(),
     fallbackModel: resolveFallbackChatModel(),
     atomesusModel: resolveAtomesusChatModel(),
+    atomesusVisionModel: resolveAtomesusVisionModel(),
     modelMismatch: isModelProviderMismatch(),
     secretsFilesHint: 'secrets/providers.env or packages/backend/.env.secrets',
   };
@@ -325,7 +335,8 @@ export function formatProviderError(...errors: unknown[]): string {
   ) {
     return (
       'Image analysis failed: the configured vision model may not support images on this provider. ' +
-      'Set VISION_MODEL=meta-llama/llama-4-scout-17b-16e-instruct with OpenRouter as primary or fallback, then restart the API.'
+      'Set VISION_MODEL=meta-llama/llama-4-scout-17b-16e-instruct with OpenRouter as primary/fallback, ' +
+      'or set ATOMESUS_VISION_MODEL to a confirmed Atomesus image-capable model, then restart the API.'
     );
   }
 
@@ -336,7 +347,7 @@ export function formatProviderError(...errors: unknown[]): string {
 export interface VisionClientConfig {
   client: OpenAI;
   model: string;
-  label: 'primary' | 'fallback';
+  label: 'primary' | 'fallback' | 'atomesus';
 }
 
 /**
@@ -379,6 +390,16 @@ export function getVisionClientConfigs(options?: { timeoutMs?: number }): Vision
       client: getOpenAIClient(timeout ? { timeoutMs: timeout } : undefined),
       model,
       label: 'primary',
+    });
+  }
+
+  const atomesusVisionModel = resolveAtomesusVisionModel();
+  const atomesusClient = atomesusVisionModel ? getAtomesusClient(timeout) : null;
+  if (atomesusClient && atomesusVisionModel) {
+    configs.push({
+      client: atomesusClient,
+      model: atomesusVisionModel,
+      label: 'atomesus',
     });
   }
 

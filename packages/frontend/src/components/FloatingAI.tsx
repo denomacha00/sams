@@ -78,10 +78,14 @@ const FloatingAI: React.FC = () => {
   // Image generation patterns
   const IMAGE_GEN_PATTERNS = [
     /^generate\s+(?:an?\s+)?image/i,
+    /^generate\s+(?:an?\s+)?(?:photo|picture)/i,
     /^draw\s+/i,
     /^show\s+me\s+a\s+picture/i,
     /^create\s+(?:an?\s+)?image/i,
+    /^create\s+(?:an?\s+)?(?:photo|picture)/i,
     /^make\s+(?:an?\s+)?image/i,
+    /^make\s+(?:me\s+)?(?:an?\s+)?(?:photo|picture)/i,
+    /^i\s+(?:want|need)\s+(?:an?\s+)?(?:.+\s+)?(?:photo|picture|image)\b/i,
   ];
 
   const isImageGenRequest = (text: string) => IMAGE_GEN_PATTERNS.some((p) => p.test(text.trim()));

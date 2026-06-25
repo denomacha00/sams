@@ -9,6 +9,7 @@ import {
   hasPrimaryAIKey,
   isModelProviderMismatch,
   isRealProviderKey,
+  resolveAtomesusVisionModel,
   resolveChatModel,
   resolveVisionModel,
 } from './aiProviderConfig';
@@ -99,9 +100,28 @@ describe('aiProviderConfig', () => {
     expect(configs.some((c) => c.label === 'fallback')).toBe(false);
   });
 
+  it('adds Atomesus as a vision backup only when a vision model is configured', () => {
+    process.env.ATOMESUS_API_KEY = 'atms_sk_real_key_1234567890';
+    process.env.ATOMESUS_VISION_MODEL = 'cipher-vision';
+
+    expect(resolveAtomesusVisionModel()).toBe('cipher-vision');
+    const configs = getVisionClientConfigs();
+    expect(configs.some((c) => c.label === 'atomesus' && c.model === 'cipher-vision')).toBe(true);
+  });
+
+  it('does not treat Atomesus text backup as image-capable without ATOMESUS_VISION_MODEL', () => {
+    process.env.ATOMESUS_API_KEY = 'atms_sk_real_key_1234567890';
+    delete process.env.ATOMESUS_VISION_MODEL;
+
+    expect(resolveAtomesusVisionModel()).toBeNull();
+    const configs = getVisionClientConfigs();
+    expect(configs.some((c) => c.label === 'atomesus')).toBe(false);
+  });
+
   it('formats vision-related provider errors', () => {
     const msg = formatProviderError(new Error('Model does not support image input'));
     expect(msg).toContain('VISION_MODEL');
+    expect(msg).toContain('ATOMESUS_VISION_MODEL');
   });
 
   it('extracts HTTP status from API errors', () => {

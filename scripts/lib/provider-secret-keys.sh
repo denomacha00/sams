@@ -12,6 +12,7 @@ provider_secret_keys() {
     ATOMESUS_API_KEY \
     ATOMESUS_BASE_URL \
     ATOMESUS_MODEL \
+    ATOMESUS_VISION_MODEL \
     VISION_MODEL \
     AT_API_KEY \
     AT_USERNAME \
