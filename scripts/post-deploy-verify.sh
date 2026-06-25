@@ -111,6 +111,7 @@ if [[ -n "$HEALTH" ]]; then
       if(ai.configured) console.log('       ai: configured | model:', ai.model||'(unknown)');
       else console.log('       ai: not configured (set OPENAI_* in secrets/providers.env)');
       if(ai.fallbackKey) console.log('       ai: fallback key present');
+      if(ai.atomesusKey) console.log('       ai: Atomesus backup key present');
       if(ai.modelMismatch) console.log('       ai: MODEL MISMATCH — fix OPENAI_MODEL vs provider URL');
     } else console.log('       ai: unknown (stale backend — redeploy)');
   " 2>/dev/null || true

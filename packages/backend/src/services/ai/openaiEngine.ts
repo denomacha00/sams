@@ -4,9 +4,11 @@ import { type AccessTokenPayload, UserRole } from '@sams/shared';
 import {
   extractProviderErrorText,
   formatProviderError,
+  getAtomesusClient,
   getFallbackClient,
   getOpenAIClient,
   resolveChatModel,
+  resolveAtomesusChatModel,
   resolveFallbackChatModel,
 } from './aiProviderConfig';
 import { buildRoleActionsPromptSection, buildRoleCapabilityMatrix } from './roleActionsPrompt';
@@ -43,6 +45,60 @@ function readBoundedIntEnv(name: string, fallback: number, min: number, max: num
 const MAX_CHAT_INPUT_TOKENS = readBoundedIntEnv('AI_MAX_INPUT_TOKENS', 8_000, 1_000, 16_000);
 const MIN_HISTORY_TOKENS = readBoundedIntEnv('AI_MIN_HISTORY_TOKENS', 1_200, 0, 4_000);
 const CHAT_MAX_TOKENS = readBoundedIntEnv('AI_MAX_TOKENS', 300, 50, 1_500);
+
+async function tryBackupChatProviders(
+  messages: OpenAI.Chat.Completions.ChatCompletionMessageParam[],
+  primaryErr: unknown,
+): Promise<OpenAIQueryResult> {
+  let fallbackErr: unknown;
+  const fallback = getFallbackClient();
+  if (fallback) {
+    try {
+      const fallbackResponse = await fallback.chat.completions.create({
+        model: resolveFallbackChatModel(),
+        messages,
+        temperature: 0.3,
+        max_tokens: CHAT_MAX_TOKENS,
+      });
+
+      const fallbackAnswer = fallbackResponse.choices[0]?.message?.content;
+      if (fallbackAnswer) {
+        return { answer: fallbackAnswer, intent: 'openai_response' };
+      }
+    } catch (err) {
+      fallbackErr = err;
+      console.error('[AI/Fallback] Also failed:', extractProviderErrorText(err));
+    }
+  }
+
+  const atomesus = getAtomesusClient();
+  if (atomesus) {
+    try {
+      const atomesusResponse = await atomesus.chat.completions.create({
+        model: resolveAtomesusChatModel(),
+        messages,
+        temperature: 0.3,
+        max_tokens: CHAT_MAX_TOKENS,
+      });
+
+      const atomesusAnswer = atomesusResponse.choices[0]?.message?.content;
+      if (atomesusAnswer) {
+        return { answer: atomesusAnswer, intent: 'openai_response' };
+      }
+    } catch (err) {
+      console.error('[AI/Atomesus] Also failed:', extractProviderErrorText(err));
+      return {
+        answer: formatProviderError(primaryErr, fallbackErr, err),
+        intent: 'ai_error',
+      };
+    }
+  }
+
+  return {
+    answer: fallbackErr ? formatProviderError(primaryErr, fallbackErr) : formatProviderError(primaryErr),
+    intent: 'ai_error',
+  };
+}
 
 function truncateForPrompt(value: string, maxChars: number): string {
   const trimmed = value.trim();
@@ -744,35 +800,7 @@ export async function openaiQuery(
     };
   } catch (err) {
     console.error('[AI/Primary] Error, trying fallback:', (err as Error).message);
-
-    // Try fallback provider (OpenRouter)
-    const fallback = getFallbackClient();
-    if (fallback) {
-      try {
-        const fallbackResponse = await fallback.chat.completions.create({
-          model: resolveFallbackChatModel(),
-          messages,
-          temperature: 0.3,
-          max_tokens: CHAT_MAX_TOKENS,
-        });
-
-        const fallbackAnswer = fallbackResponse.choices[0]?.message?.content;
-        if (fallbackAnswer) {
-          return { answer: fallbackAnswer, intent: 'openai_response' };
-        }
-      } catch (fallbackErr) {
-        console.error('[AI/Fallback] Also failed:', extractProviderErrorText(fallbackErr));
-        return {
-          answer: formatProviderError(err, fallbackErr),
-          intent: 'ai_error',
-        };
-      }
-    }
-
-    return {
-      answer: formatProviderError(err),
-      intent: 'ai_error',
-    };
+    return tryBackupChatProviders(messages, err);
   }
 }
 
@@ -817,34 +845,6 @@ export async function openaiQueryWithHistory(
     };
   } catch (err) {
     console.error('[AI/Primary] Error with history, trying fallback:', (err as Error).message);
-
-    // Try fallback provider (OpenRouter)
-    const fallback = getFallbackClient();
-    if (fallback) {
-      try {
-        const fallbackResponse = await fallback.chat.completions.create({
-          model: resolveFallbackChatModel(),
-          messages,
-          temperature: 0.3,
-          max_tokens: CHAT_MAX_TOKENS,
-        });
-
-        const fallbackAnswer = fallbackResponse.choices[0]?.message?.content;
-        if (fallbackAnswer) {
-          return { answer: fallbackAnswer, intent: 'openai_response' };
-        }
-      } catch (fallbackErr) {
-        console.error('[AI/Fallback] Also failed:', extractProviderErrorText(fallbackErr));
-        return {
-          answer: formatProviderError(err, fallbackErr),
-          intent: 'ai_error',
-        };
-      }
-    }
-
-    return {
-      answer: formatProviderError(err),
-      intent: 'ai_error',
-    };
+    return tryBackupChatProviders(messages, err);
   }
 }

@@ -12,6 +12,8 @@ export const DEFAULT_GROQ_CHAT_MODEL = 'llama-3.3-70b-versatile';
 export const DEFAULT_OPENAI_CHAT_MODEL = 'gpt-4o-mini';
 export const DEFAULT_OPENROUTER_BASE_URL = 'https://openrouter.ai/api/v1';
 export const DEFAULT_OPENROUTER_FALLBACK_MODEL = 'meta-llama/llama-3.1-8b-instruct:free';
+export const DEFAULT_ATOMESUS_BASE_URL = 'https://api.atomesus.com/v1';
+export const DEFAULT_ATOMESUS_MODEL = 'cipher';
 /** OpenRouter / Groq multimodal model (must differ from text-only chat models). */
 export const DEFAULT_VISION_MODEL = 'meta-llama/llama-4-scout-17b-16e-instruct';
 
@@ -51,6 +53,10 @@ export function resolveFallbackChatModel(): string {
   return DEPRECATED_MODEL_MIGRATIONS[configured] ?? configured;
 }
 
+export function resolveAtomesusChatModel(): string {
+  return process.env.ATOMESUS_MODEL?.trim() || DEFAULT_ATOMESUS_MODEL;
+}
+
 /** True when the value looks like a real provider key (not .env.example placeholders). */
 export function isRealProviderKey(value: string | undefined): boolean {
   const val = value?.trim();
@@ -58,6 +64,7 @@ export function isRealProviderKey(value: string | undefined): boolean {
   if (val.includes('your-')) return false;
   if (val.startsWith('gsk_your')) return false;
   if (val.startsWith('sk-or-v1-your')) return false;
+  if (val.startsWith('atms_sk_YOUR')) return false;
   return true;
 }
 
@@ -67,6 +74,10 @@ export function hasPrimaryAIKey(): boolean {
 
 export function hasFallbackAIKey(): boolean {
   return isRealProviderKey(process.env.OPENAI_FALLBACK_KEY);
+}
+
+export function hasAtomesusAIKey(): boolean {
+  return isRealProviderKey(process.env.ATOMESUS_API_KEY);
 }
 
 /** gpt-4o-mini (and other OpenAI IDs) fail on Groq — common VPS misconfiguration. */
@@ -84,21 +95,25 @@ export interface AIHealthSummary {
   configured: boolean;
   primaryKey: boolean;
   fallbackKey: boolean;
+  atomesusKey: boolean;
   baseURL: string;
   model: string;
   fallbackModel: string;
+  atomesusModel: string;
   modelMismatch: boolean;
   secretsFilesHint: string;
 }
 
 export function getAIHealthSummary(): AIHealthSummary {
   return {
-    configured: hasPrimaryAIKey(),
+    configured: hasPrimaryAIKey() || hasFallbackAIKey() || hasAtomesusAIKey(),
     primaryKey: hasPrimaryAIKey(),
     fallbackKey: hasFallbackAIKey(),
+    atomesusKey: hasAtomesusAIKey(),
     baseURL: getPrimaryBaseURL(),
     model: resolveChatModel(),
     fallbackModel: resolveFallbackChatModel(),
+    atomesusModel: resolveAtomesusChatModel(),
     modelMismatch: isModelProviderMismatch(),
     secretsFilesHint: 'secrets/providers.env or packages/backend/.env.secrets',
   };
@@ -109,12 +124,12 @@ export function getAIHealthSummary(): AIHealthSummary {
  */
 export async function probeAIProvider(timeoutMs = 15000): Promise<{
   ok: boolean;
-  provider: 'primary' | 'fallback' | 'none';
+  provider: 'primary' | 'fallback' | 'atomesus' | 'none';
   model?: string;
   error?: string;
 }> {
-  if (!hasPrimaryAIKey()) {
-    return { ok: false, provider: 'none', error: 'OPENAI_API_KEY missing or placeholder' };
+  if (!hasPrimaryAIKey() && !hasFallbackAIKey() && !hasAtomesusAIKey()) {
+    return { ok: false, provider: 'none', error: 'No AI provider key configured' };
   }
   if (isModelProviderMismatch()) {
     return {
@@ -127,46 +142,66 @@ export async function probeAIProvider(timeoutMs = 15000): Promise<{
   const messages: OpenAI.Chat.Completions.ChatCompletionMessageParam[] = [
     { role: 'user', content: 'Reply with exactly: ok' },
   ];
+  const errors: string[] = [];
 
-  try {
-    const client = getOpenAIClient({ timeoutMs });
-    const response = await client.chat.completions.create({
-      model: resolveChatModel(),
-      messages,
-      max_tokens: 8,
-      temperature: 0,
-    });
-    const text = response.choices[0]?.message?.content?.trim();
-    if (text) {
-      return { ok: true, provider: 'primary', model: resolveChatModel() };
-    }
-  } catch (err) {
-    const primaryMsg = (err as Error).message;
-    const fallback = getFallbackClient();
-    if (fallback) {
-      try {
-        const fb = await fallback.chat.completions.create({
-          model: resolveFallbackChatModel(),
-          messages,
-          max_tokens: 8,
-          temperature: 0,
-        });
-        const text = fb.choices[0]?.message?.content?.trim();
-        if (text) {
-          return { ok: true, provider: 'fallback', model: resolveFallbackChatModel() };
-        }
-      } catch (fallbackErr) {
-        return {
-          ok: false,
-          provider: 'primary',
-          error: `${primaryMsg}; fallback: ${(fallbackErr as Error).message}`,
-        };
+  if (hasPrimaryAIKey()) {
+    try {
+      const client = getOpenAIClient({ timeoutMs });
+      const response = await client.chat.completions.create({
+        model: resolveChatModel(),
+        messages,
+        max_tokens: 8,
+        temperature: 0,
+      });
+      const text = response.choices[0]?.message?.content?.trim();
+      if (text) {
+        return { ok: true, provider: 'primary', model: resolveChatModel() };
       }
+      errors.push('primary: empty response');
+    } catch (err) {
+      errors.push(`primary: ${(err as Error).message}`);
     }
-    return { ok: false, provider: 'primary', error: primaryMsg };
   }
 
-  return { ok: false, provider: 'primary', error: 'Empty response from provider' };
+  const fallback = getFallbackClient();
+  if (fallback) {
+    try {
+      const fb = await fallback.chat.completions.create({
+        model: resolveFallbackChatModel(),
+        messages,
+        max_tokens: 8,
+        temperature: 0,
+      });
+      const text = fb.choices[0]?.message?.content?.trim();
+      if (text) {
+        return { ok: true, provider: 'fallback', model: resolveFallbackChatModel() };
+      }
+      errors.push('fallback: empty response');
+    } catch (fallbackErr) {
+      errors.push(`fallback: ${(fallbackErr as Error).message}`);
+    }
+  }
+
+  const atomesus = getAtomesusClient(timeoutMs);
+  if (atomesus) {
+    try {
+      const at = await atomesus.chat.completions.create({
+        model: resolveAtomesusChatModel(),
+        messages,
+        max_tokens: 8,
+        temperature: 0,
+      });
+      const text = at.choices[0]?.message?.content?.trim();
+      if (text) {
+        return { ok: true, provider: 'atomesus', model: resolveAtomesusChatModel() };
+      }
+      errors.push('atomesus: empty response');
+    } catch (atomesusErr) {
+      errors.push(`atomesus: ${(atomesusErr as Error).message}`);
+    }
+  }
+
+  return { ok: false, provider: 'none', error: errors.join('; ') || 'Empty response from provider' };
 }
 
 export function getMissingAIKeyMessage(): string {
@@ -246,7 +281,7 @@ export function formatProviderError(...errors: unknown[]): string {
     lower.includes('over capacity') ||
     lower.includes('too many requests')
   ) {
-    return 'The AI service is rate-limited. Wait a moment and try again, or ask your administrator to add OPENAI_FALLBACK_KEY (OpenRouter).';
+    return 'The AI service is rate-limited. Wait a moment and try again, or ask your administrator to add OPENAI_FALLBACK_KEY or ATOMESUS_API_KEY.';
   }
   if (
     lower.includes('timeout') ||
@@ -270,11 +305,11 @@ export function formatProviderError(...errors: unknown[]): string {
   ) {
     return (
       'The AI provider is temporarily down. Wait a moment and try again, or ask your administrator to configure ' +
-      'OPENAI_FALLBACK_KEY (OpenRouter) as backup in secrets/providers.env.'
+      'OPENAI_FALLBACK_KEY or ATOMESUS_API_KEY as backup in secrets/providers.env.'
     );
   }
   if (lower.includes('quota') || lower.includes('insufficient') || lower.includes('billing') || lower.includes('credits')) {
-    return 'The AI provider quota is exhausted. Update billing or switch OPENAI_BASE_URL / OPENAI_FALLBACK_KEY on the server.';
+    return 'The AI provider quota is exhausted. Update billing or switch OPENAI_BASE_URL / OPENAI_FALLBACK_KEY / ATOMESUS_API_KEY on the server.';
   }
   if (lower.includes('context_length') || lower.includes('maximum context') || lower.includes('token limit')) {
     return 'The AI context was too large for the configured model after loading SAMS docs/history. The server trims this automatically; try again, or ask a shorter follow-up.';
@@ -400,4 +435,15 @@ export function getFallbackClient(): OpenAI | null {
   if (!apiKey) return null;
   const baseURL = process.env.OPENAI_FALLBACK_URL?.trim() || DEFAULT_OPENROUTER_BASE_URL;
   return new OpenAI({ apiKey, baseURL });
+}
+
+export function getAtomesusClient(timeoutMs?: number): OpenAI | null {
+  const apiKey = process.env.ATOMESUS_API_KEY?.trim();
+  if (!isRealProviderKey(apiKey)) return null;
+  const baseURL = process.env.ATOMESUS_BASE_URL?.trim() || DEFAULT_ATOMESUS_BASE_URL;
+  return new OpenAI({
+    apiKey: apiKey!,
+    baseURL,
+    ...(timeoutMs ? { timeout: timeoutMs } : {}),
+  });
 }

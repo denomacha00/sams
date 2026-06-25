@@ -26,6 +26,7 @@ DEPRECATED_MODELS=(
 
 mask_line() {
   sed -E 's/(OPENAI_(API|FALLBACK)_KEY=).*/\1***masked***/' \
+    | sed -E 's/(ATOMESUS_API_KEY=).*/\1***masked***/' \
     | sed -E 's/(AT_API_KEY=).*/\1***masked***/' \
     | sed -E 's/(SMTP_PASS=).*/\1***masked***/' \
     | sed -E 's/(MPESA_(CONSUMER_)?SECRET=).*/\1***masked***/' \
@@ -91,9 +92,12 @@ MODEL="$(read_merged_env OPENAI_MODEL)"
 FALLBACK_KEY="$(read_merged_env OPENAI_FALLBACK_KEY)"
 FALLBACK_URL="$(read_merged_env OPENAI_FALLBACK_URL)"
 FALLBACK_MODEL="$(read_merged_env OPENAI_FALLBACK_MODEL)"
+ATOMESUS_KEY="$(read_merged_env ATOMESUS_API_KEY)"
+ATOMESUS_BASE_URL="$(read_merged_env ATOMESUS_BASE_URL)"
+ATOMESUS_MODEL="$(read_merged_env ATOMESUS_MODEL)"
 VISION_MODEL="$(read_merged_env VISION_MODEL)"
 
-echo "--- AI (Groq / OpenRouter) ---"
+echo "--- AI (Groq / OpenRouter / Atomesus) ---"
 if is_real_key "$PRIMARY_KEY"; then
   echo "OK   OPENAI_API_KEY is set (effective merged env)"
 else
@@ -126,6 +130,14 @@ if is_real_key "$FALLBACK_KEY"; then
   fi
 else
   echo "INFO OPENAI_FALLBACK_KEY not set — optional"
+fi
+
+if is_real_key "$ATOMESUS_KEY"; then
+  echo "OK   ATOMESUS_API_KEY is set (third backup)"
+  echo "OK   ATOMESUS_BASE_URL=${ATOMESUS_BASE_URL:-https://api.atomesus.com/v1}"
+  echo "OK   ATOMESUS_MODEL=${ATOMESUS_MODEL:-cipher}"
+else
+  echo "INFO ATOMESUS_API_KEY not set — optional third backup"
 fi
 
 if [[ -n "$VISION_MODEL" ]]; then
@@ -320,9 +332,9 @@ fi
 echo ""
 echo "==> Configured provider lines (masked, all sources):"
 {
-  grep -E '^(OPENAI_|VISION_MODEL=|CONVERSATION_MASTER_KEY=|AT_|SMTP_|MPESA_CONSUMER_|MPESA_PASSKEY=|JWT_|QR_SECRET=|LICENSE_SECRET=)' "$ENV_FILE" 2>/dev/null || true
+  grep -E '^(OPENAI_|ATOMESUS_|VISION_MODEL=|CONVERSATION_MASTER_KEY=|AT_|SMTP_|MPESA_CONSUMER_|MPESA_PASSKEY=|JWT_|QR_SECRET=|LICENSE_SECRET=)' "$ENV_FILE" 2>/dev/null || true
   while IFS= read -r f; do
-    [[ -f "$f" ]] && grep -E '^(OPENAI_|VISION_MODEL=|CONVERSATION_MASTER_KEY=|AT_|SMTP_|MPESA_CONSUMER_|MPESA_PASSKEY=|JWT_|QR_SECRET=|LICENSE_SECRET=)' "$f" 2>/dev/null || true
+    [[ -f "$f" ]] && grep -E '^(OPENAI_|ATOMESUS_|VISION_MODEL=|CONVERSATION_MASTER_KEY=|AT_|SMTP_|MPESA_CONSUMER_|MPESA_PASSKEY=|JWT_|QR_SECRET=|LICENSE_SECRET=)' "$f" 2>/dev/null || true
   done < <(merged_env_secrets_paths)
 } | mask_line | sort -u || echo "    (no matching lines)"
 

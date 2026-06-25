@@ -19,7 +19,8 @@ MERGED_ENV_ROOT="$ROOT"
 MERGED_ENV_FILE="${ROOT}/packages/backend/.env"
 
 mask_line() {
-  sed -E 's/(OPENAI_(API|FALLBACK)_KEY=).*/\1***masked***/'
+  sed -E 's/(OPENAI_(API|FALLBACK)_KEY=).*/\1***masked***/' \
+    | sed -E 's/(ATOMESUS_API_KEY=).*/\1***masked***/'
 }
 
 echo "==> SAMS AI diagnostics ($(date -Iseconds))"
@@ -31,7 +32,7 @@ echo ""
 
 echo "==> 2) PM2 logs (last 80 lines)"
 if command -v pm2 >/dev/null 2>&1; then
-  pm2 logs sams-api --lines 80 --nostream 2>/dev/null | grep -E '\[AI|\[STARTUP\]|OPENAI|Groq|OpenRouter|rate|401|429|model' || pm2 logs sams-api --lines 80 --nostream 2>/dev/null || true
+  pm2 logs sams-api --lines 80 --nostream 2>/dev/null | grep -E '\[AI|\[STARTUP\]|OPENAI|ATOMESUS|Atomesus|Groq|OpenRouter|rate|401|429|model' || pm2 logs sams-api --lines 80 --nostream 2>/dev/null || true
 else
   echo "  pm2 not in PATH"
 fi
@@ -39,11 +40,11 @@ echo ""
 
 echo "==> 3) Provider env lines (masked)"
 {
-  grep -E '^(OPENAI_|VISION_MODEL=)' "${ROOT}/packages/backend/.env" 2>/dev/null || true
+  grep -E '^(OPENAI_|ATOMESUS_|VISION_MODEL=)' "${ROOT}/packages/backend/.env" 2>/dev/null || true
   while IFS= read -r f; do
-    [[ -f "$f" ]] && grep -E '^(OPENAI_|VISION_MODEL=)' "$f" 2>/dev/null || true
+    [[ -f "$f" ]] && grep -E '^(OPENAI_|ATOMESUS_|VISION_MODEL=)' "$f" 2>/dev/null || true
   done < <(merged_env_secrets_paths)
-} | mask_line | sort -u || echo "  (no OPENAI_* lines found)"
+} | mask_line | sort -u || echo "  (no AI provider lines found)"
 echo ""
 
 echo "==> 4) GET ${API}/health (ai config)"
@@ -76,6 +77,9 @@ MODEL="$(read_merged_env OPENAI_MODEL)"
 FALLBACK_KEY="$(read_merged_env OPENAI_FALLBACK_KEY)"
 FALLBACK_URL="$(read_merged_env OPENAI_FALLBACK_URL)"
 FALLBACK_MODEL="$(read_merged_env OPENAI_FALLBACK_MODEL)"
+ATOMESUS_KEY="$(read_merged_env ATOMESUS_API_KEY)"
+ATOMESUS_BASE_URL="$(read_merged_env ATOMESUS_BASE_URL)"
+ATOMESUS_MODEL="$(read_merged_env ATOMESUS_MODEL)"
 
 probe_provider() {
   local label="$1" key="$2" url="$3" model="$4"
@@ -93,6 +97,7 @@ probe_provider() {
 
 probe_provider "primary" "$PRIMARY_KEY" "$BASE_URL" "$MODEL"
 probe_provider "fallback" "$FALLBACK_KEY" "$FALLBACK_URL" "$FALLBACK_MODEL"
+probe_provider "atomesus" "$ATOMESUS_KEY" "${ATOMESUS_BASE_URL:-https://api.atomesus.com/v1}" "${ATOMESUS_MODEL:-cipher}"
 
 echo "==> Done. Fix FAIL from verify-secrets, then: bash scripts/restart-api.sh"
 echo "    Live probe: AI_PROBE=1 bash scripts/diagnose-ai.sh"
