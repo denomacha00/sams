@@ -262,7 +262,19 @@ bash scripts/restart-api.sh
 ### Symptom: AI talks but won't execute actions (suspend/unsuspend)
 
 - Use explicit commands: `unsuspend school [name]`, `suspend school [name]`
-- For a safe live overview, ask Super Admin AI: `run system readiness check` or `check system`. It reads database/config signals and does not run shell commands.
+- For a safe live overview, ask Super Admin AI: `run system readiness check` or `check system`. It reads database/config signals.
+- For live platform database counts, use Super Admin AI: `@db`.
+- For VPS/server operations from the Super Admin portal, start with `@`. Supported safe operations:
+  - `@status` — PM2 process status
+  - `@logs` — last SAMS API logs
+  - `@verify` — `scripts/post-deploy-verify.sh`
+  - `@diagnose-ai` — `scripts/diagnose-ai.sh`
+  - `@traffic` — light traffic readiness check
+  - `@restart-api` — restart `sams-api`
+  - `@git-status` — git branch/changed files
+  - `@git-pull` — pull latest `main`
+  - `@deploy` — run `scripts/deploy-production.sh`
+- `@` terminal operations are allowlisted, Super Admin only, and confirmed before execution. Raw shell is blocked; do not ask AI to print `.env`, provider keys, JWT secrets, database passwords, or other secrets.
 - Destructive actions need reply **yes**
 - Super Admin only for platform actions
 - School AI actions are role-scoped: HOD/teacher attendance actions only work inside their allowed timetable/session scope, and notification actions are in-app only.

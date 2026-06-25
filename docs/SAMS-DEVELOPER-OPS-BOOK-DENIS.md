@@ -803,20 +803,47 @@ Endpoint: `POST /api/v1/ai/query-with-image` (`routes/ai.ts`)
 - Merged into prompt after system docs
 - Category `ops` for runbook excerpts (manual supplement)
 
-### 9.6 Super Admin vs school AI
+### 9.6 Super Admin `@` command center
+
+Super Admin AI can run approved VPS/server operations from `super.smart-managment.com` when the message starts with `@`. This is not a raw terminal. It is an allowlist in `packages/backend/src/services/superAdminTerminalOps.ts`, exposed through the `run_terminal_command` role action in `services/ai/handlers/superAdminHandlers.ts`, then executed by `AIService.executeAction()` with the normal confirmation and audit path.
+
+Supported commands:
+
+| AI command | Server operation |
+|------------|------------------|
+| `@db` | Safe Prisma database overview: schools, users, sessions, today's attendance, notifications, AI memory, audit count |
+| `@status` | `pm2 status` |
+| `@logs` | `pm2 logs sams-api --lines 120 --nostream` |
+| `@verify` | `bash scripts/post-deploy-verify.sh` |
+| `@diagnose-ai` | `bash scripts/diagnose-ai.sh` |
+| `@traffic` | `REQUESTS=800 CONCURRENCY=40 bash scripts/traffic-readiness-check.sh` |
+| `@restart-api` | `bash scripts/restart-api.sh` |
+| `@git-status` | `git status --short --branch` |
+| `@git-pull` | `git pull origin main` |
+| `@deploy` | `bash scripts/deploy-production.sh` |
+
+Safety rules:
+
+- Only `SUPER_ADMIN` has the action in `roleActionRegistry`.
+- Server operations require the `@` prefix and confirmation before execution.
+- Unknown/raw shell commands are blocked (`@rm -rf`, `@cat secrets/providers.env`, arbitrary `bash -c`, etc.).
+- Output is truncated and must not expose `.env`, provider keys, JWT secrets, database passwords, or other credentials.
+- If PM2 starts the API from a different working directory, set `SAMS_ROOT=/var/www/sams` in the backend env so the runner uses the correct repo root.
+
+### 9.7 Super Admin vs school AI
 
 | Panel | URL | Scope |
 |-------|-----|-------|
-| Super Admin AI | super.smart-managment.com | All schools, licenses, suspend, system stats, safe readiness diagnostics |
+| Super Admin AI | super.smart-managment.com | All schools, licenses, suspend, system stats, safe readiness diagnostics, `@db`, and approved `@` server operations |
 | School AI | app.smart-managment.com | Single school; no platform actions |
 
-### 9.7 Conversation memory
+### 9.8 Conversation memory
 
 Requires `CONVERSATION_MASTER_KEY` (32+ chars) in `providers.env`. Without it, encrypted thread memory disabled (warn at startup).
 
 Frontend thread ids are stored per signed-in account (`schoolId:userId`) so switching between Super Admin, staff, and student accounts in one browser does not mix conversation memory.
 
-### 9.8 School AI role actions
+### 9.9 School AI role actions
 
 School AI action execution is centralized in `services/ai/roleActionRegistry.ts` and routed through `AIService.executeAction()`, so route/service RBAC is still the final authority.
 

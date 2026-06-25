@@ -510,7 +510,11 @@ Can execute via natural language:
 - Extend licenses
 - Get school info
 - Get system statistics
-- Run a safe system readiness diagnostic from live database/configuration signals (AI config, memory, active/stale sessions, schools/users/licenses). It does not run arbitrary shell commands.
+- Run a safe system readiness diagnostic from live database/configuration signals (AI config, memory, active/stale sessions, schools/users/licenses).
+- Read a safe live database overview with `@db` (schools, users, active sessions, today's attendance records, notifications, AI memory threads, audit count).
+- Run allowlisted server operations from the Super Admin portal by starting the message with `@`. Supported commands: `@status`, `@logs`, `@verify`, `@diagnose-ai`, `@traffic`, `@restart-api`, `@git-status`, `@git-pull`, and `@deploy`.
+
+Super Admin `@` operations are deliberately not a raw shell. The backend maps each command to an approved script/command, requires confirmation for server operations, blocks arbitrary commands, and never exposes secrets such as `.env`, provider keys, JWT secrets, or database passwords.
 
 ### School AI Actions
 School AI is scoped to the logged-in role and school:
