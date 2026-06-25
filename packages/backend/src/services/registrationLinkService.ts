@@ -28,6 +28,7 @@ export interface RegisterViaLinkData {
   password: string;
   admissionNumber?: string;
   guardianStudentAdmission?: string;
+  subjects?: string[];
 }
 
 export interface AddStudentManuallyData {
@@ -277,6 +278,17 @@ export class RegistrationLinkService {
           guardianId: user.id,
           studentId: guardianStudentId,
         },
+      });
+    }
+
+    // Save teacher subjects if provided (TEACHER or HOD registering via link)
+    if (data.subjects?.length && (link.targetRole === UserRole.TEACHER || link.targetRole === UserRole.HOD)) {
+      await prisma.teacherSubject.createMany({
+        data: data.subjects.map((subject) => ({
+          schoolId: link.schoolId,
+          teacherId: user.id,
+          subject,
+        })),
       });
     }
 

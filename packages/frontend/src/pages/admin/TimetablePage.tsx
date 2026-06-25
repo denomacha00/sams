@@ -315,7 +315,7 @@ const TimetablePage: React.FC = () => {
       const roomsList = genRooms.split(',').map((r) => r.trim()).filter(Boolean);
       const { data } = await apiClient.post('/timetable/generate', {
         classIds: genClassIds,
-        remake: true,
+        remake: genRemake,
         periodDuration: getDurationMinutes(),
         startHour: genStartHour,
         rooms: roomsList,

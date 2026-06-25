@@ -23,6 +23,8 @@ const RegisterPage: React.FC = () => {
   const [admissionNumber, setAdmissionNumber] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
+  const [subjects, setSubjects] = useState<string[]>([]);
+  const [newSubject, setNewSubject] = useState('');
   const [loading, setLoading] = useState(false);
   const [resolving, setResolving] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -54,6 +56,7 @@ const RegisterPage: React.FC = () => {
 
   const isStudent = linkMeta?.targetRole === 'STUDENT';
   const isGuardian = linkMeta?.targetRole === 'GUARDIAN';
+  const isTeacherOrHod = linkMeta?.targetRole === 'TEACHER' || linkMeta?.targetRole === 'HOD';
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -69,6 +72,7 @@ const RegisterPage: React.FC = () => {
         password,
         admissionNumber: isStudent ? admissionNumber : undefined,
         guardianStudentAdmission: isGuardian ? admissionNumber : undefined,
+        subjects: isTeacherOrHod && subjects.length > 0 ? subjects : undefined,
       });
       setSuccess(true);
       // Store credentials for optional biometric enrollment
@@ -422,6 +426,72 @@ const RegisterPage: React.FC = () => {
                   className="w-full input-field placeholder-ink-subtle focus:outline-none focus:ring-2 focus:ring-brand/40/40 focus:border-brand transition-all"
                   placeholder="e.g. ADM/2024/001"
                 />
+              </div>
+            )}
+
+            {/* Teacher/HOD: skilled units/subjects for timetable generation */}
+            {isTeacherOrHod && (
+              <div>
+                <label className="block text-sm font-semibold text-ink-muted mb-1.5">
+                  Your skilled units/subjects
+                </label>
+                <div className="mb-3 p-3 rounded-xl bg-amber-500/15 border border-amber-400/20">
+                  <p className="text-xs text-amber-300">
+                    This helps the HOD auto-generate a fair timetable. Add only the units/subjects you can teach well, so SAMS does not assign you to the wrong lesson.
+                  </p>
+                </div>
+                <div className="flex gap-2 mb-3">
+                  <input
+                    type="text"
+                    value={newSubject}
+                    onChange={(e) => setNewSubject(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault();
+                        const trimmed = newSubject.trim();
+                        if (trimmed && !subjects.includes(trimmed)) {
+                          setSubjects([...subjects, trimmed]);
+                          setNewSubject('');
+                        }
+                      }
+                    }}
+                    className="w-full input-field placeholder-ink-subtle focus:outline-none focus:ring-2 focus:ring-brand/40 focus:border-brand transition-all"
+                    placeholder="e.g. Mathematics, Physics, Database Systems"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const trimmed = newSubject.trim();
+                      if (trimmed && !subjects.includes(trimmed)) {
+                        setSubjects([...subjects, trimmed]);
+                        setNewSubject('');
+                      }
+                    }}
+                    className="px-4 py-2.5 rounded-xl bg-surface-muted border border-line text-ink-muted hover:bg-surface-elevated text-sm transition-colors shrink-0"
+                  >
+                    Add
+                  </button>
+                </div>
+                {subjects.length > 0 && (
+                  <div className="flex flex-wrap gap-1.5">
+                    {subjects.map((s) => (
+                      <span
+                        key={s}
+                        className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-brand/20 text-brand"
+                      >
+                        {s}
+                        <button
+                          type="button"
+                          onClick={() => setSubjects(subjects.filter((x) => x !== s))}
+                          className="text-brand/70 hover:text-brand ml-0.5"
+                        >
+                          ×
+                        </button>
+                      </span>
+                    ))}
+                  </div>
+                )}
+                <p className="text-xs text-ink-subtle mt-1">{subjects.length} unit/subject{subjects.length === 1 ? '' : 's'} added</p>
               </div>
             )}
 

@@ -38,6 +38,7 @@ import AdminDashboardPage from './pages/admin/AdminDashboardPage';
 import UserManagementPage from './pages/admin/UserManagementPage';
 import RegistrationLinksPage from './pages/admin/RegistrationLinksPage';
 import TimetablePage from './pages/admin/TimetablePage';
+import TeacherSubjectsPage from './pages/admin/TeacherSubjectsPage';
 import DepartmentsPage from './pages/admin/DepartmentsPage';
 import KnowledgeManagementPage from './pages/admin/KnowledgeManagementPage';
 import ExamsPage from './pages/admin/ExamsPage';
@@ -113,6 +114,11 @@ ReactDOM.createRoot(document.getElementById('root') as HTMLElement).render(
               <Route path="/admin" element={<AdminDashboardPage />} />
               <Route path="/admin/users" element={<UserManagementPage />} />
               <Route path="/admin/timetable" element={<TimetablePage />} />
+            </Route>
+
+            {/* HOD timetable ownership */}
+            <Route element={<AuthGuard allowedRoles={[UserRole.HOD]} />}>
+              <Route path="/admin/teacher-subjects" element={<TeacherSubjectsPage />} />
             </Route>
 
             {/* Risk scores */}

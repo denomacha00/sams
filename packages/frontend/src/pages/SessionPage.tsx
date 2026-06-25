@@ -1243,6 +1243,7 @@ const SessionPage: React.FC = () => {
                     <UserAvatar
                       avatarUrl={record.studentAvatarUrl}
                       fullName={record.studentName}
+                      previewable
                       className="h-8 w-8 rounded-full shrink-0"
                     />
                     <div>

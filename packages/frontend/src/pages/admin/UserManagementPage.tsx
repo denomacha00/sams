@@ -351,6 +351,7 @@ const UserManagementPage: React.FC = () => {
                           <UserAvatar
                             avatarUrl={u.avatarUrl}
                             fullName={u.fullName}
+                            previewable
                             className="h-10 w-10 rounded-full"
                           />
                           <div className="min-w-0">

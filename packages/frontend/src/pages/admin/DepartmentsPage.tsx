@@ -356,6 +356,7 @@ const DepartmentsPage: React.FC = () => {
                               <UserAvatar
                                 avatarUrl={teacher.avatarUrl}
                                 fullName={teacher.fullName}
+                                previewable
                                 className="h-6 w-6 rounded-full"
                               />
                               <span className="text-xs text-indigo-200">{teacher.fullName}</span>

@@ -1,5 +1,6 @@
 import { Router, type Request, type Response } from 'express';
 import { z } from 'zod';
+import { UserRole } from '@sams/shared';
 import { prisma } from '../lib/prisma';
 import { requirePermission } from '../middleware/rbac';
 import { AppError } from '../middleware/errors';
@@ -17,8 +18,21 @@ export const teacherSubjectsRouter = Router();
  */
 teacherSubjectsRouter.get('/', requirePermission('manage:timetable'), async (req: Request, res: Response): Promise<void> => {
   try {
+    const teacherWhere = {
+      schoolId: req.schoolId,
+      role: { in: [UserRole.TEACHER, UserRole.HOD] },
+      ...(req.user.role === 'HOD' && req.user.departmentId ? { departmentId: req.user.departmentId } : {}),
+    };
+
+    const teachers = await prisma.user.findMany({
+      where: teacherWhere,
+      select: { id: true, fullName: true, departmentId: true },
+      orderBy: { fullName: 'asc' },
+    });
+    const teacherIds = teachers.map((teacher) => teacher.id);
+
     const rows = await prisma.teacherSubject.findMany({
-      where: { schoolId: req.schoolId },
+      where: { schoolId: req.schoolId, teacherId: { in: teacherIds } },
       include: { teacher: { select: { id: true, fullName: true, departmentId: true } } },
       orderBy: [{ teacher: { fullName: 'asc' } }, { subject: 'asc' }],
     });
@@ -35,8 +49,16 @@ teacherSubjectsRouter.get('/', requirePermission('manage:timetable'), async (req
       ...DEFAULT_SUBJECTS,
     ])].sort();
 
-    // Group by teacher
     const byTeacher = new Map<string, { id: string; fullName: string; departmentId: string | null; subjects: string[] }>();
+    for (const teacher of teachers) {
+      byTeacher.set(teacher.id, {
+        id: teacher.id,
+        fullName: teacher.fullName,
+        departmentId: teacher.departmentId,
+        subjects: [],
+      });
+    }
+
     for (const row of rows) {
       const existing = byTeacher.get(row.teacherId) ?? {
         id: row.teacherId,
@@ -82,7 +104,7 @@ teacherSubjectsRouter.put('/:teacherId', requirePermission('manage:timetable'), 
       where: { id: teacherId },
       select: { schoolId: true, role: true, departmentId: true },
     });
-    if (!teacher || teacher.schoolId !== req.schoolId || (teacher.role !== 'TEACHER' && teacher.role !== 'HOD')) {
+    if (!teacher || teacher.schoolId !== req.schoolId || (teacher.role !== UserRole.TEACHER && teacher.role !== UserRole.HOD)) {
       res.status(404).json({ error: 'Teacher not found', code: 'NOT_FOUND' });
       return;
     }

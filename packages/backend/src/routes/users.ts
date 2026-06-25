@@ -100,6 +100,7 @@ const registerViaLinkSchema = z.object({
   password: z.string().min(8),
   admissionNumber: z.string().min(1).max(50).optional(),
   guardianStudentAdmission: z.string().min(1).max(50).optional(),
+  subjects: z.array(z.string().min(1).max(200)).max(50).optional(),
 });
 
 const updateMeSchema = z.object({
@@ -532,6 +533,7 @@ usersRouter.get('/student-workbench', async (req: Request, res: Response, next: 
 
     const classWhere: Prisma.ClassWhereInput = { schoolId: req.schoolId };
     let managedClassIds = new Set<string>();
+    let taughtClassIds = new Set<string>();
 
     if (role === UserRole.TEACHER) {
       const [teachingClassIds, teacherManagedClassIds] = await Promise.all([
@@ -550,6 +552,7 @@ usersRouter.get('/student-workbench', async (req: Request, res: Response, next: 
       classWhere.id = requestedClassId ?? { in: teachingClassIds };
       if (req.user.departmentId) classWhere.departmentId = req.user.departmentId;
       managedClassIds = new Set(teacherManagedClassIds);
+      taughtClassIds = new Set(teachingClassIds);
     } else if (role === UserRole.HOD) {
       if (!req.user.departmentId) {
         res.status(200).json(emptyResponse());
@@ -557,6 +560,7 @@ usersRouter.get('/student-workbench', async (req: Request, res: Response, next: 
       }
       classWhere.departmentId = req.user.departmentId;
       if (requestedClassId) classWhere.id = requestedClassId;
+      taughtClassIds = new Set(await resolveTeacherTeachingClassIds(req.user.sub, req.user.classId));
     } else {
       if (requestedDepartmentId) classWhere.departmentId = requestedDepartmentId;
       if (requestedClassId) classWhere.id = requestedClassId;
@@ -792,6 +796,7 @@ usersRouter.get('/student-workbench', async (req: Request, res: Response, next: 
         classTeacherId: cls.classTeacherId,
         classTeacher: cls.classTeacher,
         canManageClass,
+        isTaughtByMe: taughtClassIds.has(cls.id),
         studentCount: students.length,
         activeSessionCount: activeClassSessions.length,
         todayLessons: lessons,

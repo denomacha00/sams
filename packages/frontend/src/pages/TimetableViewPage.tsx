@@ -47,6 +47,7 @@ type EntryTimeStatus = 'now' | 'later' | 'past' | null;
 const TimetableViewPage: React.FC = () => {
   const user = useAuthStore((s) => s.user);
   const isSchoolAdmin = user?.role === UserRole.SCHOOL_ADMIN;
+  const isHOD = user?.role === UserRole.HOD;
   const canSeeActiveProgress = user?.role !== UserRole.STUDENT;
   const [entries, setEntries] = useState<TimetableEntry[]>([]);
   const [departments, setDepartments] = useState<Department[]>([]);
@@ -54,6 +55,7 @@ const TimetableViewPage: React.FC = () => {
   const [filterDepartmentId, setFilterDepartmentId] = useState('');
   const [filterClassId, setFilterClassId] = useState('');
   const [filterTeacherId, setFilterTeacherId] = useState('');
+  const [hodTimetableScope, setHodTimetableScope] = useState<'mine' | 'department'>('mine');
   const [loading, setLoading] = useState(true);
   const [viewMode, setViewMode] = useState<'table' | 'grid'>('table');
   const [selectedEntryId, setSelectedEntryId] = useState<string | null>(null);
@@ -75,7 +77,11 @@ const TimetableViewPage: React.FC = () => {
       try {
         const params: Record<string, string> = {};
         if (filterClassId) params.classId = filterClassId;
-        if (filterTeacherId) params.teacherId = filterTeacherId;
+        if (isHOD && hodTimetableScope === 'mine' && user?.id) {
+          params.teacherId = user.id;
+        } else if (filterTeacherId) {
+          params.teacherId = filterTeacherId;
+        }
         const { data } = await apiClient.get('/timetable', { params });
         const list = Array.isArray(data) ? data : (data.entries || []);
         setEntries(list);
@@ -87,7 +93,7 @@ const TimetableViewPage: React.FC = () => {
       }
     };
     void fetchEntries();
-  }, [filterClassId, filterTeacherId]);
+  }, [filterClassId, filterTeacherId, hodTimetableScope, isHOD, user?.id]);
 
   useEffect(() => {
     if (!isSchoolAdmin) return;
@@ -163,7 +169,11 @@ const TimetableViewPage: React.FC = () => {
     return `${entry.activeRecordCount ?? 0}/${entry.studentCount ?? 0}`;
   };
 
-  const pageTitle = isSchoolAdmin ? 'School Timetable' : 'My Timetable';
+  const pageTitle = isSchoolAdmin
+    ? 'School Timetable'
+    : isHOD && hodTimetableScope === 'department'
+      ? 'Department Timetable'
+      : 'My Timetable';
 
   return (
     <div className="page-shell">
@@ -195,6 +205,37 @@ const TimetableViewPage: React.FC = () => {
       </header>
 
       <main className="max-w-7xl mx-auto px-6 py-8">
+        {isHOD && (
+          <div className="mb-6 surface-panel rounded-2xl p-3">
+            <div className="grid gap-2 sm:grid-cols-2">
+              <button
+                type="button"
+                onClick={() => { setHodTimetableScope('mine'); setFilterClassId(''); setFilterTeacherId(''); setLoading(true); }}
+                className={`rounded-xl px-4 py-3 text-left transition-all ${
+                  hodTimetableScope === 'mine'
+                    ? 'bg-brand text-white shadow-lg shadow-indigo-500/20'
+                    : 'bg-surface-muted text-ink-muted hover:bg-surface-elevated'
+                }`}
+              >
+                <span className="block text-sm font-bold">My timetable</span>
+                <span className="block text-xs opacity-80">Only units/subjects and classes assigned to me</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => { setHodTimetableScope('department'); setFilterClassId(''); setFilterTeacherId(''); setLoading(true); }}
+                className={`rounded-xl px-4 py-3 text-left transition-all ${
+                  hodTimetableScope === 'department'
+                    ? 'bg-brand text-white shadow-lg shadow-indigo-500/20'
+                    : 'bg-surface-muted text-ink-muted hover:bg-surface-elevated'
+                }`}
+              >
+                <span className="block text-sm font-bold">Department timetable</span>
+                <span className="block text-xs opacity-80">All classes and teachers in my department</span>
+              </button>
+            </div>
+          </div>
+        )}
+
         {isSchoolAdmin && (
           <div className="flex flex-wrap gap-4 mb-6">
             <select

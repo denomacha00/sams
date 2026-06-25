@@ -279,15 +279,30 @@ function nextPeriod(ps: PeriodBlock[], cur: PeriodBlock): PeriodBlock | null {
 
 function buildTeacherSubjectMap(
   teachers: TeacherInfo[], mapping: Record<string, string[]> | undefined,
-  existing: { teacherId: string; subject: string }[],
+  explicitRows: { teacherId: string; subject: string }[],
+  historyRows: { teacherId: string; subject: string }[],
 ): Map<string, Set<string>> {
   const m = new Map<string, Set<string>>();
-  for (const e of existing) { if (!m.has(e.teacherId)) m.set(e.teacherId, new Set()); m.get(e.teacherId)!.add(e.subject); }
+  const explicitTeacherIds = new Set<string>();
+  for (const row of explicitRows) {
+    explicitTeacherIds.add(row.teacherId);
+    if (!m.has(row.teacherId)) m.set(row.teacherId, new Set());
+    m.get(row.teacherId)!.add(row.subject);
+  }
   if (mapping) {
     for (const [key, subs] of Object.entries(mapping)) {
       const t = teachers.find((x) => x.id === key || x.fullName.toLowerCase().includes(key.toLowerCase()));
-      if (t) { if (!m.has(t.id)) m.set(t.id, new Set()); for (const s of subs) m.get(t.id)!.add(s); }
+      if (t) {
+        explicitTeacherIds.add(t.id);
+        if (!m.has(t.id)) m.set(t.id, new Set());
+        for (const s of subs) m.get(t.id)!.add(s);
+      }
     }
+  }
+  for (const e of historyRows) {
+    if (explicitTeacherIds.has(e.teacherId)) continue;
+    if (!m.has(e.teacherId)) m.set(e.teacherId, new Set());
+    m.get(e.teacherId)!.add(e.subject);
   }
   return m;
 }
@@ -359,7 +374,7 @@ export const timetableGeneratorService = {
         select: { teacherId: true, subject: true }, distinct: ['teacherId', 'subject'],
       }),
     ]);
-    const tSubj = buildTeacherSubjectMap(teachers, teacherSubjectMapping, [...dbSubjectRows, ...existingSubjRows]);
+    const tSubj = buildTeacherSubjectMap(teachers, teacherSubjectMapping, dbSubjectRows, existingSubjRows);
 
     // Delete existing if remake
     if (remake) {
@@ -427,7 +442,7 @@ export const timetableGeneratorService = {
         select: { teacherId: true, subject: true }, distinct: ['teacherId', 'subject'],
       }),
     ]);
-    const tSubj = buildTeacherSubjectMap(teachers, teacherSubjectMapping, [...dbSubjectRows, ...existingSubjRows]);
+    const tSubj = buildTeacherSubjectMap(teachers, teacherSubjectMapping, dbSubjectRows, existingSubjRows);
 
     const periods = buildPeriods(startHour, periodDuration, breakStart, breakEnd, lunchStart, lunchEnd);
     const result = generate(schoolId, classes, teachers, existing, catalog, periods, workingDays, maxLessonsPerTeacherPerDay, rooms, tSubj);

@@ -299,6 +299,7 @@ const ProfilePage: React.FC = () => {
                   avatarUrl={user?.avatarUrl}
                   fullName={user?.fullName}
                   cacheKey={user?.avatarVersion}
+                  previewable
                   className="w-20 h-20 rounded-2xl text-3xl"
                 />
               </div>

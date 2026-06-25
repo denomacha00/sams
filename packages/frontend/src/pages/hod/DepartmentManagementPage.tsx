@@ -319,6 +319,7 @@ const DepartmentManagementPage: React.FC = () => {
                 <UserAvatar
                   avatarUrl={teacher.avatarUrl}
                   fullName={teacher.fullName}
+                  previewable
                   className="h-10 w-10 rounded-full shrink-0"
                 />
                 <div>
@@ -452,6 +453,7 @@ const DepartmentManagementPage: React.FC = () => {
                             <UserAvatar
                               avatarUrl={student.avatarUrl}
                               fullName={student.fullName}
+                              previewable
                               className="h-9 w-9 rounded-full shrink-0"
                             />
                             <div className="flex-1 min-w-0">

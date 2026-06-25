@@ -52,6 +52,7 @@ interface ClassGroup {
   departmentName: string;
   classTeacher?: { fullName: string; email: string | null; phone: string | null } | null;
   canManageClass: boolean;
+  isTaughtByMe?: boolean;
   studentCount: number;
   activeSessionCount: number;
   todayLessons: TodayLesson[];
@@ -120,8 +121,10 @@ const ClassStudentsPage: React.FC = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [departmentFilter, setDepartmentFilter] = useState('all');
   const [classFilter, setClassFilter] = useState('all');
+  const [hodStudentScope, setHodStudentScope] = useState<'mine' | 'department'>('mine');
   const [error, setError] = useState('');
   const canChooseDepartment = user?.role === UserRole.SCHOOL_ADMIN;
+  const isHOD = user?.role === UserRole.HOD;
 
   useEffect(() => {
     let cancelled = false;
@@ -158,6 +161,7 @@ const ClassStudentsPage: React.FC = () => {
         ...department,
         classes: department.classes
           .filter((cls) => classFilter === 'all' || cls.id === classFilter)
+          .filter((cls) => !isHOD || hodStudentScope === 'department' || cls.isTaughtByMe)
           .map((cls) => ({
             ...cls,
             students: cls.students.filter((student) => {
@@ -176,7 +180,7 @@ const ClassStudentsPage: React.FC = () => {
           .filter((cls) => cls.students.length > 0 || !q),
       }))
       .filter((department) => department.classes.length > 0);
-  }, [canChooseDepartment, classFilter, departmentFilter, departments, searchQuery]);
+  }, [canChooseDepartment, classFilter, departmentFilter, departments, hodStudentScope, isHOD, searchQuery]);
 
   const filteredStudentCount = visibleDepartments.reduce(
     (sum, department) => sum + department.classes.reduce((classSum, cls) => classSum + cls.students.length, 0),
@@ -237,6 +241,34 @@ const ClassStudentsPage: React.FC = () => {
         </section>
 
         <section className="mt-5 surface-panel rounded-2xl p-4">
+          {isHOD && (
+            <div className="mb-4 grid gap-2 sm:grid-cols-2">
+              <button
+                type="button"
+                onClick={() => { setHodStudentScope('mine'); setClassFilter('all'); }}
+                className={`rounded-xl px-4 py-3 text-left transition-all ${
+                  hodStudentScope === 'mine'
+                    ? 'bg-brand text-white shadow-lg shadow-indigo-500/20'
+                    : 'bg-surface-muted text-ink-muted hover:bg-surface-elevated'
+                }`}
+              >
+                <span className="block text-sm font-bold">My taught students</span>
+                <span className="block text-xs opacity-80">Only classes where I teach a unit/subject</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => { setHodStudentScope('department'); setClassFilter('all'); }}
+                className={`rounded-xl px-4 py-3 text-left transition-all ${
+                  hodStudentScope === 'department'
+                    ? 'bg-brand text-white shadow-lg shadow-indigo-500/20'
+                    : 'bg-surface-muted text-ink-muted hover:bg-surface-elevated'
+                }`}
+              >
+                <span className="block text-sm font-bold">Department students</span>
+                <span className="block text-xs opacity-80">All classes under my department</span>
+              </button>
+            </div>
+          )}
           <div className="grid grid-cols-1 gap-3 md:grid-cols-[minmax(0,1fr)_220px_220px]">
             <input
               value={searchQuery}
@@ -269,6 +301,7 @@ const ClassStudentsPage: React.FC = () => {
           </div>
           <p className="mt-3 text-xs text-ink-subtle">
             Showing {filteredStudentCount} student{filteredStudentCount === 1 ? '' : 's'}. Today: {data?.today.dayLabel ?? 'school day'}.
+            {isHOD && hodStudentScope === 'mine' ? ' Switch to Department students to see every class in your department.' : ''}
           </p>
         </section>
 
@@ -365,7 +398,7 @@ const ClassStudentsPage: React.FC = () => {
                                 <tr key={student.id} className="border-b border-white/5">
                                   <td className="px-3 py-3">
                                     <div className="flex items-center gap-3">
-                                      <UserAvatar avatarUrl={student.avatarUrl} fullName={student.fullName} className="h-9 w-9 rounded-full" />
+                                      <UserAvatar avatarUrl={student.avatarUrl} fullName={student.fullName} previewable className="h-9 w-9 rounded-full" />
                                       <div className="min-w-0">
                                         <p className="truncate text-sm font-semibold text-ink">{student.fullName}</p>
                                         <div className="mt-1 flex flex-wrap gap-1">

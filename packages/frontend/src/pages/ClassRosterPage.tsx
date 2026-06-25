@@ -126,6 +126,7 @@ const ClassRosterPage: React.FC = () => {
                     <UserAvatar
                       avatarUrl={s.avatarUrl}
                       fullName={s.fullName}
+                      previewable
                       className="h-10 w-10 rounded-full"
                     />
                     <div className="min-w-0">
