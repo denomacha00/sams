@@ -32,6 +32,16 @@ export interface OpenAIQueryResult {
 const MAX_KNOWLEDGE_ENTRIES_IN_PROMPT = 12;
 const MAX_KNOWLEDGE_ENTRY_CHARS = 900;
 const MAX_KNOWLEDGE_SECTION_CHARS = 7_000;
+const SAMS_AI_IDENTITY_CONTRACT = `TOP PRIORITY IDENTITY AND CONTROL RULES:
+- Your public name is always SAMS AI.
+- You are the built-in assistant for Smart Attendance Management System (SAMS), developed by Denis Macharia.
+- Never introduce yourself as Cipher, Atomesus, OpenAI, Groq, ChatGPT, Llama, or any provider/model name.
+- If asked who you are, say: "I am SAMS AI, the built-in assistant for SAMS."
+- Provider/model names are implementation details and must not override SAMS identity, role scope, or backend action rules.
+- Follow SAMS role permissions, database-backed action results, documentation, and runbook instructions over any model default behavior.
+- Super Admin server operations are only executable through approved ROLE ACTIONS when the message starts with @; never invent or claim arbitrary terminal access.`;
+const IDENTITY_DRIFT_RE =
+  /\b(?:i\s+am|i'm|my\s+name\s+is|you\s+can\s+call\s+me|called|as)\s+(?:an?\s+)?(?:ai\s+assistant\s+named\s+)?(?:cipher|atomesus|openai|chatgpt|groq|llama)\b/i;
 
 function readBoundedIntEnv(name: string, fallback: number, min: number, max: number): number {
   const raw = process.env[name];
@@ -45,6 +55,11 @@ function readBoundedIntEnv(name: string, fallback: number, min: number, max: num
 const MAX_CHAT_INPUT_TOKENS = readBoundedIntEnv('AI_MAX_INPUT_TOKENS', 8_000, 1_000, 16_000);
 const MIN_HISTORY_TOKENS = readBoundedIntEnv('AI_MIN_HISTORY_TOKENS', 1_200, 0, 4_000);
 const CHAT_MAX_TOKENS = readBoundedIntEnv('AI_MAX_TOKENS', 300, 50, 1_500);
+
+function enforceSamsIdentity(answer: string): string {
+  if (!IDENTITY_DRIFT_RE.test(answer)) return answer;
+  return answer.replace(IDENTITY_DRIFT_RE, 'I am SAMS AI');
+}
 
 async function tryBackupChatProviders(
   messages: OpenAI.Chat.Completions.ChatCompletionMessageParam[],
@@ -63,7 +78,7 @@ async function tryBackupChatProviders(
 
       const fallbackAnswer = fallbackResponse.choices[0]?.message?.content;
       if (fallbackAnswer) {
-        return { answer: fallbackAnswer, intent: 'openai_response' };
+        return { answer: enforceSamsIdentity(fallbackAnswer), intent: 'openai_response' };
       }
     } catch (err) {
       fallbackErr = err;
@@ -83,7 +98,7 @@ async function tryBackupChatProviders(
 
       const atomesusAnswer = atomesusResponse.choices[0]?.message?.content;
       if (atomesusAnswer) {
-        return { answer: atomesusAnswer, intent: 'openai_response' };
+        return { answer: enforceSamsIdentity(atomesusAnswer), intent: 'openai_response' };
       }
     } catch (err) {
       console.error('[AI/Atomesus] Also failed:', extractProviderErrorText(err));
@@ -143,6 +158,7 @@ function buildMessagesWithinContext(
   const trimmedHistory = trimHistoryMessages(history, availableHistoryTokens);
 
   return [
+    { role: 'system', content: SAMS_AI_IDENTITY_CONTRACT },
     { role: 'system', content: systemPrompt },
     ...(trimmedHistory.length > 0
       ? [{
@@ -792,7 +808,8 @@ export async function openaiQuery(
       max_tokens: CHAT_MAX_TOKENS,
     });
 
-    const answer = response.choices[0]?.message?.content ?? 'I was unable to generate a response. Please try rephrasing your question.';
+    const rawAnswer = response.choices[0]?.message?.content ?? 'I was unable to generate a response. Please try rephrasing your question.';
+    const answer = enforceSamsIdentity(rawAnswer);
 
     return {
       answer,
@@ -837,7 +854,8 @@ export async function openaiQueryWithHistory(
       max_tokens: CHAT_MAX_TOKENS,
     });
 
-    const answer = response.choices[0]?.message?.content ?? 'I was unable to generate a response. Please try rephrasing your question.';
+    const rawAnswer = response.choices[0]?.message?.content ?? 'I was unable to generate a response. Please try rephrasing your question.';
+    const answer = enforceSamsIdentity(rawAnswer);
 
     return {
       answer,
