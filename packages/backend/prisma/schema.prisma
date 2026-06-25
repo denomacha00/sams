@@ -110,6 +110,7 @@ model School {
   exams               Exam[]
   gradeBoundaries     GradeBoundary[]
   teacherSubjects     TeacherSubject[]
+  schoolFeatureFlags  SchoolFeatureFlag[]
 
   @@index([isSuspended])
   @@index([licenseExpiresAt])
