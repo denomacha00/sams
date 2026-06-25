@@ -14,6 +14,11 @@ interface ForecastData {
   projectedMRR: number;
   mrrGrowth: number;
   churnRisk: number;
+  assumptions?: {
+    source: string;
+    churnAssumptionPercent: number;
+    planPricesKes: Record<string, number>;
+  };
   trend: 'up' | 'down' | 'stable';
   monthlyBreakdown: ForecastMonth[];
 }
@@ -54,9 +59,10 @@ const RevenueForecastPage: React.FC = () => {
   return (
     <div className="space-y-6">
       <div className="rounded-3xl border border-gray-700/80 bg-gradient-to-br from-gray-800 via-gray-800 to-indigo-950/40 p-7 shadow-xl shadow-black/20">
-        <h1 className="text-3xl font-bold tracking-tight text-white">Revenue Forecast</h1>
+        <h1 className="text-3xl font-bold tracking-tight text-white">Revenue Forecast Estimate</h1>
         <p className="mt-2 max-w-2xl text-sm leading-6 text-gray-400">
-          MRR trends, projected revenue, and churn risk analysis for the coming months.
+          Estimated MRR and renewal risk from active licenses, plan tiers, and expiry dates.
+          Use the Revenue page for actual successful payment totals.
         </p>
       </div>
 
@@ -69,9 +75,12 @@ const RevenueForecastPage: React.FC = () => {
       <div className="rounded-2xl border border-gray-700/80 bg-gray-800/80 p-6 shadow-lg">
         <div className="flex items-center justify-between">
           <div>
-            <p className="text-xs font-semibold uppercase tracking-wider text-gray-400">Monthly Recurring Revenue</p>
+            <p className="text-xs font-semibold uppercase tracking-wider text-gray-400">Estimated Monthly Recurring Revenue</p>
             <p className="mt-2 text-4xl font-bold text-white">
               KES {data?.currentMRR.toLocaleString() ?? '—'}
+            </p>
+            <p className="mt-2 text-xs text-gray-500">
+              Not collected cash. Based on license plan prices and active schools.
             </p>
           </div>
           <div className={`flex items-center gap-2 rounded-xl border px-4 py-2 text-sm font-medium ${
@@ -88,8 +97,8 @@ const RevenueForecastPage: React.FC = () => {
       <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
         <section className="rounded-2xl border border-gray-700/80 bg-gray-800/80 p-6 shadow-lg">
           <div className="mb-4 border-b border-gray-700/80 pb-3">
-            <h2 className="text-lg font-semibold text-white">Revenue Forecast</h2>
-            <p className="text-sm text-gray-400">Projected monthly revenue</p>
+            <h2 className="text-lg font-semibold text-white">Estimated Revenue Forecast</h2>
+            <p className="text-sm text-gray-400">Projected monthly license value, not confirmed payments</p>
           </div>
           <div className="space-y-4">
             {(data?.monthlyBreakdown ?? []).length === 0 && (
@@ -114,8 +123,8 @@ const RevenueForecastPage: React.FC = () => {
 
         <section className="rounded-2xl border border-gray-700/80 bg-gray-800/80 p-6 shadow-lg">
           <div className="mb-4 border-b border-gray-700/80 pb-3">
-            <h2 className="text-lg font-semibold text-white">Churn Risk</h2>
-            <p className="text-sm text-gray-400">Projected churn rate over forecast period</p>
+            <h2 className="text-lg font-semibold text-white">Renewal Risk Estimate</h2>
+            <p className="text-sm text-gray-400">Schools nearing license expiry based on the forecast assumptions</p>
           </div>
           <div className="space-y-3">
             {data && data.churnRisk > 0 ? (
@@ -132,7 +141,7 @@ const RevenueForecastPage: React.FC = () => {
                   />
                 </div>
                 <p className="mt-2 text-xs text-gray-500">
-                  Projected MRR: KES {data.projectedMRR.toLocaleString()}
+                  Estimated projected MRR: KES {data.projectedMRR.toLocaleString()}
                 </p>
               </div>
             ) : (
@@ -144,7 +153,12 @@ const RevenueForecastPage: React.FC = () => {
 
       <section className="rounded-2xl border border-gray-700/80 bg-gray-800/80 p-6 shadow-lg">
         <div className="mb-4 border-b border-gray-700/80 pb-3">
-          <h2 className="text-lg font-semibold text-white">Monthly Forecast Detail</h2>
+          <h2 className="text-lg font-semibold text-white">Monthly Estimate Detail</h2>
+          {data?.assumptions && (
+            <p className="mt-1 text-xs leading-5 text-gray-500">
+              Assumption: {data.assumptions.churnAssumptionPercent}% of schools expiring in a month may not renew.
+            </p>
+          )}
         </div>
         <div className="overflow-x-auto">
           <table className="w-full text-sm">

@@ -60,6 +60,11 @@ interface RevenueForecast {
   projectedMRR: number;
   mrrGrowth: number;
   churnRisk: number;
+  assumptions: {
+    source: string;
+    churnAssumptionPercent: number;
+    planPricesKes: Record<string, number>;
+  };
   trend: 'up' | 'down' | 'stable';
   monthlyBreakdown: Array<{
     month: string;
@@ -471,6 +476,11 @@ export class SuperAdminFeaturesService {
       projectedMRR: Math.round(projectedMRR),
       mrrGrowth: Math.round(mrrGrowth * 100) / 100,
       churnRisk,
+      assumptions: {
+        source: 'Estimate from active licenses, plan tiers, and expiry dates. Actual collected money is shown on the Revenue page from successful payments.',
+        churnAssumptionPercent: 70,
+        planPricesKes: tierPriceMap,
+      },
       trend,
       monthlyBreakdown,
     };
