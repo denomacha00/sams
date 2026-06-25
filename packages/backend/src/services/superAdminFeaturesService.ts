@@ -322,7 +322,7 @@ export class SuperAdminFeaturesService {
         severity: severity ?? 'INFO',
         ipAddress: ipAddress ?? null,
         userId: userId ?? null,
-        metadata: metadata ?? {},
+        metadata: (metadata ?? {}) as any,
       },
     });
   }
@@ -461,7 +461,7 @@ export class SuperAdminFeaturesService {
       data: {
         exportType: data.type,
         format: data.format ?? 'csv',
-        filters: data.filters ?? {},
+        filters: (data.filters ?? {}) as any,
         status: 'PENDING',
       },
     });
