@@ -21,6 +21,7 @@ import {
 import { prepareImagesForAiUpload } from '../lib/aiImageUpload';
 import { AiMessageContent } from '../lib/aiMessageContent';
 import { detectAiNavigationRequest } from '../lib/aiNavigation';
+import { applyAiThemeCommand, detectAiThemeRequest } from '../lib/aiThemeCommand';
 
 interface PendingAction {
   action: string;
@@ -270,6 +271,18 @@ const FloatingAI: React.FC = () => {
 
     try {
       // Case 1: Images uploaded — use vision endpoint
+      const themeCommand = selectedImages.length === 0 ? detectAiThemeRequest(text) : null;
+      if (themeCommand) {
+        applyAiThemeCommand(themeCommand);
+        setMessages((prev) => [...prev, {
+          id: crypto.randomUUID(),
+          role: 'assistant',
+          content: `Changed to **${themeCommand.label}**.`,
+          timestamp: new Date(),
+        }]);
+        return;
+      }
+
       const navigationTarget = selectedImages.length === 0 ? detectAiNavigationRequest(text) : null;
       if (navigationTarget) {
         navigate(navigationTarget.path);

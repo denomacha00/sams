@@ -737,6 +737,19 @@ export class AIService {
         message: errMsg,
         stack: errStack,
       });
+      if (action === 'run_terminal_command') {
+        return {
+          answer: [
+            'The terminal command ran but did not finish successfully.',
+            '',
+            '```text',
+            errMsg,
+            '```',
+          ].join('\n'),
+          intent: 'action_error',
+          engine: 'openai',
+        };
+      }
       return {
         answer: 'The action could not be completed. Please try again or contact support.',
         intent: 'action_error',

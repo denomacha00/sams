@@ -40,6 +40,27 @@ const FORBIDDEN_ACTION_NAMES: Partial<Record<UserRole, string[]>> = {
     'clear_audit_logs',
     'reset_user_password',
   ],
+  ['GUARDIAN' as UserRole]: [
+    'start_session',
+    'end_session',
+    'mark_attendance',
+    'add_user',
+    'remove_user',
+    'create_class',
+    'create_department',
+    'get_school_stats',
+    'send_class_message',
+    'send_department_notification',
+    'send_school_notification',
+    'view_class_roster',
+    'suspend_school',
+    'unsuspend_school',
+    'generate_license',
+    'extend_license',
+    'get_system_stats',
+    'clear_audit_logs',
+    'reset_user_password',
+  ],
   [UserRole.HOD]: [
     'suspend_school',
     'unsuspend_school',
@@ -74,6 +95,8 @@ const ROLE_SCOPE_NOTES: Partial<Record<UserRole, string>> = {
     'Your assigned class only: attendance sessions, class roster, in-app class messages to students, and student registration links (invite via link — same as Registration Links page; never add users directly). No user management, no department/school notify, no SMS via AI.',
   [UserRole.STUDENT]:
     'Your own attendance, class timetable, today\'s schedule, teachers assigned to your class, and your department Head of Department (same as the app). In-app announcements arrive when staff send them (Notifications page). No timed personal reminders, school-wide lists, admin stats, or outbound messaging actions.',
+  ['GUARDIAN' as UserRole]:
+    'Parent/guardian access: linked children only. Can view linked students, child attendance, child timetable, export linked child attendance reports, and manage their own in-app notifications. No school-wide, class-wide, password, attendance marking, or staff management actions.',
 };
 
 export function getRoleScopeNote(role: string): string | undefined {

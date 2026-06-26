@@ -5,6 +5,7 @@ import { schoolAdminActions } from './handlers/schoolAdminHandlers';
 import { hodActions } from './handlers/hodHandlers';
 import { teacherActions } from './handlers/teacherHandlers';
 import { studentActions } from './handlers/studentHandlers';
+import { guardianActions } from './handlers/guardianHandlers';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -64,6 +65,7 @@ roleActionRegistry['SCHOOL_ADMIN'] = normalizeRoleActions(schoolAdminActions);
 roleActionRegistry['HOD'] = normalizeRoleActions(hodActions);
 roleActionRegistry['TEACHER'] = normalizeRoleActions(teacherActions);
 roleActionRegistry['STUDENT'] = normalizeRoleActions(studentActions);
+roleActionRegistry['GUARDIAN'] = normalizeRoleActions(guardianActions);
 
 // ─── Lookup Utilities ─────────────────────────────────────────────────────────
 

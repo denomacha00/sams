@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import apiClient from '../services/apiClient';
 import { prepareImagesForAiUpload } from '../lib/aiImageUpload';
 import { useAuthStore } from '../store/authStore';
@@ -33,6 +34,38 @@ const AI_VISION_FAILURE_INTENTS = new Set(['image_analysis_error', 'ai_not_confi
 const CONFIRM_RE = /^(yes|y|confirm|proceed|ok|do it|go ahead)\.?$/i;
 const SUPER_AI_THREAD_STORAGE_KEY = 'sams-super-admin-ai-thread-id';
 
+const SUPER_ADMIN_NAV_TARGETS: Array<{ path: string; label: string; patterns: RegExp[] }> = [
+  { path: '/', label: 'Dashboard', patterns: [/dashboard/i, /home/i] },
+  { path: '/licenses', label: 'License Management', patterns: [/license(?:s)?(?:\s+management)?/i] },
+  { path: '/license-expiry', label: 'License Expiry Engine', patterns: [/license\s+expiry/i, /expiry\s+engine/i] },
+  { path: '/schools', label: 'Schools', patterns: [/schools?/i] },
+  { path: '/batch-operations', label: 'Batch Operations', patterns: [/batch/i, /bulk/i] },
+  { path: '/feature-flags', label: 'Feature Flags', patterns: [/feature\s+flags?/i, /flags?/i] },
+  { path: '/revenue', label: 'Revenue', patterns: [/revenue$/i, /payments?/i] },
+  { path: '/revenue-forecast', label: 'Revenue Forecast', patterns: [/revenue\s+forecast/i, /forecast/i] },
+  { path: '/performance', label: 'Performance Monitor', patterns: [/performance/i, /monitor/i] },
+  { path: '/security', label: 'Security Dashboard', patterns: [/security/i] },
+  { path: '/audit-logs', label: 'Audit Logs', patterns: [/audit/i, /logs?/i] },
+  { path: '/school-admin-activity', label: 'School Admin Activity', patterns: [/admin\s+activity/i] },
+  { path: '/brand-templates', label: 'Branding Templates', patterns: [/brand/i, /templates?/i] },
+  { path: '/scheduled-jobs', label: 'Scheduled Jobs', patterns: [/scheduled\s+jobs?/i, /jobs?/i, /cron/i] },
+  { path: '/data-export', label: 'Data Export', patterns: [/data\s+export/i, /exports?/i] },
+  { path: '/knowledge', label: 'Knowledge Base', patterns: [/knowledge/i, /docs?/i, /documentation/i] },
+  { path: '/notifications', label: 'Notifications', patterns: [/notifications?/i, /messages?/i, /inbox/i] },
+  { path: '/settings', label: 'Settings', patterns: [/settings?/i] },
+];
+
+const SUPER_NAV_COMMAND_RE = /\b(?:take|go|open|show|move|navigate|send)\s+(?:me\s+)?(?:to\s+)?(.+)/i;
+
+function detectSuperAdminNavigation(message: string) {
+  const match = message.trim().match(SUPER_NAV_COMMAND_RE);
+  if (!match) return null;
+  const targetText = match[1]?.trim() ?? '';
+  return SUPER_ADMIN_NAV_TARGETS.find((target) =>
+    target.patterns.some((pattern) => pattern.test(targetText)),
+  ) ?? null;
+}
+
 function createWelcomeMessage(): ChatMessage {
   return {
     id: 'welcome',
@@ -43,7 +76,7 @@ function createWelcomeMessage(): ChatMessage {
       'â€¢ **School ops** â€” "school info for X", "suspend school Y", "extend license for Z"\n' +
       'â€¢ **Password reset** â€” "reset password for user at school CODE" (temp password or OTP)\n' +
       'â€¢ **Live database** â€” "@db" for platform overview, "@school greenwood" for one school\n' +
-      'â€¢ **Server ops** â€” "@status", "@logs", "@verify", "@diagnose-ai", "@traffic", "@restart-api", "@git-pull", "@deploy"\n' +
+      'â€¢ **Server ops** â€” "@status", "@test", "@logs", "@verify", "@readiness", "@secrets", "@diagnose-ai", "@traffic", "@restart-api", "@migrate-status", "@migrate-deploy", "@unlock-users", "@git-pull", "@deploy"\n' +
       'â€¢ **Troubleshooting** â€” "why is a school not working", "common problems"\n' +
       'â€¢ **How-to guides** â€” "how to generate a license", "how to suspend a school"\n' +
       'â€¢ **Platform docs** â€” architecture and features from DOCUMENTATION.md + Knowledge Base\n\n' +
@@ -129,6 +162,7 @@ function messagesToAiHistory(messages: ChatMessage[], maxMessages = 12): Array<{
 }
 
 const SuperAdminAI: React.FC = () => {
+  const navigate = useNavigate();
   const user = useAuthStore((s) => s.user);
   const [isOpen, setIsOpen] = useState(false);
   const [messages, setMessages] = useState<ChatMessage[]>([
@@ -141,7 +175,7 @@ const SuperAdminAI: React.FC = () => {
         '• **School ops** — "school info for X", "suspend school Y", "extend license for Z"\n' +
         '• **Password reset** — "reset password for user at school CODE" (temp password or OTP)\n' +
         '• **Live database** — "@db" for platform overview, "@school greenwood" for one school\n' +
-        '• **Server ops** — "@status", "@logs", "@verify", "@diagnose-ai", "@traffic", "@restart-api", "@git-pull", "@deploy"\n' +
+        '• **Server ops** — "@status", "@test", "@logs", "@verify", "@readiness", "@secrets", "@diagnose-ai", "@traffic", "@restart-api", "@migrate-status", "@migrate-deploy", "@unlock-users", "@git-pull", "@deploy"\n' +
         '• **Troubleshooting** — "why is a school not working", "common problems"\n' +
         '• **How-to guides** — "how to generate a license", "how to suspend a school"\n' +
         '• **Platform docs** — architecture and features from DOCUMENTATION.md + Knowledge Base\n\n' +
@@ -334,6 +368,16 @@ const SuperAdminAI: React.FC = () => {
     setLoading(true);
 
     try {
+      if (selectedImages.length === 0) {
+        const navigationTarget = detectSuperAdminNavigation(question);
+        if (navigationTarget) {
+          navigate(navigationTarget.path);
+          appendAssistant(`Opened **${navigationTarget.label}**.`);
+          setIsOpen(false);
+          return;
+        }
+      }
+
       if (selectedImages.length > 0) {
         const formData = new FormData();
         selectedImages.forEach((file) => formData.append('images', file));

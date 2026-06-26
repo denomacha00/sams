@@ -94,6 +94,21 @@ describe('roleActionRegistry permissions', () => {
     expect(isActionPermitted(UserRole.STUDENT, 'list_my_hod')).toBe(true);
   });
 
+  it('GUARDIAN has linked-child actions only', () => {
+    const names = getActionNames('GUARDIAN');
+    expect(names).toEqual(
+      expect.arrayContaining([
+        'list_linked_children',
+        'view_child_attendance',
+        'view_child_timetable',
+        'export_child_attendance_report',
+      ]),
+    );
+    expect(isActionPermitted('GUARDIAN', 'start_session')).toBe(false);
+    expect(isActionPermitted('GUARDIAN', 'reset_user_password')).toBe(false);
+    expect(isActionPermitted('GUARDIAN', 'view_child_attendance')).toBe(true);
+  });
+
   it('unknown role has no permitted actions', () => {
     expect(getActionNames('UNKNOWN')).toEqual([]);
     expect(isActionPermitted('UNKNOWN', 'start_session')).toBe(false);

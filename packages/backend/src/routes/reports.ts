@@ -48,6 +48,20 @@ async function assertReportScope(
     return;
   }
 
+  if (role === 'GUARDIAN') {
+    if (type !== 'student' || !targetId) {
+      throw new AppError(403, 'FORBIDDEN', 'Guardians can only access linked student reports');
+    }
+    const link = await prisma.guardian.findUnique({
+      where: { guardianId_studentId: { guardianId: userId, studentId: targetId } },
+      select: { schoolId: true },
+    });
+    if (!link || link.schoolId !== req.schoolId) {
+      throw new AppError(403, 'FORBIDDEN', 'Guardians can only access linked student reports');
+    }
+    return;
+  }
+
   if (role === UserRole.TEACHER) {
     const teacherClassIds = await resolveTeacherTeachingClassIds(userId, userClassId);
     if (type === 'student' && targetId) {
@@ -112,6 +126,17 @@ reportsRouter.get('/student/:id', requirePermission('view:reports'), async (req:
       return;
     }
 
+    if (role === 'GUARDIAN') {
+      const link = await prisma.guardian.findUnique({
+        where: { guardianId_studentId: { guardianId: userId, studentId: targetStudentId } },
+        select: { schoolId: true },
+      });
+      if (!link || link.schoolId !== req.schoolId) {
+        res.status(403).json({ error: 'Forbidden', code: 'FORBIDDEN', message: 'Guardians can only view linked children reports' });
+        return;
+      }
+    }
+
     // Teachers can only view reports for students in classes they teach
     if (role === UserRole.TEACHER) {
       const teacherClassIds = await resolveTeacherTeachingClassIds(userId, userClassId);
@@ -167,9 +192,9 @@ reportsRouter.get('/class/:classId', requirePermission('view:reports'), async (r
     const { role, classId: userClassId, departmentId: userDeptId } = req.user;
     const targetClassId = req.params.classId as string;
 
-    // Students cannot access class reports
-    if (role === UserRole.STUDENT) {
-      res.status(403).json({ error: 'Forbidden', code: 'FORBIDDEN', message: 'Students cannot access class reports' });
+    // Students and guardians cannot access class reports
+    if (role === UserRole.STUDENT || role === 'GUARDIAN') {
+      res.status(403).json({ error: 'Forbidden', code: 'FORBIDDEN', message: 'Students and guardians cannot access class reports' });
       return;
     }
 
@@ -220,9 +245,9 @@ reportsRouter.get('/department/:deptId', requirePermission('view:reports'), asyn
     const { role, departmentId: userDeptId } = req.user;
     const targetDeptId = req.params.deptId as string;
 
-    // Students cannot access department reports
-    if (role === UserRole.STUDENT) {
-      res.status(403).json({ error: 'Forbidden', code: 'FORBIDDEN', message: 'Students cannot access department reports' });
+    // Students and guardians cannot access department reports
+    if (role === UserRole.STUDENT || role === 'GUARDIAN') {
+      res.status(403).json({ error: 'Forbidden', code: 'FORBIDDEN', message: 'Students and guardians cannot access department reports' });
       return;
     }
 

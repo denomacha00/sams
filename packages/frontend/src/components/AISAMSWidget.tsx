@@ -1,8 +1,11 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
 import apiClient from '../services/apiClient';
 import { useVoiceQuery } from '../hooks/useVoiceQuery';
 import { loadAiThreadId, messagesToAiHistory, saveAiThreadId } from '../lib/aiChat';
 import { AiMessageContent } from '../lib/aiMessageContent';
+import { detectAiNavigationRequest } from '../lib/aiNavigation';
+import { applyAiThemeCommand, detectAiThemeRequest } from '../lib/aiThemeCommand';
 
 interface PendingAction {
   action: string;
@@ -37,6 +40,7 @@ const QUICK_QUESTIONS = [
 const CONFIRM_RE = /^(yes|y|confirm|proceed|ok|do it|go ahead)\.?$/i;
 
 const AISAMSWidget: React.FC = () => {
+  const navigate = useNavigate();
   const [isOpen, setIsOpen] = useState(false);
   const [messages, setMessages] = useState<Message[]>([WELCOME_MESSAGE]);
   const [input, setInput] = useState('');
@@ -93,6 +97,31 @@ const AISAMSWidget: React.FC = () => {
     setLoading(true);
 
     try {
+      const themeCommand = detectAiThemeRequest(text);
+      if (themeCommand) {
+        applyAiThemeCommand(themeCommand);
+        setMessages((prev) => [...prev, {
+          id: crypto.randomUUID(),
+          role: 'assistant',
+          content: `Changed to **${themeCommand.label}**.`,
+          timestamp: new Date(),
+        }]);
+        return;
+      }
+
+      const navigationTarget = detectAiNavigationRequest(text);
+      if (navigationTarget) {
+        navigate(navigationTarget.path);
+        setMessages((prev) => [...prev, {
+          id: crypto.randomUUID(),
+          role: 'assistant',
+          content: `Opened **${navigationTarget.label}**.`,
+          timestamp: new Date(),
+        }]);
+        setIsOpen(false);
+        return;
+      }
+
       const isConfirm = CONFIRM_RE.test(text.trim()) && pendingActionRef.current;
       const pending = pendingActionRef.current;
       const history = messagesToAiHistory(messages);
@@ -142,7 +171,7 @@ const AISAMSWidget: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  }, [messages, threadId]);
+  }, [messages, navigate, threadId]);
 
   const { isListening, startListening, stopListening } = useVoiceQuery(submitQuery);
 
