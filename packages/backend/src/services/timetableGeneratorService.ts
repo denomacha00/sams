@@ -153,7 +153,8 @@ function generate(
   existing: { teacherId: string; classId: string; dayOfWeek: number; startTime: string; subject: string }[],
   catalog: SubjectCatalog, periods: PeriodBlock[], days: number[], maxDay: number,
   rooms: string[], tSubj: Map<string, Set<string>>,
-  subjectToTeachers: Map<string, TeacherInfo[]>,
+  subjectMap: Map<string, TeacherInfo[]>,
+  unconstrained: TeacherInfo[],
 ): { slots: TimetableSlot[]; skipped: number; stats: Record<string, number>; assignments: Record<string, number>; doubles: number } {
   const tr = new Tracker();
   tr.seed(existing);
@@ -193,8 +194,11 @@ function generate(
         let best: { teacher: TeacherInfo; subject: string } | null = null;
 
         for (const subj of subs) {
-          // Get teachers who can teach this subject (from the pre-built subject→teachers map)
-          const cands = (subjectToTeachers.get(subj) ?? teachers)
+          // Get teachers who can teach this subject:
+          // 1. Qualified teachers from subject→teachers map (constrained teachers)
+          // 2. Plus any unconstrained teachers (can teach everything)
+          const qualified = subjectMap.get(subj) ?? [];
+          const cands = [...qualified, ...unconstrained]
             .filter((t) =>
               tr.teacherFree(t.id, day, p.startTime) &&
               tr.teacherUnderLimit(t.id, day, maxDay)
@@ -284,28 +288,39 @@ function buildTeacherSubjectMap(
   return m;
 }
 
-/** Build a reverse map: subject → list of teachers who can teach it */
+/** Build a reverse map: subject → list of teachers who can teach it
+ *  Also returns a separate pool of unconstrained teachers (no subject restrictions).
+ *  Teachers with explicit subject assignments ONLY appear under those subjects.
+ *  Unconstrained teachers appear under EVERY subject (wildcards). */
 function buildSubjectToTeachersMap(
   teachers: TeacherInfo[],
   tSubj: Map<string, Set<string>>,
-): Map<string, TeacherInfo[]> {
-  const map = new Map<string, TeacherInfo[]>();
+): { subjectMap: Map<string, TeacherInfo[]>; unconstrained: TeacherInfo[] } {
+  const subjectMap = new Map<string, TeacherInfo[]>();
+  const unconstrained: TeacherInfo[] = [];
 
   for (const teacher of teachers) {
     const subjects = tSubj.get(teacher.id);
     if (subjects && subjects.size > 0) {
-      // Teacher has explicit subject assignments — add them
+      // Teacher has explicit subject assignments — only add under those subjects
       for (const subj of subjects) {
-        const list = map.get(subj) ?? [];
+        const list = subjectMap.get(subj) ?? [];
         list.push(teacher);
-        map.set(subj, list);
+        subjectMap.set(subj, list);
       }
+    } else {
+      // Teacher has NO subject constraints — can teach anything
+      unconstrained.push(teacher);
     }
   }
 
-  // Teachers with NO subject assignments can teach anything
-  // We'll handle them as a fallback pool in the generation loop
-  return map;
+  // Also put unconstrained teachers under every known subject for convenience
+  for (const teacher of unconstrained) {
+    // They're also kept in the separate unconstrained array for the generation loop
+    // so we don't need to duplicate them into every subject
+  }
+
+  return { subjectMap, unconstrained };
 }
 
 async function loadClasses(schoolId: string, departmentId?: string, classIds?: string[]): Promise<ClassInfo[]> {
@@ -421,9 +436,9 @@ export const timetableGeneratorService = {
     const tSubj = buildTeacherSubjectMap(teachers, teacherSubjectMapping, dbSubjectRows, existingSubjRows);
 
     // Build reverse map: subject → teachers who can teach it
-    // Teachers with no explicit subject assignments are NOT in this map;
-    // they're handled as fallback in the generation loop (subjectToTeachers.get returns teachers for unassigned)
-    const subjectToTeachers = buildSubjectToTeachersMap(teachers, tSubj);
+    // subjectMap: teachers with explicit subject assignments (ONLY under those subjects)
+    // unconstrained: teachers with no subject restrictions (can teach anything)
+    const { subjectMap, unconstrained } = buildSubjectToTeachersMap(teachers, tSubj);
 
     // Delete existing if remake
     if (remake) {
@@ -436,7 +451,7 @@ export const timetableGeneratorService = {
     const periods = buildPeriods(startHour, periodDuration, breakStart, breakEnd, lunchStart, lunchEnd);
     const result = generate(
       schoolId, classes, teachers, existingBookings, catalog, periods,
-      workingDays, maxLessonsPerTeacherPerDay, rooms, tSubj, subjectToTeachers,
+      workingDays, maxLessonsPerTeacherPerDay, rooms, tSubj, subjectMap, unconstrained,
     );
     if (!result.slots.length) throw new Error('Could not generate any timetable entries. Not enough teachers available.');
 
@@ -497,12 +512,12 @@ export const timetableGeneratorService = {
     const tSubj = buildTeacherSubjectMap(teachers, teacherSubjectMapping, dbSubjectRows, existingSubjRows);
 
     // Build reverse map: subject → teachers who can teach it
-    const subjectToTeachers = buildSubjectToTeachersMap(teachers, tSubj);
+    const { subjectMap, unconstrained } = buildSubjectToTeachersMap(teachers, tSubj);
 
     const periods = buildPeriods(startHour, periodDuration, breakStart, breakEnd, lunchStart, lunchEnd);
     const result = generate(
       schoolId, classes, teachers, existing, catalog, periods,
-      workingDays, maxLessonsPerTeacherPerDay, rooms, tSubj, subjectToTeachers,
+      workingDays, maxLessonsPerTeacherPerDay, rooms, tSubj, subjectMap, unconstrained,
     );
 
     const tMap = new Map(teachers.map((t) => [t.id, t.fullName]));
