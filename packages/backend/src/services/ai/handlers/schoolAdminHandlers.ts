@@ -2,6 +2,7 @@ import type { ActionDefinition, ActionHandler } from '../roleActionRegistry';
 import { UserRole } from '@sams/shared';
 import { extractMessageBody, parseNotificationTargetRole } from '../notificationActionParams';
 import { buildExportReportActionDefForRole } from './reportExportAction';
+import { notificationInboxActions } from './notificationInboxActions';
 
 // ─── Handlers ─────────────────────────────────────────────────────────────────
 
@@ -321,6 +322,7 @@ const getSchoolStatsHandler: ActionHandler = async (_params, scope) => {
 // ─── Action Definitions ───────────────────────────────────────────────────────
 
 export const schoolAdminActions: ActionDefinition[] = [
+  ...notificationInboxActions,
   buildExportReportActionDefForRole(UserRole.SCHOOL_ADMIN),
   {
     action: 'add_user',

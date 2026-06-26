@@ -22,6 +22,7 @@ import {
   schemaDayName,
 } from '../../../lib/studentScheduleHelpers';
 import { buildExportReportActionDefForRole } from './reportExportAction';
+import { notificationInboxActions } from './notificationInboxActions';
 
 // ─── Handlers ─────────────────────────────────────────────────────────────────
 
@@ -294,6 +295,7 @@ const TODAY_SCHEDULE_PATTERNS: RegExp[] = [
 // ─── Action Definitions ───────────────────────────────────────────────────────
 
 export const studentActions: ActionDefinition[] = [
+  ...notificationInboxActions,
   buildExportReportActionDefForRole(UserRole.STUDENT),
   {
     action: 'explain_reminders',

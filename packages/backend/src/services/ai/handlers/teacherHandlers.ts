@@ -4,6 +4,7 @@ import { listSchoolAdminHandler } from '../../../lib/schoolAdminLookup';
 import { SCHOOL_ADMIN_QUERY_PATTERNS } from '../studentContextQuery';
 import { createRegistrationLinkActionDef } from './registrationLinkAction';
 import { buildExportReportActionDefForRole } from './reportExportAction';
+import { notificationInboxActions } from './notificationInboxActions';
 
 async function listTeacherClasses(scope: ActionScope): Promise<Array<{ id: string; name: string }>> {
   const { prisma } = await import('../../../lib/prisma');
@@ -309,6 +310,7 @@ const sendClassMessageHandler: ActionHandler = async (params, scope) => {
 // ─── Action Definitions ───────────────────────────────────────────────────────
 
 export const teacherActions: ActionDefinition[] = [
+  ...notificationInboxActions,
   buildExportReportActionDefForRole(UserRole.TEACHER),
   createRegistrationLinkActionDef,
   {

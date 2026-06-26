@@ -5,6 +5,7 @@ import {
   resolveTerminalCommand,
   runSafeTerminalCommand,
 } from '../../superAdminTerminalOps';
+import { notificationInboxActions } from './notificationInboxActions';
 
 // ─── Helper Utilities (migrated from actionIntentDetector.ts) ─────────────────
 
@@ -491,6 +492,7 @@ const runTerminalCommandHandler: ActionHandler = async (params) => {
 };
 
 export const superAdminActions: ActionDefinition[] = [
+  ...notificationInboxActions,
   {
     action: 'database_overview',
     description: 'Read a safe live database overview for the whole SAMS platform',

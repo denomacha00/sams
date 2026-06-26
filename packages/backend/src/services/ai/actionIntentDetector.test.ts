@@ -253,6 +253,18 @@ describe('actionIntentDetector role scoping (regex path)', () => {
     expect(admin.params?.reportType).toBe('school');
   });
 
+  it('detects inbox notification actions for all logged-in roles', async () => {
+    const clear = await actionIntentDetector.detect('clear notifications', UserRole.TEACHER);
+    expect(clear.isAction).toBe(true);
+    expect(clear.action).toBe('clear_inbox_notifications');
+    expect(clear.requiresConfirmation).toBe(true);
+
+    const read = await actionIntentDetector.detect('mark all alerts as read', UserRole.SUPER_ADMIN);
+    expect(read.isAction).toBe(true);
+    expect(read.action).toBe('mark_notifications_read');
+    expect(read.requiresConfirmation).toBe(false);
+  });
+
   it('detects @school as a safe school database overview before terminal fallback', async () => {
     const result = await actionIntentDetector.detect('@school greenwood', UserRole.SUPER_ADMIN);
     expect(result.isAction).toBe(true);

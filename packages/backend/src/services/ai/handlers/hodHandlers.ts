@@ -8,6 +8,7 @@ import { SCHOOL_ADMIN_QUERY_PATTERNS } from '../studentContextQuery';
 import { createRegistrationLinkActionDef } from './registrationLinkAction';
 import { buildExportReportActionDefForRole } from './reportExportAction';
 import { generateTimetableActionDef } from './timetableGenerationAction';
+import { notificationInboxActions } from './notificationInboxActions';
 
 // ─── Handlers ─────────────────────────────────────────────────────────────────
 
@@ -460,6 +461,7 @@ export const DEPARTMENT_STATS_PATTERNS: RegExp[] = [
 // ─── Action Definitions ───────────────────────────────────────────────────────
 
 export const hodActions: ActionDefinition[] = [
+  ...notificationInboxActions,
   buildExportReportActionDefForRole(UserRole.HOD),
   generateTimetableActionDef,
   createRegistrationLinkActionDef,
