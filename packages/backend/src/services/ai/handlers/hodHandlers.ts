@@ -7,6 +7,7 @@ import { extractMessageBody, parseNotificationTargetRole } from '../notification
 import { SCHOOL_ADMIN_QUERY_PATTERNS } from '../studentContextQuery';
 import { createRegistrationLinkActionDef } from './registrationLinkAction';
 import { buildExportReportActionDefForRole } from './reportExportAction';
+import { generateTimetableActionDef } from './timetableGenerationAction';
 
 // ─── Handlers ─────────────────────────────────────────────────────────────────
 
@@ -460,6 +461,7 @@ export const DEPARTMENT_STATS_PATTERNS: RegExp[] = [
 
 export const hodActions: ActionDefinition[] = [
   buildExportReportActionDefForRole(UserRole.HOD),
+  generateTimetableActionDef,
   createRegistrationLinkActionDef,
   {
     action: 'start_session',

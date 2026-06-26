@@ -135,6 +135,17 @@ describe('actionSlotFilling', () => {
     expect(slot).toBe('classId');
   });
 
+  it('HOD generate_timetable accepts all classes as the class slot answer', () => {
+    const { params } = applySlotAnswer(
+      'generate_timetable',
+      'classId',
+      'all classes',
+      {},
+      UserRole.HOD,
+    );
+    expect(params.allClasses).toBe(true);
+  });
+
   it('Super Admin generate_license asks for schoolName when missing', async () => {
     const superAdmin = {
       sub: 'super-1',

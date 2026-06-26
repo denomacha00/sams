@@ -57,6 +57,9 @@ function getActionSlotOrder(user: AccessTokenPayload, action: string): SlotName[
   if (user.role === UserRole.HOD && action === 'send_class_notification') {
     return ['classId', 'message'];
   }
+  if (user.role === UserRole.HOD && action === 'generate_timetable') {
+    return ['classId'];
+  }
   return ACTION_SLOT_ORDER[action] ?? [];
 }
 
@@ -375,7 +378,9 @@ export function applySlotAnswer(
       break;
     case 'classId': {
       const trimmed = answer.trim();
-      if (/^[a-z0-9]{20,}$/i.test(trimmed)) next.classId = trimmed;
+      if (action === 'generate_timetable' && /\b(all|whole|entire)\b/i.test(trimmed)) {
+        next.allClasses = true;
+      } else if (/^[a-z0-9]{20,}$/i.test(trimmed)) next.classId = trimmed;
       else next.className = trimmed;
       break;
     }
@@ -517,6 +522,8 @@ export async function getNextMissingSlot(
       if (action === 'create_registration_link') {
         const target = String(resolved.targetRole ?? '').toUpperCase();
         if (target !== 'STUDENT') continue;
+      } else if (action === 'generate_timetable') {
+        if (resolved.allClasses === true) continue;
       } else if (action === 'export_attendance_report') {
         const target = String(resolved.reportType ?? '').toLowerCase();
         if (target !== 'class') continue;
@@ -658,6 +665,9 @@ export async function buildSlotQuestion(
       }
       if (action === 'start_session') {
         return `Which class should this attendance session be for? Reply with one of: ${names}`;
+      }
+      if (action === 'generate_timetable') {
+        return `Should I generate the timetable for **all classes in your department**, or one class? Reply **all classes** or one of: ${names}`;
       }
       if (action === 'export_attendance_report') {
         return `Which class report should I export? Reply with one of: ${names}`;

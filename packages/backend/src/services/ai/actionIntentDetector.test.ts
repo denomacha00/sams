@@ -228,6 +228,14 @@ describe('actionIntentDetector role scoping (regex path)', () => {
     expect(result.params?.schoolName).toBe('Test Academy');
   });
 
+  it('detects HOD timetable generation as a confirmed role action', async () => {
+    const result = await actionIntentDetector.detect('auto generate timetable for all classes', UserRole.HOD);
+    expect(result.isAction).toBe(true);
+    expect(result.action).toBe('generate_timetable');
+    expect(result.requiresConfirmation).toBe(true);
+    expect(result.params?.allClasses).toBe(true);
+  });
+
   it('detects report export requests for students and staff', async () => {
     const student = await actionIntentDetector.detect('download my attendance report pdf', UserRole.STUDENT);
     expect(student.isAction).toBe(true);
