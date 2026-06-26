@@ -73,7 +73,7 @@ export const UserAvatar: React.FC<UserAvatarProps> = ({
             className="fixed inset-0 z-[80] flex items-center justify-center bg-black/85 p-4 backdrop-blur-sm"
             onClick={() => setPreviewOpen(false)}
           >
-            <div className="w-full max-w-lg" onClick={(event) => event.stopPropagation()}>
+            <div className="w-full max-w-3xl" onClick={(event) => event.stopPropagation()}>
               <div className="mb-3 flex items-center justify-between gap-3 text-white">
                 <div className="min-w-0">
                   <p className="truncate text-sm font-semibold">{fullName || 'Profile photo'}</p>
@@ -90,7 +90,7 @@ export const UserAvatar: React.FC<UserAvatarProps> = ({
               <img
                 src={src}
                 alt={fullName ? `${fullName}'s full profile` : 'Full profile'}
-                className="max-h-[78vh] w-full rounded-2xl object-contain shadow-2xl"
+                className="mx-auto max-h-[78vh] max-w-full rounded-2xl object-contain shadow-2xl"
               />
             </div>
           </div>

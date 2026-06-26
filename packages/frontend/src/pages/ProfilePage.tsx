@@ -150,8 +150,9 @@ const ProfilePage: React.FC = () => {
     clearMessages();
 
     try {
-      // Draw cropped image to canvas. At zoom 1, use the largest centered
-      // square from the original image; higher zoom crops tighter.
+      // Draw the whole photo into a square canvas by default. Zoom/drag can
+      // still crop tighter, but the saved image should not be unexpectedly
+      // zoomed when the user simply uploads and saves.
       const canvas = document.createElement('canvas');
       canvas.width = AVATAR_EXPORT_SIZE;
       canvas.height = AVATAR_EXPORT_SIZE;
@@ -159,18 +160,20 @@ const ProfilePage: React.FC = () => {
       if (!ctx) throw new Error('Canvas is not available');
       const img = cropImgRef.current;
       const previewSize = img.getBoundingClientRect().width || 192;
-      const baseSourceSize = Math.min(img.naturalWidth, img.naturalHeight);
-
-      const size = baseSourceSize / cropScale;
-      const sourcePxPerPreviewPx = baseSourceSize / previewSize / cropScale;
-      const centerX = (img.naturalWidth / 2) - (cropPosition.x * sourcePxPerPreviewPx);
-      const centerY = (img.naturalHeight / 2) - (cropPosition.y * sourcePxPerPreviewPx);
-
-      ctx.drawImage(
-        img,
-        centerX - size / 2, centerY - size / 2, size, size,
-        0, 0, AVATAR_EXPORT_SIZE, AVATAR_EXPORT_SIZE
+      const fitScale = Math.min(
+        AVATAR_EXPORT_SIZE / img.naturalWidth,
+        AVATAR_EXPORT_SIZE / img.naturalHeight,
       );
+      const outputScale = fitScale * cropScale;
+      const drawWidth = img.naturalWidth * outputScale;
+      const drawHeight = img.naturalHeight * outputScale;
+      const positionScale = AVATAR_EXPORT_SIZE / previewSize;
+      const drawX = (AVATAR_EXPORT_SIZE - drawWidth) / 2 + cropPosition.x * positionScale;
+      const drawY = (AVATAR_EXPORT_SIZE - drawHeight) / 2 + cropPosition.y * positionScale;
+
+      ctx.fillStyle = '#0f172a';
+      ctx.fillRect(0, 0, AVATAR_EXPORT_SIZE, AVATAR_EXPORT_SIZE);
+      ctx.drawImage(img, drawX, drawY, drawWidth, drawHeight);
 
       // Convert to blob
       const blob = await new Promise<Blob>((resolve, reject) =>
@@ -235,7 +238,7 @@ const ProfilePage: React.FC = () => {
                   maxWidth: 'none',
                   width: '100%',
                   height: '100%',
-                  objectFit: 'cover',
+                  objectFit: 'contain',
                 }}
                 draggable={false}
               />
