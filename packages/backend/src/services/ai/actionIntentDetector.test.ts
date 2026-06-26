@@ -282,6 +282,19 @@ describe('actionIntentDetector role scoping (regex path)', () => {
     expect(schoolAdminResult.isAction).toBe(false);
   });
 
+  it('detects super admin provider secret updates as confirmed actions', async () => {
+    const result = await actionIntentDetector.detect(
+      'set Atomesus API key to atms_sk_testvalue123456789',
+      UserRole.SUPER_ADMIN,
+    );
+
+    expect(result.isAction).toBe(true);
+    expect(result.action).toBe('update_provider_secret');
+    expect(result.requiresConfirmation).toBe(true);
+    expect(result.params?.secretName).toBe('ATOMESUS_API_KEY');
+    expect(result.params?.secretValue).toBe('atms_sk_testvalue123456789');
+  });
+
   it('detects @db as a super admin database overview action', async () => {
     const result = await actionIntentDetector.detect('@db', UserRole.SUPER_ADMIN);
     expect(result.isAction).toBe(true);

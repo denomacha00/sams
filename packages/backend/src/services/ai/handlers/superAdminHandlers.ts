@@ -11,6 +11,29 @@ import { notificationInboxActions } from './notificationInboxActions';
 
 const VALID_PLAN_TIERS = ['TRIAL', 'BASIC', 'PROFESSIONAL', 'ENTERPRISE'] as const;
 
+const ALLOWED_PROVIDER_SECRET_KEYS = new Set([
+  'OPENAI_API_KEY',
+  'OPENAI_BASE_URL',
+  'OPENAI_MODEL',
+  'OPENAI_FALLBACK_KEY',
+  'OPENAI_FALLBACK_URL',
+  'OPENAI_FALLBACK_MODEL',
+  'ATOMESUS_API_KEY',
+  'ATOMESUS_BASE_URL',
+  'ATOMESUS_MODEL',
+  'VISION_MODEL',
+  'BIOMETRIC_MASTER_KEY',
+  'CONVERSATION_MASTER_KEY',
+  'CONVERSATION_MASTER_KEY_PREVIOUS',
+  'AT_API_KEY',
+  'AT_USERNAME',
+  'AT_SENDER_ID',
+  'SMTP_HOST',
+  'SMTP_PORT',
+  'SMTP_USER',
+  'SMTP_PASS',
+]);
+
 function extractSchoolName(text: string): string {
   return text
     .replace(/^(?:the\s+)?(?:another\s+)?school\s+(?:called|named)\s+/i, '')
@@ -31,6 +54,93 @@ function extractPlanTier(question: string): string | undefined {
 function extractDays(question: string): number | undefined {
   const match = question.match(/(\d+)\s*days?/i);
   return match ? parseInt(match[1], 10) : undefined;
+}
+
+function normalizeSecretName(input: unknown): string {
+  const raw = String(input ?? '').trim();
+  const upper = raw.toUpperCase().replace(/[^A-Z0-9_]/g, '_').replace(/_+/g, '_').replace(/^_|_$/g, '');
+  const compact = raw.toLowerCase().replace(/[^a-z0-9]/g, '');
+
+  const aliases: Record<string, string> = {
+    atomesus: 'ATOMESUS_API_KEY',
+    atomesusapikey: 'ATOMESUS_API_KEY',
+    atomesuskey: 'ATOMESUS_API_KEY',
+    openai: 'OPENAI_API_KEY',
+    openaiapikey: 'OPENAI_API_KEY',
+    openaikey: 'OPENAI_API_KEY',
+    openrouter: 'OPENAI_API_KEY',
+    openrouterkey: 'OPENAI_API_KEY',
+    openrouterapikey: 'OPENAI_API_KEY',
+    groq: 'OPENAI_FALLBACK_KEY',
+    groqkey: 'OPENAI_FALLBACK_KEY',
+    fallbackkey: 'OPENAI_FALLBACK_KEY',
+    fallbackapikey: 'OPENAI_FALLBACK_KEY',
+    biometricmasterkey: 'BIOMETRIC_MASTER_KEY',
+    biometrickey: 'BIOMETRIC_MASTER_KEY',
+    conversationmasterkey: 'CONVERSATION_MASTER_KEY',
+    conversationkey: 'CONVERSATION_MASTER_KEY',
+  };
+
+  return aliases[compact] ?? upper;
+}
+
+function maskSecret(value: string): string {
+  if (value.length <= 8) return '***masked***';
+  return `${value.slice(0, 4)}...${value.slice(-4)}`;
+}
+
+function quoteEnvValue(value: string): string {
+  return JSON.stringify(value);
+}
+
+function getProvidersEnvPath(): string {
+  const root = process.env.SAMS_ROOT?.trim() || process.cwd();
+  const path = require('path') as typeof import('path');
+  const fs = require('fs') as typeof import('fs');
+  const vpsPath = '/var/www/sams/secrets/providers.env';
+  if (fs.existsSync('/var/www/sams')) return vpsPath;
+  return path.join(root, 'secrets', 'providers.env');
+}
+
+async function writeProviderSecret(secretName: string, secretValue: string): Promise<string> {
+  const fs = await import('fs/promises');
+  const path = await import('path');
+  const filePath = getProvidersEnvPath();
+  await fs.mkdir(path.dirname(filePath), { recursive: true });
+
+  let existing = '';
+  try {
+    existing = await fs.readFile(filePath, 'utf8');
+  } catch {
+    existing = '# SAMS provider secrets overlay\n';
+  }
+
+  const line = `${secretName}=${quoteEnvValue(secretValue)}`;
+  const escaped = secretName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const re = new RegExp(`^\\s*${escaped}\\s*=.*$`, 'm');
+  const next = re.test(existing)
+    ? existing.replace(re, line)
+    : `${existing.replace(/\s*$/, '\n')}${line}\n`;
+
+  await fs.writeFile(filePath, next, { mode: 0o600 });
+  return filePath;
+}
+
+function extractSecretNameFromMessage(message: string): string | undefined {
+  const explicit = message.match(/\b([A-Z][A-Z0-9_]{2,})\b/);
+  if (explicit) return explicit[1];
+  if (/atomesus/i.test(message)) return 'ATOMESUS_API_KEY';
+  if (/openrouter/i.test(message)) return 'OPENAI_API_KEY';
+  if (/\bgroq\b|fallback/i.test(message)) return 'OPENAI_FALLBACK_KEY';
+  if (/\bopen\s*ai\b|\bopenai\b/i.test(message)) return 'OPENAI_API_KEY';
+  if (/biometric/i.test(message)) return 'BIOMETRIC_MASTER_KEY';
+  if (/conversation/i.test(message)) return 'CONVERSATION_MASTER_KEY';
+  return undefined;
+}
+
+function extractSecretValueFromMessage(message: string): string | undefined {
+  const match = message.match(/\b(?:to|as|value|key)\s+(['"]?)(\S{8,})\1\s*$/i);
+  return match?.[2]?.trim();
 }
 
 // ─── Handlers ─────────────────────────────────────────────────────────────────
@@ -491,6 +601,51 @@ const runTerminalCommandHandler: ActionHandler = async (params) => {
   };
 };
 
+const updateProviderSecretHandler: ActionHandler = async (params) => {
+  const secretName = normalizeSecretName(params.secretName);
+  const secretValue = String(params.secretValue ?? '').trim();
+
+  if (!secretName) {
+    return { answer: 'Which key should I update? Example: ATOMESUS_API_KEY.' };
+  }
+  if (!ALLOWED_PROVIDER_SECRET_KEYS.has(secretName)) {
+    return {
+      answer:
+        `I blocked that key because it is not in the Super Admin secrets allowlist: **${secretName}**.\n\n` +
+        `Allowed keys include: ${Array.from(ALLOWED_PROVIDER_SECRET_KEYS).sort().join(', ')}.`,
+    };
+  }
+  if (secretValue.length < 4) {
+    return { answer: 'That value looks too short. Paste the full new value for the key.' };
+  }
+
+  const filePath = await writeProviderSecret(secretName, secretValue);
+
+  let restartOutput = '';
+  try {
+    const restart = await runSafeTerminalCommand('@restart-api');
+    restartOutput = `\n\nRestart: ${restart.label} completed.`;
+  } catch (err) {
+    restartOutput =
+      `\n\nI updated the file, but the automatic API restart did not complete:\n` +
+      '```text\n' +
+      `${err instanceof Error ? err.message : String(err)}\n` +
+      '```\n' +
+      'Run **@restart-api** from Super Admin AI after checking the server.';
+  }
+
+  return {
+    answer:
+      `Updated **${secretName}** in the provider secrets overlay.\n\n` +
+      `Stored value: **${maskSecret(secretValue)}**\n` +
+      `File: ${filePath}\n` +
+      `The full secret was not printed back in chat.` +
+      restartOutput +
+      '\n\nRun **@diagnose-ai** or **@secrets** to verify masked provider status.',
+    data: { secretName, filePath, maskedValue: maskSecret(secretValue) },
+  };
+};
+
 export const superAdminActions: ActionDefinition[] = [
   ...notificationInboxActions,
   {
@@ -546,6 +701,27 @@ export const superAdminActions: ActionDefinition[] = [
       return `Run terminal operation "${resolved.label}" (${resolved.command} ${resolved.args.join(' ')}).`;
     },
     handler: runTerminalCommandHandler,
+  },
+  {
+    action: 'update_provider_secret',
+    description:
+      'Update an allowlisted provider/config secret in secrets/providers.env, masked in chat. Super Admin only.',
+    destructive: true,
+    patterns: [
+      /(?:set|change|update|replace)\s+(?:the\s+)?(.+?)\s+(?:api\s+key|key|secret)(?:\s+(?:to|as)\s+(\S{8,}))?$/i,
+      /(?:set|change|update|replace)\s+(?:the\s+)?(?:api\s+key|key|secret)\s+(?:for\s+)?(.+?)(?:\s+(?:to|as)\s+(\S{8,}))?$/i,
+      /(?:set|change|update|replace)\s+([A-Z][A-Z0-9_]{2,})(?:\s+(?:to|as)\s+(\S{8,}))?$/i,
+      /(?:add|save)\s+(?:my\s+)?(.+?)\s+(?:api\s+)?key(?:\s+(?:to|as)\s+(\S{8,}))?$/i,
+    ],
+    extractParams: (message: string, match: RegExpMatchArray | null) => ({
+      secretName: normalizeSecretName(match?.[1] ?? extractSecretNameFromMessage(message) ?? ''),
+      secretValue: match?.[2] ?? extractSecretValueFromMessage(message),
+    }),
+    descriptionTemplate: (params) => {
+      const key = normalizeSecretName(params.secretName);
+      return `Update provider secret **${key || 'unknown key'}** in secrets/providers.env, masked in chat, then restart the API.`;
+    },
+    handler: updateProviderSecretHandler,
   },
   {
     action: 'unsuspend_school',

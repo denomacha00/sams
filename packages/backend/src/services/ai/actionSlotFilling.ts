@@ -27,6 +27,8 @@ export type SlotName =
   | 'teacherName'
   | 'studentName'
   | 'schoolName'
+  | 'secretName'
+  | 'secretValue'
 
 const NOTIFICATION_ACTIONS = new Set([
   'send_class_message',
@@ -76,6 +78,7 @@ const ACTION_SLOT_ORDER: Record<string, SlotName[]> = {
   create_class: ['className'],
   create_department: ['departmentName'],
   generate_license: ['schoolName'],
+  update_provider_secret: ['secretName', 'secretValue'],
 };
 
 const DEFAULT_REGISTRATION_MAX_USES = 50;
@@ -402,6 +405,12 @@ export function applySlotAnswer(
           .trim();
       }
       break;
+    case 'secretName':
+      next.secretName = answer.trim();
+      break;
+    case 'secretValue':
+      next.secretValue = answer.trim();
+      break;
     case 'targetRole': {
       const roleVal = parseTargetRoleAnswer(answer);
       if (roleVal) next.targetRole = roleVal;
@@ -696,6 +705,10 @@ export async function buildSlotQuestion(
         return 'Which school should the license be generated for? Reply with the school name, for example **Mwihoko**.';
       }
       return 'Which school? Reply with the school name.';
+    case 'secretName':
+      return 'Which provider/config key should I update? For example **ATOMESUS_API_KEY**, **OPENAI_API_KEY**, **OPENAI_FALLBACK_KEY**, **BIOMETRIC_MASTER_KEY**, or **CONVERSATION_MASTER_KEY**.';
+    case 'secretValue':
+      return 'Paste the new value for that key. I will store it masked and will not repeat it back in full.';
     case 'targetRole':
       if (user.role === UserRole.HOD) {
         return (
