@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect, useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
 import apiClient from '../services/apiClient';
 import { useVoiceQuery } from '../hooks/useVoiceQuery';
 import { useAuthStore } from '../store/authStore';
@@ -20,6 +21,7 @@ import {
 import { prepareImagesForAiUpload } from '../lib/aiImageUpload';
 import { AiMessageContent } from '../lib/aiMessageContent';
 import { readAccessToken } from '../lib/authTokens';
+import { detectAiNavigationRequest } from '../lib/aiNavigation';
 
 interface PendingAction {
   action: string;
@@ -45,6 +47,7 @@ const SUGGESTED_QUESTIONS = [
 const CONFIRM_RE = /^(yes|y|confirm|proceed|ok|do it|go ahead)\.?$/i;
 
 const AIAssistantPage: React.FC = () => {
+  const navigate = useNavigate();
   const user = useAuthStore((s) => s.user);
   const threadOwner = useMemo(
     () => user ? { userId: user.id, schoolId: user.schoolId, role: user.role } : null,
@@ -235,6 +238,18 @@ const AIAssistantPage: React.FC = () => {
     setLoading(true);
 
     try {
+      const navigationTarget = selectedImages.length === 0 ? detectAiNavigationRequest(text) : null;
+      if (navigationTarget) {
+        navigate(navigationTarget.path);
+        setMessages((prev) => [...prev, {
+          id: crypto.randomUUID(),
+          role: 'assistant',
+          content: `Opened **${navigationTarget.label}**.`,
+          timestamp: new Date(),
+        }]);
+        return;
+      }
+
       if (selectedImages.length > 0) {
         const formData = new FormData();
         selectedImages.forEach((file) => formData.append('images', file));

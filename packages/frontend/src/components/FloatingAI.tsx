@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
 import apiClient from '../services/apiClient';
 import { useVoiceQuery } from '../hooks/useVoiceQuery';
 import { useAuthStore } from '../store/authStore';
@@ -19,6 +20,7 @@ import {
 } from '../lib/aiChat';
 import { prepareImagesForAiUpload } from '../lib/aiImageUpload';
 import { AiMessageContent } from '../lib/aiMessageContent';
+import { detectAiNavigationRequest } from '../lib/aiNavigation';
 
 interface PendingAction {
   action: string;
@@ -59,6 +61,7 @@ export const AISparkleIcon: React.FC<{ className?: string }> = ({ className = 'w
 );
 
 const FloatingAI: React.FC = () => {
+  const navigate = useNavigate();
   const user = useAuthStore((s) => s.user);
   const threadOwner = useMemo(
     () => user ? { userId: user.id, schoolId: user.schoolId, role: user.role } : null,
@@ -267,6 +270,19 @@ const FloatingAI: React.FC = () => {
 
     try {
       // Case 1: Images uploaded — use vision endpoint
+      const navigationTarget = selectedImages.length === 0 ? detectAiNavigationRequest(text) : null;
+      if (navigationTarget) {
+        navigate(navigationTarget.path);
+        setMessages((prev) => [...prev, {
+          id: crypto.randomUUID(),
+          role: 'assistant',
+          content: `Opened **${navigationTarget.label}**.`,
+          timestamp: new Date(),
+        }]);
+        setIsOpen(false);
+        return;
+      }
+
       if (selectedImages.length > 0) {
         const formData = new FormData();
         selectedImages.forEach((file) => formData.append('images', file));
@@ -357,7 +373,7 @@ const FloatingAI: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  }, [messages, selectedImages, imagePreviews, threadId, threadOwner, appendMemoryNotice]);
+  }, [messages, selectedImages, imagePreviews, threadId, threadOwner, appendMemoryNotice, navigate]);
 
   const { isListening, startListening, stopListening } = useVoiceQuery(submitQuery);
 
