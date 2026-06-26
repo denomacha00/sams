@@ -153,6 +153,7 @@ function generate(
   existing: { teacherId: string; classId: string; dayOfWeek: number; startTime: string; subject: string }[],
   catalog: SubjectCatalog, periods: PeriodBlock[], days: number[], maxDay: number,
   rooms: string[], tSubj: Map<string, Set<string>>,
+  subjectToTeachers: Map<string, TeacherInfo[]>,
 ): { slots: TimetableSlot[]; skipped: number; stats: Record<string, number>; assignments: Record<string, number>; doubles: number } {
   const tr = new Tracker();
   tr.seed(existing);
@@ -160,100 +161,76 @@ function generate(
   let skipped = 0, doubles = 0;
   const stats: Record<string, number> = {}, assignments: Record<string, number> = {};
 
-  const byDept = new Map<string, TeacherInfo[]>();
-  const noDept: TeacherInfo[] = [];
-  for (const t of teachers) {
-    if (t.departmentId) {
-      const existing = byDept.get(t.departmentId) ?? [];
-      existing.push(t);
-      byDept.set(t.departmentId, existing);
-    } else {
-      noDept.push(t);
-    }
-  }
-
-  // Build candidate pool per class: department teachers + no-dept teachers
-  const classCandidates = new Map<string, TeacherInfo[]>();
-  for (const cls of classes) {
-    const deptT = byDept.get(cls.departmentId) ?? [];
-    classCandidates.set(cls.id, deptT.length > 0 ? [...deptT, ...noDept] : [...teachers]);
-  }
-
   let ri = 0;
   const nextRoom = rooms.length > 0 ? () => rooms[ri++ % rooms.length] : () => undefined as string | undefined;
 
-  // PHASE 1: Round-robin baseline — each period, give every class a turn
-  // This ensures every class gets fair access to teachers, not just the first ones
-  const MIN_PER_DAY = 2;
+  // ─── Strategy: fill every class in every period if possible ──────────────
+  // For each day, for each period in order, iterate classes round-robin to
+  // assign a teacher+subject. This ensures:
+  //   (a) every class gets as many lessons as periods allow
+  //   (b) teachers get a fair share of lessons across their subjects
+  //   (c) teacher-subject constraints are strictly respected
 
   for (const day of days) {
-    // Track how many we've placed for each class on this day
-    const classProgress = new Map<string, number>();
-    for (const cls of classes) classProgress.set(cls.id, 0);
+    // Build ordered period list (not shuffled — we want consistent order)
+    const orderedPeriods = [...periods];
 
-    let anyPlaced = true;
-    // Keep looping until every class has MIN_PER_DAY or no more slots possible
-    while (anyPlaced) {
-      anyPlaced = false;
-      // For each period, try classes that still need more lessons
-      for (const p of shuffle(periods)) {
-        for (const cls of shuffle(classes)) {
-          const progress = classProgress.get(cls.id) ?? 0;
-          if (progress >= MIN_PER_DAY) continue; // already has enough
-          if (!tr.classFree(cls.id, day, p.startTime)) continue;
-
-          const cand = shuffle(classCandidates.get(cls.id) ?? teachers);
-          const subs = shuffle(getSubjects(cls, catalog));
-          const subj = subs.find((s) => !tr.hasSubject(cls.id, day, s)) ?? subs[Math.floor(Math.random() * subs.length)];
-
-          const qual = cand
-            .filter((t) => {
-              const ts = tSubj.get(t.id);
-              return (!ts || ts.size === 0 || ts.has(subj)) && tr.teacherFree(t.id, day, p.startTime) && tr.teacherUnderLimit(t.id, day, maxDay);
-            })
-            .sort((a, b) => tr.teacherLoad(a.id, day) - tr.teacherLoad(b.id, day));
-
-          if (qual.length === 0) { skipped++; continue; }
-
-          const tch = qual[0];
-          tr.book(tch.id, cls.id, day, p.startTime, subj);
-          slots.push({ schoolId, classId: cls.id, teacherId: tch.id, subject: subj, dayOfWeek: day, startTime: p.startTime, endTime: p.endTime, room: nextRoom() });
-          (assignments[tch.id] ??= 0);
-          assignments[tch.id] += 1;
-          classProgress.set(cls.id, progress + 1);
-          anyPlaced = true;
-        }
-      }
-    }
-  }
-
-  // Phase 2: Fill remaining periods with any class that still has free slots
-  for (const day of days) {
-    for (const p of shuffle(periods)) {
+    for (const p of orderedPeriods) {
+      // Round-robin through classes — each gets one chance at this period
       for (const cls of shuffle(classes)) {
         if (!tr.classFree(cls.id, day, p.startTime)) continue;
 
-        const cand = shuffle(classCandidates.get(cls.id) ?? teachers);
-        const subs = shuffle(getSubjects(cls, catalog));
-        const subj = subs.find((s) => !tr.hasSubject(cls.id, day, s)) ?? subs[Math.floor(Math.random() * subs.length)];
+        // Available subjects for this class (deduplicate what's already booked today)
+        const allSubs = shuffle(getSubjects(cls, catalog));
+        const available = allSubs.filter((s) => !tr.hasSubject(cls.id, day, s));
+        const subs = available.length > 0 ? available : allSubs;
 
-        const qual = cand.filter((t) => {
-          const ts = tSubj.get(t.id);
-          return (!ts || ts.size === 0 || ts.has(subj)) && tr.teacherFree(t.id, day, p.startTime) && tr.teacherUnderLimit(t.id, day, maxDay);
-        });
+        // For each subject, find a teacher who:
+        // 1. Can teach it (per tSubj mapping or has no mapping = teaches anything)
+        // 2. Is free at this time on this day
+        // 3. Hasn't exceeded maxLessonsPerTeacherPerDay
+        // Try subjects in order, pick the most underloaded teacher per subject
+        let best: { teacher: TeacherInfo; subject: string } | null = null;
 
-        if (qual.length === 0) { skipped++; continue; }
+        for (const subj of subs) {
+          // Get teachers who can teach this subject (from the pre-built subject→teachers map)
+          const cands = (subjectToTeachers.get(subj) ?? teachers)
+            .filter((t) =>
+              tr.teacherFree(t.id, day, p.startTime) &&
+              tr.teacherUnderLimit(t.id, day, maxDay)
+            )
+            .sort((a, b) => tr.teacherLoad(a.id, day) - tr.teacherLoad(b.id, day));
 
-        const tch = qual[Math.floor(Math.random() * qual.length)];
+          if (cands.length === 0) continue;
+
+          // Pick the least-loaded teacher for this subject
+          const tch = cands[0];
+          if (!best || tr.teacherLoad(tch.id, day) < tr.teacherLoad(best.teacher.id, day)) {
+            best = { teacher: tch, subject: subj };
+          }
+          // If equally loaded, prefer the teacher who already had this subject today
+          // (so they keep teaching their specialty)
+        }
+
+        if (!best) {
+          skipped++;
+          continue;
+        }
+
+        const { teacher: tch, subject: subj } = best;
         tr.book(tch.id, cls.id, day, p.startTime, subj);
-        slots.push({ schoolId, classId: cls.id, teacherId: tch.id, subject: subj, dayOfWeek: day, startTime: p.startTime, endTime: p.endTime, room: nextRoom() });
+        slots.push({
+          schoolId, classId: cls.id, teacherId: tch.id, subject: subj,
+          dayOfWeek: day, startTime: p.startTime, endTime: p.endTime,
+          room: nextRoom(),
+        });
         (assignments[tch.id] ??= 0);
         assignments[tch.id] += 1;
       }
     }
   }
 
-  // Calculate stats after both passes
+  // Calculate stats
   for (const cls of classes) {
     let total = 0;
     for (const day of days) {
@@ -307,6 +284,30 @@ function buildTeacherSubjectMap(
   return m;
 }
 
+/** Build a reverse map: subject → list of teachers who can teach it */
+function buildSubjectToTeachersMap(
+  teachers: TeacherInfo[],
+  tSubj: Map<string, Set<string>>,
+): Map<string, TeacherInfo[]> {
+  const map = new Map<string, TeacherInfo[]>();
+
+  for (const teacher of teachers) {
+    const subjects = tSubj.get(teacher.id);
+    if (subjects && subjects.size > 0) {
+      // Teacher has explicit subject assignments — add them
+      for (const subj of subjects) {
+        const list = map.get(subj) ?? [];
+        list.push(teacher);
+        map.set(subj, list);
+      }
+    }
+  }
+
+  // Teachers with NO subject assignments can teach anything
+  // We'll handle them as a fallback pool in the generation loop
+  return map;
+}
+
 async function loadClasses(schoolId: string, departmentId?: string, classIds?: string[]): Promise<ClassInfo[]> {
   const where: Record<string, unknown> = { schoolId };
   if (departmentId) where.departmentId = departmentId;
@@ -321,17 +322,60 @@ async function loadTeachers(schoolId: string, departmentId?: string): Promise<Te
   });
 }
 
+/**
+ * Build the subject catalog from THREE sources:
+ * 1. Existing timetable entries (historical subjects)
+ * 2. TeacherSubject table (assigned skills — even if never scheduled)
+ * 3. DEFAULT_SUBJECTS fallback
+ */
 async function loadSubjectCatalog(schoolId: string, departmentId?: string): Promise<SubjectCatalog> {
   const where: Record<string, unknown> = { schoolId };
   if (departmentId) where.class = { departmentId };
-  const rows = await prisma.timetableEntry.findMany({ where, select: { subject: true, class: { select: { departmentId: true } } } });
-  const cat: SubjectCatalog = { byDepartment: new Map(), schoolWide: uniqueSubjects(rows.map((r) => r.subject)) };
-  for (const r of rows) {
+
+  // Source 1: existing timetable entries
+  const timetableRows = await prisma.timetableEntry.findMany({
+    where: { schoolId },
+    select: { subject: true, class: { select: { departmentId: true } } },
+  });
+
+  // Source 2: TeacherSubject assignments (includes subjects teachers are skilled in
+  // that may not yet have timetable entries)
+  const teacherSubjectRows = await prisma.teacherSubject.findMany({
+    where: { schoolId },
+    select: { subject: true, teacher: { select: { departmentId: true } } },
+  });
+
+  // Merge all subjects
+  const schoolWideSet = new Set<string>();
+  const byDeptMap = new Map<string, Set<string>>();
+
+  for (const r of timetableRows) {
+    if (r.subject) schoolWideSet.add(r.subject.trim());
     const d = r.class.departmentId;
-    const e = cat.byDepartment.get(d) ?? [];
-    e.push(r.subject);
-    cat.byDepartment.set(d, uniqueSubjects(e));
+    if (!byDeptMap.has(d)) byDeptMap.set(d, new Set());
+    byDeptMap.get(d)!.add(r.subject.trim());
   }
+
+  for (const r of teacherSubjectRows) {
+    if (r.subject) schoolWideSet.add(r.subject.trim());
+    const d = r.teacher.departmentId;
+    if (d) {
+      if (!byDeptMap.has(d)) byDeptMap.set(d, new Set());
+      byDeptMap.get(d)!.add(r.subject.trim());
+    }
+  }
+
+  // Ensure DEFAULT_SUBJECTS are present
+  for (const s of DEFAULT_SUBJECTS) schoolWideSet.add(s);
+
+  const cat: SubjectCatalog = {
+    schoolWide: [...schoolWideSet].sort(),
+    byDepartment: new Map(),
+  };
+  for (const [d, subs] of byDeptMap) {
+    cat.byDepartment.set(d, [...subs].sort());
+  }
+
   return cat;
 }
 
@@ -376,6 +420,11 @@ export const timetableGeneratorService = {
     ]);
     const tSubj = buildTeacherSubjectMap(teachers, teacherSubjectMapping, dbSubjectRows, existingSubjRows);
 
+    // Build reverse map: subject → teachers who can teach it
+    // Teachers with no explicit subject assignments are NOT in this map;
+    // they're handled as fallback in the generation loop (subjectToTeachers.get returns teachers for unassigned)
+    const subjectToTeachers = buildSubjectToTeachersMap(teachers, tSubj);
+
     // Delete existing if remake
     if (remake) {
       await prisma.timetableEntry.deleteMany({ where: { schoolId, classId: { in: targetIds } } });
@@ -385,7 +434,10 @@ export const timetableGeneratorService = {
     }
 
     const periods = buildPeriods(startHour, periodDuration, breakStart, breakEnd, lunchStart, lunchEnd);
-    const result = generate(schoolId, classes, teachers, existingBookings, catalog, periods, workingDays, maxLessonsPerTeacherPerDay, rooms, tSubj);
+    const result = generate(
+      schoolId, classes, teachers, existingBookings, catalog, periods,
+      workingDays, maxLessonsPerTeacherPerDay, rooms, tSubj, subjectToTeachers,
+    );
     if (!result.slots.length) throw new Error('Could not generate any timetable entries. Not enough teachers available.');
 
     const db = await prisma.timetableEntry.createMany({ data: result.slots });
@@ -444,8 +496,14 @@ export const timetableGeneratorService = {
     ]);
     const tSubj = buildTeacherSubjectMap(teachers, teacherSubjectMapping, dbSubjectRows, existingSubjRows);
 
+    // Build reverse map: subject → teachers who can teach it
+    const subjectToTeachers = buildSubjectToTeachersMap(teachers, tSubj);
+
     const periods = buildPeriods(startHour, periodDuration, breakStart, breakEnd, lunchStart, lunchEnd);
-    const result = generate(schoolId, classes, teachers, existing, catalog, periods, workingDays, maxLessonsPerTeacherPerDay, rooms, tSubj);
+    const result = generate(
+      schoolId, classes, teachers, existing, catalog, periods,
+      workingDays, maxLessonsPerTeacherPerDay, rooms, tSubj, subjectToTeachers,
+    );
 
     const tMap = new Map(teachers.map((t) => [t.id, t.fullName]));
     const cMap = new Map(classes.map((c) => [c.id, c.name]));
