@@ -82,6 +82,10 @@ const FloatingAI: React.FC = () => {
   const inputRef = useRef<HTMLInputElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  // ── Voice tracking ──────────────────────────────────────────────────────
+  // Set true when voice button is tapped; stays true until response is spoken
+  const voicePendingRef = useRef(false);
+
   // Image generation patterns
   const IMAGE_GEN_PATTERNS = [
     /^generate\s+(?:an?\s+)?image/i,
@@ -103,6 +107,19 @@ const FloatingAI: React.FC = () => {
     pendingActionRef.current = null;
     setMessages([WELCOME_MESSAGE]);
   }, [threadOwner]);
+
+  // On speech end, re-open the mic if voice is still pending
+  const handleSpeechEnd = useCallback(() => {
+    if (voicePendingRef.current) {
+      // Keep listening for the next command automatically
+      // The mic is already re-opened by voicePendingRef logic below
+    }
+  }, []);
+
+  // ── Speech hook (onEnd fires after each utterance completes) ──────────
+  const { speaking, speak, toggle: toggleSpeech } = useAiSpeech({
+    onEnd: handleSpeechEnd,
+  });
 
   const handleImageSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []);
@@ -163,7 +180,7 @@ const FloatingAI: React.FC = () => {
     URL.revokeObjectURL(url);
   };
 
-  // Restore encrypted thread history after refresh (thread id alone is not enough for UI).
+  // Restore encrypted thread history after refresh
   useEffect(() => {
     if (!threadId || historyLoaded) return;
     let cancelled = false;
@@ -210,7 +227,7 @@ const FloatingAI: React.FC = () => {
         await apiClient.delete(`/ai/conversations/${threadId}`);
       }
     } catch {
-      // Clear the local panel even if the saved thread was already removed.
+      // Clear locally even if the saved thread was already removed.
     } finally {
       pendingActionRef.current = null;
       setThreadId(null);
@@ -237,13 +254,17 @@ const FloatingAI: React.FC = () => {
         saveAiThreadId(data.threadId, threadOwner);
       }
       pendingActionRef.current = null;
-      setMessages((prev) => [...prev, {
+      const newMsg: Message = {
         id: crypto.randomUUID(),
         role: 'assistant',
         content: data.answer,
         timestamp: new Date(),
         actionData: data.data,
-      }]);
+      };
+      setMessages((prev) => [...prev, newMsg]);
+      if (voicePendingRef.current && data.answer) {
+        speak(data.answer);
+      }
     } catch {
       setMessages((prev) => [...prev, {
         id: crypto.randomUUID(),
@@ -254,8 +275,9 @@ const FloatingAI: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  }, [messages, threadId, threadOwner]);
+  }, [messages, threadId, threadOwner, speak]);
 
+  // ── Core query submission ──────────────────────────────────────────────
   const submitQuery = useCallback(async (text: string) => {
     if (!text.trim() && selectedImages.length === 0) return;
 
@@ -270,37 +292,43 @@ const FloatingAI: React.FC = () => {
     setInput('');
     setLoading(true);
 
+    // Helper: add assistant message and speak if voice-pending
+    const addAssistantMessage = (msg: Message) => {
+      setMessages((prev) => [...prev, msg]);
+      if (voicePendingRef.current && msg.content && !msg.isError) {
+        speak(msg.content);
+        // Keep voicePending true for follow-up — mic stays open
+      }
+    };
+
     try {
-      // Case 1: Images uploaded — use vision endpoint
+      // Theme command
       const themeCommand = selectedImages.length === 0 ? detectAiThemeRequest(text) : null;
       if (themeCommand) {
         applyAiThemeCommand(themeCommand);
-        setMessages((prev) => [...prev, {
+        addAssistantMessage({
           id: crypto.randomUUID(),
           role: 'assistant',
           content: `Changed to **${themeCommand.label}**.`,
           timestamp: new Date(),
-        }]);
+        });
         return;
       }
 
+      // Navigation request — keep chat open, ask what next
       const navigationTarget = selectedImages.length === 0 ? detectAiNavigationRequest(text) : null;
       if (navigationTarget) {
         navigate(navigationTarget.path);
-        const navMessage = `Opened **${navigationTarget.label}**. What would you like to do there?\n\n• Check attendance\n• View reports\n• See your class list\n• Or ask me anything else`;
-        setMessages((prev) => [...prev, {
+        addAssistantMessage({
           id: crypto.randomUUID(),
           role: 'assistant',
-          content: navMessage,
+          content: `Done. Brought you to **${navigationTarget.label}**. What do you need next?`,
           timestamp: new Date(),
-        }]);
-        // Auto-speak navigation response when coming from voice
-        if (isListening) {
-          setTimeout(() => toggleSpeech(navMessage), 300);
-        }
+        });
         return;
       }
 
+      // Image upload query
       if (selectedImages.length > 0) {
         const formData = new FormData();
         selectedImages.forEach((file) => formData.append('images', file));
@@ -313,7 +341,7 @@ const FloatingAI: React.FC = () => {
           setThreadId(data.threadId);
           saveAiThreadId(data.threadId, threadOwner);
         }
-        setMessages((prev) => [...prev, {
+        addAssistantMessage({
           id: crypto.randomUUID(),
           role: 'assistant',
           content: data.answer,
@@ -323,21 +351,21 @@ const FloatingAI: React.FC = () => {
             isAiUploadErrorIntent(data.intent) ||
             isAiVisionFailureIntent(data.intent) ||
             isAiUnavailableIntent(data.intent),
-        }]);
+        });
         return;
       }
 
-      // Case 2: Image generation request
+      // Image generation request
       if (isImageGenRequest(text)) {
         const { data } = await apiClient.post('/ai/generate-image', { prompt: text.trim() });
-        setMessages((prev) => [...prev, {
+        addAssistantMessage({
           id: crypto.randomUUID(), role: 'assistant',
           content: `Here's the generated image:`, imageUrl: data.imageUrl, timestamp: new Date(),
-        }]);
+        });
         return;
       }
 
-      // Case 3: Normal text query (with action confirmation support)
+      // Normal text query (with action confirmation support)
       const isConfirm = CONFIRM_RE.test(text.trim()) && pendingActionRef.current;
       const pending = pendingActionRef.current;
       const history = messagesToAiHistory(messages);
@@ -359,43 +387,64 @@ const FloatingAI: React.FC = () => {
 
       if (data.pendingAction) {
         pendingActionRef.current = data.pendingAction;
-        setMessages((prev) => [...prev, {
+        addAssistantMessage({
           id: crypto.randomUUID(),
           role: 'assistant',
           content: data.answer,
           timestamp: new Date(),
           pendingAction: data.pendingAction,
           actionData: data.data,
-        }]);
+        });
         return;
       }
 
       pendingActionRef.current = null;
       const authHint = getAiAuthHint(data.intent);
-      setMessages((prev) => [...prev, {
+      addAssistantMessage({
         id: crypto.randomUUID(),
         role: 'assistant',
         content: authHint ?? data.answer,
         timestamp: new Date(),
         actionData: data.data,
         isError: isAiUnavailableIntent(data.intent) || isAiAuthIntent(data.intent),
-      }]);
+      });
     } catch (err) {
-      setMessages((prev) => [...prev, {
+      const errorMsg: Message = {
         id: crypto.randomUUID(),
         role: 'assistant',
         content: getAiErrorMessage(err, "I'm having trouble connecting. Please try again."),
         timestamp: new Date(),
         isError: true,
-      }]);
+      };
+      setMessages((prev) => [...prev, errorMsg]);
+      if (voicePendingRef.current) {
+        speak(errorMsg.content);
+      }
     } finally {
       setLoading(false);
     }
-  }, [messages, selectedImages, imagePreviews, threadId, threadOwner, appendMemoryNotice, navigate]);
+  }, [messages, selectedImages, imagePreviews, threadId, threadOwner, appendMemoryNotice, navigate, speak]);
 
-  const { isListening, startListening, stopListening } = useVoiceQuery(submitQuery);
-  const { speaking, toggle: toggleSpeech } = useAiSpeech();
+  // ── Voice integration ───────────────────────────────────────────────────
+  // Wrapped submit that auto-speaks the response if triggered by voice
+  const voiceSubmit = useCallback((transcript: string) => {
+    voicePendingRef.current = true;
+    submitQuery(transcript);
+  }, [submitQuery]);
 
+  const { isListening, startListening, stopListening } = useVoiceQuery(voiceSubmit);
+
+  const handleVoiceToggle = useCallback(() => {
+    if (isListening) {
+      voicePendingRef.current = false;
+      stopListening();
+    } else {
+      voicePendingRef.current = true;
+      startListening();
+    }
+  }, [isListening, startListening, stopListening]);
+
+  // ── Text submit ─────────────────────────────────────────────────────────
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     submitQuery(input);
@@ -606,7 +655,7 @@ const FloatingAI: React.FC = () => {
             {/* Voice button */}
             <button
               type="button"
-              onClick={isListening ? stopListening : startListening}
+              onClick={handleVoiceToggle}
               className={`relative p-2 rounded-lg transition-all duration-200 ${
                 isListening
                   ? 'bg-red-500/20 text-red-300 border border-red-500/30'

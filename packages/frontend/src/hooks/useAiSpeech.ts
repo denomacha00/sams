@@ -5,10 +5,12 @@ import { useState, useRef, useCallback } from 'react';
  * Built into Chrome, Safari, Firefox, Edge. No API key needed.
  * Kenyan voice preferred when available, falls back to default.
  */
-export function useAiSpeech() {
+export function useAiSpeech(options?: { onEnd?: () => void }) {
   const [speaking, setSpeaking] = useState(false);
   const speakingRef = useRef(false);
   const utteranceRef = useRef<SpeechSynthesisUtterance | null>(null);
+  const onEndRef = useRef(options?.onEnd);
+  onEndRef.current = options?.onEnd;
 
   const speak = useCallback((text: string) => {
     if (typeof window === 'undefined' || !window.speechSynthesis) return;
@@ -45,6 +47,7 @@ export function useAiSpeech() {
     utterance.onend = () => {
       speakingRef.current = false;
       setSpeaking(false);
+      onEndRef.current?.();
     };
 
     utterance.onerror = () => {

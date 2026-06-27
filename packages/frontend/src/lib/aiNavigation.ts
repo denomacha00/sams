@@ -35,7 +35,8 @@ export function detectAiNavigationRequest(message: string): AiNavigationTarget |
   const match = message.trim().match(NAV_COMMAND_RE);
   if (!match) return null;
 
-  const targetText = match[1]?.trim() ?? '';
+  // Strip articles (the, a, an, my) so voice transcription like "go to my timetable" → "timetable"
+  const targetText = match[1]?.trim()?.replace(/^(?:my|the|a|an)\s+/i, '') ?? '';
   if (!targetText) return null;
 
   return NAV_TARGETS.find((target) => target.patterns.some((pattern) => pattern.test(targetText))) ?? null;
