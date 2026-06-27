@@ -385,19 +385,29 @@ export const teacherActions: ActionDefinition[] = [
     description: 'Send an in-app message to all students in your class (not SMS)',
     destructive: true,
     patterns: [
-      /^notify\s+(?:my\s+)?class\s*$/i,
-      /^(?:post|send)\s+(?:a\s+)?(?:notification|message)\s*$/i,
-      /^notify\s+(?:my\s+)?students?\s*$/i,
+      // Message-capturing patterns FIRST (these extract the actual content)
       /(?:send|message)\s+(?:to\s+)?(?:my\s+)?class\s*[:,-]?\s*(.+)/i,
       /notify\s+(?:my\s+)?class\s*[:,-]?\s*(.+)/i,
       /notify\s+(?:the\s+)?students?\s+in\s+(?:my\s+)?class\s*[:,-]?\s*(.+)/i,
       /tell\s+(?:my\s+)?class\s*[:,-]?\s*(.+)/i,
       /message\s+(?:all\s+)?(?:my\s+)?students?\s*[:,-]?\s*(.+)/i,
       /send\s+(?:a\s+)?message\s+to\s+(?:my\s+)?class\s*[:,-]?\s*(.+)/i,
+      // Fallback patterns (no message — handler will ask for it)
+      /^notify\s+(?:my\s+)?class\s*$/i,
+      /^notify\s+(?:my\s+)?students?\s*$/i,
+      /^(?:post|send)\s+(?:a\s+)?(?:notification|message)\s+to\s+(?:my\s+)?class\s*$/i,
     ],
-    extractParams: (_message: string, match: RegExpMatchArray | null) => {
-      const message = match && match[1] ? match[1].trim() : '';
-      return { message };
+    extractParams: (message: string, match: RegExpMatchArray | null) => {
+      // For message-capturing patterns, match[1] is the message text
+      if (match && match[1] && match[1].trim()) {
+        return { message: match[1].trim() };
+      }
+      // For fallback patterns with no capture group, try to extract from remaining text after colon/dash
+      const colonMatch = message.match(/[:,-]\s*(.+)$/);
+      if (colonMatch) {
+        return { message: colonMatch[1].trim() };
+      }
+      return { message: '' };
     },
     descriptionTemplate: (params) =>
       `Send in-app message to your class: "${String(params.message).slice(0, 80)}${String(params.message).length > 80 ? '…' : ''}"`,

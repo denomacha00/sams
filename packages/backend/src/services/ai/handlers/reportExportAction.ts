@@ -9,6 +9,10 @@ const REPORT_EXPORT_PATTERNS: RegExp[] = [
   /(?:export|download|generate|prepare)\s+(?:a\s+)?(pdf|excel|csv|xlsx)\s+(?:attendance\s+)?report/i,
   /(?:export|download|generate|prepare)\s+(?:my\s+)?(?:student|class|department|school)?\s*(?:attendance\s+)?report\s+as\s+(pdf|excel|csv|xlsx)/i,
   /(?:attendance\s+)?report\s+(?:pdf|excel|csv|xlsx|download|export)/i,
+  // More flexible patterns - don't require "attendance report" specifically
+  /(?:export|download|generate|prepare)\s+(?:my\s+)?report/i,
+  /(?:export|download)\s+(?:my\s+)?(?:pdf|attendance|report)/i,
+  /(?:i\s+)?(?:need|want)\s+(?:a\s+)?(?:(?:pdf|attendance)\s+)?report/i,
 ];
 
 function normalizeFormat(value?: string): ReportFormat {

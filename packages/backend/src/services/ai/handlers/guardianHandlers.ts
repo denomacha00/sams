@@ -1,5 +1,6 @@
 import { UserRole } from '@sams/shared';
 import type { ActionDefinition, ActionHandler } from '../roleActionRegistry';
+import { buildExportReportActionDefForRole } from './reportExportAction';
 import { notificationInboxActions } from './notificationInboxActions';
 
 interface LinkedChild {
@@ -179,6 +180,7 @@ const exportChildReportHandler: ActionHandler = async (params, scope) => {
 
 export const guardianActions: ActionDefinition[] = [
   ...notificationInboxActions,
+  buildExportReportActionDefForRole(UserRole.GUARDIAN),
   {
     action: 'list_linked_children',
     description: 'List linked children for a parent or guardian',

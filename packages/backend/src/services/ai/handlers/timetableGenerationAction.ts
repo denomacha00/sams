@@ -53,26 +53,34 @@ export const generateTimetableHandler: ActionHandler = async (params, scope) => 
   const { timetableGeneratorService } = await import('../../timetableGeneratorService');
   const allClasses = params.allClasses === true;
   const className = typeof params.className === 'string' ? params.className : undefined;
-  const cls = allClasses ? null : await resolveClassId(scope.schoolId, scope.departmentId, className);
 
-  if (!allClasses && !cls) {
-    return {
-      answer:
-        'Which class should I generate the timetable for? Reply with the class name, or reply **all classes** for your department.',
-    };
+  // Determine which classes to generate for:
+  // - If specific class named → that class only
+  // - If "all classes" or no class specified → all department classes
+  let resolvedClassIds: string[] | undefined;
+  if (className && !allClasses) {
+    const resolved = await resolveClassId(scope.schoolId, scope.departmentId, className);
+    if (!resolved) {
+      return {
+        answer:
+          'Which class should I generate the timetable for? Reply with the class name, or say **all classes** for your department.',
+      };
+    }
+    resolvedClassIds = [resolved.id];
   }
+  // undefined = all classes in the department (this is the default)
 
   try {
     const result = await timetableGeneratorService.generate({
       schoolId: scope.schoolId,
       departmentId: scope.departmentId,
-      classIds: cls ? [cls.id] : undefined,
+      classIds: resolvedClassIds,
       remake: params.remake === true,
-      periodDuration: typeof params.periodDuration === 'number' ? params.periodDuration : 120,
+      periodDuration: typeof params.periodDuration === 'number' ? params.periodDuration : 40,
       startHour: typeof params.startHour === 'number' ? params.startHour : 8,
     });
 
-    const scopeLabel = cls ? cls.name : 'all classes in your department';
+    const scopeLabel = resolvedClassIds ? className || 'selected class' : 'all classes in your department';
     const breakdown = Object.entries(result.stats)
       .slice(0, 12)
       .map(([name, count]) => `• ${name}: ${count} lesson(s)`)
@@ -97,14 +105,14 @@ export const generateTimetableHandler: ActionHandler = async (params, scope) => 
     const message = err instanceof Error ? err.message : 'Failed to generate timetable';
     return {
       answer:
-        `${message}\n\nI did not save a fake result. Adjust classes, teacher skilled units/subjects, or say **remake timetable for all classes** if you want to replace existing slots.`,
+        `${message}\n\nI did not save a fake result. HODs and teachers fill their skilled subjects during registration in **Teacher Subjects** page - the generator uses those assignments. Check that teachers have subjects assigned, or say **remake timetable for all classes**.`,
     };
   }
 };
 
 export const generateTimetableActionDef: ActionDefinition = {
   action: 'generate_timetable',
-  description: 'Generate or remake a department timetable using the real timetable generator',
+  description: 'Generate or remake a department timetable using each teacher\'s skilled subjects from registration',
   destructive: true,
   patterns: TIMETABLE_MANAGE_PATTERNS,
   extractParams: extractTimetableGenerationParams,
@@ -113,7 +121,7 @@ export const generateTimetableActionDef: ActionDefinition = {
       ? 'all classes in your department'
       : params.className
         ? `class "${params.className}"`
-        : 'a class you choose';
+        : 'all classes in your department (auto)';
     return `${params.remake ? 'Remake' : 'Generate'} timetable for ${target}.`;
   },
   handler: generateTimetableHandler,

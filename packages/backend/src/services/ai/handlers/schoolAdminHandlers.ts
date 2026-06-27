@@ -415,17 +415,13 @@ export const schoolAdminActions: ActionDefinition[] = [
     ],
     extractParams: (message: string, match: RegExpMatchArray | null) => {
       const remainder = match && match[1] ? match[1].trim() : '';
-      // Try to detect role from the pattern
       let role = 'STUDENT';
       if (/teacher/i.test(message)) role = 'TEACHER';
       else if (/staff/i.test(message)) role = 'SCHOOL_ADMIN';
-
-      // Clean up the name
       const fullName = remainder
         .replace(/\s*(?:as|with role)\s+\w+$/i, '')
         .replace(/^named?\s+/i, '')
         .trim();
-
       return { fullName, role };
     },
     descriptionTemplate: (params) =>
@@ -486,7 +482,7 @@ export const schoolAdminActions: ActionDefinition[] = [
   },
   {
     action: 'get_school_stats',
-    description: 'Get school statistics like number of students, teachers, departments, classes, attendance rate',
+    description: 'Get school statistics (students, teachers, departments, classes)',
     destructive: false,
     patterns: [
       /how\s+many\s+(students?|teachers?|users?|departments?|classes?|hods?)/i,
@@ -505,8 +501,7 @@ export const schoolAdminActions: ActionDefinition[] = [
   },
   {
     action: 'reset_user_password',
-    description:
-      'Reset a user password at your school (temporary password shown once, or send OTP reset). Cannot read existing passwords.',
+    description: 'Reset a user password at your school (temporary password shown once, or send OTP reset). Cannot read existing passwords.',
     destructive: true,
     patterns: [
       /reset\s+(?:user\s+)?pass\s*word\s+(?:for\s+)?(.+)/i,
@@ -538,16 +533,25 @@ export const schoolAdminActions: ActionDefinition[] = [
     description: 'Send an in-app notification school-wide (optional role filter)',
     destructive: true,
     patterns: [
-      /^(?:post|send)\s+(?:a\s+)?(?:notification|message|announcement)\s*$/i,
+      // Message-capturing patterns FIRST
+      /(?:notify|message|send)\s+(?:to\s+)?(?:the\s+)?(?:whole\s+)?school\s*[:,-]\s*(.+)/i,
+      /(?:notify|message)\s+(?:all\s+)?school\s+(?:students?|teachers?|staff)\s*[:,-]\s*(.+)/i,
+      /school[\s-]wide\s+(?:message|notification)\s*[:,-]\s*(.+)/i,
+      // Fallback patterns (no message — handler will ask)
+      /^(?:post|send)\s+(?:a\s+)?(?:notification|message|announcement)\s+to\s+(?:the\s+)?(?:whole\s+)?school\s*$/i,
       /^(?:notify|message)\s+(?:the\s+)?school\s*$/i,
-      /(?:notify|message|send)\s+(?:to\s+)?(?:the\s+)?(?:whole\s+)?school\s*[:,-]?\s*(.+)/i,
-      /(?:notify|message)\s+(?:all\s+)?school\s+(?:students?|teachers?|staff)\s*[:,-]?\s*(.+)/i,
-      /school[\s-]wide\s+(?:message|notification)\s*[:,-]?\s*(.+)/i,
+      /^(?:post|send)\s+(?:a\s+)?(?:notification|message|announcement)\s*$/i,
     ],
-    extractParams: (message: string, match: RegExpMatchArray | null) => ({
-      message: extractMessageBody(match),
-      targetRole: parseNotificationTargetRole(message),
-    }),
+    extractParams: (message: string, match: RegExpMatchArray | null) => {
+      if (match && match[1] && match[1].trim()) {
+        return { message: match[1].trim(), targetRole: parseNotificationTargetRole(message) };
+      }
+      const colonMatch = message.match(/[:,]\s*(.+)$/);
+      if (colonMatch) {
+        return { message: colonMatch[1].trim(), targetRole: parseNotificationTargetRole(message) };
+      }
+      return { message: extractMessageBody(match), targetRole: parseNotificationTargetRole(message) };
+    },
     descriptionTemplate: (params) =>
       `Send in-app notification school-wide: "${String(params.message).slice(0, 80)}${String(params.message).length > 80 ? '…' : ''}"`,
     handler: sendSchoolNotificationHandler,
@@ -557,8 +561,13 @@ export const schoolAdminActions: ActionDefinition[] = [
     description: 'Send an in-app notification to a class (by name)',
     destructive: true,
     patterns: [
-      /(?:notify|message|send)\s+(?:to\s+)?class\s+(.+?)\s*[:,-]?\s*(.+)/i,
-      /notify\s+(?:the\s+)?class\s+(.+?)\s*[:,-]?\s*(.+)/i,
+      // Message-capturing patterns FIRST
+      /(?:notify|message|send)\s+(?:to\s+)?class\s+(.+?)\s*[:,-]\s*(.+)/i,
+      /notify\s+(?:the\s+)?class\s+(.+?)\s*[:,-]\s*(.+)/i,
+      /(?:notify|message|send)\s+(?:to\s+)?class\s+(.+?)\s*(?:that|saying|about)\s*(.+)/i,
+      // Fallback — no message text, handler will ask
+      /^(?:post|send)\s+(?:a\s+)?(?:notification|message|announcement)\s+to\s+(?:the\s+)?class\s+(.+)\s*$/i,
+      /^(?:notify|message)\s+(?:the\s+)?class\s+(.+)\s*$/i,
     ],
     extractParams: (message: string, match: RegExpMatchArray | null) => {
       if (match && match[2]) {
@@ -567,6 +576,10 @@ export const schoolAdminActions: ActionDefinition[] = [
           message: match[2].trim(),
           targetRole: parseNotificationTargetRole(message),
         };
+      }
+      const colonMatch = message.match(/[:,]\s*(.+)$/);
+      if (colonMatch) {
+        return { message: colonMatch[1].trim(), targetRole: parseNotificationTargetRole(message) };
       }
       return { message: extractMessageBody(match), targetRole: parseNotificationTargetRole(message) };
     },
@@ -579,8 +592,13 @@ export const schoolAdminActions: ActionDefinition[] = [
     description: 'Send an in-app notification to a department (by name if given)',
     destructive: true,
     patterns: [
-      /(?:notify|message|send)\s+(?:to\s+)?(?:the\s+)?(.+?)\s+department\s*[:,-]?\s*(.+)/i,
+      // Message-capturing patterns FIRST
+      /(?:notify|message|send)\s+(?:to\s+)?(?:the\s+)?(.+?)\s+department\s*[:,-]\s*(.+)/i,
       /(?:notify|message)\s+department\s+(.+?)\s*[:,-]\s*(.+)/i,
+      /(?:notify|message|send)\s+(?:to\s+)?(?:the\s+)?(.+?)\s+department\s*(?:that|saying|about)\s*(.+)/i,
+      // Fallback — no message text, handler will ask
+      /^(?:post|send)\s+(?:a\s+)?(?:notification|message|announcement)\s+to\s+(?:the\s+)?department\s+(.+)\s*$/i,
+      /^(?:notify|message)\s+(?:the\s+)?department\s+(.+)\s*$/i,
     ],
     extractParams: (message: string, match: RegExpMatchArray | null) => {
       if (match && match[2]) {
@@ -589,6 +607,10 @@ export const schoolAdminActions: ActionDefinition[] = [
           message: match[2].trim(),
           targetRole: parseNotificationTargetRole(message),
         };
+      }
+      const colonMatch = message.match(/[:,]\s*(.+)$/);
+      if (colonMatch) {
+        return { message: colonMatch[1].trim(), targetRole: parseNotificationTargetRole(message) };
       }
       return {
         message: extractMessageBody(match),
@@ -601,8 +623,7 @@ export const schoolAdminActions: ActionDefinition[] = [
   },
   {
     action: 'view_school_students',
-    description:
-      'List all students in your school with names, admission numbers, and class',
+    description: 'List all students in your school with names, admission numbers, and class',
     destructive: false,
     patterns: [
       /(?:list|show|view)\s+(?:all\s+)?(?:school\s+)?(?:students?|student\s+names?|student\s+list|roster)/i,
@@ -611,22 +632,19 @@ export const schoolAdminActions: ActionDefinition[] = [
       /names?\s*$/i,
     ],
     extractParams: () => ({}),
-    descriptionTemplate: () =>
-      'List all students in your school with admission numbers and class.',
+    descriptionTemplate: () => 'List all students in your school with admission numbers and class.',
     handler: viewSchoolStudentsHandler,
   },
   {
     action: 'view_school_teachers',
-    description:
-      'List all teachers in your school',
+    description: 'List all teachers in your school',
     destructive: false,
     patterns: [
       /(?:list|show|view)\s+(?:all\s+)?(?:school\s+)?(?:teachers?|teacher\s+names?|staff)/i,
       /(?:who\s+are|name)\s+(?:the\s+)?(?:teachers?|staff)\s+(?:in|of)\s+(?:the\s+)?(?:school|my\s+school)\b/i,
     ],
     extractParams: () => ({}),
-    descriptionTemplate: () =>
-      'List all teachers in your school.',
+    descriptionTemplate: () => 'List all teachers in your school.',
     handler: viewSchoolTeachersHandler,
   },
 ];

@@ -628,16 +628,27 @@ export const hodActions: ActionDefinition[] = [
     description: 'Send an in-app notification to a class in your department',
     destructive: true,
     patterns: [
-      /(?:notify|message|send)\s+(?:to\s+)?class\s+(.+?)\s*[:,-]?\s*(.+)/i,
-      /notify\s+(?:the\s+)?class\s+(.+?)\s*[:,-]?\s*(.+)/i,
+      // Message-capturing patterns FIRST
+      /(?:notify|message|send)\s+(?:to\s+)?class\s+(.+?)\s*[:,-]\s*(.+)/i,
+      /notify\s+(?:the\s+)?class\s+(.+?)\s*[:,-]\s*(.+)/i,
+      /(?:notify|message|send)\s+(?:to\s+)?class\s+(.+?)\s*(?:that|saying|about)\s*(.+)/i,
+      // Single-argument pattern (message only, no class name — handler asks for clarification)
+      /^notify\s+(?:my\s+)?class\s*$/i,
+      /^(?:post|send)\s+(?:a\s+)?(?:notification|message|announcement)\s+to\s+(?:my\s+)?class\s*$/i,
     ],
     extractParams: (message: string, match: RegExpMatchArray | null) => {
+      // Try to extract after colon/dash first
       if (match && match[2]) {
         return {
           className: match[1]?.trim(),
           message: match[2].trim(),
           targetRole: parseNotificationTargetRole(message),
         };
+      }
+      // Fallback: try to extract message after colon/dash separator
+      const colonMatch = message.match(/[:,]\s*(.+)$/);
+      if (colonMatch) {
+        return { message: colonMatch[1].trim(), targetRole: parseNotificationTargetRole(message) };
       }
       return { message: extractMessageBody(match), targetRole: parseNotificationTargetRole(message) };
     },
@@ -651,17 +662,28 @@ export const hodActions: ActionDefinition[] = [
       'Send an in-app notification to your department (all users, or students/teachers only)',
     destructive: true,
     patterns: [
-      /^(?:post|send)\s+(?:a\s+)?(?:notification|message|announcement)\s*$/i,
+      // Message-capturing patterns FIRST
+      /(?:notify|message|send)\s+(?:to\s+)?(?:my\s+)?department\s*[:,-]\s*(.+)/i,
+      /notify\s+(?:the\s+)?(?:department\s+)?students?\s*[:,-]\s*(.+)/i,
+      /notify\s+(?:the\s+)?(?:department\s+)?teachers?\s*[:,-]\s*(.+)/i,
+      /send\s+(?:a\s+)?message\s+to\s+(?:my\s+)?(?:dep(?:artment)?|dept)\s*[:,-]\s*(.+)/i,
+      // Fallback patterns (no message — handler will ask for it)
+      /^(?:post|send)\s+(?:a\s+)?(?:notification|message|announcement)\s+to\s+(?:my\s+)?(?:department|dept)\s*$/i,
       /^(?:notify|message)\s+(?:my\s+)?(?:department|dept)\s*$/i,
-      /(?:notify|message|send)\s+(?:to\s+)?(?:my\s+)?department\s*[:,-]?\s*(.+)/i,
-      /notify\s+(?:the\s+)?(?:department\s+)?students?\s*[:,-]?\s*(.+)/i,
-      /notify\s+(?:the\s+)?(?:department\s+)?teachers?\s*[:,-]?\s*(.+)/i,
-      /send\s+(?:a\s+)?message\s+to\s+(?:my\s+)?(?:dep(?:artment)?|dept)\s*[:,-]?\s*(.+)/i,
+      /^(?:post|send)\s+(?:a\s+)?(?:notification|message|announcement)\s*$/i,
     ],
-    extractParams: (message: string, match: RegExpMatchArray | null) => ({
-      message: extractMessageBody(match),
-      targetRole: parseNotificationTargetRole(message),
-    }),
+    extractParams: (message: string, match: RegExpMatchArray | null) => {
+      // For message-capturing patterns
+      if (match && match[1] && match[1].trim()) {
+        return { message: match[1].trim(), targetRole: parseNotificationTargetRole(message) };
+      }
+      // Fallback: try to extract after colon/dash
+      const colonMatch = message.match(/[:,]\s*(.+)$/);
+      if (colonMatch) {
+        return { message: colonMatch[1].trim(), targetRole: parseNotificationTargetRole(message) };
+      }
+      return { message: extractMessageBody(match), targetRole: parseNotificationTargetRole(message) };
+    },
     descriptionTemplate: (params) =>
       `Send in-app notification to your department${params.targetRole ? ` (${params.targetRole}s only)` : ''}: "${String(params.message).slice(0, 80)}${String(params.message).length > 80 ? '…' : ''}"`,
     handler: sendDepartmentNotificationHandler,
