@@ -323,20 +323,13 @@ const listSchoolsHandler: ActionHandler = async () => {
   const { prisma } = await import('../../../index');
   const schools = await prisma.school.findMany({
     orderBy: { name: 'asc' },
-    select: {
-      name: true,
-      schoolCode: true,
-      planTier: true,
-      isSuspended: true,
-      licenseExpiresAt: true,
-      email: true,
-      phone: true,
+    include: {
       _count: { select: { users: true } },
     },
   });
   if (schools.length === 0) return { answer: 'No schools found.' };
   const lines = schools.map((s) =>
-    `- ${s.name} (${s.schoolCode}) — ${s.planTier}, ${s._count.users} users, expires ${s.licenseExpiresAt.toLocaleDateString()}${s.isSuspended ? ' SUSPENDED' : ''}`
+    `- ${s.name} (${s.schoolCode}) — ${s.planTier}, ${(s as any)._count.users} users, expires ${s.licenseExpiresAt.toLocaleDateString()}${s.isSuspended ? ' SUSPENDED' : ''}`
   );
   return {
     answer: `${schools.length} school(s):\n${lines.join('\n')}`,
@@ -556,7 +549,7 @@ const databaseOverviewHandler: ActionHandler = async () => {
     notificationCount,
     auditCount,
   ] = await Promise.all([
-    prisma.school.findMany({ orderBy: { createdAt: 'desc' }, take: 10, select: { name: true, schoolCode: true, planTier: true, isSuspended: true, licenseExpiresAt: true, _count: { select: { users: true, sessions: true } } } }),
+    prisma.school.findMany({ orderBy: { createdAt: 'desc' }, take: 10, include: { _count: { select: { users: true, sessions: true } } } }),
     prisma.school.count(),
     prisma.school.count({ where: { isSuspended: true } }),
     prisma.user.count(),
