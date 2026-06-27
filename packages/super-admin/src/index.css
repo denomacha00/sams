@@ -3,12 +3,54 @@
 @tailwind utilities;
 
 @layer base {
+  :root {
+    --color-bg: #0f101a;
+    --color-bg-rgb: 15 16 26;
+    --color-surface: #181923;
+    --color-surface-rgb: 24 25 35;
+    --color-surface-muted: #13141e;
+    --color-surface-muted-rgb: 19 20 30;
+    --color-surface-elevated: #22233a;
+    --color-surface-elevated-rgb: 34 35 58;
+
+    --color-text: #ececf5;
+    --color-text-rgb: 236 236 245;
+    --color-text-muted: #989bb3;
+    --color-text-muted-rgb: 152 155 179;
+    --color-text-subtle: #76799b;
+    --color-text-subtle-rgb: 118 121 155;
+
+    --color-border: #262841;
+    --color-border-rgb: 38 40 65;
+    --color-border-strong: #36385a;
+    --color-border-strong-rgb: 54 56 90;
+
+    --color-brand: #6366f1;
+    --color-brand-rgb: 99 102 241;
+    --color-brand-hover: #818cf8;
+    --color-brand-hover-rgb: 129 140 248;
+    --color-brand-light: #1e1f4a;
+    --color-brand-light-rgb: 30 31 74;
+
+    --color-accent-orange: #f59e0b;
+    --color-accent-orange-rgb: 245 158 11;
+    --color-accent-orange-hover: #d97706;
+    --color-accent-orange-hover-rgb: 217 119 6;
+
+    --color-attendance-green: #22c55e;
+    --color-attendance-green-rgb: 34 197 94;
+    --color-attendance-red: #ef4444;
+    --color-attendance-red-rgb: 239 68 68;
+    --color-attendance-amber: #f59e0b;
+    --color-attendance-amber-rgb: 245 158 11;
+  }
+
   * {
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
   }
   body {
-    @apply bg-gray-900 text-white font-sans;
+    @apply bg-canvas text-ink font-sans;
   }
   ::-webkit-scrollbar {
     width: 6px;
@@ -17,6 +59,9 @@
     @apply bg-transparent;
   }
   ::-webkit-scrollbar-thumb {
-    @apply bg-white/20 rounded-full;
+    @apply bg-line-strong rounded-full;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    @apply bg-ink-subtle;
   }
 }
