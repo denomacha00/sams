@@ -40,6 +40,7 @@ interface Message extends AiChatMessage {
 }
 
 const CONFIRM_RE = /^(yes|y|confirm|proceed|ok|do it|go ahead)\.?$/i;
+const DONE_RE = /^(?:i'?m\s+)?done|no|stop|bye|enough|thats?\s+all|finish|end/i;
 
 const WELCOME_MESSAGE: Message = {
   id: 'welcome',
@@ -83,7 +84,6 @@ const FloatingAI: React.FC = () => {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // ── Voice tracking ──────────────────────────────────────────────────────
-  // Set true when voice button is tapped; stays true until response is spoken
   const voicePendingRef = useRef(false);
 
   // Image generation patterns
@@ -108,18 +108,8 @@ const FloatingAI: React.FC = () => {
     setMessages([WELCOME_MESSAGE]);
   }, [threadOwner]);
 
-  // On speech end, re-open the mic if voice is still pending
-  const handleSpeechEnd = useCallback(() => {
-    if (voicePendingRef.current) {
-      // Keep listening for the next command automatically
-      // The mic is already re-opened by voicePendingRef logic below
-    }
-  }, []);
-
-  // ── Speech hook (onEnd fires after each utterance completes) ──────────
-  const { speaking, speak, toggle: toggleSpeech } = useAiSpeech({
-    onEnd: handleSpeechEnd,
-  });
+  // ── Speech hook ─────────────────────────────────────────────────────────
+  const { speaking, speak, toggle: toggleSpeech, stop: stopSpeech } = useAiSpeech();
 
   const handleImageSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []);
@@ -230,6 +220,8 @@ const FloatingAI: React.FC = () => {
       // Clear locally even if the saved thread was already removed.
     } finally {
       pendingActionRef.current = null;
+      voicePendingRef.current = false;
+      if (isListening) stopListening();
       setThreadId(null);
       saveAiThreadId(null, threadOwner);
       clearImages();
@@ -263,6 +255,7 @@ const FloatingAI: React.FC = () => {
       };
       setMessages((prev) => [...prev, newMsg]);
       if (voicePendingRef.current && data.answer) {
+        setAiSpeaking(true);
         speak(data.answer);
       }
     } catch {
@@ -296,8 +289,8 @@ const FloatingAI: React.FC = () => {
     const addAssistantMessage = (msg: Message) => {
       setMessages((prev) => [...prev, msg]);
       if (voicePendingRef.current && msg.content && !msg.isError) {
+        setAiSpeaking(true);
         speak(msg.content);
-        // Keep voicePending true for follow-up — mic stays open
       }
     };
 
@@ -315,7 +308,7 @@ const FloatingAI: React.FC = () => {
         return;
       }
 
-      // Navigation request — keep chat open, ask what next
+      // Navigation request
       const navigationTarget = selectedImages.length === 0 ? detectAiNavigationRequest(text) : null;
       if (navigationTarget) {
         navigate(navigationTarget.path);
@@ -365,7 +358,21 @@ const FloatingAI: React.FC = () => {
         return;
       }
 
-      // Normal text query (with action confirmation support)
+      // Detect if user is saying they are done (in voice mode)
+      if (voicePendingRef.current && DONE_RE.test(text.trim())) {
+        voicePendingRef.current = false;
+        stopListening();
+        stopSpeech();
+        setMessages((prev) => [...prev, {
+          id: crypto.randomUUID(),
+          role: 'assistant',
+          content: 'Alright, I\'m here if you need me. Tap the mic again anytime.',
+          timestamp: new Date(),
+        }]);
+        return;
+      }
+
+      // Normal text query
       const isConfirm = CONFIRM_RE.test(text.trim()) && pendingActionRef.current;
       const pending = pendingActionRef.current;
       const history = messagesToAiHistory(messages);
@@ -418,6 +425,7 @@ const FloatingAI: React.FC = () => {
       };
       setMessages((prev) => [...prev, errorMsg]);
       if (voicePendingRef.current) {
+        setAiSpeaking(true);
         speak(errorMsg.content);
       }
     } finally {
@@ -426,13 +434,46 @@ const FloatingAI: React.FC = () => {
   }, [messages, selectedImages, imagePreviews, threadId, threadOwner, appendMemoryNotice, navigate, speak]);
 
   // ── Voice integration ───────────────────────────────────────────────────
+  // Silence callbacks
+  const handleSilence = useCallback(() => {
+    // AI asks if user is still there
+    const silenceMsg: Message = {
+      id: crypto.randomUUID(),
+      role: 'assistant',
+      content: "Are you still talking to me? I didn't hear anything for a while.",
+      timestamp: new Date(),
+    };
+    setMessages((prev) => [...prev, silenceMsg]);
+    setAiSpeaking(true);
+    speak(silenceMsg.content);
+  }, [speak]);
+
+  const handleAutoClose = useCallback(() => {
+    voicePendingRef.current = false;
+    const closeMsg: Message = {
+      id: crypto.randomUUID(),
+      role: 'assistant',
+      content: 'I closed the mic since I didn\'t hear anything. Tap the mic button when you need me.',
+      timestamp: new Date(),
+    };
+    setMessages((prev) => [...prev, closeMsg]);
+  }, []);
+
   // Wrapped submit that auto-speaks the response if triggered by voice
   const voiceSubmit = useCallback((transcript: string) => {
     voicePendingRef.current = true;
     submitQuery(transcript);
   }, [submitQuery]);
 
-  const { isListening, startListening, stopListening } = useVoiceQuery(voiceSubmit);
+  const {
+    isListening,
+    startListening,
+    stopListening,
+    setAiSpeaking,
+  } = useVoiceQuery(voiceSubmit, {
+    onSilence: handleSilence,
+    onAutoClose: handleAutoClose,
+  });
 
   const handleVoiceToggle = useCallback(() => {
     if (isListening) {
@@ -447,13 +488,12 @@ const FloatingAI: React.FC = () => {
   // ── Text submit ─────────────────────────────────────────────────────────
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    // Typing — don't read response aloud
     voicePendingRef.current = false;
     if (isListening) stopListening();
     submitQuery(input);
   };
 
-  // Auto-scroll to bottom
+  // Auto-scroll
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
@@ -531,7 +571,6 @@ const FloatingAI: React.FC = () => {
                         : 'bg-surface-muted border border-line text-ink'
                 }`}
               >
-                {/* User uploaded images */}
                 {msg.userImages && msg.userImages.length > 0 && (
                   <div className="flex gap-1 mb-2 flex-wrap">
                     {msg.userImages.map((img, i) => (
@@ -584,7 +623,6 @@ const FloatingAI: React.FC = () => {
                     {msg.actionData.download.label}
                   </button>
                 )}
-                {/* AI generated image */}
                 {msg.imageUrl && (
                   <img src={msg.imageUrl} alt="AI Generated" className="max-w-full rounded-lg mt-2 border border-white/10" loading="lazy" />
                 )}
@@ -592,7 +630,6 @@ const FloatingAI: React.FC = () => {
             </div>
           ))}
 
-          {/* Loading indicator */}
           {loading && (
             <div className="flex justify-start">
               <div className="w-6 h-6 rounded-full bg-brand flex items-center justify-center mr-2 mt-1 flex-shrink-0">
@@ -613,7 +650,6 @@ const FloatingAI: React.FC = () => {
 
         {/* Input */}
         <div className="border-t border-line p-3 bg-surface rounded-b-2xl">
-          {/* Image previews */}
           {imagePreviews.length > 0 && (
             <div className="flex gap-2 mb-2 flex-wrap">
               {imagePreviews.map((img, i) => (
@@ -632,10 +668,8 @@ const FloatingAI: React.FC = () => {
             </div>
           )}
           <form onSubmit={handleSubmit} className="flex gap-2">
-            {/* Hidden file input (multiple) */}
             <input ref={fileInputRef} type="file" accept="image/*" multiple onChange={handleImageSelect} className="hidden" />
 
-            {/* Image upload button */}
             <button type="button" onClick={() => fileInputRef.current?.click()}
               className="p-2 bg-surface-muted text-ink-muted border border-line rounded-lg hover:bg-surface-elevated hover:text-ink transition-all"
               title="Upload images (max 4)" aria-label="Upload images">
@@ -690,7 +724,7 @@ const FloatingAI: React.FC = () => {
         </div>
       </div>
 
-      {/* Floating Button with pulse animation */}
+      {/* Floating Button */}
       <button
         type="button"
         onClick={() => setIsOpen((prev) => !prev)}
