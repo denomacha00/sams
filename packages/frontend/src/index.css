@@ -16,15 +16,15 @@
 
     --color-text: #111218;
     --color-text-rgb: 17 18 24;
-    --color-text-muted: #383b50;
-    --color-text-muted-rgb: 56 59 80;
-    --color-text-subtle: #5a5e7a;
-    --color-text-subtle-rgb: 90 94 122;
+    --color-text-muted: #2e3147;
+    --color-text-muted-rgb: 46 49 71;
+    --color-text-subtle: #474b66;
+    --color-text-subtle-rgb: 71 75 102;
 
-    --color-border: #c5c9db;
-    --color-border-rgb: 197 201 219;
-    --color-border-strong: #8e93af;
-    --color-border-strong-rgb: 142 147 175;
+    --color-border: #b4b9d0;
+    --color-border-rgb: 180 185 208;
+    --color-border-strong: #757a9a;
+    --color-border-strong-rgb: 117 122 154;
 
     /* Deep indigo brand */
     --color-brand: #4f46e5;
