@@ -627,10 +627,12 @@ export const superAdminActions: ActionDefinition[] = [
   // ─── SCHOOL INFO ────────────────────────────────────────────────────────
   {
     action: 'get_school_info',
-    description: 'Get detailed information about a school including email, contact, users, plan, and status',
+    description: 'Get detailed information about a school including email, contact, users, plan, and status. Also matches "can you see school X" or "see school X".',
     destructive: false,
     patterns: [
       /^@\s*school\s+(.+)/i,
+      /(?:can\s+(?:you\s+)?)?see\s+(?:the\s+)?school\s+(.+)/i,
+      /(?:can\s+(?:you\s+)?)?school\s+(.+)/i,
       /(?:info|information)\s+(?:about|on|for)\s+(.+)/i,
       /details?\s+(?:of|about|for)\s+(.+)/i,
       /show\s+(.+?)\s+info/i,
