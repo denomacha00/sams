@@ -1,6 +1,7 @@
 import type { ActionDefinition, ActionHandler } from '../roleActionRegistry';
 import { UserRole } from '@sams/shared';
 import { extractMessageBody, parseNotificationTargetRole } from '../notificationActionParams';
+import { fetchDepartmentStudents, fetchDepartmentTeachers } from '../departmentStatsQuery';
 import { buildExportReportActionDefForRole } from './reportExportAction';
 import { notificationInboxActions } from './notificationInboxActions';
 
@@ -295,27 +296,105 @@ const resetUserPasswordHandler: ActionHandler = async (params, scope) => {
 const getSchoolStatsHandler: ActionHandler = async (_params, scope) => {
   const { prisma } = await import('../../../index');
 
-  const [totalStudents, totalTeachers, totalHODs, totalDepartments, totalClasses, totalSessions] = await Promise.all([
+  const [totalStudents, totalTeachers, totalHODs, totalDepartments, totalClasses, totalSessions, students, teachers] = await Promise.all([
     prisma.user.count({ where: { schoolId: scope.schoolId, role: 'STUDENT' } }),
     prisma.user.count({ where: { schoolId: scope.schoolId, role: 'TEACHER' } }),
     prisma.user.count({ where: { schoolId: scope.schoolId, role: 'HOD' } }),
     prisma.department.count({ where: { schoolId: scope.schoolId } }),
     prisma.class.count({ where: { schoolId: scope.schoolId } }),
     prisma.attendanceSession.count({ where: { schoolId: scope.schoolId } }),
+    prisma.user.findMany({
+      where: { schoolId: scope.schoolId, role: 'STUDENT' },
+      select: { fullName: true, admissionNumber: true },
+      orderBy: { fullName: 'asc' },
+    }),
+    prisma.user.findMany({
+      where: { schoolId: scope.schoolId, role: 'TEACHER' },
+      select: { fullName: true },
+      orderBy: { fullName: 'asc' },
+    }),
   ]);
 
   const totalUsers = totalStudents + totalTeachers + totalHODs + 1; // +1 for admin
 
+  const lines: string[] = [
+    `📊 **School Statistics**`,
+    '',
+    `• **Total Users:** ${totalUsers}`,
+    `• **Students:** ${totalStudents}`,
+    `• **Teachers:** ${totalTeachers}`,
+    `• **HODs:** ${totalHODs}`,
+    `• **Departments:** ${totalDepartments}`,
+    `• **Classes:** ${totalClasses}`,
+    `• **Attendance Sessions:** ${totalSessions}`,
+  ];
+
+  if (teachers.length > 0) {
+    lines.push('');
+    lines.push(`**Teachers:**`);
+    teachers.forEach((t) => lines.push(`  👤 ${t.fullName}`));
+  }
+
+  if (students.length > 0) {
+    lines.push('');
+    lines.push(`**Students:**`);
+    students.forEach((s) => {
+      const label = s.admissionNumber ? `${s.fullName} (${s.admissionNumber})` : s.fullName;
+      lines.push(`  🧑‍🎓 ${label}`);
+    });
+  }
+
   return {
-    answer: `📊 **School Statistics**\n\n` +
-      `• **Total Users:** ${totalUsers}\n` +
-      `• **Students:** ${totalStudents}\n` +
-      `• **Teachers:** ${totalTeachers}\n` +
-      `• **HODs:** ${totalHODs}\n` +
-      `• **Departments:** ${totalDepartments}\n` +
-      `• **Classes:** ${totalClasses}\n` +
-      `• **Attendance Sessions:** ${totalSessions}`,
+    answer: lines.join('\n'),
     data: { totalStudents, totalTeachers, totalHODs, totalDepartments, totalClasses, totalSessions, totalUsers },
+  };
+};
+
+const viewSchoolStudentsHandler: ActionHandler = async (_params, scope) => {
+  const { prisma } = await import('../../../index');
+
+  const students = await prisma.user.findMany({
+    where: { schoolId: scope.schoolId, role: 'STUDENT' },
+    select: { fullName: true, admissionNumber: true, class: { select: { name: true } } },
+    orderBy: { fullName: 'asc' },
+    take: 100,
+  });
+
+  if (students.length === 0) {
+    return { answer: 'No students registered in your school yet.', data: { count: 0 } };
+  }
+
+  const lines = students.map((s, i) => {
+    const label = s.admissionNumber ? `${s.fullName} (${s.admissionNumber})` : s.fullName;
+    const classInfo = s.class?.name ? ` — ${s.class.name}` : '';
+    return `${i + 1}. ${label}${classInfo}`;
+  });
+
+  return {
+    answer: `🧑‍🎓 **Students in your school (${students.length})**\n\n${lines.join('\n')}`,
+    data: { count: students.length, students },
+  };
+};
+
+const viewSchoolTeachersHandler: ActionHandler = async (_params, scope) => {
+  const { prisma } = await import('../../../index');
+
+  const teachers = await prisma.user.findMany({
+    where: { schoolId: scope.schoolId, role: 'TEACHER' },
+    select: { fullName: true },
+    orderBy: { fullName: 'asc' },
+    take: 100,
+  });
+
+  if (teachers.length === 0) {
+    return { answer: 'No teachers registered in your school yet.', data: { count: 0 } };
+  }
+
+  const lines = teachers.map((t, i) => `${i + 1}. 👤 ${t.fullName}`);
+
+  return {
+    answer: `👤 **Teachers in your school (${teachers.length})**\n\n${lines.join('\n')}`,
+    data: { count: teachers.length, teachers },
   };
 };
 
@@ -519,5 +598,35 @@ export const schoolAdminActions: ActionDefinition[] = [
     descriptionTemplate: (params) =>
       `Send in-app notification to department${params.departmentName ? ` "${params.departmentName}"` : ''}: "${String(params.message).slice(0, 80)}${String(params.message).length > 80 ? '…' : ''}"`,
     handler: sendDepartmentNotificationHandler,
+  },
+  {
+    action: 'view_school_students',
+    description:
+      'List all students in your school with names, admission numbers, and class',
+    destructive: false,
+    patterns: [
+      /(?:list|show|view)\s+(?:all\s+)?(?:school\s+)?(?:students?|student\s+names?|student\s+list|roster)/i,
+      /(?:who\s+are|name)\s+(?:the\s+)?(?:students?)\s+(?:in|of)\s+(?:the\s+)?(?:school|my\s+school)\b/i,
+      /names?\s+of\s+(?:the\s+)?students?\s+(?:in|of)\s+(?:the\s+)?(?:school|my\s+school)\b/i,
+      /names?\s*$/i,
+    ],
+    extractParams: () => ({}),
+    descriptionTemplate: () =>
+      'List all students in your school with admission numbers and class.',
+    handler: viewSchoolStudentsHandler,
+  },
+  {
+    action: 'view_school_teachers',
+    description:
+      'List all teachers in your school',
+    destructive: false,
+    patterns: [
+      /(?:list|show|view)\s+(?:all\s+)?(?:school\s+)?(?:teachers?|teacher\s+names?|staff)/i,
+      /(?:who\s+are|name)\s+(?:the\s+)?(?:teachers?|staff)\s+(?:in|of)\s+(?:the\s+)?(?:school|my\s+school)\b/i,
+    ],
+    extractParams: () => ({}),
+    descriptionTemplate: () =>
+      'List all teachers in your school.',
+    handler: viewSchoolTeachersHandler,
   },
 ];

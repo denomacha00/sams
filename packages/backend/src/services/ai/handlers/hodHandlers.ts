@@ -2,9 +2,9 @@ import { UserRole } from '@sams/shared';
 import type { ActionDefinition, ActionHandler } from '../roleActionRegistry';
 import { HOD_DEPARTMENT_UNLINKED_MESSAGE } from '../../../lib/hodScope';
 import { listSchoolAdminHandler } from '../../../lib/schoolAdminLookup';
-import { fetchDepartmentStats, formatDepartmentStatsAnswer } from '../departmentStatsQuery';
 import { extractMessageBody, parseNotificationTargetRole } from '../notificationActionParams';
 import { SCHOOL_ADMIN_QUERY_PATTERNS } from '../studentContextQuery';
+import { fetchDepartmentStats, formatDepartmentStatsAnswer, fetchDepartmentStudents, fetchDepartmentTeachers } from '../departmentStatsQuery';
 import { createRegistrationLinkActionDef } from './registrationLinkAction';
 import { buildExportReportActionDefForRole } from './reportExportAction';
 import { generateTimetableActionDef } from './timetableGenerationAction';
@@ -444,6 +444,54 @@ const viewDepartmentStatsHandler: ActionHandler = async (_params, scope) => {
   };
 };
 
+const viewDepartmentStudentsHandler: ActionHandler = async (_params, scope) => {
+  if (!scope.departmentId) {
+    return { answer: HOD_DEPARTMENT_UNLINKED_MESSAGE };
+  }
+
+  const students = await fetchDepartmentStudents(scope.schoolId, scope.departmentId);
+
+  if (students.length === 0) {
+    return {
+      answer: 'No students are assigned to your department yet.',
+      data: { count: 0 },
+    };
+  }
+
+  const lines = students.map((s, i) => {
+    const label = s.admissionNumber ? `${s.fullName} (${s.admissionNumber})` : s.fullName;
+    const classInfo = s.className ? ` — ${s.className}` : '';
+    return `${i + 1}. ${label}${classInfo}`;
+  });
+
+  return {
+    answer: `🧑‍🎓 **Students in your department (${students.length})**\n\n${lines.join('\n')}`,
+    data: { count: students.length, students },
+  };
+};
+
+const viewDepartmentTeachersHandler: ActionHandler = async (_params, scope) => {
+  if (!scope.departmentId) {
+    return { answer: HOD_DEPARTMENT_UNLINKED_MESSAGE };
+  }
+
+  const teachers = await fetchDepartmentTeachers(scope.schoolId, scope.departmentId);
+
+  if (teachers.length === 0) {
+    return {
+      answer: 'No teachers are assigned to your department yet.',
+      data: { count: 0 },
+    };
+  }
+
+  const lines = teachers.map((t, i) => `${i + 1}. 👤 ${t.fullName}`);
+
+  return {
+    answer: `👤 **Teachers in your department (${teachers.length})**\n\n${lines.join('\n')}`,
+    data: { count: teachers.length, teachers },
+  };
+};
+
 /** Regex patterns for HOD department statistics (natural language). */
 export const DEPARTMENT_STATS_PATTERNS: RegExp[] = [
   /department\s+stats/i,
@@ -626,5 +674,39 @@ export const hodActions: ActionDefinition[] = [
     extractParams: () => ({}),
     descriptionTemplate: () => 'Tell the user who the school administrator is for their school.',
     handler: listSchoolAdminHandler,
+  },
+  {
+    action: 'view_department_students',
+    description:
+      'List all students in your department with their names, admission numbers, and class',
+    destructive: false,
+    patterns: [
+      /^(?:my\s+)?(?:student|department)\s*names?\s*$/i,
+      /(?:list|show|view)\s+(?:my\s+)?(?:department\s+)?(?:students?|student\s+names?|student\s+list|roster)/i,
+      /(?:who\s+are|name)\s+(?:the\s+)?(?:students?|learners?)\s+(?:in|of)\s+(?:my\s+)?(?:dep(?:artment)?|dept)\b/i,
+      /^(?:student|department)\s+roster\s*$/i,
+      /names?\s+of\s+(?:the\s+)?students?\s+(?:in|of)\s+(?:my\s+)?(?:dep(?:artment)?|dept)\b/i,
+      /names?\s*$/i,
+    ],
+    extractParams: () => ({}),
+    descriptionTemplate: () =>
+      'List all students in your department with admission numbers and class.',
+    handler: viewDepartmentStudentsHandler,
+  },
+  {
+    action: 'view_department_teachers',
+    description:
+      'List all teachers assigned to your department',
+    destructive: false,
+    patterns: [
+      /^(?:my\s+)?(?:teacher|staff)\s*names?\s*$/i,
+      /(?:list|show|view)\s+(?:my\s+)?(?:department\s+)?(?:teachers?|teacher\s+names?|staff)/i,
+      /(?:who\s+are|name)\s+(?:the\s+)?(?:teachers?|staff)\s+(?:in|of)\s+(?:my\s+)?(?:dep(?:artment)?|dept)\b/i,
+      /teachers?\s+(?:in|of|for)\s+(?:my\s+)?(?:dep(?:artment)?|dept)\b/i,
+    ],
+    extractParams: () => ({}),
+    descriptionTemplate: () =>
+      'List all teachers in your department.',
+    handler: viewDepartmentTeachersHandler,
   },
 ];
