@@ -287,13 +287,17 @@ const FloatingAI: React.FC = () => {
       const navigationTarget = selectedImages.length === 0 ? detectAiNavigationRequest(text) : null;
       if (navigationTarget) {
         navigate(navigationTarget.path);
+        const navMessage = `Opened **${navigationTarget.label}**. What would you like to do there?\n\n• Check attendance\n• View reports\n• See your class list\n• Or ask me anything else`;
         setMessages((prev) => [...prev, {
           id: crypto.randomUUID(),
           role: 'assistant',
-          content: `Opened **${navigationTarget.label}**.`,
+          content: navMessage,
           timestamp: new Date(),
         }]);
-        setIsOpen(false);
+        // Auto-speak navigation response when coming from voice
+        if (isListening) {
+          setTimeout(() => toggleSpeech(navMessage), 300);
+        }
         return;
       }
 
