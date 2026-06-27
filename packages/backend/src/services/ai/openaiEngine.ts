@@ -343,6 +343,244 @@ ${sensitiveDataSection}
 ${roleActionsSection}${knowledgeSection}${documentationSection}${systemDataSection}`;
 }
 
+// ─── Function-Calling Tools ───────────────────────────────────────────────────
+
+const AI_TOOLS: OpenAI.Chat.Completions.ChatCompletionTool[] = [
+  {
+    type: 'function',
+    function: {
+      name: 'query_database',
+      description: 'Run a read-only SQL query (SELECT only) against the database. Returns rows with column names. Use for any data question: school info, user count, email lookup, student names, etc.',
+      parameters: {
+        type: 'object',
+        properties: {
+          sql: { type: 'string', description: 'The SQL query to run. Must be SELECT only. Example: SELECT * FROM "School" LIMIT 5' },
+        },
+        required: ['sql'],
+      },
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'lookup_school',
+      description: 'Look up a school by name (partial match). Returns full school details including user/session counts.',
+      parameters: {
+        type: 'object',
+        properties: {
+          name: { type: 'string', description: 'School name to search for (partial match)' },
+        },
+        required: ['name'],
+      },
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'lookup_user',
+      description: 'Look up users by name, email, or username. Optionally filter by role (STUDENT, TEACHER, SCHOOL_ADMIN, SUPER_ADMIN, HOD). Returns up to 5 matching users.',
+      parameters: {
+        type: 'object',
+        properties: {
+          search: { type: 'string', description: 'Name, email, or username to search' },
+          role: { type: 'string', enum: ['STUDENT', 'TEACHER', 'SCHOOL_ADMIN', 'SUPER_ADMIN', 'HOD'], description: 'Optional role filter' },
+        },
+        required: ['search'],
+      },
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'query_attendance',
+      description: 'Query attendance records and calculate attendance statistics. Returns attendance percentage, counts of present/absent/late students.',
+      parameters: {
+        type: 'object',
+        properties: {
+          type: { type: 'string', enum: ['percentage', 'absent_today', 'records', 'top_students'] },
+          limit: { type: 'number', description: 'Max results (default 10)' },
+        },
+        required: ['type'],
+      },
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'query_risk_scores',
+      description: 'Query dropout risk scores for students. Returns risk levels and scores.',
+      parameters: {
+        type: 'object',
+        properties: {
+          filter: { type: 'string', enum: ['all', 'high_risk', 'critical'] },
+          limit: { type: 'number', description: 'Max results (default 10)' },
+        },
+        required: ['filter'],
+      },
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'query_reports',
+      description: 'Query attendance reports for students, classes, or departments.',
+      parameters: {
+        type: 'object',
+        properties: {
+          scope: { type: 'string', enum: ['student', 'class', 'department', 'school'] },
+          targetId: { type: 'string', description: 'ID of target entity' },
+        },
+        required: ['scope'],
+      },
+    },
+  },
+];
+
+// ─── Function Call Dispatchers ────────────────────────────────────────────────
+
+async function dispatchQueryAttendance(
+  args: { type: string; limit?: number },
+  user: AccessTokenPayload,
+): Promise<unknown> {
+  const limit = args.limit ?? 10;
+  const schoolId = user.schoolId;
+  const baseWhere: Record<string, unknown> = { schoolId };
+
+  if (user.role === UserRole.STUDENT) {
+    baseWhere.studentId = user.sub;
+  } else if (user.role === UserRole.TEACHER && user.classId) {
+    const sessions = await prisma.attendanceSession.findMany({
+      where: { schoolId, classId: user.classId },
+      select: { id: true },
+    });
+    baseWhere.sessionId = { in: sessions.map((s: any) => s.id) };
+  }
+
+  switch (args.type) {
+    case 'percentage': {
+      const total = await prisma.attendanceRecord.count({ where: baseWhere });
+      const present = await prisma.attendanceRecord.count({
+        where: { ...baseWhere, status: { in: ['PRESENT', 'LATE'] } },
+      });
+      const percentage = total > 0 ? ((present / total) * 100).toFixed(1) : '0.0';
+      return { total, present, percentage: parseFloat(percentage) };
+    }
+    case 'absent_today': {
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const absentRecords = await prisma.attendanceRecord.findMany({
+        where: { ...baseWhere, status: 'ABSENT', scannedAt: { gte: today } },
+        include: { student: { select: { fullName: true } } },
+        take: limit,
+      });
+      return { count: absentRecords.length, students: absentRecords.map((r: any) => ({ name: r.student.fullName })) };
+    }
+    default: {
+      const records = await prisma.attendanceRecord.findMany({
+        where: baseWhere,
+        include: { student: { select: { fullName: true } } },
+        orderBy: { scannedAt: 'desc' },
+        take: limit,
+      });
+      return records.map((r: any) => ({ student: r.student.fullName, status: r.status }));
+    }
+  }
+}
+
+async function dispatchQueryRiskScores(
+  args: { filter: string; limit?: number },
+  user: AccessTokenPayload,
+): Promise<unknown> {
+  const limit = args.limit ?? 10;
+  const where: Record<string, unknown> = { schoolId: user.schoolId };
+  if (user.role === UserRole.STUDENT) where.studentId = user.sub;
+  if (args.filter === 'high_risk') where.riskLevel = { in: ['HIGH', 'CRITICAL'] };
+  else if (args.filter === 'critical') where.riskLevel = 'CRITICAL';
+
+  const scores = await prisma.riskScore.findMany({ where, orderBy: { score: 'desc' }, take: limit });
+  const studentIds = scores.map((s) => s.studentId);
+  const students = await prisma.user.findMany({ where: { id: { in: studentIds } }, select: { id: true, fullName: true } });
+  const studentMap = new Map(students.map((s: any) => [s.id, s.fullName]));
+  return scores.map((s) => ({ studentName: studentMap.get(s.studentId) ?? 'Unknown', score: s.score, riskLevel: s.riskLevel }));
+}
+
+async function dispatchQueryReports(args: { scope: string; targetId?: string }, user: AccessTokenPayload): Promise<unknown> {
+  const schoolId = user.schoolId;
+  if (args.scope === 'student') {
+    const targetId = user.role === UserRole.STUDENT ? user.sub : args.targetId;
+    if (!targetId) return { error: 'targetId required' };
+    const total = await prisma.attendanceRecord.count({ where: { studentId: targetId, schoolId } });
+    const present = await prisma.attendanceRecord.count({ where: { studentId: targetId, schoolId, status: { in: ['PRESENT', 'LATE'] } } });
+    const percentage = total > 0 ? ((present / total) * 100).toFixed(1) : '0.0';
+    return { totalSessions: total, present, percentage: parseFloat(percentage) };
+  }
+  return { error: 'Unsupported scope' };
+}
+
+async function dispatchFunctionCall(
+  name: string,
+  args: string,
+  user: AccessTokenPayload,
+): Promise<string> {
+  try {
+    const parsedArgs = JSON.parse(args);
+    let result: unknown;
+    switch (name) {
+      case 'query_attendance':
+        result = await dispatchQueryAttendance(parsedArgs, user);
+        break;
+      case 'query_risk_scores':
+        result = await dispatchQueryRiskScores(parsedArgs, user);
+        break;
+      case 'query_reports':
+        result = await dispatchQueryReports(parsedArgs, user);
+        break;
+      case 'query_database': {
+        const { runRawQuery } = await import('../superAdminDbAccess');
+        const sql = parsedArgs.sql as string;
+        try {
+          const queryResult = await runRawQuery(sql);
+          result = { columns: queryResult.columns, rows: queryResult.rows.slice(0, 20), total: queryResult.totalRows };
+        } catch (qErr) {
+          result = { error: qErr instanceof Error ? qErr.message : String(qErr) };
+        }
+        break;
+      }
+      case 'lookup_school': {
+        const { prisma } = await import('../../lib/prisma');
+        const name = parsedArgs.name as string;
+        const school = await prisma.school.findFirst({
+          where: { name: { contains: name || '', mode: 'insensitive' } },
+          include: { _count: { select: { users: true, sessions: true } } },
+        });
+        result = school ?? { error: 'School not found' };
+        break;
+      }
+      case 'lookup_user': {
+        const { prisma } = await import('../../lib/prisma');
+        const search = parsedArgs.search as string;
+        const role = parsedArgs.role as string | undefined;
+        const where: Record<string, unknown> = {
+          OR: [
+            { fullName: { contains: search, mode: 'insensitive' } },
+            { email: { contains: search, mode: 'insensitive' } },
+            { username: { contains: search, mode: 'insensitive' } },
+          ],
+        };
+        if (role) where.role = role;
+        const users = await prisma.user.findMany({ where, take: 5, select: { id: true, fullName: true, email: true, role: true, phone: true } });
+        result = users.length > 0 ? users : { error: 'No users found' };
+        break;
+      }
+      default:
+        result = { error: `Unknown function: ${name}` };
+    }
+    return JSON.stringify(result);
+  } catch (err) {
+    return JSON.stringify({ error: err instanceof Error ? err.message : String(err) });
+  }
+}
+
 // ─── OpenAI Engine ────────────────────────────────────────────────────────────
 
 export async function openaiQuery(
@@ -361,14 +599,21 @@ export async function openaiQuery(
 
   try {
     const client = getOpenAIClient();
+    const useTools = user.sub !== 'guest' && user.role === 'SUPER_ADMIN';
     const response = await client.chat.completions.create({
       model: resolveChatModel(),
       messages,
       temperature: 0.3,
       max_tokens: CHAT_MAX_TOKENS,
+      ...(useTools ? { tools: AI_TOOLS, tool_choice: 'auto' as const } : {}),
     });
 
-    const rawAnswer = response.choices[0]?.message?.content ?? 'I was unable to generate a response. Please try rephrasing your question.';
+    const choice = response.choices[0];
+    if (choice?.finish_reason === 'tool_calls' && choice.message?.tool_calls) {
+      return await handleToolCalls(choice.message.tool_calls, user, messages);
+    }
+
+    const rawAnswer = choice?.message?.content ?? 'I was unable to generate a response. Please try rephrasing your question.';
     const answer = enforceSamsIdentity(rawAnswer);
 
     return { answer, intent: 'openai_response' };
@@ -376,6 +621,98 @@ export async function openaiQuery(
     console.error('[AI/Primary] Error, trying fallback:', (err as Error).message);
     return tryBackupChatProviders(messages, err);
   }
+}
+
+async function handleToolCalls(
+  toolCalls: OpenAI.Chat.Completions.ChatCompletionMessageToolCall[],
+  user: AccessTokenPayload,
+  messages: OpenAI.Chat.Completions.ChatCompletionMessageParam[],
+): Promise<OpenAIQueryResult> {
+  // Process each tool call and collect results
+  const toolResults: OpenAI.Chat.Completions.ChatCompletionMessageParam[] = [];
+  const msg = toolCalls[0]!;
+
+  let result: string;
+  try {
+    const parsedArgs = JSON.parse(msg.function.arguments);
+    switch (msg.function.name) {
+      case 'query_attendance':
+        result = await dispatchFunctionCall('query_attendance', msg.function.arguments, user);
+        break;
+      case 'query_risk_scores':
+        result = await dispatchFunctionCall('query_risk_scores', msg.function.arguments, user);
+        break;
+      case 'query_reports':
+        result = await dispatchFunctionCall('query_reports', msg.function.arguments, user);
+        break;
+      case 'query_database': {
+        const { runRawQuery } = await import('../superAdminDbAccess');
+        const sql = parsedArgs.sql as string;
+        try {
+          const queryResult = await runRawQuery(sql);
+          result = JSON.stringify({ columns: queryResult.columns, rows: queryResult.rows.slice(0, 20), total: queryResult.totalRows });
+        } catch (qErr) {
+          result = JSON.stringify({ error: qErr instanceof Error ? qErr.message : String(qErr) });
+        }
+        break;
+      }
+      case 'lookup_school': {
+        const { prisma } = await import('../../lib/prisma');
+        const name = parsedArgs.name as string;
+        const school = await prisma.school.findFirst({
+          where: { name: { contains: name || '', mode: 'insensitive' } },
+          include: { _count: { select: { users: true, sessions: true } } },
+        });
+        result = school ? JSON.stringify(school) : JSON.stringify({ error: 'Not found' });
+        break;
+      }
+      case 'lookup_user': {
+        const { prisma } = await import('../../lib/prisma');
+        const search = parsedArgs.search as string;
+        const role = parsedArgs.role as string | undefined;
+        const where: Record<string, unknown> = {
+          OR: [
+            { fullName: { contains: search, mode: 'insensitive' } },
+            { email: { contains: search, mode: 'insensitive' } },
+            { username: { contains: search, mode: 'insensitive' } },
+          ],
+        };
+        if (role) where.role = role;
+        const users = await prisma.user.findMany({ where, take: 5, select: { id: true, fullName: true, email: true, role: true, phone: true } });
+        result = JSON.stringify(users.length > 0 ? users : { error: 'No users found' });
+        break;
+      }
+      default:
+        result = JSON.stringify({ error: `Unknown tool: ${msg.function.name}` });
+    }
+  } catch (err) {
+    result = JSON.stringify({ error: err instanceof Error ? err.message : String(err) });
+  }
+
+  // Add the assistant's tool call and result to messages
+  toolResults.push({
+    role: 'assistant',
+    content: null,
+    tool_calls: [msg],
+  });
+  toolResults.push({
+    role: 'tool',
+    tool_call_id: msg.id,
+    content: result,
+  });
+
+  // Send back to provider for final answer
+  const updatedMessages = [...messages, ...toolResults];
+  const client = getOpenAIClient();
+  const response = await client.chat.completions.create({
+    model: resolveChatModel(),
+    messages: updatedMessages,
+    temperature: 0.3,
+    max_tokens: CHAT_MAX_TOKENS,
+  });
+
+  const rawAnswer = response.choices[0]?.message?.content ?? 'Done.';
+  return { answer: enforceSamsIdentity(rawAnswer), intent: 'openai_response' };
 }
 
 export async function openaiQueryWithHistory(
@@ -395,14 +732,21 @@ export async function openaiQueryWithHistory(
 
   try {
     const client = getOpenAIClient();
+    const useTools = user.sub !== 'guest' && (user.role === 'SUPER_ADMIN' || user.role === 'SCHOOL_ADMIN');
     const response = await client.chat.completions.create({
       model: resolveChatModel(),
       messages,
       temperature: 0.3,
       max_tokens: CHAT_MAX_TOKENS,
+      ...(useTools ? { tools: AI_TOOLS, tool_choice: 'auto' as const } : {}),
     });
 
-    const rawAnswer = response.choices[0]?.message?.content ?? 'I was unable to generate a response. Please try rephrasing your question.';
+    const choice = response.choices[0];
+    if (choice?.finish_reason === 'tool_calls' && choice.message?.tool_calls) {
+      return await handleToolCalls(choice.message.tool_calls, user, messages);
+    }
+
+    const rawAnswer = choice?.message?.content ?? 'I was unable to generate a response. Please try rephrasing your question.';
     const answer = enforceSamsIdentity(rawAnswer);
 
     return { answer, intent: 'openai_response' };
