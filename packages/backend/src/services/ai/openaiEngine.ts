@@ -83,7 +83,7 @@ async function tryBackupChatProviders(
       const fallbackResponse = await fallback.chat.completions.create({
         model: resolveFallbackChatModel(),
         messages,
-        temperature: 0.3,
+        temperature: 0.7,
         max_tokens: CHAT_MAX_TOKENS,
       });
 
@@ -103,7 +103,7 @@ async function tryBackupChatProviders(
       const atomesusResponse = await atomesus.chat.completions.create({
         model: resolveAtomesusChatModel(),
         messages,
-        temperature: 0.3,
+        temperature: 0.7,
         max_tokens: CHAT_MAX_TOKENS,
       });
 
@@ -612,7 +612,7 @@ export async function openaiQuery(
     const response = await client.chat.completions.create({
       model: resolveChatModel(),
       messages,
-      temperature: 0.3,
+      temperature: 0.7,
       max_tokens: CHAT_MAX_TOKENS,
       ...(useTools ? { tools: AI_TOOLS, tool_choice: 'auto' as const } : {}),
     });
@@ -716,7 +716,7 @@ async function handleToolCalls(
   const response = await client.chat.completions.create({
     model: resolveChatModel(),
     messages: updatedMessages,
-    temperature: 0.3,
+    temperature: 0.7,
     max_tokens: CHAT_MAX_TOKENS,
   });
 
@@ -745,7 +745,7 @@ export async function openaiQueryWithHistory(
     const response = await client.chat.completions.create({
       model: resolveChatModel(),
       messages,
-      temperature: 0.3,
+      temperature: 0.7,
       max_tokens: CHAT_MAX_TOKENS,
       ...(useTools ? { tools: AI_TOOLS, tool_choice: 'auto' as const } : {}),
     });

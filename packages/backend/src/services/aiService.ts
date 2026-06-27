@@ -748,6 +748,53 @@ export class AIService {
         },
       });
 
+      // ─── Handler Response Reframe ──────────────────────────────────────
+      // Instead of returning the handler's hardcoded answer string directly,
+      // pipe it through the LLM so it comes out in the AI's natural voice.
+      // This makes notification sends, timetable generation, etc. sound like
+      // the AI is speaking, not a system message.
+      try {
+        const { getOpenAIClient, resolveChatModel } = await import('./ai/aiProviderConfig');
+        const client = getOpenAIClient();
+        const reframeResponse = await client.chat.completions.create({
+          model: resolveChatModel(),
+          messages: [
+            {
+              role: 'system',
+              content: `You are SAMS AI. You just completed an action for the user.
+
+Your job: say what happened in your own words, naturally. Be short, direct, and human.
+
+Rules:
+- Never say "as an AI" or "I cannot" — you just did it.
+- Use the user's tone: man-to-man, direct, no fluff.
+- If the handler result says "In-app message sent to 5 user(s) in the class", say "Done. 5 students got your message in-app."
+- If it says "Class created" or "License generated", say "Done." or "Created." — no paragraphs.
+- Keep it 1-2 sentences max.
+- Never include emoji unless it fits the tone naturally.
+- Never include technical backend details like batchId, endpoint paths, etc.
+
+Here is the raw action result: "${result.answer}"`,
+            },
+            { role: 'user', content: 'What happened?' },
+          ],
+          temperature: 0.7,
+          max_tokens: 150,
+        });
+
+        const reframed = reframeResponse.choices[0]?.message?.content?.trim();
+        if (reframed) {
+          return {
+            answer: reframed,
+            intent: 'action_executed',
+            engine: 'openai',
+            data: result.data,
+          };
+        }
+      } catch {
+        // Reframe failed — fall through to the raw handler answer
+      }
+
       return {
         answer: result.answer,
         intent: 'action_executed',

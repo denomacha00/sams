@@ -419,13 +419,13 @@ const FloatingAI: React.FC = () => {
       >
         {/* Header */}
         <div className="flex items-center justify-between px-4 py-3 border-b border-line bg-surface-muted rounded-t-2xl">
-          <div className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-lg bg-brand flex items-center justify-center">
-              <AISparkleIcon className="w-4 h-4 text-white" />
+            <div className="flex items-center gap-2">
+            <div className="w-8 h-8 rounded-lg bg-brand flex items-center justify-center overflow-hidden">
+              <img src="/ai-sams-logo.svg" alt="SAMS AI" className="w-8 h-8" />
             </div>
             <div>
-              <h3 className="text-sm font-bold text-ink">SAMS AI Assistant</h3>
-              <p className="text-[10px] text-ink-muted">Powered by AI</p>
+              <h3 className="text-sm font-bold text-ink">SAMS AI</h3>
+              <p className="text-[10px] text-ink-muted">Your Human-School Assistant</p>
             </div>
           </div>
           <div className="flex items-center gap-1">
