@@ -378,8 +378,7 @@ const SuperAdminAI: React.FC = () => {
         const navigationTarget = detectSuperAdminNavigation(question);
         if (navigationTarget) {
           navigate(navigationTarget.path);
-          appendAssistant(`Opened **${navigationTarget.label}**.`);
-          setIsOpen(false);
+          appendAssistant(`Done. Brought you to **${navigationTarget.label}**. What do you need next?`);
           return;
         }
       }
@@ -436,6 +435,31 @@ const SuperAdminAI: React.FC = () => {
     }
   };
 
+  const handleVoiceVerifyAndSend = useCallback(async () => {
+    if (loading) return;
+    
+    // Check if voiceprint exists
+    const stored = loadVoicePrint();
+    if (!stored) {
+      appendAssistant('🔊 **No voice enrolled yet.** Go to **Settings → Voice Biometrics** to enroll your voice first. Then come back and I will recognise only you.', undefined, true);
+      return;
+    }
+
+    // Verify the speaker
+    appendAssistant('🔊 **Verifying your voice...** Speak naturally for 2 seconds.', undefined, false);
+    setLoading(true);
+    
+    const result = await verify();
+    setVoiceResult(result);
+    
+    if (result.match) {
+      appendAssistant(`✅ **Voice verified** (${Math.round(result.score * 100)}% match). You're recognised, Deno. Tap the mic again and speak your command.`, undefined, false);
+    } else {
+      appendAssistant(`🔊 **Voice didn't match** (${Math.round(result.score * 100)}%). Only the enrolled Super Admin can use voice commands. Try again or use text input.`, undefined, true);
+    }
+    setLoading(false);
+  }, [loading, verify, appendAssistant]);
+
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
@@ -443,63 +467,76 @@ const SuperAdminAI: React.FC = () => {
     }
   };
 
+  const isVoiceEnrolled = !!loadVoicePrint();
+
   return (
     <>
       <button
         onClick={() => setIsOpen(!isOpen)}
-        className="fixed bottom-6 right-6 z-50 w-14 h-14 bg-purple-600 hover:bg-purple-700 text-white rounded-full shadow-lg flex items-center justify-center transition-all duration-300 hover:scale-110"
+        className={`fixed bottom-6 right-6 z-50 w-14 h-14 rounded-full flex items-center justify-center transition-all duration-300 hover:scale-105 active:scale-95 shadow-lg ${
+          isOpen
+            ? 'bg-gray-800 text-gray-200 border border-gray-600 shadow-xl'
+            : 'bg-indigo-600 hover:bg-indigo-500 text-white shadow-[0_4px_20px_rgb(99_102_241/0.45)] ring-2 ring-indigo-500/40'
+        }`}
         aria-label="Open Super Admin AI Assistant"
       >
-        <span className="relative">
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            viewBox="0 0 24 24"
-            fill="currentColor"
-            className="w-7 h-7"
-          >
-            <path
-              fillRule="evenodd"
-              d="M9 4.5a.75.75 0 01.721.544l.813 2.846a3.75 3.75 0 002.576 2.576l2.846.813a.75.75 0 010 1.442l-2.846.813a3.75 3.75 0 00-2.576 2.576l-.813 2.846a.75.75 0 01-1.442 0l-.813-2.846a3.75 3.75 0 00-2.576-2.576l-2.846-.813a.75.75 0 010-1.442l2.846-.813A3.75 3.75 0 007.466 7.89l.813-2.846A.75.75 0 019 4.5zM18 1.5a.75.75 0 01.728.568l.258 1.036c.236.94.97 1.674 1.91 1.91l1.036.258a.75.75 0 010 1.456l-1.036.258c-.94.236-1.674.97-1.91 1.91l-.258 1.036a.75.75 0 01-1.456 0l-.258-1.036a2.625 2.625 0 00-1.91-1.91l-1.036-.258a.75.75 0 010-1.456l1.036-.258a2.625 2.625 0 001.91-1.91l.258-1.036A.75.75 0 0118 1.5zM16.5 15a.75.75 0 01.712.513l.394 1.183c.15.447.5.799.948.948l1.183.395a.75.75 0 010 1.422l-1.183.395c-.447.15-.799.5-.948.948l-.395 1.183a.75.75 0 01-1.422 0l-.395-1.183a1.5 1.5 0 00-.948-.948l-1.183-.395a.75.75 0 010-1.422l1.183-.395c.447-.15.799-.5.948-.948l.395-1.183A.75.75 0 0116.5 15z"
-              clipRule="evenodd"
-            />
+        {isOpen ? (
+          <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
           </svg>
-          <span className="absolute -top-1 -right-1 w-3 h-3 bg-green-400 rounded-full animate-pulse" />
-        </span>
+        ) : (
+          <span className="relative">
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              viewBox="0 0 24 24"
+              fill="currentColor"
+              className="w-7 h-7"
+            >
+              <path
+                fillRule="evenodd"
+                d="M9 4.5a.75.75 0 01.721.544l.813 2.846a3.75 3.75 0 002.576 2.576l2.846.813a.75.75 0 010 1.442l-2.846.813a3.75 3.75 0 00-2.576 2.576l-.813 2.846a.75.75 0 01-1.442 0l-.813-2.846a3.75 3.75 0 00-2.576-2.576l-2.846-.813a.75.75 0 010-1.442l2.846-.813A3.75 3.75 0 007.466 7.89l.813-2.846A.75.75 0 019 4.5zM18 1.5a.75.75 0 01.728.568l.258 1.036c.236.94.97 1.674 1.91 1.91l1.036.258a.75.75 0 010 1.456l-1.036.258c-.94.236-1.674.97-1.91 1.91l-.258 1.036a.75.75 0 01-1.456 0l-.258-1.036a2.625 2.625 0 00-1.91-1.91l-1.036-.258a.75.75 0 010-1.456l1.036-.258a2.625 2.625 0 001.91-1.91l.258-1.036A.75.75 0 0118 1.5zM16.5 15a.75.75 0 01.712.513l.394 1.183c.15.447.5.799.948.948l1.183.395a.75.75 0 010 1.422l-1.183.395c-.447.15-.799.5-.948.948l-.395 1.183a.75.75 0 01-1.422 0l-.395-1.183a1.5 1.5 0 00-.948-.948l-1.183-.395a.75.75 0 010-1.422l1.183-.395c.447-.15.799-.5.948-.948l.395-1.183A.75.75 0 0116.5 15z"
+                clipRule="evenodd"
+              />
+            </svg>
+            {!isOpen && (
+              <span className="absolute -top-1 -right-1 w-3 h-3 bg-green-400 rounded-full animate-pulse" />
+            )}
+          </span>
+        )}
       </button>
 
       {isOpen && (
         <div className="fixed bottom-24 right-6 z-50 w-[420px] h-[600px] bg-gray-900 border border-gray-700 rounded-xl shadow-2xl flex flex-col overflow-hidden">
-          <div className="bg-purple-700 px-4 py-3 flex items-center justify-between">
+          {/* Header */}
+          <div className="bg-indigo-700 px-4 py-3 flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                viewBox="0 0 24 24"
-                fill="currentColor"
-                className="w-5 h-5 text-indigo-200"
-              >
-                <path
-                  fillRule="evenodd"
-                  d="M9 4.5a.75.75 0 01.721.544l.813 2.846a3.75 3.75 0 002.576 2.576l2.846.813a.75.75 0 010 1.442l-2.846.813a3.75 3.75 0 00-2.576 2.576l-.813 2.846a.75.75 0 01-1.442 0l-.813-2.846a3.75 3.75 0 00-2.576-2.576l-2.846-.813a.75.75 0 010-1.442l2.846-.813A3.75 3.75 0 007.466 7.89l.813-2.846A.75.75 0 019 4.5z"
-                  clipRule="evenodd"
-                />
-              </svg>
+              <div className="w-8 h-8 rounded-lg bg-indigo-500 flex items-center justify-center overflow-hidden">
+                <svg className="w-5 h-5 text-white" viewBox="0 0 24 24" fill="currentColor">
+                  <path d="M9 4.5a.75.75 0 01.721.544l.813 2.846a3.75 3.75 0 002.576 2.576l2.846.813a.75.75 0 010 1.442l-2.846.813a3.75 3.75 0 00-2.576 2.576l-.813 2.846a.75.75 0 01-1.442 0l-.813-2.846a3.75 3.75 0 00-2.576-2.576l-2.846-.813a.75.75 0 010-1.442l2.846-.813A3.75 3.75 0 007.466 7.89l.813-2.846A.75.75 0 019 4.5z" />
+                </svg>
+              </div>
               <div>
-                <h3 className="text-white font-semibold text-sm">Super Admin AI</h3>
-                <p className="text-purple-200 text-xs">System Administrator Assistant</p>
+                <h3 className="text-white font-semibold text-sm">SAMS AI</h3>
+                <p className="text-indigo-200 text-xs">System Administrator Assistant</p>
               </div>
             </div>
             <div className="flex items-center gap-2">
+              {isVoiceEnrolled && (
+                <span className="px-2 py-0.5 bg-green-900/50 border border-green-600 text-green-300 text-[10px] font-medium rounded-full">
+                  Voice Ready
+                </span>
+              )}
               <button
                 onClick={() => void clearConversation()}
                 disabled={loading || (!threadId && messages.length <= 1)}
-                className="text-xs text-purple-100 hover:text-white disabled:opacity-40 transition-colors"
+                className="text-xs text-indigo-100 hover:text-white disabled:opacity-40 transition-colors"
                 aria-label="Clear AI conversation"
               >
                 Clear
               </button>
               <button
                 onClick={() => setIsOpen(false)}
-                className="text-purple-200 hover:text-white transition-colors"
+                className="text-indigo-200 hover:text-white transition-colors"
                 aria-label="Close AI panel"
               >
                 <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" viewBox="0 0 20 20" fill="currentColor">
@@ -513,6 +550,7 @@ const SuperAdminAI: React.FC = () => {
             </div>
           </div>
 
+          {/* Messages */}
           <div className="flex-1 overflow-y-auto p-4 space-y-4">
             {messages.map((msg) => (
               <div
@@ -520,9 +558,9 @@ const SuperAdminAI: React.FC = () => {
                 className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
               >
                 <div
-                  className={`max-w-[85%] rounded-lg px-3 py-2 text-sm ${
+                  className={`max-w-[85%] rounded-xl px-3 py-2 text-sm ${
                     msg.role === 'user'
-                      ? 'bg-purple-600 text-white'
+                      ? 'bg-indigo-600 text-white'
                       : msg.isError
                         ? 'bg-red-950 text-red-100 border border-red-600'
                         : 'bg-gray-800 text-gray-200 border border-gray-700'
@@ -534,7 +572,7 @@ const SuperAdminAI: React.FC = () => {
                     <button
                       onClick={() => void handleConfirmAction(msg.pendingAction!)}
                       disabled={loading}
-                      className="mt-2 w-full bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white text-xs font-medium py-1.5 px-3 rounded transition-colors"
+                      className="mt-2 w-full bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white text-xs font-medium py-1.5 px-3 rounded-lg transition-colors"
                     >
                       ✓ Confirm: {msg.pendingAction.description}
                     </button>
@@ -544,11 +582,16 @@ const SuperAdminAI: React.FC = () => {
             ))}
             {loading && (
               <div className="flex justify-start">
-                <div className="bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-gray-400">
+                <div className="w-6 h-6 rounded-full bg-indigo-500 flex items-center justify-center mr-2 mt-1 flex-shrink-0">
+                  <svg className="w-3 h-3 text-white" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M9 4.5a.75.75 0 01.721.544l.813 2.846a3.75 3.75 0 002.576 2.576l2.846.813a.75.75 0 010 1.442l-2.846.813a3.75 3.75 0 00-2.576 2.576l-.813 2.846a.75.75 0 01-1.442 0l-.813-2.846a3.75 3.75 0 00-2.576-2.576l-2.846-.813a.75.75 0 010-1.442l2.846-.813A3.75 3.75 0 007.466 7.89l.813-2.846A.75.75 0 019 4.5z" />
+                  </svg>
+                </div>
+                <div className="bg-gray-800 border border-gray-700 rounded-xl px-3 py-2 text-sm text-gray-400">
                   <span className="inline-flex gap-1">
-                    <span className="animate-bounce">●</span>
-                    <span className="animate-bounce" style={{ animationDelay: '0.1s' }}>●</span>
-                    <span className="animate-bounce" style={{ animationDelay: '0.2s' }}>●</span>
+                    <span className="w-1.5 h-1.5 bg-indigo-400 rounded-full animate-bounce" />
+                    <span className="w-1.5 h-1.5 bg-indigo-400 rounded-full animate-bounce" style={{ animationDelay: '0.1s' }} />
+                    <span className="w-1.5 h-1.5 bg-indigo-400 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }} />
                   </span>
                 </div>
               </div>
@@ -556,7 +599,8 @@ const SuperAdminAI: React.FC = () => {
             <div ref={messagesEndRef} />
           </div>
 
-          <div className="border-t border-gray-700 p-3">
+          {/* Input */}
+          <div className="border-t border-gray-700 p-3 bg-gray-800/50">
             {imagePreviews.length > 0 && (
               <div className="flex gap-2 mb-2 flex-wrap">
                 {imagePreviews.map((img, i) => (
@@ -574,12 +618,33 @@ const SuperAdminAI: React.FC = () => {
               <button
                 type="button"
                 onClick={() => fileInputRef.current?.click()}
-                className="bg-gray-800 border border-gray-600 text-gray-400 hover:text-white px-2 py-2 rounded-lg transition-colors"
+                className="bg-gray-800 border border-gray-600 text-gray-400 hover:text-white p-2 rounded-lg transition-colors"
                 title="Upload images (max 4)"
               >
                 <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2 2v10a2 2 0 002 2z" />
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
                   <path strokeLinecap="round" strokeLinejoin="round" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
+                </svg>
+              </button>
+
+              {/* Voice biometrics button */}
+              <button
+                type="button"
+                onClick={() => void handleVoiceVerifyAndSend()}
+                disabled={loading || isVerifying}
+                className={`relative p-2 rounded-lg transition-all duration-200 ${
+                  isVerifying
+                    ? 'bg-green-500/20 text-green-300 border border-green-500/30'
+                    : 'bg-gray-800 border border-gray-600 text-gray-400 hover:text-white'
+                }`}
+                title={isVoiceEnrolled ? 'Verify voice & command' : 'Enroll voice first in Settings'}
+                aria-label="Voice biometrics"
+              >
+                {isVerifying && (
+                  <span className="absolute inset-0 rounded-lg bg-green-500/20 animate-ping" />
+                )}
+                <svg className="w-4 h-4 relative z-10" viewBox="0 0 20 20" fill="currentColor">
+                  <path fillRule="evenodd" d="M7 4a3 3 0 016 0v4a3 3 0 11-6 0V4zm4 10.93A7.001 7.001 0 0017 8a1 1 0 10-2 0A5 5 0 015 8a1 1 0 00-2 0 7.001 7.001 0 006 6.93V17H6a1 1 0 100 2h8a1 1 0 100-2h-3v-2.07z" clipRule="evenodd" />
                 </svg>
               </button>
 
@@ -589,13 +654,13 @@ const SuperAdminAI: React.FC = () => {
                 onChange={(e) => setInput(e.target.value)}
                 onKeyDown={handleKeyDown}
                 placeholder={selectedImages.length > 0 ? 'Ask about these images...' : 'Ask or run an admin action...'}
-                className="flex-1 bg-gray-800 border border-gray-600 rounded-lg px-3 py-2 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-purple-500"
+                className="flex-1 bg-gray-800 border border-gray-600 rounded-lg px-3 py-2 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-indigo-500"
                 disabled={loading}
               />
               <button
                 onClick={() => void handleSend()}
                 disabled={loading || (!input.trim() && selectedImages.length === 0)}
-                className="bg-purple-600 hover:bg-purple-700 disabled:bg-gray-700 disabled:text-gray-500 text-white px-3 py-2 rounded-lg transition-colors"
+                className="bg-indigo-600 hover:bg-indigo-500 disabled:bg-gray-700 disabled:text-gray-500 text-white p-2 rounded-lg transition-colors"
                 aria-label="Send message"
               >
                 <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" viewBox="0 0 20 20" fill="currentColor">
@@ -604,7 +669,7 @@ const SuperAdminAI: React.FC = () => {
               </button>
             </div>
             <p className="text-xs text-gray-500 mt-1.5">
-              Try: &quot;suspend school Y&quot; • &quot;clear audit logs&quot; • &quot;system stats&quot;
+              🔊 Voice: {isVoiceEnrolled ? 'enrolled' : 'not enrolled'} • <span className="text-indigo-400">Settings → Voice Biometrics</span> to train
             </p>
           </div>
         </div>
