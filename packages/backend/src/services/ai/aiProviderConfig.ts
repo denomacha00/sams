@@ -215,10 +215,18 @@ export async function probeAIProvider(timeoutMs = 15000): Promise<{
 }
 
 export function getMissingAIKeyMessage(): string {
+  const hasAtomesus = process.env.ATOMESUS_API_KEY?.trim();
+  if (hasAtomesus && hasAtomesus.length > 10) {
+    return (
+      'AI chat is not configured on this server. The ATOMESUS_API_KEY is present but may be invalid or the Atomesus service is unreachable. ' +
+      'Please run **@diagnose-ai** or check the server logs.'
+    );
+  }
   return (
     'AI chat is not configured on this server. Your administrator must set OPENAI_API_KEY in the backend .env. ' +
     'For Groq (free tier): OPENAI_BASE_URL=https://api.groq.com/openai/v1 and OPENAI_MODEL=llama-3.3-70b-versatile. ' +
-    'Optional backup: OPENAI_FALLBACK_KEY with OPENAI_FALLBACK_URL=https://openrouter.ai/api/v1.'
+    'Optional backup: OPENAI_FALLBACK_KEY with OPENAI_FALLBACK_URL=https://openrouter.ai/api/v1. ' +
+    'You can also use ATOMESUS_API_KEY as the primary provider.'
   );
 }
 
@@ -443,6 +451,9 @@ export function getOpenAIClient(options?: { timeoutMs?: number }): OpenAI {
   const apiKey = process.env.OPENAI_API_KEY?.trim();
   if (!apiKey) {
     throw new Error('OPENAI_API_KEY environment variable is not set');
+  }
+  if (!isRealProviderKey(apiKey)) {
+    throw new Error('OPENAI_API_KEY is set to a placeholder value - not a real key. Set a valid OpenAI/Groq/OpenRouter API key or use ATOMESUS_API_KEY instead.');
   }
   return new OpenAI({
     apiKey,

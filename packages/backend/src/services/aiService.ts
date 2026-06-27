@@ -21,6 +21,7 @@ import {
   formatProviderError,
   getMissingAIKeyMessage,
   hasPrimaryAIKey,
+  hasAtomesusAIKey,
 } from './ai/aiProviderConfig';
 import { isConversationMemoryEnabled } from './ai/roleActionsPrompt';
 import {
@@ -400,8 +401,9 @@ export class AIService {
 
     historyMessages = mergeHistoryMessages(historyMessages, clientHistory);
 
-    // Local engine couldn't resolve — try the OpenAI-compatible provider chain
-    if (!hasPrimaryAIKey()) {
+    // Local engine couldn't resolve — try the OpenAI-compatible provider chain.
+    // This blocks only when NO key is configured (primary, Atomesus, or fallback).
+    if (!hasPrimaryAIKey() && !hasAtomesusAIKey()) {
       const answer = getMissingAIKeyMessage();
       if (user.sub !== 'guest') {
         threadId = await this.safelyPersist(user, question, answer, threadId);
@@ -414,7 +416,8 @@ export class AIService {
       };
     }
 
-    // Step 4: Call the OpenAI-compatible provider chain with conversation history
+    // Step 4: Call the OpenAI-compatible provider chain with conversation history.
+    // The openaiEngine handles primary → fallback → Atomesus fallback chain internally.
     try {
       const openaiResult = await openaiQueryWithHistory(user, question, historyMessages);
 

@@ -816,13 +816,12 @@ export async function openaiQuery(
     };
   }
 
-  const client = getOpenAIClient();
   const systemPrompt = await buildSystemPrompt(user);
 
   const messages = buildMessagesWithinContext(systemPrompt, question);
 
   try {
-    // Simple chat completion without function calling (works with Groq free tier)
+    const client = getOpenAIClient();
     const response = await client.chat.completions.create({
       model: resolveChatModel(),
       messages,
@@ -863,12 +862,13 @@ export async function openaiQueryWithHistory(
     };
   }
 
-  const client = getOpenAIClient();
   const systemPrompt = await buildSystemPrompt(user);
 
   const messages = buildMessagesWithinContext(systemPrompt, question, history);
 
+  // Try primary provider first (may throw for placeholder keys — caught below)
   try {
+    const client = getOpenAIClient();
     const response = await client.chat.completions.create({
       model: resolveChatModel(),
       messages,
