@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import apiClient from '../services/apiClient';
 import { prepareImagesForAiUpload } from '../lib/aiImageUpload';
 import { useAuthStore } from '../store/authStore';
+import AiChartRenderer from './AiChartRenderer';
 
 interface PendingAction {
   action: string;
@@ -514,7 +515,7 @@ const SuperAdminAI: React.FC = () => {
                 className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
               >
                 <div
-                  className={`max-w-[85%] rounded-lg px-3 py-2 text-sm whitespace-pre-wrap ${
+                  className={`max-w-[85%] rounded-lg px-3 py-2 text-sm ${
                     msg.role === 'user'
                       ? 'bg-purple-600 text-white'
                       : msg.isError
@@ -522,7 +523,8 @@ const SuperAdminAI: React.FC = () => {
                         : 'bg-gray-800 text-gray-200 border border-gray-700'
                   }`}
                 >
-                  {msg.content}
+                  <div className="whitespace-pre-wrap">{msg.content}</div>
+                  <AiChartRenderer content={msg.content} />
                   {msg.pendingAction && (
                     <button
                       onClick={() => void handleConfirmAction(msg.pendingAction!)}

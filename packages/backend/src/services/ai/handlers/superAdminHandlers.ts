@@ -6,6 +6,8 @@ import {
   runSafeTerminalCommand,
 } from '../../superAdminTerminalOps';
 import { notificationInboxActions } from './notificationInboxActions';
+import { describeBatchParams, resolveBatchSchools, detectBatchOperation, type BatchResolveResult } from '../../superAdminBatchResolver';
+import { sendPlatformSummaryEmail } from '../../superAdminEmailSummary';
 
 // ─── Helper Utilities (migrated from actionIntentDetector.ts) ─────────────────
 
@@ -899,6 +901,23 @@ export const superAdminActions: ActionDefinition[] = [
     handler: resetUserPasswordHandler,
   },
   {
+    action: 'send_platform_summary',
+    description: 'Send a platform summary email to the super admin email',
+    destructive: false,
+    patterns: [
+      /send\s+(?:platform|system|daily)\s+(?:summary|report|email)/i,
+      /email\s+(?:platform|system|daily)\s+(?:summary|report)/i,
+      /(?:send|email)\s+(?:me\s+)?(?:a\s+)?(?:platform\s+)?summary/i,
+    ],
+    extractParams: () => ({}),
+    descriptionTemplate: () =>
+      'Send a full SAMS platform summary email to denomacha000000@gmail.com with school/user/attendance/revenue stats.',
+    handler: async () => {
+      const result = await sendPlatformSummaryEmail();
+      return { answer: result.message, data: { sentTo: result.sentTo } };
+    },
+  },
+  {
     action: 'clear_audit_logs',
     description: 'Clear or delete audit log records (optionally filtered)',
     destructive: true,
@@ -913,5 +932,126 @@ export const superAdminActions: ActionDefinition[] = [
     descriptionTemplate: () =>
       'Clear audit logs. This permanently deletes matching records and leaves one new entry documenting the purge.',
     handler: clearAuditLogsHandler,
+  },
+  {
+    action: 'batch_operation',
+    description:
+      'Batch operation on multiple schools (suspend, unsuspend, extend license, change plan, send notification) based on criteria like status (suspended/expired/active), plan tier, or search name.',
+    destructive: true,
+    patterns: [
+      /(?:batch|bulk)\s+(suspend|unsuspend|extend|change\s+plan|send|notify)\s+(.+)/i,
+      /(suspend|unsuspend|extend|change\s+plan|send|notify)\s+(?:all|every)\s+(suspended|expired|active|trial|basic|professional|enterprise)\s+(.+)/i,
+      /(?:all|every)\s+(suspended|expired|active)\s+school/i,
+      /schools?\s+that\s+(?:are|have)\s+(suspended|expired)/i,
+    ],
+    extractParams: (message: string, match: RegExpMatchArray | null) => {
+      if (match) {
+        const detected = detectBatchOperation(message);
+        return {
+          description: match[0],
+          criteria: detected.criteriaText,
+          operation: detected.operation,
+        };
+      }
+      return { description: message, operation: null };
+    },
+    descriptionTemplate: (params) => {
+      const op = params.operation ? String(params.operation).replace(/_/g, ' ') : 'operation';
+      const desc = params.description ? `matching "${String(params.description).slice(0, 80)}"` : 'selected schools';
+      return `Batch ${op} — ${desc}`;
+    },
+    handler: async (params, scope) => {
+      const { prisma } = await import('../../../index');
+      const { auditService } = await import('../../auditService');
+
+      // Resolve which schools
+      const resolved: BatchResolveResult = await resolveBatchSchools(params);
+      if (resolved.total === 0) {
+        return { answer: 'No schools match the given criteria.' };
+      }
+
+      // Detect the operation
+      const rawDesc = String(params.description ?? params.criteria ?? '');
+      const { operation } = detectBatchOperation(rawDesc);
+      const finalOp = String(params.operation ?? operation ?? '');
+
+      if (!finalOp) {
+        const names = resolved.schoolNames.join(', ');
+        return {
+          answer: `Found **${resolved.total}** school(s): ${names}\n\nWhat would you like to do with these? Options: **suspend**, **unsuspend**, **extend license**, **change plan**, or **send notification**.`,
+          data: { schools: resolved.schoolNames, total: resolved.total },
+        };
+      }
+
+      // Import the service
+      const { superAdminFeaturesService } = await import('../../superAdminFeaturesService');
+
+      const schoolIds = resolved.schoolIds;
+      let updatedCount: number;
+      let actionLabel: string;
+
+      switch (finalOp) {
+        case 'suspend_school': {
+          const r = await superAdminFeaturesService.batchSuspend({ schoolIds });
+          updatedCount = r.updated;
+          actionLabel = `Suspended ${updatedCount} school(s)`;
+          break;
+        }
+        case 'unsuspend_school': {
+          const r = await superAdminFeaturesService.batchUnsuspend({ schoolIds });
+          updatedCount = r.updated;
+          actionLabel = `Unsuspended ${updatedCount} school(s)`;
+          break;
+        }
+        case 'extend_license': {
+          const days = (params.daysToAdd as number) || 30;
+          const r = await superAdminFeaturesService.batchExtendLicenses({ schoolIds, daysToAdd: days });
+          updatedCount = r.updated;
+          actionLabel = `Extended licenses by ${days} days for ${updatedCount} school(s)`;
+          break;
+        }
+        case 'batch_change_plan': {
+          const plan = String(params.planTier ?? 'BASIC').toUpperCase();
+          const r = await superAdminFeaturesService.batchChangePlan({ schoolIds, planTier: plan });
+          updatedCount = r.updated;
+          actionLabel = `Changed plan to ${plan} for ${updatedCount} school(s)`;
+          break;
+        }
+        case 'batch_send_notification': {
+          const title = String(params.title ?? 'Platform Notification');
+          const message = String(params.message ?? 'Notification from Super Admin.');
+          const r = await superAdminFeaturesService.batchSendNotification({ schoolIds, title, message });
+          updatedCount = r.sent;
+          actionLabel = `Sent notification to ${updatedCount} user(s) across ${schoolIds.length} school(s)`;
+          break;
+        }
+        default: {
+          return {
+            answer: `Found **${resolved.total}** school(s): ${resolved.schoolNames.join(', ')}\n\nWhat operation should I perform? Options: **suspend**, **unsuspend**, **extend license**, **change plan**, or **send notification**.`,
+            data: { schools: resolved.schoolNames, total: resolved.total },
+          };
+        }
+      }
+
+      // Audit log
+      await auditService.log({
+        eventType: 'AI_ACTION_EXECUTED',
+        actorId: scope.userId,
+        actorRole: scope.role,
+        resourceSnapshot: {
+          action: 'BATCH_OPERATION',
+          operation: finalOp,
+          schoolCount: resolved.total,
+          schoolNames: resolved.schoolNames,
+          updated: updatedCount,
+          label: actionLabel,
+        },
+      });
+
+      return {
+        answer: `✅ Batch operation **${finalOp.replace(/_/g, ' ')}** completed.\n\n• Schools affected: ${updatedCount}\n• ${actionLabel}\n\nCriteria: ${describeBatchParams(params)}`,
+        data: { operation: finalOp, schools: resolved.schoolNames, total: resolved.total, result: { updated: updatedCount, label: actionLabel } },
+      };
+    },
   },
 ];
