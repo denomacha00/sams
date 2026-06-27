@@ -70,7 +70,7 @@ function readBoundedIntEnv(name: string, fallback: number, min: number, max: num
 
 const MAX_CHAT_INPUT_TOKENS = readBoundedIntEnv('AI_MAX_INPUT_TOKENS', 8_000, 1_000, 16_000);
 const MIN_HISTORY_TOKENS = readBoundedIntEnv('AI_MIN_HISTORY_TOKENS', 1_200, 0, 4_000);
-const CHAT_MAX_TOKENS = readBoundedIntEnv('AI_MAX_TOKENS', 300, 50, 1_500);
+const CHAT_MAX_TOKENS = readBoundedIntEnv('AI_MAX_TOKENS', 600, 50, 1_500);
 
 async function tryBackupChatProviders(
   messages: OpenAI.Chat.Completions.ChatCompletionMessageParam[],
