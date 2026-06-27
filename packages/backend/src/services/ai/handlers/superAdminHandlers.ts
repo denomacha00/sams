@@ -745,7 +745,7 @@ export const superAdminActions: ActionDefinition[] = [
   {
     action: 'send_school_notification',
     description: 'Send an in-app notification to all users in a specific school',
-    destructive: false,
+    destructive: true,
     patterns: [
       /send\s+(?:a\s+)?(?:message|notification|notice)\s+(?:to\s+)?(.+)/i,
       /notify\s+(?:school\s+)?(.+)/i,
@@ -759,7 +759,11 @@ export const superAdminActions: ActionDefinition[] = [
         message: schoolMatch?.[2]?.trim() || 'Notification from Super Admin',
       };
     },
-    descriptionTemplate: (params) => `Notify "${String(params.target || '').slice(0, 60)}".`,
+    descriptionTemplate: (params) => {
+      const target = String(params.target || '').slice(0, 80);
+      const msg = String(params.message || '').slice(0, 120);
+      return `Send notification to school "${target}" with message: "${msg}".`;
+    },
     handler: sendSchoolNotificationHandler,
   },
 
