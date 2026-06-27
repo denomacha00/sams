@@ -8,6 +8,8 @@ import {
 import { notificationInboxActions } from './notificationInboxActions';
 import { describeBatchParams, resolveBatchSchools, detectBatchOperation, type BatchResolveResult } from '../../superAdminBatchResolver';
 import { sendPlatformSummaryEmail } from '../../superAdminEmailSummary';
+import { runRawQuery, listAllTables, findInTable } from '../../superAdminDbAccess';
+import { readProjectFile, searchInProject, listDirectory } from '../../superAdminCodeAccess';
 
 // ─── Helper Utilities (migrated from actionIntentDetector.ts) ─────────────────
 
@@ -1051,6 +1053,176 @@ export const superAdminActions: ActionDefinition[] = [
       return {
         answer: `✅ Batch operation **${finalOp.replace(/_/g, ' ')}** completed.\n\n• Schools affected: ${updatedCount}\n• ${actionLabel}\n\nCriteria: ${describeBatchParams(params)}`,
         data: { operation: finalOp, schools: resolved.schoolNames, total: resolved.total, result: { updated: updatedCount, label: actionLabel } },
+      };
+    },
+  },
+  {
+    action: 'db_list_tables',
+    description: 'List all database tables with row counts and column details. Super Admin only — full read access.',
+    destructive: false,
+    patterns: [
+      /list\s+(?:all\s+)?(?:database\s+)?tables?/i,
+      /show\s+(?:database\s+)?(?:schema|tables)/i,
+      /what\s+tables?\s+(?:exist|are\s+there)/i,
+      /db\s+schema/i,
+      /database\s+schema/i,
+    ],
+    extractParams: () => ({}),
+    descriptionTemplate: () =>
+      'List all database tables with row counts and column types.',
+    handler: async () => {
+      const tables = await listAllTables();
+      const summary = tables
+        .map((t) => `• **${t.tableName}** — ${t.rowCount} row(s), ${t.columns.length} column(s)`)
+        .join('\n');
+      return {
+        answer: `📋 **Database Tables (${tables.length} total)**\n\n${summary}\n\nYou can query any table with: \`SELECT * FROM "${tables[0]?.tableName ?? '[table_name]'}" LIMIT 10\``,
+        data: { tables },
+      };
+    },
+  },
+  {
+    action: 'db_query',
+    description: 'Run a read-only SQL query (SELECT/EXPLAIN/DESCRIBE/SHOW only). All mutations are blocked.',
+    destructive: false,
+    patterns: [
+      /^SELECT\s/i,
+      /^select\s/i,
+      /^(?:run|execute)\s+(?:a\s+)?(?:SQL\s+)?query/i,
+      /query\s+the\s+database/i,
+      /find\s+(?:in\s+)?(?:the\s+)?(\w+)\s+table/i,
+      /search\s+(\w+)\s+(?:for|with|where)\s+(.+)/i,
+      /what\s+is\s+the\s+(\w+)\s+(?:of|for)\s+(.+)/i,
+    ],
+    extractParams: (message: string, match: RegExpMatchArray | null) => {
+      const tableMatch = message.match(/find\s+(?:in\s+)?(?:the\s+)?(\w+)\s+table/i);
+      const searchMatch = message.match(/search\s+\w+\s+(?:for|with|where)\s+(.+)/i);
+      const whatMatch = message.match(/what\s+is\s+the\s+(\w+)\s+(?:of|for)\s+(.+)/i);
+      if (tableMatch && searchMatch) {
+        return { tableName: tableMatch[1], searchValue: searchMatch[1]?.trim() };
+      }
+      if (whatMatch) {
+        return { tableName: whatMatch[1], searchValue: whatMatch[2]?.trim() };
+      }
+      return { sql: message };
+    },
+    descriptionTemplate: (params) => {
+      if (params.tableName && params.searchValue) {
+        return `Search for "${String(params.searchValue).slice(0, 60)}" in the "${params.tableName}" table.`;
+      }
+      const sql = String(params.sql ?? '').slice(0, 100);
+      return `Run database query: ${sql}`;
+    },
+    handler: async (params) => {
+      if (params.tableName && params.searchValue) {
+        const result = await findInTable(
+          String(params.tableName),
+          String(params.searchValue),
+        );
+        const rowLines = result.rows
+          .slice(0, 10)
+          .map((r) => JSON.stringify(r, null, 2))
+          .join('\n');
+        return {
+          answer: `🔍 Found ${result.totalRows} result(s) in "${params.tableName}" (${result.executionMs}ms)\n\n\`\`\`json\n${rowLines}\n\`\`\`${result.truncated ? '\n\n_Results truncated_' : ''}`,
+          data: result,
+        };
+      }
+
+      const sql = String(params.sql ?? '');
+      if (!sql.trim()) {
+        return { answer: 'What would you like to query? Example: `SELECT * FROM "School" LIMIT 10`' };
+      }
+      const result = await runRawQuery(sql);
+      const rowLines = result.rows
+        .slice(0, 10)
+        .map((r) => JSON.stringify(r, null, 2))
+        .join('\n');
+      return {
+        answer: `📊 Query returned ${result.totalRows} row(s) in ${result.executionMs}ms\n\nColumns: ${result.columns.join(', ')}\n\n\`\`\`json\n${rowLines}\n\`\`\`${result.truncated ? '\n\n_Results truncated to 10 rows_' : ''}`,
+        data: result,
+      };
+    },
+  },
+  {
+    action: 'read_file',
+    description: 'Read a source code or config file from the project. Secrets and .env are blocked.',
+    destructive: false,
+    patterns: [
+      /read\s+(?:file\s+)?(.+\.(?:ts|tsx|js|jsx|json|md|sh|sql|css|prisma|yaml|env\.example))/i,
+      /show\s+(?:me\s+)?(?:the\s+)?(?:contents?\s+of\s+)?(.+\.(?:ts|tsx|js|jsx|json|md|sh|sql|css))/i,
+      /open\s+(?:file\s+)?(.+)/i,
+      /cat\s+(.+)/i,
+      /view\s+(?:file\s+)?(.+)/i,
+    ],
+    extractParams: (_message: string, match: RegExpMatchArray | null) => {
+      const filePath = match?.[1]?.trim() ?? '';
+      return { filePath };
+    },
+    descriptionTemplate: (params) =>
+      `Read file "${params.filePath}" from the project.`,
+    handler: async (params) => {
+      const filePath = String(params.filePath ?? '').trim();
+      if (!filePath) {
+        return { answer: 'Which file should I read? Example: `packages/backend/src/index.ts`' };
+      }
+      try {
+        const result = await readProjectFile(filePath);
+        const lang = filePath.endsWith('.ts') || filePath.endsWith('.tsx') ? 'typescript'
+          : filePath.endsWith('.js') || filePath.endsWith('.jsx') ? 'javascript'
+          : filePath.endsWith('.json') ? 'json'
+          : filePath.endsWith('.md') ? 'markdown'
+          : filePath.endsWith('.sh') ? 'bash'
+          : filePath.endsWith('.sql') ? 'sql'
+          : filePath.endsWith('.css') ? 'css'
+          : filePath.endsWith('.prisma') ? 'prisma'
+          : 'text';
+        return {
+          answer: `📄 **${result.relativePath}** (${result.size}, ${result.lines} lines${result.truncated ? ', truncated at 1000 lines' : ''})\n\n\`\`\`${lang}\n${result.content}\n\`\`\``,
+          data: result,
+        };
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        return { answer: `❌ ${msg}` };
+      }
+    },
+  },
+  {
+    action: 'search_code',
+    description: 'Search for text across all project source files. Super Admin only — full system search.',
+    destructive: false,
+    patterns: [
+      /search\s+(?:for\s+)?(?:the\s+)?["'](.+?)["']/i,
+      /find\s+(?:where\s+)?(?:is\s+)?(.+?)\s+(?:used|defined|called|referenced|implemented)/i,
+      /grep\s+(?:for\s+)?(.+)/i,
+      /where\s+(?:is\s+)?(.+?)\s+(?:defined|declared|set)/i,
+      /search\s+(?:code|files)\s+(?:for\s+)?(.+)/i,
+    ],
+    extractParams: (message: string, match: RegExpMatchArray | null) => {
+      const quoted = message.match(/["'](.+?)["']/);
+      const term = quoted?.[1]?.trim()
+        ?? match?.[1]?.trim()
+        ?? message.replace(/search\s+(?:for\s+)?(?:the\s+)?/i, '').replace(/\s+(?:used|defined|called|referenced).*$/, '').trim();
+      return { searchTerm: term };
+    },
+    descriptionTemplate: (params) =>
+      `Search project for "${String(params.searchTerm).slice(0, 60)}".`,
+    handler: async (params) => {
+      const searchTerm = String(params.searchTerm ?? '').trim();
+      if (!searchTerm) {
+        return { answer: 'What should I search for? Example: "search for sendPlatformSummaryEmail"' };
+      }
+      const results = await searchInProject(searchTerm);
+      if (results.length === 0) {
+        return { answer: `No results found for "${searchTerm}".` };
+      }
+      const lines = results.slice(0, 15).map((r) => {
+        const fileSample = r.matches.slice(0, 3).map((m) => `  L${m.line}: ${m.content}`).join('\n');
+        return `📁 **${r.relativePath}** (${r.totalMatches} match(es))\n${fileSample}`;
+      }).join('\n\n');
+      return {
+        answer: `🔍 **${results.length} file(s)** match "${searchTerm}"\n\n${lines}${results.length > 15 ? '\n\n… and more' : ''}`,
+        data: { results: results.slice(0, 15) },
       };
     },
   },
