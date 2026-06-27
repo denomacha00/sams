@@ -419,6 +419,31 @@ export class AIService {
     // Step 4: Call the OpenAI-compatible provider chain with conversation history.
     // The openaiEngine handles primary → fallback → Atomesus fallback chain internally.
     try {
+      // CRITICAL: Before sending to the LLM, re-check if the user's message matches an
+      // actionable intent. The actionIntentDetector already ran at the top, but it only
+      // uses regex patterns. The LLM may classify this as a request we can route to an action.
+      // This catches natural phrasing that regex patterns miss.
+      const llmActionIntent = user.sub !== 'guest'
+        ? await actionIntentDetector.detect(question, user.role)
+        : null;
+
+      // If LLM re-check found an action AND it hasn't already been handled at Step 1
+      // (meaning regex didn't match but LLM classified it), execute it directly.
+      if (llmActionIntent && llmActionIntent.isAction && !actionIntent?.isAction) {
+        const llmAction = llmActionIntent.action!;
+        if (isActionPermitted(user.role, llmAction)) {
+          const actionResult = await this.processDetectedAction(user, {
+            action: llmAction,
+            params: llmActionIntent.params ?? {},
+            description: llmActionIntent.description ?? llmAction,
+          });
+          if (user.sub !== 'guest') {
+            threadId = await this.safelyPersist(user, question, actionResult.answer, threadId);
+          }
+          return { ...actionResult, threadId, memoryNotice, memoryStatus };
+        }
+      }
+
       const openaiResult = await openaiQueryWithHistory(user, question, historyMessages);
 
       if (openaiResult.intent === 'ai_error' || openaiResult.intent === 'ai_not_configured') {

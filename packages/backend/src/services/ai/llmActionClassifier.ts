@@ -11,23 +11,25 @@ export interface ClassificationResult {
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
-const CONFIDENCE_THRESHOLD = 0.7;
-const TIMEOUT_MS = 5000;
+const CONFIDENCE_THRESHOLD = 0.6;
+const TIMEOUT_MS = 15000;
 
-const CLASSIFICATION_SYSTEM_PROMPT = `You are an intent classifier for a school management system.
+const CLASSIFICATION_SYSTEM_PROMPT = `You are an intent classifier for a school management system called SAMS.
 Given a user message and a list of available actions, determine if the message is requesting one of the actions.
 
-Respond with JSON only:
+Respond with JSON only (no markdown):
 - If the message matches an action: {"action": "<action_name>", "params": {...extracted params...}, "confidence": 0.0-1.0}
 - If no action matches: {"action": "none", "confidence": 1.0}
 
 Rules:
-- Only classify as an action if confidence >= 0.7
+- Only classify as an action if confidence >= 0.6
 - Extract relevant parameters from the message
 - If ambiguous between multiple actions, pick the highest confidence one
 - Questions asking "how many" teachers, students, or classes in the user's department are action requests (e.g. view_department_stats, get_school_stats), not generic informational chat — classify them when a matching stats action exists
 - "Send message to class", "notify students", "notify department", "notify school" are action requests when a matching send_* action exists for the role
 - "Remind me at class time", "set a reminder", or "will you remind me" for students map to explain_reminders (not a generic refusal)
+- "Export report", "download PDF", "get attendance report", "generate report" are action requests when export_* actions exist
+- "Generate timetable", "create timetable", "auto generate timetable" are action requests when generate_timetable exists
 - Do not classify general knowledge or policy questions as actions`;
 
 // ─── Classifier ───────────────────────────────────────────────────────────────
