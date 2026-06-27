@@ -66,10 +66,8 @@ export function useAiSpeech(options?: { onEnd?: () => void }) {
     utterance.rate = 1.0;  // Normal speed
     utterance.pitch = 1.0; // Normal pitch
     utterance.volume = 1.0;
-
-    // If we found a voice, use it with en-KE locale. Otherwise skip lang
-    // so the browser falls back to its default voice.
-    utterance.lang = preferredVoice ? 'en-KE' : '';
+    // Always set a valid lang — empty string causes Chrome to silently fail
+    utterance.lang = 'en';
 
     utterance.onstart = () => {
       speakingRef.current = true;

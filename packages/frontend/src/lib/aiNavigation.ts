@@ -29,14 +29,21 @@ const NAV_TARGETS: Array<AiNavigationTarget & { patterns: RegExp[] }> = [
   { path: '/parent', label: 'Parent Portal', patterns: [/parent/i, /guardian\s+portal/i] },
 ];
 
-const NAV_COMMAND_RE = /\b(?:take|go|open|show|move|navigate|send)\s+(?:me\s+)?(?:to\s+)?(.+)/i;
+// Matches: "open timetable", "show me attendance", "go to dashboard",
+// "can you open", "I want to see my", "take me to", "navigate to",
+// "show reports", "open my sessions"
+const NAV_COMMAND_RE = /\b(?:take|go|open|show|move|navigate|send)\s+(?:me\s+)?(?:to\s+)?(.+)|i\s+(?:want\s+to\s+)?(?:see|view|check)\s+(?:my\s+)?(.+)|can\s+you\s+(?:open|show|take)\s+(?:me\s+)?(?:to\s+)?(.+)/i;
 
 export function detectAiNavigationRequest(message: string): AiNavigationTarget | null {
   const match = message.trim().match(NAV_COMMAND_RE);
   if (!match) return null;
 
+  // Pick the first non-empty capture group (3 alternatives in the regex)
+  const rawTarget = match[1] || match[2] || match[3] || '';
+  if (!rawTarget?.trim()) return null;
+
   // Strip articles (the, a, an, my) so voice transcription like "go to my timetable" → "timetable"
-  const targetText = match[1]?.trim()?.replace(/^(?:my|the|a|an)\s+/i, '') ?? '';
+  const targetText = rawTarget.trim().replace(/^(?:my|the|a|an)\s+/i, '');
   if (!targetText) return null;
 
   return NAV_TARGETS.find((target) => target.patterns.some((pattern) => pattern.test(targetText))) ?? null;
