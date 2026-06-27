@@ -4,37 +4,35 @@
 
 @layer base {
   :root {
-    /* ── Light mode ── teal/emerald + warm amber ──────────── */
-    --color-bg: #f0f5f2;
-    --color-bg-rgb: 240 245 242;
-    --color-surface: #f7faf8;
-    --color-surface-rgb: 247 250 248;
-    --color-surface-muted: #e8f0ec;
-    --color-surface-muted-rgb: 232 240 236;
-    --color-surface-elevated: #d6e4de;
-    --color-surface-elevated-rgb: 214 228 222;
+    /* ── Light mode ───────────────────────────────────────── */
+    --color-bg: #e6edf5;
+    --color-bg-rgb: 230 237 245;
+    --color-surface: #f8fafc;
+    --color-surface-rgb: 248 250 252;
+    --color-surface-muted: #eef4fa;
+    --color-surface-muted-rgb: 238 244 250;
+    --color-surface-elevated: #dde7f0;
+    --color-surface-elevated-rgb: 221 231 240;
 
-    --color-text: #0f1a15;
-    --color-text-rgb: 15 26 21;
-    --color-text-muted: #2d4038;
-    --color-text-muted-rgb: 45 64 56;
-    --color-text-subtle: #4b6b5c;
-    --color-text-subtle-rgb: 75 107 92;
+    --color-text: #101827;
+    --color-text-rgb: 16 24 39;
+    --color-text-muted: #334155;
+    --color-text-muted-rgb: 51 65 85;
+    --color-text-subtle: #4b5f78;
+    --color-text-subtle-rgb: 75 95 120;
 
-    --color-border: #b8ccc2;
-    --color-border-rgb: 184 204 194;
-    --color-border-strong: #7b9e8a;
-    --color-border-strong-rgb: 123 158 138;
+    --color-border: #b8c6d6;
+    --color-border-rgb: 184 198 214;
+    --color-border-strong: #7f91a8;
+    --color-border-strong-rgb: 127 145 168;
 
-    /* Teal/emerald brand */
-    --color-brand: #0d9488;
-    --color-brand-rgb: 13 148 136;
-    --color-brand-hover: #0f766e;
-    --color-brand-hover-rgb: 15 118 110;
-    --color-brand-light: #c9ece7;
-    --color-brand-light-rgb: 201 236 231;
+    --color-brand: #1d4ed8;
+    --color-brand-rgb: 29 78 216;
+    --color-brand-hover: #1e40af;
+    --color-brand-hover-rgb: 30 64 175;
+    --color-brand-light: #d2e3ff;
+    --color-brand-light-rgb: 210 227 255;
 
-    /* Warm amber accent */
     --color-accent-orange: #b45309;
     --color-accent-orange-rgb: 180 83 9;
     --color-accent-orange-hover: #92400e;
@@ -51,43 +49,41 @@
   }
 
   .dark {
-    /* ── Dark mode ── deep green-black + warm emerald ────── */
-    --color-bg: #0d1512;
-    --color-bg-rgb: 13 21 18;
-    --color-surface: #141f1b;
-    --color-surface-rgb: 20 31 27;
-    --color-surface-muted: #111d18;
-    --color-surface-muted-rgb: 17 29 24;
-    --color-surface-elevated: #1e2d26;
-    --color-surface-elevated-rgb: 30 45 38;
+    /* ── Dark mode ────────────────────────────────────────── */
+    --color-bg: #0d1117;
+    --color-bg-rgb: 13 17 23;
+    --color-surface: #151b23;
+    --color-surface-rgb: 21 27 35;
+    --color-surface-muted: #111827;
+    --color-surface-muted-rgb: 17 24 39;
+    --color-surface-elevated: #1f2937;
+    --color-surface-elevated-rgb: 31 41 55;
 
-    --color-text: #e6f0ec;
-    --color-text-rgb: 230 240 236;
-    --color-text-muted: #8ea99a;
-    --color-text-muted-rgb: 142 169 154;
-    --color-text-subtle: #688577;
-    --color-text-subtle-rgb: 104 133 119;
+    --color-text: #f8fafc;
+    --color-text-rgb: 248 250 252;
+    --color-text-muted: #9aa4b2;
+    --color-text-muted-rgb: 154 164 178;
+    --color-text-subtle: #7f8a99;
+    --color-text-subtle-rgb: 127 138 153;
 
-    --color-border: #1f332b;
-    --color-border-rgb: 31 51 43;
-    --color-border-strong: #2a4237;
-    --color-border-strong-rgb: 42 66 55;
+    --color-border: #263241;
+    --color-border-rgb: 38 50 65;
+    --color-border-strong: #364557;
+    --color-border-strong-rgb: 54 69 87;
 
-    /* Brighter teal for dark mode readability */
-    --color-brand: #14b8a6;
-    --color-brand-rgb: 20 184 166;
-    --color-brand-hover: #2dd4bf;
-    --color-brand-hover-rgb: 45 212 191;
-    --color-brand-light: #134e44;
-    --color-brand-light-rgb: 19 78 68;
+    --color-brand: #3b82f6;
+    --color-brand-rgb: 59 130 246;
+    --color-brand-hover: #2563eb;
+    --color-brand-hover-rgb: 37 99 235;
+    --color-brand-light: #1e3a5f;
+    --color-brand-light-rgb: 30 58 95;
 
-    /* Amber - warmer in dark */
     --color-accent-orange: #f59e0b;
     --color-accent-orange-rgb: 245 158 11;
     --color-accent-orange-hover: #d97706;
     --color-accent-orange-hover-rgb: 217 119 6;
-    --color-accent-orange-light: #4a2e05;
-    --color-accent-orange-light-rgb: 74 46 5;
+    --color-accent-orange-light: #451a03;
+    --color-accent-orange-light-rgb: 69 26 3;
 
     --color-attendance-green: #22c55e;
     --color-attendance-green-rgb: 34 197 94;
@@ -142,7 +138,7 @@
     @apply flex items-center justify-between p-3 rounded-lg bg-surface-muted border border-line hover:bg-surface-elevated transition-colors;
   }
 
-  /* Dashboard hero */
+  /* Dashboard stat cards */
   .dashboard-hero {
     @apply relative overflow-hidden rounded-xl border border-line bg-surface shadow-card;
   }
@@ -157,8 +153,7 @@
     content: '';
     @apply pointer-events-none absolute inset-0;
     background:
-      radial-gradient(ellipse 80% 60% at 50% -20%, rgb(var(--color-brand-rgb) / 0.12), transparent 70%),
-      linear-gradient(180deg, rgb(var(--color-surface-elevated-rgb) / 0.2), transparent 48%);
+      linear-gradient(180deg, rgb(var(--color-surface-elevated-rgb) / 0.28), transparent 48%);
   }
 
   .dashboard-kicker {
@@ -184,7 +179,7 @@
   }
 
   .dashboard-command-card--attendance {
-    @apply hover:border-accent-orange/45;
+    @apply hover:border-brand/45;
   }
 
   .dashboard-workflow-grid {
@@ -201,7 +196,7 @@
   }
 
   .dashboard-workflow-card--orange {
-    @apply hover:border-accent-orange/35;
+    @apply hover:border-brand/35;
   }
 
   .dashboard-workflow-step {
@@ -213,7 +208,7 @@
   }
 
   .dashboard-workflow-step--orange {
-    @apply border-accent-orange/25 bg-accent-orange-light text-accent-orange;
+    @apply border-brand/20 bg-brand-light text-brand;
   }
 
   .dash-card {
@@ -247,7 +242,7 @@
   }
 
   .dash-stat-accent-orange {
-    @apply border-l-[3px] border-l-accent-orange;
+    @apply border-l-[3px] border-l-brand;
   }
 
   .dash-stat-accent-indigo {
@@ -489,11 +484,6 @@
 
 @keyframes fadeIn {
   from { opacity: 0; transform: translateY(4px); }
-  to { opacity: 1; transform: translateY(0); }
-}
-
-@keyframes fadeInUp {
-  from { opacity: 0; transform: translateY(20px); }
   to { opacity: 1; transform: translateY(0); }
 }
 
