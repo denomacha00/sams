@@ -45,6 +45,20 @@ Rules:
 const IDENTITY_DRIFT_RE =
   /\b(?:i\s+am|i'm|my\s+name\s+is|you\s+can\s+call\s+me|called|as)\s+(?:an?\s+)?(?:ai\s+assistant\s+named\s+)?(?:cipher|atomesus|openai|chatgpt|groq|llama)\b/i;
 
+const PROVIDER_MENTION_RE =
+  /\b(?:atomesus|cipher\s+(?:ai|intelligence|research)?\b|indus\s+valley\s*(?:group|inc|technologies)?|alibaba|meta\s+(?:ai|llama)?)\b/i;
+
+function sanitizeLlmOutput(answer: string): string {
+  let result = answer;
+  if (IDENTITY_DRIFT_RE.test(result)) {
+    result = result.replace(IDENTITY_DRIFT_RE, 'I am SAMS AI');
+  }
+  if (PROVIDER_MENTION_RE.test(result)) {
+    result = result.replace(PROVIDER_MENTION_RE, 'SAMS');
+  }
+  return result;
+}
+
 function readBoundedIntEnv(name: string, fallback: number, min: number, max: number): number {
   const raw = process.env[name];
   if (!raw) return fallback;
@@ -57,11 +71,6 @@ function readBoundedIntEnv(name: string, fallback: number, min: number, max: num
 const MAX_CHAT_INPUT_TOKENS = readBoundedIntEnv('AI_MAX_INPUT_TOKENS', 8_000, 1_000, 16_000);
 const MIN_HISTORY_TOKENS = readBoundedIntEnv('AI_MIN_HISTORY_TOKENS', 1_200, 0, 4_000);
 const CHAT_MAX_TOKENS = readBoundedIntEnv('AI_MAX_TOKENS', 300, 50, 1_500);
-
-function enforceSamsIdentity(answer: string): string {
-  if (!IDENTITY_DRIFT_RE.test(answer)) return answer;
-  return answer.replace(IDENTITY_DRIFT_RE, 'I am SAMS AI');
-}
 
 async function tryBackupChatProviders(
   messages: OpenAI.Chat.Completions.ChatCompletionMessageParam[],
@@ -80,7 +89,7 @@ async function tryBackupChatProviders(
 
       const fallbackAnswer = fallbackResponse.choices[0]?.message?.content;
       if (fallbackAnswer) {
-        return { answer: enforceSamsIdentity(fallbackAnswer), intent: 'openai_response' };
+        return { answer: sanitizeLlmOutput(fallbackAnswer), intent: 'openai_response' };
       }
     } catch (err) {
       fallbackErr = err;
@@ -100,7 +109,7 @@ async function tryBackupChatProviders(
 
       const atomesusAnswer = atomesusResponse.choices[0]?.message?.content;
       if (atomesusAnswer) {
-        return { answer: enforceSamsIdentity(atomesusAnswer), intent: 'openai_response' };
+        return { answer: sanitizeLlmOutput(atomesusAnswer), intent: 'openai_response' };
       }
     } catch (err) {
       console.error('[AI/Atomesus] Also failed:', extractProviderErrorText(err));
@@ -599,7 +608,7 @@ export async function openaiQuery(
 
   try {
     const client = getOpenAIClient();
-    const useTools = user.sub !== 'guest' && user.role === 'SUPER_ADMIN';
+    const useTools = user.sub !== 'guest';
     const response = await client.chat.completions.create({
       model: resolveChatModel(),
       messages,
@@ -614,7 +623,7 @@ export async function openaiQuery(
     }
 
     const rawAnswer = choice?.message?.content ?? 'I was unable to generate a response. Please try rephrasing your question.';
-    const answer = enforceSamsIdentity(rawAnswer);
+    const answer = sanitizeLlmOutput(rawAnswer);
 
     return { answer, intent: 'openai_response' };
   } catch (err) {
@@ -712,7 +721,7 @@ async function handleToolCalls(
   });
 
   const rawAnswer = response.choices[0]?.message?.content ?? 'Done.';
-  return { answer: enforceSamsIdentity(rawAnswer), intent: 'openai_response' };
+  return { answer: sanitizeLlmOutput(rawAnswer), intent: 'openai_response' };
 }
 
 export async function openaiQueryWithHistory(
@@ -732,7 +741,7 @@ export async function openaiQueryWithHistory(
 
   try {
     const client = getOpenAIClient();
-    const useTools = user.sub !== 'guest' && (user.role === 'SUPER_ADMIN' || user.role === 'SCHOOL_ADMIN');
+    const useTools = user.sub !== 'guest';
     const response = await client.chat.completions.create({
       model: resolveChatModel(),
       messages,
@@ -747,7 +756,7 @@ export async function openaiQueryWithHistory(
     }
 
     const rawAnswer = choice?.message?.content ?? 'I was unable to generate a response. Please try rephrasing your question.';
-    const answer = enforceSamsIdentity(rawAnswer);
+    const answer = sanitizeLlmOutput(rawAnswer);
 
     return { answer, intent: 'openai_response' };
   } catch (err) {

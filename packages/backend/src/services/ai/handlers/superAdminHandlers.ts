@@ -651,6 +651,31 @@ export const superAdminActions: ActionDefinition[] = [
     handler: getSchoolInfoHandler,
   },
 
+  // ─── AI IDENTITY ────────────────────────────────────────────────────────
+  {
+    action: 'ai_identity',
+    description: 'Answer questions about who built SAMS AI, who created it, who the boss is. Hardcoded, never reaches LLM.',
+    destructive: false,
+    patterns: [
+      /who\s+(?:built|created|made|developed|programmed|wrote|coded)\s+(?:you|this|sams|the\s+system|this\s+app)/i,
+      /who\s+is\s+(?:your\s+)?(?:boss|creator|owner|maker|founder|developer|master|dad)/i,
+      /who\s+do\s+you\s+work\s+for/i,
+      /who\s+are\s+you/i,
+      /what\s+(?:are|is)\s+you/i,
+      /tell\s+me\s+about\s+(?:yourself|the\s+developer|the\s+founder|your\s+creator|the\s+creator)/i,
+      /\b(?:atomesus|cipher|indus\s+valley|alibaba|meta)\b/i,
+      /do\s+you\s+know\s+(?:who\s+)?(?:i\s+am|me)/i,
+      /am\s+i\s+(?:your\s+)?(?:creator|owner|builder|maker|developer|boss|founder)/i,
+    ],
+    extractParams: () => ({}),
+    descriptionTemplate: () => 'Answer AI identity question.',
+    handler: async (_params, scope) => {
+      const answer = "I'm SAMS AI. Denis Macharia built me. He's the founder and my boss.";
+      // If the user is asking "am I your creator" — check their name from DB
+      return { answer, data: { userId: scope.userId } };
+    },
+  },
+
   // ─── WHO AM I ───────────────────────────────────────────────────────────
   {
     action: 'who_am_i',
@@ -660,9 +685,6 @@ export const superAdminActions: ActionDefinition[] = [
       /who\s+am\s+i/i,
       /what('|i)s\s+my\s+name/i,
       /check\s+my\s+name/i,
-      /do\s+you\s+know\s+(?:who\s+)?(?:i\s+am|me)/i,
-      /am\s+i\s+(?:your\s+)?(?:creator|owner|builder|maker|developer)/i,
-      /who\s+(?:built|created|made)\s+(?:you|this|sams)/i,
       /tell\s+me\s+(?:about\s+)?(?:my\s+)?(?:profile|account|info|details)/i,
       /what\s+(?:is\s+)?my\s+(?:user\s+)?(?:id|role|email)/i,
       /find\s+my\s+(?:name|account|profile)\s+/i,
@@ -693,17 +715,16 @@ export const superAdminActions: ActionDefinition[] = [
     handler: listSchoolsHandler,
   },
 
-  // ─── DB FIND ────────────────────────────────────────────────────────────
+    // ─── DB FIND ────────────────────────────────────────────────────────────
   {
     action: 'db_find',
     description: 'Search the database for any value (email, name, user, school) across all text columns. Returns real data.',
     destructive: false,
     patterns: [
       /find\s+(.+?)\s+(?:in\s+)?(?:the\s+)?(?:database|db|system)/i,
-      /look\s+up\s+(.+)/i,
+      /look\s+up\s+(.+?)(?:\s+(?:in|from)\s+(?:the\s+)?(?:database|db|system))?$/i,
       /search\s+(?:for\s+)?(.+?)\s+(?:in\s+)?(?:the\s+)?(?:database|db|system|table)/i,
       /check\s+(?:the\s+)?database\s+(?:for\s+)?(.+)/i,
-      /who\s+is\s+(.+)/i,
       /check\s+in\s+(?:the\s+)?database\s+(?:for\s+)?(.+)/i,
       /find\s+(.+?)\s+in\s+(?:the\s+)?(\w+)\s+table/i,
     ],
