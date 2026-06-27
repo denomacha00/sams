@@ -1,9 +1,10 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import apiClient from '../services/apiClient';
 import { prepareImagesForAiUpload } from '../lib/aiImageUpload';
 import { useAuthStore } from '../store/authStore';
 import AiChartRenderer from './AiChartRenderer';
+import { useVoiceBiometrics, loadVoicePrint } from '../hooks/useVoiceBiometrics';
 
 interface PendingAction {
   action: string;
@@ -194,6 +195,10 @@ const SuperAdminAI: React.FC = () => {
   const pendingActionRef = useRef<PendingAction | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // ── Voice biometrics ───────────────────────────────────────────────────
+  const { verify, isVerifying } = useVoiceBiometrics();
+  const [voiceResult, setVoiceResult] = useState<{ match: boolean; score: number } | null>(null);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });

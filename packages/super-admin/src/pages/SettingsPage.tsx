@@ -1,7 +1,9 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import apiClient from '../services/apiClient';
 import { getSuperAdminApiError } from '../utils/apiError';
 import { useAuthStore } from '../store/authStore';
+import { useVoiceBiometrics, VERIFICATION_THRESHOLD } from '../hooks/useVoiceBiometrics';
+import { VoiceEnrollmentSection } from '../components/VoiceEnrollmentSection';
 
 interface SystemStatus {
   status: 'ok' | 'degraded';
@@ -197,7 +199,7 @@ const SettingsPage: React.FC = () => {
               <StatusBadge ok={systemStatus.checks.redis} label="Redis" />
             </div>
 
-            <div className="pt-2 border-t border-gray-700 space-y-2 text-sm">
+          <div className="pt-2 border-t border-gray-700 space-y-2 text-sm">
               <div className="flex justify-between gap-4">
                 <span className="text-gray-400">Environment</span>
                 <span className="text-gray-300 font-mono">{systemStatus.environment}</span>
@@ -224,6 +226,9 @@ const SettingsPage: React.FC = () => {
           </div>
         ) : null}
       </div>
+
+      {/* Voice biometrics (only for the Super Admin of this browser session) */}
+      <VoiceEnrollmentSection />
     </div>
   );
 };
