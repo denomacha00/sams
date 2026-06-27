@@ -447,6 +447,9 @@ const FloatingAI: React.FC = () => {
   // ── Text submit ─────────────────────────────────────────────────────────
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    // Typing — don't read response aloud
+    voicePendingRef.current = false;
+    if (isListening) stopListening();
     submitQuery(input);
   };
 

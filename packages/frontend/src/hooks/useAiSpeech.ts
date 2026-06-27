@@ -1,12 +1,46 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
 
 /**
+ * Strip emojis and markdown syntax from text before speaking.
+ * Preserves punctuation (commas, periods, question marks, etc.)
+ * so the browser's SpeechSynthesis creates natural pauses.
+ *
+ * Only removes: emoji characters, markdown formatting symbols,
+ * and Unicode dingbats that would be read as words.
+ */
+function cleanTextForSpeech(text: string): string {
+  return text
+    // Remove emoji characters (ranges common in Unicode)
+    .replace(/[\u{1F600}-\u{1F64F}]/gu, '') // emoticons
+    .replace(/[\u{1F300}-\u{1F5FF}]/gu, '') // symbols & pictographs
+    .replace(/[\u{1F680}-\u{1F6FF}]/gu, '') // transport & map
+    .replace(/[\u{1F1E0}-\u{1F1FF}]/gu, '') // flags
+    .replace(/[\u{2600}-\u{26FF}]/gu, '')   // misc symbols
+    .replace(/[\u{2700}-\u{27BF}]/gu, '')   // dingbats
+    .replace(/[\u{FE00}-\u{FE0F}]/gu, '')   // variation selectors
+    .replace(/[\u{200D}]/gu, '')            // zero-width joiner
+    // Remove markdown formatting symbols ONLY — keep punctuation for pauses
+    .replace(/[*_`~#|\\@<>^$+=]/g, '')      // markdown syntax
+    // Remove double/triple hyphens but keep single dash
+    .replace(/---+/g, ' ')
+    // Remove consecutive ellipsis dots (3+)
+    .replace(/\.{3,}/g, '...')
+    // Collapse multiple spaces into one
+    .replace(/\s{2,}/g, ' ')
+    .trim();
+}
+
+/**
  * Browser SpeechSynthesis hook — reads AI responses aloud.
  * Built into Chrome, Safari, Firefox, Edge. No API key needed.
  * Kenyan voice preferred when available, falls back to default.
  *
  * Fixes the common browser bug where getVoices() returns empty on first call:
  * we trigger voices loading on mount and re-check if still empty.
+ *
+ * Strips emojis and markdown symbols before speaking so the voice
+ * only reads clean words — no emoji names or markdown artifacts.
+ * Punctuation is preserved for natural pauses.
  */
 export function useAiSpeech(options?: { onEnd?: () => void }) {
   const [speaking, setSpeaking] = useState(false);
@@ -55,7 +89,11 @@ export function useAiSpeech(options?: { onEnd?: () => void }) {
     // Cancel any current speech
     window.speechSynthesis.cancel();
 
-    const utterance = new SpeechSynthesisUtterance(text);
+    // Strip emojis, punctuation, markdown so voice only reads clean words
+    const cleanText = cleanTextForSpeech(text);
+    if (!cleanText) return;
+
+    const utterance = new SpeechSynthesisUtterance(cleanText);
 
     // Try to find a good voice — prefer African English or any English voice
     const preferredVoice = resolveVoice();
