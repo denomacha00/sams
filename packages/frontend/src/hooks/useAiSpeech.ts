@@ -1,9 +1,12 @@
-import { useState, useRef, useCallback } from 'react';
+import { useState, useRef, useCallback, useEffect } from 'react';
 
 /**
  * Browser SpeechSynthesis hook — reads AI responses aloud.
  * Built into Chrome, Safari, Firefox, Edge. No API key needed.
  * Kenyan voice preferred when available, falls back to default.
+ *
+ * Fixes the common browser bug where getVoices() returns empty on first call:
+ * we trigger voices loading on mount and re-check if still empty.
  */
 export function useAiSpeech(options?: { onEnd?: () => void }) {
   const [speaking, setSpeaking] = useState(false);
@@ -11,6 +14,40 @@ export function useAiSpeech(options?: { onEnd?: () => void }) {
   const utteranceRef = useRef<SpeechSynthesisUtterance | null>(null);
   const onEndRef = useRef(options?.onEnd);
   onEndRef.current = options?.onEnd;
+  const voicesLoadedRef = useRef(false);
+
+  // Force browsers to load voices on mount (getVoices returns [] on first call)
+  useEffect(() => {
+    if (typeof window === 'undefined' || !window.speechSynthesis) return;
+
+    // Kick-start voice loading
+    const voices = window.speechSynthesis.getVoices();
+    if (voices.length > 0) {
+      voicesLoadedRef.current = true;
+    }
+
+    // Listen for the async load event
+    const handler = () => {
+      voicesLoadedRef.current = true;
+    };
+    window.speechSynthesis.addEventListener('voiceschanged', handler);
+    return () => window.speechSynthesis.removeEventListener('voiceschanged', handler);
+  }, []);
+
+  const resolveVoice = useCallback(() => {
+    if (typeof window === 'undefined' || !window.speechSynthesis) return null;
+    const voices = window.speechSynthesis.getVoices();
+    if (voices.length === 0) return null;
+
+    return (
+      voices.find((v) => v.lang.startsWith('en') && v.name.includes('Kenya')) ||
+      voices.find((v) => v.lang.startsWith('en') && v.name.includes('Africa')) ||
+      voices.find((v) => v.lang.startsWith('en') && v.name.includes('UK')) ||
+      voices.find((v) => v.lang.startsWith('en') && v.name.includes('India')) ||
+      voices.find((v) => v.lang.startsWith('en')) ||
+      null
+    );
+  }, []);
 
   const speak = useCallback((text: string) => {
     if (typeof window === 'undefined' || !window.speechSynthesis) return;
@@ -21,23 +58,18 @@ export function useAiSpeech(options?: { onEnd?: () => void }) {
     const utterance = new SpeechSynthesisUtterance(text);
 
     // Try to find a good voice — prefer African English or any English voice
-    const voices = window.speechSynthesis.getVoices();
-    const preferredVoice =
-      voices.find((v) => v.lang.startsWith('en') && v.name.includes('Kenya')) ||
-      voices.find((v) => v.lang.startsWith('en') && v.name.includes('Africa')) ||
-      voices.find((v) => v.lang.startsWith('en') && v.name.includes('UK')) ||
-      voices.find((v) => v.lang.startsWith('en') && v.name.includes('India')) ||
-      voices.find((v) => v.lang.startsWith('en')) ||
-      null;
-
+    const preferredVoice = resolveVoice();
     if (preferredVoice) {
       utterance.voice = preferredVoice;
     }
 
-    utterance.lang = 'en-KE';
     utterance.rate = 1.0;  // Normal speed
     utterance.pitch = 1.0; // Normal pitch
     utterance.volume = 1.0;
+
+    // If we found a voice, use it with en-KE locale. Otherwise skip lang
+    // so the browser falls back to its default voice.
+    utterance.lang = preferredVoice ? 'en-KE' : '';
 
     utterance.onstart = () => {
       speakingRef.current = true;
@@ -57,7 +89,7 @@ export function useAiSpeech(options?: { onEnd?: () => void }) {
 
     utteranceRef.current = utterance;
     window.speechSynthesis.speak(utterance);
-  }, []);
+  }, [resolveVoice]);
 
   const stop = useCallback(() => {
     if (typeof window !== 'undefined' && window.speechSynthesis) {
