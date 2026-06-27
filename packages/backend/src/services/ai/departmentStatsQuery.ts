@@ -14,12 +14,27 @@ export async function fetchDepartmentStats(
   schoolId: string,
   departmentId: string,
 ): Promise<DepartmentStatsCounts> {
+  // Students may have classId set instead of departmentId directly.
+  // Get all class IDs in this department first to find students by class.
+  const deptClasses = await prisma.class.findMany({
+    where: { schoolId, departmentId },
+    select: { id: true },
+  });
+  const deptClassIds = deptClasses.map((c) => c.id);
+
   const [teacherCount, studentCount, classCount, teachers, students] = await Promise.all([
     prisma.user.count({
       where: { schoolId, departmentId, role: 'TEACHER' },
     }),
     prisma.user.count({
-      where: { schoolId, departmentId, role: 'STUDENT' },
+      where: {
+        schoolId,
+        role: 'STUDENT',
+        OR: [
+          { departmentId },
+          { classId: { in: deptClassIds } },
+        ],
+      },
     }),
     prisma.class.count({
       where: { schoolId, departmentId },
@@ -30,7 +45,14 @@ export async function fetchDepartmentStats(
       orderBy: { fullName: 'asc' },
     }),
     prisma.user.findMany({
-      where: { schoolId, departmentId, role: 'STUDENT' },
+      where: {
+        schoolId,
+        role: 'STUDENT',
+        OR: [
+          { departmentId },
+          { classId: { in: deptClassIds } },
+        ],
+      },
       select: { fullName: true, admissionNumber: true },
       orderBy: { fullName: 'asc' },
     }),
@@ -88,8 +110,21 @@ export async function fetchDepartmentStudents(
   departmentId: string,
   limit: number = 100,
 ): Promise<Array<{ fullName: string; admissionNumber: string | null; className: string | null }>> {
+  const deptClasses = await prisma.class.findMany({
+    where: { schoolId, departmentId },
+    select: { id: true },
+  });
+  const deptClassIds = deptClasses.map((c) => c.id);
+
   const students = await prisma.user.findMany({
-    where: { schoolId, departmentId, role: 'STUDENT' },
+    where: {
+      schoolId,
+      role: 'STUDENT',
+      OR: [
+        { departmentId },
+        { classId: { in: deptClassIds } },
+      ],
+    },
     select: {
       fullName: true,
       admissionNumber: true,
