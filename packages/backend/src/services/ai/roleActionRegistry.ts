@@ -15,6 +15,7 @@ import { virtualAssistantActions } from './handlers/virtualAssistantActions';
 import { teacherWorkbenchActions } from './handlers/teacherStudentWorkbenchActions';
 import { classRepActions } from './handlers/classRepAction';
 import { parentChatTeacherActions, parentChatGuardianActions } from './handlers/parentChatHandlers';
+import { riskViewActions } from './handlers/riskViewHandlers';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -73,6 +74,7 @@ roleActionRegistry['SUPER_ADMIN'] = normalizeRoleActions([
   ...superAdminActions,
   ...profileActions,
   ...virtualAssistantActions,
+  ...riskViewActions,
 ]);
 
 roleActionRegistry['SCHOOL_ADMIN'] = normalizeRoleActions([
@@ -83,6 +85,7 @@ roleActionRegistry['SCHOOL_ADMIN'] = normalizeRoleActions([
   ...examActions,
   ...profileActions,
   ...virtualAssistantActions,
+  ...riskViewActions,
 ]);
 
 roleActionRegistry['HOD'] = normalizeRoleActions([
@@ -93,6 +96,7 @@ roleActionRegistry['HOD'] = normalizeRoleActions([
   ...timetableEditActions,
   ...profileActions,
   ...virtualAssistantActions,
+  ...riskViewActions,
 ]);
 
 roleActionRegistry['TEACHER'] = normalizeRoleActions([
@@ -104,6 +108,7 @@ roleActionRegistry['TEACHER'] = normalizeRoleActions([
   ...profileActions,
   ...virtualAssistantActions,
   ...parentChatTeacherActions,
+  ...riskViewActions,
 ]);
 
 roleActionRegistry['STUDENT'] = normalizeRoleActions([
@@ -119,6 +124,7 @@ roleActionRegistry['GUARDIAN'] = normalizeRoleActions([
   ...virtualAssistantActions,
   ...examActions,
   ...parentChatGuardianActions,
+  ...riskViewActions,
 ]);
 
 // ─── Lookup Utilities ─────────────────────────────────────────────────────────
