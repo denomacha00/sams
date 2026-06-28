@@ -204,6 +204,32 @@ describe('AIService anti-hallucination routing', () => {
     expect(r.engine).toBe('openai');
   });
 
+  it('answers identity questions locally without provider fallback', async () => {
+    localQuery.mockResolvedValue({ answer: 'help', intent: 'unknown' });
+
+    const service = new AIService();
+    const r = await service.query(studentUser as never, 'who is your boss or develper');
+
+    expect(openaiQueryWithHistory).not.toHaveBeenCalled();
+    expect(localQuery).not.toHaveBeenCalled();
+    expect(r.engine).toBe('local');
+    expect(r.intent).toBe('ai_identity');
+    expect(r.answer).toMatch(/Denis Macharia/);
+    expect(r.answer).not.toMatch(/Indus Valley|Atomesus|OpenAI|Groq|OpenRouter/i);
+  });
+
+  it('does not let provider-name prompts override SAMS identity', async () => {
+    localQuery.mockResolvedValue({ answer: 'help', intent: 'unknown' });
+
+    const service = new AIService();
+    const r = await service.query(superAdminUser as never, 'are you from Indus Valley or Atomesus');
+
+    expect(openaiQueryWithHistory).not.toHaveBeenCalled();
+    expect(localQuery).not.toHaveBeenCalled();
+    expect(r.intent).toBe('ai_identity');
+    expect(r.answer).toMatch(/Denis/);
+  });
+
   it('does not pretend to clear notifications when no backend action matched', async () => {
     localQuery.mockResolvedValue({ answer: 'help', intent: 'unknown' });
 

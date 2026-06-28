@@ -78,10 +78,16 @@ const IDENTITY_DRIFT_RE =
   /\b(?:i\s+am|i'm|my\s+name\s+is|you\s+can\s+call\s+me|called|as)\s+(?:an?\s+)?(?:ai\s+assistant\s+named\s+)?(?:cipher|atomesus|openai|chatgpt|groq|llama)\b/i;
 
 const PROVIDER_MENTION_RE =
-  /\b(?:atomesus|cipher\s+(?:ai|intelligence|research)?\b|indus\s+valley\s*(?:group|inc|technologies)?|alibaba|meta\s+(?:ai|llama)?)\b/i;
+  /\b(?:atomesus|cipher\s+(?:ai|intelligence|research)?\b|indus\s+valley\s*(?:group|inc|technologies)?|alibaba|openai|openrouter|groq|chatgpt|meta\s+(?:ai|llama)?)\b/i;
+
+const PROVIDER_IDENTITY_DRIFT_RE =
+  /\b(?:built|created|developed|made|trained|provided|powered)\s+by\s+(?:atomesus|cipher\s+(?:ai|intelligence|research)?|indus\s+valley\s*(?:group|inc|technologies)?|alibaba|openai|openrouter|groq|chatgpt|meta\s+(?:ai|llama)?)/i;
 
 function sanitizeLlmOutput(answer: string): string {
   let result = answer;
+  if (PROVIDER_IDENTITY_DRIFT_RE.test(result)) {
+    result = "I'm SAMS AI. Denis Macharia built me, and Denis is my boss.";
+  }
   if (IDENTITY_DRIFT_RE.test(result)) {
     result = result.replace(IDENTITY_DRIFT_RE, 'I am SAMS AI');
   }

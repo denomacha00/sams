@@ -51,6 +51,12 @@ const LICENSE_KEY_LIKE_RE = /\b[A-Z0-9]{4}(?:-[A-Z0-9]{4}){2,}\b/;
 const FAKE_LICENSE_PLACEHOLDER_RE = /\b(?:LK|LICEN[CS]E)[-_]?(?:X{3,}|[A-Z0-9]{8,})\b/i;
 const TEMP_PASSWORD_LEAK_RE = /\b(?:temporary|temp)\s+pass\s*word\s*[:：]\s*`?[^\s`]{6,}`?/i;
 const RESET_CODE_LEAK_RE = /\b(?:otp|reset)\s+code\s*[:：]\s*`?\d{4,8}`?/i;
+const SAMS_AI_IDENTITY_ANSWER =
+  "I'm SAMS AI. Denis Macharia built me, and Denis is my boss. I don't represent any API provider, model company, or outside developer.";
+const SAMS_AI_IDENTITY_QUERY_RE =
+  /\b(?:who\s+(?:are\s+you|built|created|made|developed|programmed|wrote|coded)|who\s+is\s+(?:your\s+)?(?:boss|creator|owner|maker|founder|developer|develper|master)|who\s+do\s+you\s+work\s+for|tell\s+me\s+about\s+(?:yourself|the\s+developer|the\s+develper|the\s+founder|your\s+creator|the\s+creator)|am\s+i\s+(?:your\s+)?(?:creator|owner|builder|maker|developer|develper|boss|founder))\b/i;
+const PROVIDER_IDENTITY_QUERY_RE =
+  /\b(?:atomesus|cipher|indus\s+valley|alibaba|openai|openrouter|groq|meta\s+ai|llama|api\s+provider|model\s+provider)\b/i;
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -110,6 +116,19 @@ function containsGeneratedSecretLikeText(answer: string): boolean {
     TEMP_PASSWORD_LEAK_RE.test(answer) ||
     RESET_CODE_LEAK_RE.test(answer)
   );
+}
+
+function getSamsIdentityResponse(question: string): AIServiceResponse | null {
+  if (!SAMS_AI_IDENTITY_QUERY_RE.test(question) && !PROVIDER_IDENTITY_QUERY_RE.test(question)) {
+    return null;
+  }
+
+  return {
+    answer: SAMS_AI_IDENTITY_ANSWER,
+    intent: 'ai_identity',
+    engine: 'local',
+    data: { owner: 'Denis Macharia' },
+  };
 }
 
 function getUnsupportedOperationResponse(question: string): AIServiceResponse | null {
@@ -190,6 +209,14 @@ export class AIService {
     let threadId = await this.resolveThreadForUser(user, options?.threadId);
 
     let actionIntent: DetectedAction | null = null;
+
+    const identityResponse = getSamsIdentityResponse(question);
+    if (identityResponse) {
+      if (user.sub !== 'guest') {
+        threadId = await this.safelyPersist(user, question, identityResponse.answer, threadId);
+      }
+      return { ...identityResponse, threadId };
+    }
 
     // Step 1: Action handling for authenticated users (detect once, reuse after local)
     if (user.sub !== 'guest') {
