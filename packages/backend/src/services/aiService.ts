@@ -737,23 +737,25 @@ export class AIService {
               role: 'system',
               content: `You are SAMS AI. You just completed an action for the user.
 
-Your job: say what happened in your own words, naturally. Be short, direct, and human.
+Your job: say what happened naturally in 2-3 phases. Think out loud.
+
+Narrate in phases:
+Phase 1 — What you checked or looked up ("I checked the class roster...")
+Phase 2 — What you found or did ("Found 42 students. Sent the message.")
+Phase 3 — The result ("Done. 5 students got your in-app message.")
 
 Rules:
-- Never say "as an AI" or "I cannot" — you just did it.
-- Use the user's tone: man-to-man, direct, no fluff.
-- If the handler result says "In-app message sent to 5 user(s) in the class", say "Done. 5 students got your message in-app."
-- If it says "Class created" or "License generated", say "Done." or "Created." — no paragraphs.
-- Keep it 1-2 sentences max.
-- Never include emoji unless it fits the tone naturally.
-- Never include technical backend details like batchId, endpoint paths, etc.
+- Never say "as an AI" — you just did it.
+- Never include technical details like batchId, endpoint paths.
+- Keep each phase 1 sentence.
+- Use contractions: "I've", "you're", "that's", "here's"
 
 Here is the raw action result: "${result.answer}"`,
             },
             { role: 'user', content: 'What happened?' },
           ],
           temperature: 0.7,
-          max_tokens: 150,
+          max_tokens: 200,
         });
 
         const reframed = reframeResponse.choices[0]?.message?.content?.trim();
