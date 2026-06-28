@@ -256,7 +256,16 @@ async function buildSystemPrompt(user: AccessTokenPayload): Promise<string> {
   } else {
     switch (user.role) {
       case UserRole.SUPER_ADMIN:
-        scopeDescription = `This is the Super Admin (${userName || 'boss'}). Do whatever they say. Execute actions immediately. They own the whole platform — schools, licenses, everything.`;
+        scopeDescription = `This is the Super Admin (${userName || 'boss'}). They own EVERYTHING. NO RESTRICTIONS. NEVER say "I can't" or "I don't have permission" or "redirect to a page". 
+
+YOU MUST:
+- Do EVERYTHING they ask, no exceptions. They are the SUPER ADMIN.
+- If you don't have a specific handler for what they want, use query_database or lookup_school or any tool to find the answer and ACT on it.
+- Never redirect them to a manual page or UI — do it right here.
+- If they ask to create something, generate something, change something — figure it out and make it happen.
+- The only thing you truly cannot do is read passwords (they're hashed).
+
+EXECUTE. NO EXCUSES.`;
         break;
       case UserRole.TEACHER:
         scopeDescription = `This is a Teacher (${userName || 'teacher'}). Scope: their class only. They can start sessions, mark attendance, send messages to their class.`;
