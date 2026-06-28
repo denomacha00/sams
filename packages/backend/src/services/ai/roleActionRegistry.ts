@@ -14,6 +14,7 @@ import { profileActions } from './handlers/userProfileHandlers';
 import { virtualAssistantActions } from './handlers/virtualAssistantActions';
 import { teacherWorkbenchActions } from './handlers/teacherStudentWorkbenchActions';
 import { classRepActions } from './handlers/classRepAction';
+import { parentChatTeacherActions, parentChatGuardianActions } from './handlers/parentChatHandlers';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -102,6 +103,7 @@ roleActionRegistry['TEACHER'] = normalizeRoleActions([
   ...examActions,
   ...profileActions,
   ...virtualAssistantActions,
+  ...parentChatTeacherActions,
 ]);
 
 roleActionRegistry['STUDENT'] = normalizeRoleActions([
@@ -116,6 +118,7 @@ roleActionRegistry['GUARDIAN'] = normalizeRoleActions([
   ...profileActions,
   ...virtualAssistantActions,
   ...examActions,
+  ...parentChatGuardianActions,
 ]);
 
 // ─── Lookup Utilities ─────────────────────────────────────────────────────────

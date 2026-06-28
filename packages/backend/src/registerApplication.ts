@@ -31,6 +31,7 @@ import { knowledgeRouter } from './routes/knowledge';
 import { guardiansRouter } from './routes/guardians';
 import { examsRouter } from './routes/exams';
 import { teacherSubjectsRouter } from './routes/teacherSubjects';
+import { parentChatRouter } from './routes/parentChat';
 import { registerSocketServer } from './lib/socket';
 import { setupAttendanceSocket } from './sockets/attendanceSocket';
 import { setupTypingSocket } from './sockets/typingSocket';
@@ -182,6 +183,7 @@ export function registerApplication(app: express.Express, httpServer: HttpServer
   app.use('/api/v1/super', superAdminRouter);
   app.use('/api/v1/super', superAdminFeaturesRouter);
   app.use('/api/v1/teacher-subjects', teacherSubjectsRouter);
+  app.use('/api/v1/parent-chat', parentChatRouter);
 
   io = new SocketIOServer(httpServer, {
     cors: {
