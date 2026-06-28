@@ -109,10 +109,15 @@ const FloatingAI: React.FC = () => {
     setMessages([WELCOME_MESSAGE]);
   }, [threadOwner]);
 
-  // ── Speech hook with callback to re-open mic after AI finishes talking ─
+  // ── Speech hook ─────────────────────────────────────────────────────────
+  // NOTE: In voice mode we NEVER use speechSynthesis or AudioContext beeps.
+  // Both can route through the BT headset's A2DP channel, which kills the
+  // HFP mic profile. The AI response is shown as text in the chat only.
+  // The user sees the text immediately and can tap the speaker icon to hear
+  // it read aloud if they want.
   const { speaking, speak, toggle: toggleSpeech, stop: stopSpeech } = useAiSpeech({
     onEnd: () => {
-      // After AI finishes speaking, re-open mic if still in voice mode
+      // After AI finishes speaking (manual button press only), re-open mic
       if (voicePendingRef.current && !isListening) {
         startListening();
       }
@@ -254,17 +259,22 @@ const FloatingAI: React.FC = () => {
     setInput('');
     setLoading(true);
 
-    // Helper: add assistant message and speak if voice-pending
+    // Helper: add assistant message. In voice mode, DO NOT use
+    // speechSynthesis or any audio output — both can trigger the BT headset
+    // to switch to A2DP (audio playback profile), which kills the HFP mic.
+    // The response text is shown visually. User can tap speaker icon to hear it.
     const addAssistantMessage = (msg: Message) => {
       setMessages((prev) => [...prev, msg]);
       if (voicePendingRef.current && msg.content && !msg.isError) {
         // Pause recognition but KEEP the HFP keepalive stream alive.
         // This is CRITICAL for Bluetooth headsets — if we kill the
-        // getUserMedia stream, the BT headset drops HFP mic mode and
-        // subsequent recognition attempts will fail with 'audio-capture'.
+        // getUserMedia stream, the BT headset drops HFP mic mode.
         pauseRecognition();
         setAiSpeaking(true);
-        speak(msg.content);
+        // Restart recognition immediately (no audio output needed)
+        setTimeout(() => {
+          setAiSpeaking(false);
+        }, 100);
       }
     };
 
@@ -402,7 +412,7 @@ const FloatingAI: React.FC = () => {
       setMessages((prev) => [...prev, errorMsg]);
       if (voicePendingRef.current) {
         setAiSpeaking(true);
-        speak(errorMsg.content);
+        setTimeout(() => { setAiSpeaking(false); }, 100);
       }
     } finally {
       setLoading(false);
@@ -468,8 +478,8 @@ const FloatingAI: React.FC = () => {
     };
     setMessages((prev) => [...prev, silenceMsg]);
     setAiSpeaking(true);
-    speak(silenceMsg.content);
-  }, [speak]);
+    setTimeout(() => { setAiSpeaking(false); }, 100);
+  }, []);
 
   const handleAutoClose = useCallback(() => {
     voicePendingRef.current = false;
