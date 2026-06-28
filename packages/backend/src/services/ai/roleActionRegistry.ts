@@ -6,6 +6,14 @@ import { hodActions } from './handlers/hodHandlers';
 import { teacherActions } from './handlers/teacherHandlers';
 import { studentActions } from './handlers/studentHandlers';
 import { guardianActions } from './handlers/guardianHandlers';
+import { examActions, classAttendanceAction } from './handlers/examHandlers';
+import { guardianLinkActions } from './handlers/guardianLinkAction';
+import { timetableEditActions } from './handlers/timetableEditAction';
+import { knowledgeActions } from './handlers/knowledgeHandlers';
+import { profileActions } from './handlers/userProfileHandlers';
+import { virtualAssistantActions } from './handlers/virtualAssistantActions';
+import { teacherWorkbenchActions } from './handlers/teacherStudentWorkbenchActions';
+import { classRepActions } from './handlers/classRepAction';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -60,12 +68,55 @@ function normalizeRoleActions(actions: ActionDefinition[]): ActionDefinition[] {
 // Registry - populated by handler imports
 export const roleActionRegistry: RoleActionMap = {};
 
-roleActionRegistry['SUPER_ADMIN'] = normalizeRoleActions(superAdminActions);
-roleActionRegistry['SCHOOL_ADMIN'] = normalizeRoleActions(schoolAdminActions);
-roleActionRegistry['HOD'] = normalizeRoleActions(hodActions);
-roleActionRegistry['TEACHER'] = normalizeRoleActions(teacherActions);
-roleActionRegistry['STUDENT'] = normalizeRoleActions(studentActions);
-roleActionRegistry['GUARDIAN'] = normalizeRoleActions(guardianActions);
+roleActionRegistry['SUPER_ADMIN'] = normalizeRoleActions([
+  ...superAdminActions,
+  ...profileActions,
+  ...virtualAssistantActions,
+]);
+
+roleActionRegistry['SCHOOL_ADMIN'] = normalizeRoleActions([
+  ...schoolAdminActions,
+  ...classRepActions,
+  ...guardianLinkActions,
+  ...knowledgeActions,
+  ...examActions,
+  ...profileActions,
+  ...virtualAssistantActions,
+]);
+
+roleActionRegistry['HOD'] = normalizeRoleActions([
+  ...hodActions,
+  ...teacherWorkbenchActions,
+  ...knowledgeActions,
+  ...examActions,
+  ...timetableEditActions,
+  ...profileActions,
+  ...virtualAssistantActions,
+]);
+
+roleActionRegistry['TEACHER'] = normalizeRoleActions([
+  ...teacherActions,
+  ...teacherWorkbenchActions,
+  ...classRepActions,
+  ...knowledgeActions,
+  ...examActions,
+  ...profileActions,
+  ...virtualAssistantActions,
+]);
+
+roleActionRegistry['STUDENT'] = normalizeRoleActions([
+  ...studentActions,
+  ...examActions,
+  ...profileActions,
+  ...virtualAssistantActions,
+]);
+
+roleActionRegistry['GUARDIAN'] = normalizeRoleActions([
+  ...guardianActions,
+  ...profileActions,
+  ...virtualAssistantActions,
+  ...examActions,
+]);
 
 // ─── Lookup Utilities ─────────────────────────────────────────────────────────
 
