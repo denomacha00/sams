@@ -1,6 +1,5 @@
 import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useTypewriter } from '../hooks/useTypewriter';
 import apiClient from '../services/apiClient';
 import { useVoiceQuery } from '../hooks/useVoiceQuery';
 import { useAuthStore } from '../store/authStore';
@@ -90,52 +89,26 @@ const FloatingAI: React.FC = () => {
   const pendingStreamContentRef = useRef<string>('');
   const pendingStreamMsgIdRef = useRef<string | null>(null);
 
-  // ── Typewriter streaming ─────────────────────────────────────────────────
-  const { displayText: streamDisplayText, isComplete: streamComplete } = useTypewriter(
-    isStreaming ? streamingMessage : '',
-    20,
-  );
-
-  // Show "thinking" during backend query, "writing" during typewriter streaming
+  // Show "thinking" while loading, then show result instantly (no typewriter)
   useEffect(() => {
     if (loading) {
       setTypingStage('thinking');
     } else {
-      // When loading ends, kick off streaming for any pending content
+      // When loading ends, finalize any pending stream content into the message
       if (pendingStreamContentRef.current && pendingStreamMsgIdRef.current) {
-        setIsStreaming(true);
-        setStreamingMessage(pendingStreamContentRef.current);
-      } else {
-        setTypingStage('idle');
+        setMessages((prev) =>
+          prev.map((m) =>
+            m.id === pendingStreamMsgIdRef.current
+              ? { ...m, content: pendingStreamContentRef.current, isStreaming: false }
+              : m,
+          ),
+        );
+        pendingStreamContentRef.current = '';
+        pendingStreamMsgIdRef.current = null;
       }
-    }
-  }, [loading]);
-
-  // When streaming starts → "writing", when it finishes → "idle"
-  useEffect(() => {
-    if (isStreaming) {
-      setTypingStage('writing');
-    } else if (!loading) {
       setTypingStage('idle');
     }
-  }, [isStreaming, loading]);
-
-  // Finalize streaming when typewriter completes
-  useEffect(() => {
-    if (streamComplete && isStreaming && pendingStreamMsgIdRef.current) {
-      setMessages((prev) =>
-        prev.map((m) =>
-          m.id === pendingStreamMsgIdRef.current
-            ? { ...m, content: streamingMessage, isStreaming: false }
-            : m,
-        ),
-      );
-      setIsStreaming(false);
-      setStreamingMessage('');
-      pendingStreamContentRef.current = '';
-      pendingStreamMsgIdRef.current = null;
-    }
-  }, [streamComplete, isStreaming, streamingMessage]);
+  }, [loading]);
 
   // ── Voice tracking ──────────────────────────────────────────────────────
   const voicePendingRef = useRef(false);
@@ -475,10 +448,30 @@ const FloatingAI: React.FC = () => {
 
       pendingActionRef.current = null;
       const authHint = getAiAuthHint(data.intent);
-      addStreamingMessage(authHint ?? data.answer, {
-        actionData: data.data,
-        isError: isAiUnavailableIntent(data.intent) || isAiAuthIntent(data.intent),
-      });
+      // Action results and data queries appear instantly — only pure LLM text should stream
+      if (data.intent === 'action_executed' || data.intent === 'action_slot_fill' || data.intent === 'action_confirmation' || data.intent === 'action_denied' || data.intent === 'data_not_found' || data.intent === 'action_error' || data.intent === 'action_denied') {
+        addAssistantMessage({
+          id: crypto.randomUUID(),
+          role: 'assistant',
+          content: authHint ?? data.answer,
+          timestamp: new Date(),
+          actionData: data.data,
+          isError: isAiUnavailableIntent(data.intent) || isAiAuthIntent(data.intent),
+        });
+      } else if (data.intent === 'local_response' || data.intent?.startsWith && data.intent.startsWith('local_')) {
+        addAssistantMessage({
+          id: crypto.randomUUID(),
+          role: 'assistant',
+          content: authHint ?? data.answer,
+          timestamp: new Date(),
+          actionData: data.data,
+        });
+      } else {
+        addStreamingMessage(authHint ?? data.answer, {
+          actionData: data.data,
+          isError: isAiUnavailableIntent(data.intent) || isAiAuthIntent(data.intent),
+        });
+      }
     } catch (err) {
       const errorMsg: Message = {
         id: crypto.randomUUID(),
@@ -615,10 +608,7 @@ const FloatingAI: React.FC = () => {
         {/* Messages */}
         <div className="flex-1 overflow-y-auto p-3 space-y-3">
           {messages.map((msg) => {
-            // Use streaming display text if this message is currently being streamed
-            const displayContent = msg.isStreaming && msg.id === pendingStreamMsgIdRef.current
-              ? streamDisplayText
-              : msg.content;
+            const displayContent = msg.content;
 
             return (
               <div
@@ -654,9 +644,6 @@ const FloatingAI: React.FC = () => {
                         <AiMessageContent content={displayContent} />
                       ) : (
                         <p className="whitespace-pre-wrap leading-relaxed">{displayContent}</p>
-                      )}
-                      {msg.isStreaming && msg.id === pendingStreamMsgIdRef.current && !streamComplete && (
-                        <span className="inline-block w-1 h-4 ml-0.5 bg-indigo-400 animate-typewriter-pulse" />
                       )}
                     </div>
                     {msg.role === 'assistant' && msg.content.length > 0 && !msg.isStreaming && (
