@@ -21,13 +21,11 @@ const RESTART_DELAY_MS = 500;   // Brief pause before restarting recognition
  * for mic and A2DP for audio playback — they are mutually exclusive.
  *
  * To keep the BT headset in HFP mic mode:
- * 1. A persistent getUserMedia audio stream MUST be held open
- * 2. In voice mode, speechSynthesis is NOT used (the AI response is a
- *    brief beep via the PHONE SPEAKER, so the BT headset never leaves
- *    HFP mode — the keepalive stream stays active)
- * 3. When BT connects mid-session, we detect devicechange and restart
- * 4. After non-voice speechSynthesis, the consumer must call
- *    setAiSpeaking(false) which re-opens the HFP stream
+ * 1. A persistent getUserMedia audio stream MUST be held open at ALL times
+ * 2. NEVER release the HFP stream — even during AI response beep
+ * 3. Only stop the SpeechRecognition object, keep the MediaStream alive
+ * 4. After AI beep, restart SpeechRecognition (uses existing stream,
+ *    no new permission prompt needed)
  */
 export function useVoiceQuery(
   submitQuery: (transcript: string) => void,
@@ -84,8 +82,11 @@ export function useVoiceQuery(
    * Without this, Chrome's SpeechRecognition silently reverts to the
    * phone's internal mic after a few seconds.
    *
-   * Works on all browsers (not just Chrome) — the catch block handles
-   * browsers that don't support getUserMedia or reject the permission.
+   * Works on all browsers — the catch block handles browsers that don't
+   * support getUserMedia or reject the permission.
+   *
+   * CRITICAL: This stream must NEVER be released during voice mode.
+   * Once opened, only close it when the user explicitly stops voice mode.
    */
   const startHfpKeepalive = useCallback(async (): Promise<void> => {
     // Release any existing HFP stream
@@ -133,6 +134,22 @@ export function useVoiceQuery(
     }
   }, []);
 
+  // ── Pause recognition WITHOUT releasing HFP stream ────────────────────
+  // This is called when AI is about to respond. We stop recognition and
+  // silence timers, but KEEP the getUserMedia stream alive so the BT headset
+  // stays in HFP mic mode. When AI finishes, we just restart recognition.
+  const pauseRecognition = useCallback(() => {
+    clearSilenceTimer();
+    clearScheduledRestart();
+    silenceStageRef.current = 'none';
+    if (recognitionRef.current) {
+      try { recognitionRef.current.abort(); } catch { /* ignore */ }
+      recognitionRef.current = null;
+    }
+    setIsListening(false);
+    // DO NOT call stopHfpKeepalive() here — the stream stays alive
+  }, [clearSilenceTimer, clearScheduledRestart]);
+
   const stopListeningInternal = useCallback(() => {
     shouldRestartRef.current = false;
     clearSilenceTimer();
@@ -142,7 +159,7 @@ export function useVoiceQuery(
       try { recognitionRef.current.abort(); } catch { /* ignore */ }
       recognitionRef.current = null;
     }
-    stopHfpKeepalive();
+    stopHfpKeepalive();  // Full stop — kill everything
     setIsListening(false);
   }, [clearSilenceTimer, clearScheduledRestart, stopHfpKeepalive]);
 
@@ -278,11 +295,11 @@ export function useVoiceQuery(
     if (speaking) {
       clearSilenceTimer();
       clearScheduledRestart();
-      // IMPORTANT: Do NOT release the HFP stream here.
-      // In voice mode the AI response is a brief beep via the PHONE SPEAKER,
-      // not speechSynthesis — the BT headset stays in HFP mode.
-      // If we release the stream, the BT headset may drop HFP entirely
-      // and fail to capture the user's next utterance.
+      // HFP stream stays alive — the BT headset remains in HFP mic mode.
+      // The AI response beep plays through AudioContext; on most Android
+      // phones this routes through the PHONE SPEAKER, not the BT headset,
+      // because we hold an open getUserMedia stream that keeps the audio
+      // path locked to HFP.
     } else {
       resetSilenceTimer();
       if (shouldRestartRef.current) {
@@ -339,5 +356,9 @@ export function useVoiceQuery(
     setAiSpeaking,
     reInitMic,
     silenceStage: silenceStageRef,
+    // EXPORT pauseRecognition so FloatingAI can stop recognition WITHOUT
+    // releasing the HFP keepalive stream. This is the KEY to BT working —
+    // the getUserMedia stream MUST stay open continuously.
+    pauseRecognition,
   };
 }
