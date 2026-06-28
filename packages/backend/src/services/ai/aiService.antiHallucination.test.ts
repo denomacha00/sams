@@ -230,6 +230,22 @@ describe('AIService anti-hallucination routing', () => {
     expect(r.answer).toMatch(/Denis/);
   });
 
+  it('lets developer detail questions use the local knowledge path', async () => {
+    localQuery.mockResolvedValue({
+      answer: 'Knowledge says Denis is the SAMS founder in Kenya.',
+      intent: 'custom_knowledge',
+      data: { count: 1 },
+    });
+
+    const service = new AIService();
+    const r = await service.query(superAdminUser as never, 'tell me about the developer');
+
+    expect(openaiQueryWithHistory).not.toHaveBeenCalled();
+    expect(localQuery).toHaveBeenCalled();
+    expect(r.intent).toBe('custom_knowledge');
+    expect(r.answer).toMatch(/SAMS founder/);
+  });
+
   it('does not pretend to clear notifications when no backend action matched', async () => {
     localQuery.mockResolvedValue({ answer: 'help', intent: 'unknown' });
 

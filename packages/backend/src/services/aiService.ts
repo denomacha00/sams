@@ -54,7 +54,7 @@ const RESET_CODE_LEAK_RE = /\b(?:otp|reset)\s+code\s*[:：]\s*`?\d{4,8}`?/i;
 const SAMS_AI_IDENTITY_ANSWER =
   "I'm SAMS AI. Denis Macharia built me, and Denis is my boss.";
 const SAMS_AI_IDENTITY_QUERY_RE =
-  /\b(?:who\s+(?:are\s+you|built|created|made|developed|programmed|wrote|coded)|who\s+is\s+(?:your\s+)?(?:boss|creator|owner|maker|founder|developer|develper|master)|who\s+do\s+you\s+work\s+for|tell\s+me\s+about\s+(?:yourself|the\s+developer|the\s+develper|the\s+founder|your\s+creator|the\s+creator)|am\s+i\s+(?:your\s+)?(?:creator|owner|builder|maker|developer|develper|boss|founder))\b/i;
+  /\b(?:who\s+are\s+you|who\s+(?:built|created|made|developed|programmed|wrote|coded)\s+(?:you|me|sams\s+ai|this\s+(?:ai|assistant))|who\s+is\s+(?:your\s+)?(?:boss|creator|owner|maker|founder|developer|develper|master)|who\s+do\s+you\s+work\s+for|tell\s+me\s+about\s+(?:yourself|your\s+creator)|am\s+i\s+(?:your\s+)?(?:creator|owner|builder|maker|developer|develper|boss|founder))\b/i;
 const PROVIDER_IDENTITY_QUERY_RE =
   /\b(?:atomesus|cipher|indus\s+valley|alibaba|openai|openrouter|groq|meta\s+ai|llama|api\s+provider|model\s+provider)\b/i;
 
