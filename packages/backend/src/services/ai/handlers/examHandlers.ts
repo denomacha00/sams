@@ -98,7 +98,6 @@ const viewReportCardHandler: ActionHandler = async (params, scope) => {
 
   if (!termId) return { answer: 'No active term found.' };
 
-  // Fetch report card from route logic via exam service
   const exams = await prisma.exam.findMany({
     where: { schoolId: scope.schoolId, termId, results: { some: { studentId } } },
     include: { results: { where: { studentId } } },
@@ -191,118 +190,27 @@ const listGradeBoundariesHandler: ActionHandler = async (_params, scope) => {
   };
 };
 
-const viewRiskScoresHandler: ActionHandler = async (params, scope) => {
+const viewClassAttendanceHandler: ActionHandler = async (params, scope) => {
   const { prisma } = await import('../../../lib/prisma');
-  const { riskService } = await import('../../riskService');
 
-  let departmentId = scope.role === UserRole.HOD ? scope.departmentId : params.departmentId as string | undefined;
   const classId = params.classId as string | undefined;
+  let resolvedClassId = classId;
 
-  let classIds: string[] | undefined;
-  let deptId: string | undefined;
-
-  if (classId) {
-    classIds = [classId];
-  } else if (scope.role === UserRole.TEACHER) {
-    const { resolveTeacherTeachingClassIds } = await import('../../../lib/teacherScope');
-    classIds = await resolveTeacherTeachingClassIds(scope.userId, scope.classId);
-    if (classIds.length === 0) return { answer: 'Your account is not linked to any classes.' };
-  } else if (departmentId) {
-    deptId = departmentId;
-  }
-
-  const scores = await riskService.getRiskScores(scope.schoolId, deptId, classIds);
-
-  if (scores.length === 0) {
-    return { answer: 'No risk scores computed yet.', data: [] };
-  }
-
-  const highRisk = scores.filter((s) => s.riskLevel === 'HIGH' || s.riskLevel === 'CRITICAL');
-  const lines = scores.slice(0, 20).map((s) =>
-    `• **${s.studentName || s.studentId}**: ${s.score.toFixed(1)} — ${s.riskLevel}${s.riskLevel === 'HIGH' || s.riskLevel === 'CRITICAL' ? ' 🚨' : ''}`
-  );
-
-  let answer = `📊 **Risk Scores (${scores.length} students)**\n\n${lines.join('\n')}`;
-  if (highRisk.length > 0) {
-    answer += `\n\n🚨 **${highRisk.length} student(s) at HIGH/CRITICAL risk** — intervention recommended.`;
-  }
-
-  return { answer, data: { count: scores.length, highRiskCount: highRisk.length, scores } };
-};
-
-const viewChildRiskScoresHandler: ActionHandler = async (params, scope) => {
-  const { prisma } = await import('../../../lib/prisma');
-  const { riskService } = await import('../../riskService');
-
-  const childName = (params.childName as string)?.trim();
-  if (!childName) {
-    const links = await prisma.guardian.findMany({
-      where: { guardianId: scope.userId },
-      include: { student: { select: { id: true, fullName: true } } },
-    });
-    if (links.length === 0) return { answer: 'No linked children found.' };
-    if (links.length === 1) {
-      const score = await riskService.computeRiskScore(scope.schoolId, links[0].student.id);
-      return {
-        answer: `📊 **Risk Score — ${links[0].student.fullName}**: ${score.score.toFixed(1)} — ${score.riskLevel}`,
-        data: score,
-      };
-    }
-    return {
-      answer: `Which child? ${links.map((l) => l.student.fullName).join(', ')}`,
-    };
-  }
-
-  const links = await prisma.guardian.findMany({
-    where: { guardianId: scope.userId },
-    include: { student: { select: { id: true, fullName: true } } },
-  });
-  const child = links.find((l) => l.student.fullName.toLowerCase().includes(childName.toLowerCase()));
-  if (!child) return { answer: `No linked child matching "${childName}".` };
-
-  const score = await riskService.computeRiskScore(scope.schoolId, child.student.id);
-  return {
-    answer: `📊 **Risk Score — ${child.student.fullName}**: ${score.score.toFixed(1)} — ${score.riskLevel}`,
-    data: score,
-  };
-};
-
-const viewAttendanceHandler: ActionHandler = async (params, scope) => {
-  const { prisma } = await import('../../../lib/prisma');
-
-  // Student viewing their own
-  if (scope.role === UserRole.STUDENT) {
-    const records = await prisma.attendanceRecord.findMany({
-      where: { studentId: scope.userId, schoolId: scope.schoolId },
-      orderBy: { scannedAt: 'desc' },
-      take: 20,
-    });
-    if (records.length === 0) return { answer: 'No attendance records found.' };
-    const present = records.filter((r) => r.status === 'PRESENT' || r.status === 'LATE').length;
-    const pct = ((present / records.length) * 100).toFixed(1);
-    return {
-      answer: `📊 **Your Attendance**: ${pct}% (${present}/${records.length} sessions)`,
-      data: { percentage: parseFloat(pct), total: records.length, present },
-    };
-  }
-
-  // Teacher/HOD viewing class attendance
-  const classId = params.classId as string | undefined;
-  if (!classId && scope.role === UserRole.TEACHER) {
+  if (!resolvedClassId && scope.role === UserRole.TEACHER) {
     const { resolveTeacherTeachingClassIds } = await import('../../../lib/teacherScope');
     const ids = await resolveTeacherTeachingClassIds(scope.userId, scope.classId);
     if (ids.length === 0) return { answer: 'No linked classes found.' };
-    // Use first class
-    return {
-      answer: 'Which class attendance should I show? Reply with the class name.',
-      data: { classIds: ids },
-    };
+    if (ids.length === 1) {
+      resolvedClassId = ids[0];
+    } else {
+      return { answer: 'Which class attendance should I show? Reply with the class name.', data: { classIds: ids } };
+    }
   }
 
-  if (!classId) return { answer: 'Which class? Provide the class ID or name.' };
+  if (!resolvedClassId) return { answer: 'Which class? Provide the class name.' };
 
   const cls = await prisma.class.findFirst({
-    where: { schoolId: scope.schoolId, ...(classId.length > 10 ? { id: classId } : { name: { contains: classId, mode: 'insensitive' } }) },
+    where: { schoolId: scope.schoolId, ...(resolvedClassId.length > 10 ? { id: resolvedClassId } : { name: { contains: resolvedClassId, mode: 'insensitive' } }) },
   });
   if (!cls) return { answer: 'Class not found.' };
 
@@ -326,6 +234,7 @@ const viewAttendanceHandler: ActionHandler = async (params, scope) => {
 };
 
 // ─── Action Definitions ───────────────────────────────────────────────────────
+// NOTE: Risk score actions are in riskViewHandlers.ts — only exam-related actions here
 
 export const examActions: ActionDefinition[] = [
   {
@@ -410,38 +319,9 @@ export const examActions: ActionDefinition[] = [
     descriptionTemplate: () => 'List grade boundaries and point system.',
     handler: listGradeBoundariesHandler,
   },
-  {
-    action: 'view_risk_scores',
-    description: 'View dropout risk scores for students in your scope',
-    destructive: false,
-    patterns: [
-      /(?:risk|at[\s-]risk)\s+(?:scores?|students?|assessments?)/i,
-      /who\s+(?:is|are)\s+(?:at\s+)?risk/i,
-      /dropout\s+risk/i,
-      /student\s+risk/i,
-    ],
-    extractParams: () => ({}),
-    descriptionTemplate: () => 'View dropout risk scores for students.',
-    handler: viewRiskScoresHandler,
-  },
-  {
-    action: 'view_child_risk_score',
-    description: 'View risk score for a linked child (guardian only)',
-    destructive: false,
-    patterns: [
-      /(?:child|ward|student)(?:'s)?\s+(?:risk|at[\s-]risk)/i,
-      /risk\s+(?:score|level)\s+(?:for|of)\s+(.+)/i,
-    ],
-    extractParams: (message: string) => {
-      const match = message.match(/(?:for|of|about)\s+(.+?)(?:\s+(?:risk|at[\s-]risk)|$)/i);
-      return { childName: match?.[1]?.trim() };
-    },
-    descriptionTemplate: () => 'View risk score for linked child.',
-    handler: viewChildRiskScoresHandler,
-  },
 ];
 
-// Attendance handler for teacher/HOD to view class attendance stats
+// Class attendance action — for TEACHER and HOD
 export const classAttendanceAction: ActionDefinition = {
   action: 'view_class_attendance',
   description: 'View attendance statistics for a class',
@@ -455,5 +335,5 @@ export const classAttendanceAction: ActionDefinition = {
     return { className: classMatch?.[1]?.trim() };
   },
   descriptionTemplate: (params) => `View attendance for${params.className ? ` ${params.className}` : ' class'}.`,
-  handler: viewAttendanceHandler,
+  handler: viewClassAttendanceHandler,
 };

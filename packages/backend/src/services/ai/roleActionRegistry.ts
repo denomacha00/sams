@@ -97,6 +97,7 @@ roleActionRegistry['HOD'] = normalizeRoleActions([
   ...profileActions,
   ...virtualAssistantActions,
   ...riskViewActions,
+  classAttendanceAction,
 ]);
 
 roleActionRegistry['TEACHER'] = normalizeRoleActions([
@@ -109,6 +110,7 @@ roleActionRegistry['TEACHER'] = normalizeRoleActions([
   ...virtualAssistantActions,
   ...parentChatTeacherActions,
   ...riskViewActions,
+  classAttendanceAction,
 ]);
 
 roleActionRegistry['STUDENT'] = normalizeRoleActions([
