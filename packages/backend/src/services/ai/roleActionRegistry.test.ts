@@ -36,6 +36,8 @@ describe('roleActionRegistry permissions', () => {
     expect(isActionPermitted(UserRole.SUPER_ADMIN, 'reset_user_password')).toBe(true);
     expect(isActionPermitted(UserRole.SUPER_ADMIN, 'run_terminal_command')).toBe(true);
     expect(isActionPermitted(UserRole.SUPER_ADMIN, 'update_provider_secret')).toBe(true);
+    expect(isActionPermitted(UserRole.SUPER_ADMIN, 'list_knowledge')).toBe(true);
+    expect(isActionPermitted(UserRole.SUPER_ADMIN, 'search_knowledge')).toBe(true);
     expect(findAction(UserRole.SUPER_ADMIN, 'reset_user_password')?.destructive).toBe(true);
     expect(findAction(UserRole.SUPER_ADMIN, 'run_terminal_command')?.destructive).toBe(true);
     expect(findAction(UserRole.SUPER_ADMIN, 'update_provider_secret')?.destructive).toBe(true);

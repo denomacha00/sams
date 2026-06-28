@@ -322,6 +322,15 @@ export class KnowledgeService {
   async getForAIContext(
     user: AccessTokenPayload,
   ): Promise<Array<{ title: string; content: string; category: string }>> {
+    if (user.role === UserRole.SUPER_ADMIN) {
+      return prisma.aIKnowledge.findMany({
+        where: { createdBy: { role: UserRole.SUPER_ADMIN } },
+        select: { title: true, content: true, category: true },
+        orderBy: { createdAt: 'desc' },
+        take: 50,
+      });
+    }
+
     const where = await this.buildScopeFilter(user);
 
     const entries = await prisma.aIKnowledge.findMany({
@@ -368,6 +377,10 @@ export class KnowledgeService {
   }
 
   private async buildScopeFilter(user: AccessTokenPayload) {
+    if (user.role === UserRole.SUPER_ADMIN) {
+      return { createdBy: { role: UserRole.SUPER_ADMIN } };
+    }
+
     const baseFilter: { schoolId: string; OR?: Array<Record<string, unknown>> } = {
       schoolId: user.schoolId,
     };

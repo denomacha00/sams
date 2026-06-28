@@ -72,6 +72,7 @@ export const roleActionRegistry: RoleActionMap = {};
 
 roleActionRegistry['SUPER_ADMIN'] = normalizeRoleActions([
   ...superAdminActions,
+  ...knowledgeActions,
   ...profileActions,
   ...virtualAssistantActions,
   ...riskViewActions,

@@ -6,6 +6,7 @@ const { prismaMock, resolveTeacherClassIdMock, resolveTeacherTeachingClassIdsMoc
     aIKnowledge: {
       create: vi.fn(),
       findFirst: vi.fn(),
+      findMany: vi.fn(),
     },
     class: {
       findFirst: vi.fn(),
@@ -106,5 +107,27 @@ describe('KnowledgeService', () => {
         }),
       }),
     );
+  });
+
+  it('gets Super Admin knowledge from Super Admin-created entries for AI context', async () => {
+    prismaMock.aIKnowledge.findMany.mockResolvedValue([
+      { title: 'Developer', content: 'Denis built SAMS.', category: 'company' },
+    ]);
+
+    const entries = await service.getForAIContext({
+      sub: 'super-1',
+      role: UserRole.SUPER_ADMIN,
+      schoolId: 'platform',
+    } as any);
+
+    expect(prismaMock.aIKnowledge.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { createdBy: { role: UserRole.SUPER_ADMIN } },
+        take: 50,
+      }),
+    );
+    expect(entries).toEqual([
+      { title: 'Developer', content: 'Denis built SAMS.', category: 'company' },
+    ]);
   });
 });
