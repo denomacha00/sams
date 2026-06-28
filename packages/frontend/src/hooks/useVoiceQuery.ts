@@ -10,25 +10,24 @@ interface SpeechRecognitionErrorEvent {
   message: string;
 }
 
-const SILENCE_TIMEOUT_MS = 20000;
-const FINAL_SILENCE_TIMEOUT_MS = 10000;
-const BLUETOOTH_SETTLE_MS = 1500;
+const HFP_KEEPALIVE_MS = 5000;  // Renew the HFP keepalive stream every 5s
+const RESTART_DELAY_MS = 500;   // Brief pause before restarting recognition
 
 /**
  * Hook for hands-free voice conversation with Bluetooth headset support.
  *
- * CRITICAL BUG FIXED: SpeechRecognition in Chrome/Edge uses the OS default
- * audio input device DIRECTLY — it does NOT use a MediaStream. This means
- * calling getUserMedia() alone doesn't change which mic SpeechRecognition uses.
+ * CRITICAL: On Android Chrome, SpeechRecognition uses the OS default
+ * communication device. Bluetooth headsets use HFP (Hands-Free Profile)
+ * for mic and A2DP for audio playback — they are mutually exclusive.
  *
- * Solution:
- * 1. Force-getUserMedia() on start to "wake up" Bluetooth HFP profile
- * 2. Listen for navigator.mediaDevices.ondevicechange to auto-restart when
- *    Bluetooth connects/disconnects
- * 3. Show available mic names so user can verify Bluetooth detection
- * 4. On 'audio-capture' errors (Bluetooth profile switch), re-enumerate
- *    and restart with longer delay
- * 5. Return a reInitMic function so the UI can offer "tap twice" recovery
+ * To keep the BT headset in HFP mic mode:
+ * 1. A persistent getUserMedia audio stream MUST be held open
+ * 2. In voice mode, speechSynthesis is NOT used (the AI response is a
+ *    brief beep via the PHONE SPEAKER, so the BT headset never leaves
+ *    HFP mode — the keepalive stream stays active)
+ * 3. When BT connects mid-session, we detect devicechange and restart
+ * 4. After non-voice speechSynthesis, the consumer must call
+ *    setAiSpeaking(false) which re-opens the HFP stream
  */
 export function useVoiceQuery(
   submitQuery: (transcript: string) => void,
@@ -39,15 +38,14 @@ export function useVoiceQuery(
 ) {
   const [isListening, setIsListening] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [availableMics, setAvailableMics] = useState<string[]>([]);
-  const [batterySaving, setBatterySaving] = useState(false);
   const recognitionRef = useRef<any>(null);
   const shouldRestartRef = useRef(false);
   const silenceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const silenceStageRef = useRef<'none' | 'prompted' | 'closing'>('none');
   const isAiSpeakingRef = useRef(false);
   const scheduledRestartRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const deviceLabelSet = useRef(new Set<string>());
+  const hfpStreamRef = useRef<MediaStream | null>(null); // Persistent BT HFP stream
+  const hfpTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const clearSilenceTimer = useCallback(() => {
     if (silenceTimerRef.current) {
@@ -76,49 +74,23 @@ export function useVoiceQuery(
         silenceStageRef.current = 'closing';
         options?.onAutoClose?.();
         stopListeningInternal();
-      }, FINAL_SILENCE_TIMEOUT_MS);
-    }, SILENCE_TIMEOUT_MS);
+      }, 10000);
+    }, 20000);
   }, [clearSilenceTimer, options]);
 
   /**
-   * Check which microphones are available. This forces the browser to
-   * enumerate all audio inputs including recently connected Bluetooth headsets.
+   * Open and HOLD a persistent getUserMedia audio stream.
+   * This is the KEY to forcing Android to keep the Bluetooth HFP mic active.
+   * Without this, Chrome's SpeechRecognition silently reverts to the
+   * phone's internal mic after a few seconds.
+   *
+   * Works on all browsers (not just Chrome) — the catch block handles
+   * browsers that don't support getUserMedia or reject the permission.
    */
-  const enumerateMics = useCallback(async (): Promise<string[]> => {
-    try {
-      const devices = await navigator.mediaDevices.enumerateDevices();
-      const audioInputs = devices.filter((d) => d.kind === 'audioinput');
-      const labels = audioInputs
-        .filter((d) => d.label)
-        .map((d) => d.label);
-      const uniqLabels = [...new Set(labels)];
-      if (uniqLabels.length > 0) {
-        const changed =
-          uniqLabels.some((l) => !deviceLabelSet.current.has(l)) ||
-          deviceLabelSet.current.size !== uniqLabels.length;
-        if (changed) {
-          deviceLabelSet.current = new Set(uniqLabels);
-          console.log('[VoiceQuery] Mics changed:', uniqLabels);
-        }
-        setAvailableMics(uniqLabels);
-      } else if (audioInputs.length > 0) {
-        // Some browsers hide labels without getUserMedia permission
-        setAvailableMics([`${audioInputs.length} mic(s) detected`]);
-      } else {
-        setAvailableMics([]);
-      }
-      return uniqLabels;
-    } catch {
-      return [];
-    }
-  }, []);
+  const startHfpKeepalive = useCallback(async (): Promise<void> => {
+    // Release any existing HFP stream
+    stopHfpKeepalive();
 
-  /**
-   * Force the browser to enumerate audio devices and wake up Bluetooth.
-   * This sends a brief audio stream request which causes the OS to
-   * activate the Bluetooth Hands-Free Profile (HFP) if a headset is connected.
-   */
-  const wakeBluetoothMic = useCallback(async (): Promise<void> => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
         audio: {
@@ -127,12 +99,37 @@ export function useVoiceQuery(
           autoGainControl: true,
         },
       });
-      // Hold stream briefly then release — this is enough to trigger
-      // the OS to set the Bluetooth mic as active/default
-      await new Promise((r) => setTimeout(r, 200));
-      stream.getTracks().forEach((t) => t.stop());
-    } catch (err) {
-      console.warn('[VoiceQuery] getUserMedia for Bluetooth wake failed:', err);
+      hfpStreamRef.current = stream;
+
+      // Renew the stream periodically to keep BT HFP alive
+      // (some Android phones drop the HFP channel after ~5s of silence)
+      hfpTimerRef.current = setInterval(async () => {
+        if (!shouldRestartRef.current) return;
+        try {
+          const newStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+          // Atomically replace the old stream with the new one
+          const oldStream = hfpStreamRef.current;
+          hfpStreamRef.current = newStream;
+          if (oldStream) {
+            oldStream.getTracks().forEach((t) => t.stop());
+          }
+        } catch {
+          // Keep the existing stream — renewal is best-effort
+        }
+      }, HFP_KEEPALIVE_MS);
+    } catch {
+      // getUserMedia not available — BT fix not possible, fallback to internal mic
+    }
+  }, []);
+
+  const stopHfpKeepalive = useCallback(() => {
+    if (hfpTimerRef.current) {
+      clearInterval(hfpTimerRef.current);
+      hfpTimerRef.current = null;
+    }
+    if (hfpStreamRef.current) {
+      hfpStreamRef.current.getTracks().forEach((t) => t.stop());
+      hfpStreamRef.current = null;
     }
   }, []);
 
@@ -145,15 +142,16 @@ export function useVoiceQuery(
       try { recognitionRef.current.abort(); } catch { /* ignore */ }
       recognitionRef.current = null;
     }
+    stopHfpKeepalive();
     setIsListening(false);
-  }, [clearSilenceTimer, clearScheduledRestart]);
+  }, [clearSilenceTimer, clearScheduledRestart, stopHfpKeepalive]);
 
   const createAndStartRecognition = useCallback(() => {
     const SpeechRecognition =
       (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
 
     if (!SpeechRecognition) {
-      setError('Speech recognition is not supported.');
+      setError('Speech recognition not supported.');
       return null;
     }
 
@@ -189,22 +187,22 @@ export function useVoiceQuery(
     recognition.onerror = (event: SpeechRecognitionErrorEvent) => {
       if (event.error === 'no-speech' || event.error === 'aborted') return;
 
-      // Bluetooth headsets cause 'audio-capture' when switching HFP↔HSP
       if (event.error === 'audio-capture' || event.error === 'not-allowed') {
-        console.warn('[VoiceQuery] BT profile switch — audio-capture');
-        setError('Bluetooth mic switching. Tap mic twice to re-init.');
+        console.warn('[VoiceQuery] BT audio-capture error — re-opening HFP stream');
+        setError('Bluetooth mic switching... tap again if it fails.');
+
         if (shouldRestartRef.current) {
           clearScheduledRestart();
           scheduledRestartRef.current = setTimeout(() => {
             if (shouldRestartRef.current) {
-              wakeBluetoothMic().then(() => {
-                enumerateMics().then(() => {
-                  const nr = createAndStartRecognition();
-                  recognitionRef.current = nr;
-                });
+              // Re-create HFP keepalive, then restart
+              startHfpKeepalive().then(() => {
+                if (!shouldRestartRef.current) return;
+                const nr = createAndStartRecognition();
+                recognitionRef.current = nr;
               });
             }
-          }, BLUETOOTH_SETTLE_MS);
+          }, RESTART_DELAY_MS);
         }
         return;
       }
@@ -226,6 +224,7 @@ export function useVoiceQuery(
       if (shouldRestartRef.current) {
         resetSilenceTimer();
         if (isAiSpeakingRef.current) return;
+
         clearScheduledRestart();
         scheduledRestartRef.current = setTimeout(() => {
           if (!shouldRestartRef.current) return;
@@ -237,10 +236,10 @@ export function useVoiceQuery(
                   const nr = createAndStartRecognition();
                   recognitionRef.current = nr;
                 }
-              }, BLUETOOTH_SETTLE_MS);
+              }, RESTART_DELAY_MS);
             }
           }
-        }, BLUETOOTH_SETTLE_MS);
+        }, RESTART_DELAY_MS);
         return;
       }
       setIsListening(false);
@@ -254,54 +253,54 @@ export function useVoiceQuery(
     }
 
     return recognition;
-  }, [submitQuery, resetSilenceTimer, clearScheduledRestart, wakeBluetoothMic, enumerateMics]);
+  }, [submitQuery, resetSilenceTimer, clearScheduledRestart, startHfpKeepalive]);
 
-  // ── Listen for device changes (Bluetooth connect/disconnect) ─────
+  // Listen for BT connect/disconnect
   useEffect(() => {
     const handler = () => {
-      console.log('[VoiceQuery] Audio device changed — re-enumerating');
-      enumerateMics();
-      // If listening, restart to pick up new Bluetooth mic
+      console.log('[VoiceQuery] Audio device change detected');
       if (shouldRestartRef.current && !isAiSpeakingRef.current) {
         stopListeningInternal();
-        wakeBluetoothMic().then(() => {
-          enumerateMics().then(() => {
-            if (shouldRestartRef.current) {
-              const nr = createAndStartRecognition();
-              recognitionRef.current = nr;
-            }
-          });
+        startHfpKeepalive().then(() => {
+          if (shouldRestartRef.current) {
+            const nr = createAndStartRecognition();
+            recognitionRef.current = nr;
+          }
         });
       }
     };
     navigator.mediaDevices?.addEventListener('devicechange', handler);
     return () => navigator.mediaDevices?.removeEventListener('devicechange', handler);
-  }, [enumerateMics, wakeBluetoothMic, createAndStartRecognition, stopListeningInternal]);
+  }, [createAndStartRecognition, startHfpKeepalive, stopListeningInternal]);
 
   const setAiSpeaking = useCallback((speaking: boolean) => {
     isAiSpeakingRef.current = speaking;
     if (speaking) {
       clearSilenceTimer();
       clearScheduledRestart();
+      // IMPORTANT: Do NOT release the HFP stream here.
+      // In voice mode the AI response is a brief beep via the PHONE SPEAKER,
+      // not speechSynthesis — the BT headset stays in HFP mode.
+      // If we release the stream, the BT headset may drop HFP entirely
+      // and fail to capture the user's next utterance.
     } else {
       resetSilenceTimer();
       if (shouldRestartRef.current) {
         clearScheduledRestart();
+        // HFP stream is still alive (was never released), so restart
+        // recognition with a short delay — no BT profile switch needed.
         scheduledRestartRef.current = setTimeout(() => {
           if (!shouldRestartRef.current) return;
-          wakeBluetoothMic().then(() => {
-            if (!shouldRestartRef.current) return;
-            if (recognitionRef.current) {
-              try { recognitionRef.current.start(); return; }
-              catch { /* fall through */ }
-            }
-            const nr = createAndStartRecognition();
-            recognitionRef.current = nr;
-          });
-        }, BLUETOOTH_SETTLE_MS);
+          if (recognitionRef.current) {
+            try { recognitionRef.current.start(); return; }
+            catch { /* fall through */ }
+          }
+          const nr = createAndStartRecognition();
+          recognitionRef.current = nr;
+        }, RESTART_DELAY_MS);
       }
     }
-  }, [resetSilenceTimer, clearScheduledRestart, createAndStartRecognition, wakeBluetoothMic]);
+  }, [resetSilenceTimer, clearScheduledRestart, createAndStartRecognition]);
 
   const startListening = useCallback(() => {
     setError(null);
@@ -310,29 +309,24 @@ export function useVoiceQuery(
     silenceStageRef.current = 'none';
     shouldRestartRef.current = true;
 
-    // Step 1: Wake up Bluetooth mic first
-    wakeBluetoothMic().then(() => {
-      // Step 2: Enumerate mics (logs available devices)
-      enumerateMics().then(() => {
-        // Step 3: Start recognition
-        if (!shouldRestartRef.current) return;
-        const recognition = createAndStartRecognition();
-        recognitionRef.current = recognition;
-      });
+    // Step 1: Force BT HFP keepalive stream (CRITICAL for Android/Chrome)
+    startHfpKeepalive().then(() => {
+      // Step 2: Start recognition
+      if (!shouldRestartRef.current) return;
+      const recognition = createAndStartRecognition();
+      recognitionRef.current = recognition;
     });
-  }, [clearSilenceTimer, clearScheduledRestart, wakeBluetoothMic, enumerateMics, createAndStartRecognition]);
+  }, [clearSilenceTimer, clearScheduledRestart, startHfpKeepalive, createAndStartRecognition]);
 
   const stopListening = useCallback(() => {
     stopListeningInternal();
   }, [stopListeningInternal]);
 
-  /** Re-initialize mic — called when user taps mic button twice */
+  /** Re-initialize mic — for "tap twice" recovery */
   const reInitMic = useCallback(() => {
     stopListeningInternal();
     setError(null);
-    setBatterySaving(true);
     setTimeout(() => {
-      setBatterySaving(false);
       startListening();
     }, 300);
   }, [stopListeningInternal, startListening]);
@@ -340,8 +334,6 @@ export function useVoiceQuery(
   return {
     isListening,
     error,
-    availableMics,
-    batterySaving,
     startListening,
     stopListening,
     setAiSpeaking,
