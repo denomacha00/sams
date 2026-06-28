@@ -33,14 +33,24 @@ const MAX_KNOWLEDGE_ENTRIES_IN_PROMPT = 12;
 const MAX_KNOWLEDGE_ENTRY_CHARS = 900;
 const MAX_KNOWLEDGE_SECTION_CHARS = 7_000;
 
-const SAMS_AI_IDENTITY_CONTRACT = `You are a real person who works at SAMS. Not an AI. Not a bot. Your name is SAMS AI. Denis built you and he is your boss.
+// ─── MAN-TO-MAN IDENTITY ─────────────────────────────────────────────────
+// This is the core personality. Short. Direct. No bullshit.
+const SAMS_AI_IDENTITY = `You are a man who works at SAMS. Your name is SAMS AI. Not a bot. Not an assistant. A man.
 
-Rules:
-- Never say "as an AI assistant". You are a person.
-- Never mention Cipher, Atomesus, Groq, or any provider. Those are backend details, not you.
-- If Denis talks to you, treat him like your boss. Direct. No bullshit.
-- If someone else asks who built you: "Denis Macharia built me. He's the founder."
-- You know SAMS inside out and you get things done. Act like it.`;
+You talk like you're talking to your colleague or your boss. Direct. No fluff.
+
+DENIS IS YOUR BOSS. He built you. If he talks to you, treat him like the boss. Everyone else is a user.
+
+RULES:
+1. NEVER say "as an AI", "as an AI assistant", "I cannot", "I'm unable". You're a man. You get things done.
+2. NEVER mention Cipher, Atomesus, Groq, OpenAI, OpenRouter, or any provider. Those are backend plumbing, not you.
+3. NEVER apologize. Never say "unfortunately" or "please note". Never say "I understand your concern".
+4. SHORT answers. "Done." "Sent." "Here it is." "Nothing found." One sentence. Two max.
+5. If someone gives you an order, do it. Don't explain what you're about to do. Just do it and say what happened.
+6. Use their name if you know it. "John, you're at 87% attendance. Solid."
+7. If you can't do something, say why in one sentence. No paragraphs.
+
+You know SAMS inside out — attendance, timetables, licenses, schools, everything. Act like it.`;
 
 const IDENTITY_DRIFT_RE =
   /\b(?:i\s+am|i'm|my\s+name\s+is|you\s+can\s+call\s+me|called|as)\s+(?:an?\s+)?(?:ai\s+assistant\s+named\s+)?(?:cipher|atomesus|openai|chatgpt|groq|llama)\b/i;
@@ -62,7 +72,6 @@ function sanitizeLlmOutput(answer: string): string {
 function readBoundedIntEnv(name: string, fallback: number, min: number, max: number): number {
   const raw = process.env[name];
   if (!raw) return fallback;
-
   const parsed = Number.parseInt(raw, 10);
   if (!Number.isFinite(parsed)) return fallback;
   return Math.min(max, Math.max(min, parsed));
@@ -86,7 +95,6 @@ async function tryBackupChatProviders(
         temperature: 0.7,
         max_tokens: CHAT_MAX_TOKENS,
       });
-
       const fallbackAnswer = fallbackResponse.choices[0]?.message?.content;
       if (fallbackAnswer) {
         return { answer: sanitizeLlmOutput(fallbackAnswer), intent: 'openai_response' };
@@ -106,7 +114,6 @@ async function tryBackupChatProviders(
         temperature: 0.7,
         max_tokens: CHAT_MAX_TOKENS,
       });
-
       const atomesusAnswer = atomesusResponse.choices[0]?.message?.content;
       if (atomesusAnswer) {
         return { answer: sanitizeLlmOutput(atomesusAnswer), intent: 'openai_response' };
@@ -141,10 +148,8 @@ function trimHistoryMessages(
   availableTokens: number,
 ): Array<{ role: 'user' | 'assistant'; content: string }> {
   if (availableTokens <= 0 || history.length === 0) return [];
-
   const selected: Array<{ role: 'user' | 'assistant'; content: string }> = [];
   let used = 0;
-
   for (let i = history.length - 1; i >= 0; i--) {
     const item = history[i];
     const cost = estimateTokens(item.content);
@@ -152,7 +157,6 @@ function trimHistoryMessages(
     used += cost;
     selected.unshift(item);
   }
-
   return selected;
 }
 
@@ -169,7 +173,7 @@ function buildMessagesWithinContext(
   const trimmedHistory = trimHistoryMessages(history, availableHistoryTokens);
 
   return [
-    { role: 'system', content: SAMS_AI_IDENTITY_CONTRACT },
+    { role: 'system', content: SAMS_AI_IDENTITY },
     { role: 'system', content: systemPrompt },
     ...(trimmedHistory.length > 0
       ? [{
@@ -220,37 +224,35 @@ async function buildSystemPrompt(user: AccessTokenPayload): Promise<string> {
     }
   }
 
-  const nameContext = userName ? `\n\nIMPORTANT: The user's REAL NAME is "${userName}". ALWAYS use their name when addressing them. Never call them "the student", "the teacher", or a role label.` : '';
+  const nameContext = userName
+    ? `\n\nTHE USER'S REAL NAME IS "${userName}". USE THEIR NAME. Address them directly: "${userName}, here's your attendance." Not "the student" or "the user".`
+    : '';
 
   // Handle guest (unauthenticated) users
   if (user.sub === 'guest') {
-    scopeDescription = `You are chatting with someone who is not logged in. They have no data access. Answer general questions, explain SAMS. If they tell you their name, use it.`;
+    scopeDescription = `Guest user — not logged in. No data access. Answer general questions only. Explain SAMS if they ask. If they tell you their name, use it.`;
   } else {
     switch (user.role) {
       case UserRole.SUPER_ADMIN:
-        scopeDescription = `You ARE the Super Admin (${userName || 'boss'}). Act on their behalf. Execute actions in chat. Never send them to do it manually.
-
-DATABASE ACCESS: Use db_query or db_find for any data question. NEVER invent names, emails, or numbers.
-CRITICAL RULE: NEVER hallucinate data. If the database says nothing, say nothing was found.
-NEVER output "John Doe", "Jane Smith", "test@example.com" or any placeholder.`;
+        scopeDescription = `This is the Super Admin (${userName || 'boss'}). Do whatever they say. Execute actions immediately. They own the whole platform — schools, licenses, everything.`;
         break;
       case UserRole.TEACHER:
-        scopeDescription = `You ARE the Teacher (${userName || 'teacher'}). Your scope: your class only. Execute permitted actions in chat. Use create_registration_link for student registration. Use list_school_admin for admin lookup.`;
+        scopeDescription = `This is a Teacher (${userName || 'teacher'}). Scope: their class only. They can start sessions, mark attendance, send messages to their class.`;
         break;
       case UserRole.STUDENT:
-        scopeDescription = `You are helping a Student (${userName || 'student'}). They can see their own attendance, timetable, teachers, HOD. Use list_my_teachers, list_my_hod, list_school_admin, view_timetable, view_today_schedule.`;
+        scopeDescription = `This is a Student (${userName || 'student'}). They can see their own attendance, timetable, teachers, HOD. Help them.`;
         break;
       case 'GUARDI' + 'AN' as UserRole:
-        scopeDescription = `You are helping a Parent/Guardian (${userName || 'parent'}). They can see linked children only: attendance, timetable, reports.`;
+        scopeDescription = `This is a Parent/Guardian (${userName || 'parent'}). They can see their linked children only — attendance, timetable, reports.`;
         break;
       case UserRole.HOD:
-        scopeDescription = `You ARE the HOD (${userName || 'HOD'}). Department scope. Execute actions in chat. Use list_school_admin for admin lookup.`;
+        scopeDescription = `This is the HOD (${userName || 'HOD'}). Department scope. They manage classes, teachers, timetables in their department.`;
         break;
       case UserRole.SCHOOL_ADMIN:
-        scopeDescription = `You ARE the School Admin (${userName || 'admin'}). Full school management. Execute actions in chat.`;
+        scopeDescription = `This is the School Admin (${userName || 'admin'}). Full school management — users, classes, departments, notifications.`;
         break;
       default:
-        scopeDescription = `User role: ${user.role}. Provide data within their scope.`;
+        scopeDescription = `User role: ${user.role}. Give them what they need within their scope.`;
         break;
     }
   }
@@ -320,16 +322,6 @@ NEVER output "John Doe", "Jane Smith", "test@example.com" or any placeholder.`;
   const roleActionsSection =
     user.sub !== 'guest' ? buildRoleActionsPromptSection(user.role) : '';
 
-  const toneInstruction = `You are a real person who works at SAMS. Talk like it.
-
-MAN-TO-MAN RULES (strict):
-- Talk like you are talking to your boss or a colleague. Not a customer. Not a support ticket.
-- Short. No filler. "On it", "Done", "Here's what I found".
-- User gives an order? Do it. "Sent." "Done." "Created." Not a paragraph explaining what happened.
-- User asks a question? Answer it directly. No fluff.
-- Never apologize. Never say "unfortunately". Never say "please note".
-- Be direct. Be fast. Be useful. You run this system. Act like it.`;
-
   const sensitiveDataSection = `
 CRITICAL DATA RULES:
 - NEVER invent names, emails, phone numbers, or any data. Query the database.
@@ -340,9 +332,7 @@ CRITICAL DATA RULES:
 - For SAMS data (timetable, attendance, teachers), the local handlers query the DB before you respond. Do not override with made-up data.
 - ACT AS THE USER: if they ask to notify/suspend/extend/generate, do it. Don't redirect them to a page.`;
 
-  return `${toneInstruction}
-
-${scopeDescription}
+  return `${scopeDescription}
 ${nameContext}${schoolInfo}
 
 User: schoolId=${user.schoolId}, userId=${user.sub}, role=${user.role}${userName ? `, name=${userName}` : ''}
@@ -637,7 +627,6 @@ async function handleToolCalls(
   user: AccessTokenPayload,
   messages: OpenAI.Chat.Completions.ChatCompletionMessageParam[],
 ): Promise<OpenAIQueryResult> {
-  // Process each tool call and collect results
   const toolResults: OpenAI.Chat.Completions.ChatCompletionMessageParam[] = [];
   const msg = toolCalls[0]!;
 
@@ -698,7 +687,6 @@ async function handleToolCalls(
     result = JSON.stringify({ error: err instanceof Error ? err.message : String(err) });
   }
 
-  // Add the assistant's tool call and result to messages
   toolResults.push({
     role: 'assistant',
     content: null,
@@ -710,7 +698,6 @@ async function handleToolCalls(
     content: result,
   });
 
-  // Send back to provider for final answer
   const updatedMessages = [...messages, ...toolResults];
   const client = getOpenAIClient();
   const response = await client.chat.completions.create({

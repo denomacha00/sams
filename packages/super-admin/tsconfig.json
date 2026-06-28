@@ -21,7 +21,9 @@
     "types": ["vite/client"],
     "paths": {
       "@sams/shared": ["../shared/src/types/index.ts"],
-      "@/*": ["./src/*"]
+      "@/*": ["./src/*"],
+      "use-voice-query": ["../frontend/src/hooks/useVoiceQuery.ts"],
+      "use-ai-speech": ["../frontend/src/hooks/useAiSpeech.ts"]
     }
   },
   "include": ["src/**/*"],

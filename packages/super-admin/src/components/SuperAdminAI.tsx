@@ -5,6 +5,8 @@ import { prepareImagesForAiUpload } from '../lib/aiImageUpload';
 import { useAuthStore } from '../store/authStore';
 import AiChartRenderer from './AiChartRenderer';
 import { useVoiceBiometrics, loadVoicePrint } from '../hooks/useVoiceBiometrics';
+import { useVoiceQuery } from 'use-voice-query';
+import { useAiSpeech } from 'use-ai-speech';
 
 interface PendingAction {
   action: string;
@@ -34,6 +36,7 @@ const AI_UNAVAILABLE_INTENTS = new Set(['ai_error', 'ai_not_configured']);
 const AI_VISION_FAILURE_INTENTS = new Set(['image_analysis_error', 'ai_not_configured', 'upload_error']);
 
 const CONFIRM_RE = /^(yes|y|confirm|proceed|ok|do it|go ahead)\.?$/i;
+const DONE_RE = /^(?:i'?m\s+)?done|no|stop|bye|enough|thats?\s+all|finish|end/i;
 const SUPER_AI_THREAD_STORAGE_KEY = 'sams-super-admin-ai-thread-id';
 
 const SUPER_ADMIN_NAV_TARGETS: Array<{ path: string; label: string; patterns: RegExp[] }> = [
@@ -73,16 +76,16 @@ function createWelcomeMessage(): ChatMessage {
     id: 'welcome',
     role: 'assistant',
     content:
-      'ðŸ‘‹ Hello, Super Admin! I\'m your AI system assistant. I can help you with:\n\n' +
-      'â€¢ **System stats** â€” "how many schools", "total revenue", "platform overview"\n' +
-      'â€¢ **School ops** â€” "school info for X", "suspend school Y", "extend license for Z"\n' +
-      'â€¢ **Password reset** â€” "reset password for user at school CODE" (temp password or OTP)\n' +
-      'â€¢ **Live database** â€” "@db" for platform overview, "@school greenwood" for one school\n' +
-      'â€¢ **Server ops** â€” "@status", "@test", "@logs", "@verify", "@readiness", "@secrets", "@diagnose-ai", "@traffic", "@restart-api", "@migrate-status", "@migrate-deploy", "@unlock-users", "@git-pull", "@deploy"\n' +
-      'â€¢ **Troubleshooting** â€” "why is a school not working", "common problems"\n' +
-      'â€¢ **How-to guides** â€” "how to generate a license", "how to suspend a school"\n' +
-      'â€¢ **Platform docs** â€” architecture and features from DOCUMENTATION.md + Knowledge Base\n\n' +
-      'I use documentation, knowledge base, live stats, and executable actions â€” **not** source code or repository access. I cannot expose API keys or secrets.\n\n' +
+      '👋 Hello, Super Admin! I\'m your AI system assistant. I can help you with:\n\n' +
+      '• **System stats** — "how many schools", "total revenue", "platform overview"\n' +
+      '• **School ops** — "school info for X", "suspend school Y", "extend license for Z"\n' +
+      '• **Password reset** — "reset password for user at school CODE" (temp password or OTP)\n' +
+      '• **Live database** — "@db" for platform overview, "@school greenwood" for one school\n' +
+      '• **Server ops** — "@status", "@test", "@logs", "@verify", "@readiness", "@secrets", "@diagnose-ai", "@traffic", "@restart-api", "@migrate-status", "@migrate-deploy", "@unlock-users", "@git-pull", "@deploy"\n' +
+      '• **Troubleshooting** — "why is a school not working", "common problems"\n' +
+      '• **How-to guides** — "how to generate a license", "how to suspend a school"\n' +
+      '• **Platform docs** — architecture and features from DOCUMENTATION.md + Knowledge Base\n\n' +
+      'I use documentation, knowledge base, live stats, and executable actions — **not** source code or repository access. I cannot expose API keys or secrets.\n\n' +
       'Say normal actions directly. For terminal/server commands, start with @. Every server command asks you to confirm before it runs.',
     timestamp: new Date(),
   };
@@ -167,25 +170,7 @@ const SuperAdminAI: React.FC = () => {
   const navigate = useNavigate();
   const user = useAuthStore((s) => s.user);
   const [isOpen, setIsOpen] = useState(false);
-  const [messages, setMessages] = useState<ChatMessage[]>([
-    {
-      id: 'welcome',
-      role: 'assistant',
-      content:
-        '👋 Hello, Super Admin! I\'m your AI system assistant. I can help you with:\n\n' +
-        '• **System stats** — "how many schools", "total revenue", "platform overview"\n' +
-        '• **School ops** — "school info for X", "suspend school Y", "extend license for Z"\n' +
-        '• **Password reset** — "reset password for user at school CODE" (temp password or OTP)\n' +
-        '• **Live database** — "@db" for platform overview, "@school greenwood" for one school\n' +
-        '• **Server ops** — "@status", "@test", "@logs", "@verify", "@readiness", "@secrets", "@diagnose-ai", "@traffic", "@restart-api", "@migrate-status", "@migrate-deploy", "@unlock-users", "@git-pull", "@deploy"\n' +
-        '• **Troubleshooting** — "why is a school not working", "common problems"\n' +
-        '• **How-to guides** — "how to generate a license", "how to suspend a school"\n' +
-        '• **Platform docs** — architecture and features from DOCUMENTATION.md + Knowledge Base\n\n' +
-        'I use documentation, knowledge base, live stats, and executable actions — **not** source code or repository access. I cannot expose API keys or secrets.\n\n' +
-        'Say normal actions directly. For terminal/server commands, start with @. Every server command asks you to confirm before it runs.',
-      timestamp: new Date(),
-    },
-  ]);
+  const [messages, setMessages] = useState<ChatMessage[]>([createWelcomeMessage()]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
   const [threadId, setThreadId] = useState<string | undefined>(() => loadSuperAiThreadId(user?.id));
@@ -193,12 +178,14 @@ const SuperAdminAI: React.FC = () => {
   const [selectedImages, setSelectedImages] = useState<File[]>([]);
   const [imagePreviews, setImagePreviews] = useState<string[]>([]);
   const pendingActionRef = useRef<PendingAction | null>(null);
+  const voicePendingRef = useRef(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // ── Voice biometrics ───────────────────────────────────────────────────
+  // ── Voice biometrics + speech ───────────────────────────────────────────
   const { verify, isVerifying } = useVoiceBiometrics();
   const [voiceResult, setVoiceResult] = useState<{ match: boolean; score: number } | null>(null);
+  const { speaking, speak, stop: stopSpeech } = useAiSpeech();
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -335,6 +322,8 @@ const SuperAdminAI: React.FC = () => {
       // Still reset the panel if the saved thread was already removed.
     } finally {
       pendingActionRef.current = null;
+      voicePendingRef.current = false;
+      if (isListening) stopListening();
       setThreadId(undefined);
       saveSuperAiThreadId(undefined, user?.id);
       setSelectedImages([]);
@@ -363,6 +352,9 @@ const SuperAdminAI: React.FC = () => {
     if (!question && selectedImages.length === 0) return;
     if (loading) return;
 
+    voicePendingRef.current = false;
+    if (isListening) stopListening();
+
     const userMsg: ChatMessage = {
       id: generateId(),
       role: 'user',
@@ -373,12 +365,21 @@ const SuperAdminAI: React.FC = () => {
     setInput('');
     setLoading(true);
 
+    // Helper for voice-spoken responses
+    const addAssistantWithVoice = (content: string, pendingAction?: PendingAction, isError?: boolean) => {
+      appendAssistant(content, pendingAction, isError);
+      if (voicePendingRef.current && content && !isError) {
+        setAiSpeaking(true);
+        speak(content);
+      }
+    };
+
     try {
       if (selectedImages.length === 0) {
         const navigationTarget = detectSuperAdminNavigation(question);
         if (navigationTarget) {
           navigate(navigationTarget.path);
-          appendAssistant(`Done. Brought you to **${navigationTarget.label}**. What do you need next?`);
+          addAssistantWithVoice(`Done. Brought you to **${navigationTarget.label}**. What do you need next?`);
           return;
         }
       }
@@ -397,11 +398,20 @@ const SuperAdminAI: React.FC = () => {
           saveSuperAiThreadId(data.threadId, user?.id);
         }
         appendMemoryNotice(data.memoryNotice);
-        appendAssistant(
+        addAssistantWithVoice(
           data.answer,
           undefined,
           AI_VISION_FAILURE_INTENTS.has(data.intent) || AI_UNAVAILABLE_INTENTS.has(data.intent),
         );
+        return;
+      }
+
+      // Detect done in voice mode
+      if (voicePendingRef.current && DONE_RE.test(question)) {
+        voicePendingRef.current = false;
+        stopListening();
+        stopSpeech();
+        appendAssistant('Alright, I\'m here if you need me. Tap the mic again anytime.');
         return;
       }
 
@@ -438,14 +448,12 @@ const SuperAdminAI: React.FC = () => {
   const handleVoiceVerifyAndSend = useCallback(async () => {
     if (loading) return;
     
-    // Check if voiceprint exists
     const stored = loadVoicePrint();
     if (!stored) {
       appendAssistant('🔊 **No voice enrolled yet.** Go to **Settings → Voice Biometrics** to enroll your voice first. Then come back and I will recognise only you.', undefined, true);
       return;
     }
 
-    // Verify the speaker
     appendAssistant('🔊 **Verifying your voice...** Speak naturally for 2 seconds.', undefined, false);
     setLoading(true);
     
@@ -453,12 +461,136 @@ const SuperAdminAI: React.FC = () => {
     setVoiceResult(result);
     
     if (result.match) {
-      appendAssistant(`✅ **Voice verified** (${Math.round(result.score * 100)}% match). You're recognised, Deno. Tap the mic again and speak your command.`, undefined, false);
+      // Voice verified — start conversation mode
+      voicePendingRef.current = true;
+      startListening();
+      appendAssistant(`✅ **Voice verified** (${Math.round(result.score * 100)}% match). You're recognised. Speak your command — I'll keep listening.`, undefined, false);
     } else {
       appendAssistant(`🔊 **Voice didn't match** (${Math.round(result.score * 100)}%). Only the enrolled Super Admin can use voice commands. Try again or use text input.`, undefined, true);
     }
     setLoading(false);
-  }, [loading, verify, appendAssistant]);
+  }, [loading, verify]);
+
+  // ── Voice & silence integration ─────────────────────────────────────────
+  const handleSilence = useCallback(() => {
+    const silenceMsg: ChatMessage = {
+      id: generateId(),
+      role: 'assistant',
+      content: "Are you still there? I didn't hear anything for a while.",
+      timestamp: new Date(),
+    };
+    setMessages((prev) => [...prev, silenceMsg]);
+  }, []);
+
+  const handleAutoClose = useCallback(() => {
+    voicePendingRef.current = false;
+    const closeMsg: ChatMessage = {
+      id: generateId(),
+      role: 'assistant',
+      content: 'I closed the mic since I didn\'t hear anything. Tap the mic button when you need me.',
+      timestamp: new Date(),
+    };
+    setMessages((prev) => [...prev, closeMsg]);
+  }, []);
+
+  // Wrapped voice submit
+  const voiceSubmit = useCallback((transcript: string) => {
+    voicePendingRef.current = true;
+    setInput(transcript);
+    // Direct submit to handleSend logic but avoid circular ref
+    const question = transcript.trim();
+    if (!question) return;
+    if (loading) return;
+
+    const userMsg: ChatMessage = {
+      id: generateId(),
+      role: 'user',
+      content: question,
+      timestamp: new Date(),
+    };
+    setMessages((prev) => [...prev, userMsg]);
+    setLoading(true);
+
+    const addAssistantWithVoice = (content: string, pendingAction?: PendingAction, isError?: boolean) => {
+      if (pendingAction) pendingActionRef.current = pendingAction;
+      else if (!content.includes('Confirm Action')) pendingActionRef.current = null;
+      setMessages((prev) => [...prev, { id: generateId(), role: 'assistant', content, timestamp: new Date(), pendingAction, isError }]);
+      if (voicePendingRef.current && content && !isError) {
+        setAiSpeaking(true);
+        speak(content);
+      }
+    };
+
+    void (async () => {
+      try {
+        // Detect done
+        if (voicePendingRef.current && DONE_RE.test(question)) {
+          voicePendingRef.current = false;
+          stopListening();
+          stopSpeech();
+          addAssistantWithVoice('Alright, I\'m here if you need me. Tap the mic again anytime.');
+          return;
+        }
+
+        const navigationTarget = detectSuperAdminNavigation(question);
+        if (navigationTarget) {
+          navigate(navigationTarget.path);
+          addAssistantWithVoice(`Done. Brought you to **${navigationTarget.label}**. What do you need next?`);
+          return;
+        }
+
+        const pending = pendingActionRef.current;
+        if (CONFIRM_RE.test(question) && pending) {
+          const { data } = await apiClient.post('/ai/query', {
+            question,
+            threadId,
+            history: messagesToAiHistory(messages),
+            confirmAction: true,
+            pendingAction: pending,
+          });
+          if (data.threadId) { setThreadId(data.threadId); saveSuperAiThreadId(data.threadId, user?.id); }
+          appendMemoryNotice(data.memoryNotice);
+          if (data.pendingAction) {
+            addAssistantWithVoice(data.answer, data.pendingAction, AI_UNAVAILABLE_INTENTS.has(data.intent));
+            return;
+          }
+          pendingActionRef.current = null;
+          addAssistantWithVoice(data.answer, undefined, AI_UNAVAILABLE_INTENTS.has(data.intent));
+          return;
+        }
+
+        const { data } = await apiClient.post('/ai/query', {
+          question,
+          threadId,
+          history: messagesToAiHistory(messages),
+          ...(pending ? { pendingAction: pending } : {}),
+        });
+        if (data.threadId) { setThreadId(data.threadId); saveSuperAiThreadId(data.threadId, user?.id); }
+        appendMemoryNotice(data.memoryNotice);
+        if (data.pendingAction) {
+          addAssistantWithVoice(data.answer, data.pendingAction, AI_UNAVAILABLE_INTENTS.has(data.intent));
+          return;
+        }
+        pendingActionRef.current = null;
+        addAssistantWithVoice(data.answer, undefined, AI_UNAVAILABLE_INTENTS.has(data.intent));
+      } catch (err: any) {
+        const answer = err.response?.data?.answer || err.response?.data?.error || err.message || 'Unknown error';
+        addAssistantWithVoice(`Sorry, I encountered an error: ${answer}`, undefined, true);
+      } finally {
+        setLoading(false);
+      }
+    })();
+  }, [messages, threadId, user?.id, navigate, loading, speak]);
+
+  const {
+    isListening,
+    startListening,
+    stopListening,
+    setAiSpeaking,
+  } = useVoiceQuery(voiceSubmit, {
+    onSilence: handleSilence,
+    onAutoClose: handleAutoClose,
+  });
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && !e.shiftKey) {
@@ -630,16 +762,28 @@ const SuperAdminAI: React.FC = () => {
               {/* Voice biometrics button */}
               <button
                 type="button"
-                onClick={() => void handleVoiceVerifyAndSend()}
+                onClick={() => {
+                  if (isListening) {
+                    voicePendingRef.current = false;
+                    stopListening();
+                  } else {
+                    void handleVoiceVerifyAndSend();
+                  }
+                }}
                 disabled={loading || isVerifying}
                 className={`relative p-2 rounded-lg transition-all duration-200 ${
-                  isVerifying
-                    ? 'bg-green-500/20 text-green-300 border border-green-500/30'
-                    : 'bg-gray-800 border border-gray-600 text-gray-400 hover:text-white'
+                  isListening
+                    ? 'bg-red-500/20 text-red-300 border border-red-500/30'
+                    : isVerifying
+                      ? 'bg-green-500/20 text-green-300 border border-green-500/30'
+                      : 'bg-gray-800 border border-gray-600 text-gray-400 hover:text-white'
                 }`}
-                title={isVoiceEnrolled ? 'Verify voice & command' : 'Enroll voice first in Settings'}
+                title={isListening ? 'Stop listening' : isVoiceEnrolled ? 'Start voice conversation' : 'Enroll voice first in Settings'}
                 aria-label="Voice biometrics"
               >
+                {isListening && (
+                  <span className="absolute inset-0 rounded-lg bg-red-500/20 animate-ping" />
+                )}
                 {isVerifying && (
                   <span className="absolute inset-0 rounded-lg bg-green-500/20 animate-ping" />
                 )}
@@ -669,7 +813,7 @@ const SuperAdminAI: React.FC = () => {
               </button>
             </div>
             <p className="text-xs text-gray-500 mt-1.5">
-              🔊 Voice: {isVoiceEnrolled ? 'enrolled' : 'not enrolled'} • <span className="text-indigo-400">Settings → Voice Biometrics</span> to train
+              🔊 Voice: {isVoiceEnrolled ? 'enrolled' : 'not enrolled'} • {isListening ? 'listening...' : 'tap mic to talk'}
             </p>
           </div>
         </div>
