@@ -303,7 +303,9 @@ const enterExamResultHandler: ActionHandler = async (params, scope) => {
         subject,
         examType,
         maxScore,
+        weight: 1.0,
         date: new Date(),
+        createdById: scope.userId,
       },
       select: { id: true, maxScore: true },
     });

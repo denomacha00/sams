@@ -109,8 +109,15 @@ const FloatingAI: React.FC = () => {
     setMessages([WELCOME_MESSAGE]);
   }, [threadOwner]);
 
-  // ── Speech hook ─────────────────────────────────────────────────────────
-  const { speaking, speak, toggle: toggleSpeech, stop: stopSpeech } = useAiSpeech();
+  // ── Speech hook with callback to re-open mic after AI finishes talking ─
+  const { speaking, speak, toggle: toggleSpeech, stop: stopSpeech } = useAiSpeech({
+    onEnd: () => {
+      // After AI finishes speaking, re-open mic if still in voice mode
+      if (voicePendingRef.current && !isListening) {
+        startListening();
+      }
+    },
+  });
 
   const handleImageSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []);
@@ -251,6 +258,8 @@ const FloatingAI: React.FC = () => {
     const addAssistantMessage = (msg: Message) => {
       setMessages((prev) => [...prev, msg]);
       if (voicePendingRef.current && msg.content && !msg.isError) {
+        // Close mic first so SpeechRecognition doesn't hear its own voice
+        stopListening();
         setAiSpeaking(true);
         speak(msg.content);
       }
