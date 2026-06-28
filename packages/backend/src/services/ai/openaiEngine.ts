@@ -608,13 +608,6 @@ export async function openaiQuery(
   user: AccessTokenPayload,
   question: string,
 ): Promise<OpenAIQueryResult> {
-  if (user.sub !== 'guest' && isSamsDataQuery(question)) {
-    return {
-      answer: "I couldn't load that from SAMS here. Try \"show my timetable\", \"what is my attendance\", or \"who is absent today\".",
-      intent: 'data_not_found',
-    };
-  }
-
   const systemPrompt = await buildSystemPrompt(user);
   const messages = buildMessagesWithinContext(systemPrompt, question);
 
@@ -738,13 +731,6 @@ export async function openaiQueryWithHistory(
   question: string,
   history: Array<{ role: 'user' | 'assistant'; content: string }>,
 ): Promise<OpenAIQueryResult> {
-  if (user.sub !== 'guest' && isSamsDataQuery(question)) {
-    return {
-      answer: "I couldn't load that from SAMS here. Try \"show my timetable\", \"what is my attendance\", or \"who is absent today\".",
-      intent: 'data_not_found',
-    };
-  }
-
   const systemPrompt = await buildSystemPrompt(user);
   const messages = buildMessagesWithinContext(systemPrompt, question, history);
 

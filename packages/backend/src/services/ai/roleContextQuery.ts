@@ -11,10 +11,12 @@ import {
 export { isSchoolPersonnelQuery, isStudentContextQuery };
 export { detectStudentContextAction as detectRoleContextAction } from './studentContextQuery';
 
-/** Resolve handler registry role — prefer the caller's role for shared actions like list_school_admin. */
+/** Resolve handler registry role — prefer the caller's role for shared actions like list_school_admin or list_my_hod. */
 function resolveRegistryRole(userRole: UserRole, action: string): UserRole {
   if (findAction(userRole, action)) return userRole;
-  if (action === 'list_school_admin' && findAction(UserRole.STUDENT, action)) {
+  // Shared/lookup actions registered under STUDENT but useful for all roles
+  const studentSharedActions = ['list_school_admin', 'list_my_hod', 'list_my_teachers', 'who_is_class_rep', 'describe_my_class', 'describe_my_department'];
+  if (studentSharedActions.includes(action) && findAction(UserRole.STUDENT, action)) {
     return UserRole.STUDENT;
   }
   return userRole;
@@ -24,7 +26,8 @@ function canRunRoleContextAction(user: AccessTokenPayload, action: string): bool
   if (action === 'list_school_admin') {
     return SCHOOL_ADMIN_LOOKUP_ROLES.includes(user.role);
   }
-  return user.role === UserRole.STUDENT;
+  // Any role that can see this info in their dashboard should get it from AI too
+  return [UserRole.STUDENT, UserRole.TEACHER, UserRole.HOD, UserRole.SCHOOL_ADMIN, UserRole.SUPER_ADMIN].includes(user.role);
 }
 
 /**

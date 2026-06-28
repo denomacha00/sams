@@ -13,6 +13,11 @@ export const STUDENT_HOD_QUERY_PATTERNS: RegExp[] = [
   /who\s+is\s+(?:the\s+)?hod\s+for\s+(?:my|our)\s+(?:class|department)/i,
   /who\s+is\s+(?:the\s+)?hod\s+of\s+(?:this|my|our)\s+(?:dep(?:artment)?|dept)\b/i,
   /(?:this|my|our)\s+(?:dep(?:artment)?|dept)(?:'s)?\s+hod\b/i,
+  /\bhod\b/i,
+  /(?:tell\s+me\s+about|show\s+me|what\s+(?:is|are)|give\s+me|can\s+i\s+(?:get|have|see))\s+.*\bhod\b/i,
+  /\bhod\s+(?:contact|details?|info(?:rmation)?|profile|name|email|phone|mobile|number|cell|whatsapp)/i,
+  /(?:contact|details?|info(?:rmation)?|profile|name|email|phone|mobile|number|cell|whatsapp)\s+(?:of\s+)?(?:the\s+)?\bhod\b/i,
+  /(?:contact|details?|info(?:rmation)?|profile)\s+of\s+(?:the\s+)?(?:head\s+of\s+department|hod)/i,
 ];
 
 /** School administrator lookup — students, teachers, and HODs may ask. */
@@ -23,6 +28,11 @@ export const SCHOOL_ADMIN_QUERY_PATTERNS: RegExp[] = [
   /(?:who|which)\s+(?:are\s+)?(?:is\s+)?(?:the\s+)?school\s+admin(?:istrator)?\b/i,
   /\b(?:school\s+)?admin(?:istrator)?\s+of\s+(?:this|my|our)\s+school\b/i,
   /\bwho\s+is\s+(?:the\s+)?adim\b/i,
+  /\bschool\s+admin(?:istrator)?\b/i,
+  /(?:tell\s+me\s+about|show\s+me|what\s+(?:is|are)|give\s+me|can\s+i\s+(?:get|have|see))\s+.*\bschool\s+admin(?:istrator)?\b/i,
+  /\badmin(?:istrator)?\s+(?:contact|details?|info(?:rmation)?|profile|name|email|phone|mobile|number)/i,
+  /(?:contact|details?|info(?:rmation)?|profile|name|email|phone|mobile|number)\s+(?:of\s+)?(?:the\s+)?\bschool\s+admin(?:istrator)?\b/i,
+  /(?:contact|details?|info(?:rmation)?|profile|name)\s+of\s+(?:the\s+)?(?:school\s+)?(?:admin|adim)(?:istrator)?/i,
 ];
 
 /** Roles that may resolve school admin via DB (not LLM). */
@@ -41,6 +51,11 @@ export const STUDENT_TEACHERS_QUERY_PATTERNS: RegExp[] = [
   /who\s+is\s+(?:my|our)\s+(?:class\s+)?teacher/i,
   /teachers?\s+for\s+(?:my|our)\s+class/i,
   /list\s+(?:my|our)\s+teachers?/i,
+  /\bteachers?\b/,
+  /(?:tell\s+me\s+about|show\s+me|what\s+(?:is|are)|give\s+me|can\s+i\s+(?:get|have|see))\s+.*\bteachers?/i,
+  /(?:my\s+)?teachers?\s+(?:contact|details?|info(?:rmation)?|profile|name|email|phone|mobile|number)/i,
+  /(?:contact|details?|info(?:rmation)?|profile|name|email|phone|mobile|number)\s+(?:of\s+)?(?:my|our)?\s*teachers?/i,
+  /who\s+(?:teaches?|is\s+teaching)\s+(?:me|us|my\s+class)/i,
 ];
 
 /** Class rep before generic "my class" so rep questions are not misclassified. */
