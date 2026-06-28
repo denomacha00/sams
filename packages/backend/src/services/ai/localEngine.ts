@@ -103,8 +103,11 @@ const INTENT_PATTERNS: { intent: DetectedIntent; patterns: RegExp[] }[] = [
       /what\s*do\s*you\s*know\s*about/i,
     ],
   },
+  // ⚠️ ORDER MATTERS: "remake_timetable" MUST come before "generate_timetable"
+  // because "remake" patterns are more specific and must be checked first.
+  // If these are reordered, "remake timetable" requests will be caught
+  // by "generate_timetable" instead of "remake_timetable".
   {
-    // "remake" must come BEFORE "generate" so it matches first
     intent: 'remake_timetable',
     patterns: [
       /remake\s*(a\s*)?timetable/i,
@@ -1003,7 +1006,7 @@ async function handleAbsentStudents(scope: QueryScope): Promise<AIQueryResult> {
   const names = students.map((s) => s.name).join(', ');
 
   return {
-    answer: `${absentRecords.length} student(s) marked absent today: ${names}`,
+    answer: `${absentRecords.length} student${absentRecords.length === 1 ? '' : 's'} marked absent today: ${names}`,
     intent: 'absent_students',
     data: { count: absentRecords.length, students },
   };

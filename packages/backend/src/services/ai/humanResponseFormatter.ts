@@ -2,13 +2,14 @@
  * HumanResponseFormatter
  *
  * Transforms raw database answers into natural, human-sounding responses.
- * No LLM needed — just pattern-matching and templates.
+ * The goal: SAMS talks like a real person — warm, direct, uses contractions,
+ * thinks out loud in phases, and never sounds like a bot.
  *
  * Instead of: "The attendance rate is 87.5% (42 present/late out of 48 total records)"
- * Now: "John's doing well — 87.5% attendance (42 of 48 sessions)."
+ * Now: "Alright, let me check your attendance... You're at 87% — doing great. 42 out of 48 sessions."
  *
  * Instead of: "3 student(s) marked absent today: Alice, Bob, Charlie"
- * Now: "3 students are out today: Alice, Bob, Charlie. Want me to notify their guardians?"
+ * Now: "3 students are out today: Alice, Bob, and Charlie. Want me to notify their guardians?"
  */
 
 // ─── Patterns ────────────────────────────────────────────────────────────
@@ -16,7 +17,7 @@
 const PERCENTAGE_RE = /(\d+\.?\d*)%\s*\((\d+).+?(\d+)\s*total/i;
 const ABSENT_COUNT_RE = /(\d+)\s*student\(?s?\)?\s*marked\s*absent\s*today:\s*(.+)/i;
 const ABSENT_COUNT_SHORT_RE = /^(\d+)\s*student\(?s?\)?\s*marked\s*absent/i;
-const TOP_STUDENTS_RE = /Top\s+students?\s+by\s+attendance:\s*([\s\S]+)/i;
+const TOP_STUDENTS_RE = /Top\s+students?\s*by\s*attendance:\s*([\s\S]+)/i;
 const RISK_SCORE_RE = /(\d+)\s*student\(?s?\)?\s*at\s+(?:high\/critical\s+)?risk/i;
 const CLASS_COMPARISON_RE = /Class\s+attendance\s+comparison:\s*([\s\S]+)/i;
 const TIMETABLE_RE = /📅\s*(?:Timetable|Your\s*Timetable|Today)/i;
@@ -31,11 +32,11 @@ const GENERATED_TIMETABLE_RE = /Timetable.*generated|generated.*timetable|✅ Ti
 // ─── Quality indicators ──────────────────────────────────────────────────
 
 function qualityLabel(pct: number): string {
-  if (pct >= 95) return 'excellent — near perfect';
+  if (pct >= 95) return 'excellent — near perfect attendance';
   if (pct >= 85) return 'doing great';
   if (pct >= 75) return 'okay — room to improve';
   if (pct >= 60) return 'concerning — needs attention';
-  return 'critical — urgent intervention needed';
+  return 'critical — needs urgent intervention';
 }
 
 function qualityEmoji(pct: number): string {
@@ -59,23 +60,52 @@ export interface HumanResponse {
   suggestions: FormattedSuggestion[];
 }
 
+/**
+ * Convert a raw database answer into a warm, human-sounding response.
+ * Uses the user's actual name when available.
+ */
 export function formatHumanResponse(
   raw: string,
-  context?: { role?: string; className?: string; hasActiveSession?: boolean },
+  context?: { role?: string; className?: string; hasActiveSession?: boolean; userName?: string },
 ): HumanResponse {
   const suggestions: FormattedSuggestion[] = [];
+  let text = raw;
 
-  // 1. Attendance percentage
-  const pctMatch = raw.match(PERCENTAGE_RE);
+  // ─── Phase 0: Clean up raw text universal issues ───────────────────
+  // Remove "(s)" nonsense like "student(s)" → "students"
+  text = text.replace(/\(s\)/g, 's');
+
+  // Fix "There are X student(s)" patterns
+  text = text.replace(
+    /There (?:is|are)\s+(\d+)\s+student(?:s)?\s+in\s+(?:the\s+)?(school|class|department)/gi,
+    (_, count, scope) => {
+      const n = parseInt(count, 10);
+      const scopeName = scope?.toLowerCase() || 'school';
+      const prefix = n === 0 ? "There aren't any" : n === 1 ? 'There is 1' : `There are ${n}`;
+      return `${prefix} students in the ${scopeName}`;
+    },
+  );
+
+  // Fix "No X found for your scope" → friendlier versions
+  text = text.replace(
+    /No\s+(attendance records|students|classes|sessions|entries)(\s+found)?\s+(?:within\s+)?(?:your\s+)?(scope|class|department)/gi,
+    (_, entity) => `No ${entity.toLowerCase()} yet`,
+  );
+
+  // ─── Case 1: Attendance percentage ──────────────────────────────────
+  const pctMatch = text.match(PERCENTAGE_RE);
   if (pctMatch) {
     const pct = parseFloat(pctMatch[1]);
     const present = parseInt(pctMatch[2], 10);
     const total = parseInt(pctMatch[3], 10);
     const label = qualityLabel(pct);
     const emoji = qualityEmoji(pct);
-    const studentName = context?.role === 'STUDENT' ? 'You have' : 'The rate is';
 
-    let text = `${emoji} ${studentName} **${pct}%** attendance — ${label} (${present} of ${total} sessions).`;
+    const userName = context?.userName || '';
+    const greeting = userName ? `Hey ${userName}, ` : '';
+    const subject = context?.role === 'STUDENT' ? "you're" : "it's";
+
+    text = `${greeting}${emoji} ${subject} at **${pct}%** — ${label}. You've got ${present} out of ${total} sessions.`;
 
     // Suggestions based on percentage
     if (pct < 75 && context?.role === 'STUDENT') {
@@ -96,144 +126,201 @@ export function formatHumanResponse(
     return { text, suggestions };
   }
 
-  // 2. Absent students (with names)
-  const absentMatch = raw.match(ABSENT_COUNT_RE);
+  // ─── Case 2: Absent students with names ─────────────────────────────
+  const absentMatch = text.match(ABSENT_COUNT_RE);
   if (absentMatch) {
     const count = parseInt(absentMatch[1], 10);
-    const names = absentMatch[2];
-    let text = `${count} student${count === 1 ? ' is' : 's are'} out today: **${names}**.`;
-    if (count === 0) text = 'No absent students today. 👍';
+    const names = absentMatch[2].replace(/,([^,]*)$/, ', and$1'); // Oxford comma
+    const userName = context?.userName || '';
+    const greeting = userName ? `Hey ${userName}, ` : '';
 
-    suggestions.push({
-      label: count === 1 ? '👤 Mark them present?' : '📝 Mark all present?',
-      action: 'mark_attendance',
-    });
+    if (count === 0) {
+      text = `${greeting}No absent students today. 👍 Everyone's here.`;
+    } else {
+      text = `${greeting}${count} student${count === 1 ? ' is' : 's are'} out today: **${names}**.`;
+    }
+
+    if (count > 0) {
+      suggestions.push({
+        label: count === 1 ? '👤 Mark them present?' : '📝 Notify guardians?',
+        action: 'send_class_notification',
+        params: { message: `Your child was absent today.` },
+      });
+    }
 
     return { text, suggestions };
   }
 
-  // 3. Absent count only (no names)
-  const absentShortMatch = raw.match(ABSENT_COUNT_SHORT_RE);
+  // ─── Case 3: Absent count only (no names) ───────────────────────────
+  const absentShortMatch = text.match(ABSENT_COUNT_SHORT_RE);
   if (absentShortMatch) {
     const count = parseInt(absentShortMatch[1], 10);
-    return {
-      text: `${count} student${count === 1 ? '' : 's'} absent today.`,
-      suggestions: [
-        { label: '👤 Show names', action: 'absent_students' },
-        { label: '📩 Notify parents', action: 'send_class_notification', params: { message: 'Your child was absent today.' } },
-      ],
-    };
+    const userName = context?.userName || '';
+    const greeting = userName ? `${userName}, ` : '';
+
+    text = `${greeting}${count} student${count === 1 ? '' : 's'} absent today.`;
+    suggestions.push(
+      { label: '👤 Show names', action: 'absent_students' },
+      { label: '📩 Notify parents', action: 'send_class_notification', params: { message: 'Your child was absent today.' } },
+    );
+
+    return { text, suggestions };
   }
 
-  // 4. Top students
-  const topMatch = raw.match(TOP_STUDENTS_RE);
+  // ─── Case 4: Top students ───────────────────────────────────────────
+  const topMatch = text.match(TOP_STUDENTS_RE);
   if (topMatch) {
     const list = topMatch[1].trim();
-    return {
-      text: `🏆 **Top performers:**\n${list}`,
-      suggestions: [
-        { label: '📊 See bottom performers', action: 'risk_scores' },
-        { label: '📋 Full class comparison', action: 'class_comparison' },
-      ],
-    };
+    text = `🏆 **Top performers:**\n${list}`;
+    suggestions.push(
+      { label: '📊 See bottom performers', action: 'risk_scores' },
+      { label: '📋 Full class comparison', action: 'class_comparison' },
+    );
+
+    return { text, suggestions };
   }
 
-  // 5. Risk scores
-  const riskMatch = raw.match(RISK_SCORE_RE);
+  // ─── Case 5: Risk scores ────────────────────────────────────────────
+  const riskMatch = text.match(RISK_SCORE_RE);
   if (riskMatch) {
     const count = parseInt(riskMatch[1], 10);
-    return {
-      text: count > 0
-        ? `🚨 **${count} student${count === 1 ? '' : 's'} at risk.** Here are the details:\n\n${raw.replace(/^\d+\s+student.*risk\.\s*/i, '')}`
-        : 'No students at risk right now. ✅',
-      suggestions: count > 0
-        ? [{ label: '📩 Send intervention notice', action: 'send_class_notification', params: { message: 'Attendance intervention needed for at-risk students.' } }]
-        : [],
-    };
+    if (count > 0) {
+      text = `🚨 **${count} student${count === 1 ? '' : 's'} at risk.** Here's the breakdown:\n\n${text.replace(/^\d+\s+student.*risk\.\s*/i, '')}`;
+      suggestions.push(
+        { label: '📩 Send intervention notice', action: 'send_class_notification', params: { message: 'Attendance intervention needed for at-risk students.' } },
+      );
+    } else {
+      text = 'No students at risk right now. ✅ All clear.';
+    }
+
+    return { text, suggestions };
   }
 
-  // 6. Class comparison
-  const classMatch = raw.match(CLASS_COMPARISON_RE);
+  // ─── Case 6: Class comparison ───────────────────────────────────────
+  const classMatch = text.match(CLASS_COMPARISON_RE);
   if (classMatch) {
-    return {
-      text: `📊 ${classMatch[1].trim()}`,
-      suggestions: [
-        { label: '📈 Show risk scores', action: 'risk_scores' },
-      ],
-    };
+    text = `📊 ${classMatch[1].trim()}`;
+    suggestions.push({ label: '📈 Show risk scores', action: 'risk_scores' });
+
+    return { text, suggestions };
   }
 
-  // 7. Stats counts (how many students, teachers, etc.)
-  const statsMatch = raw.match(STATS_COUNT_RE);
+  // ─── Case 7: Stats counts ───────────────────────────────────────────
+  const statsMatch = text.match(STATS_COUNT_RE);
   if (statsMatch) {
     const count = parseInt(statsMatch[1], 10);
     const entity = statsMatch[2].toLowerCase();
+    const userName = context?.userName || '';
+    const greeting = userName ? `${userName}, ` : '';
+
     const plural = entity + (count !== 1 ? 's' : '');
     const verb = count === 1 ? 'is' : 'are';
-    return {
-      text: `**${count}** ${plural} ${verb} in your ${context?.role === 'SUPER_ADMIN' ? 'platform' : 'school'}.`,
-      suggestions: entity === 'student'
-        ? [{ label: '📋 Show class list', action: 'view_class_roster' }]
+    text = `${greeting}You've got **${count}** ${plural} ${verb} in ${context?.role === 'SUPER_ADMIN' ? 'the platform' : 'your school'}.`;
+
+    suggestions.push(
+      entity === 'student'
+        ? { label: '📋 Show student list', action: 'view_class_roster' }
         : entity === 'teacher'
-          ? [{ label: '👥 List teachers', action: 'view_school_teachers' }]
-          : [],
-    };
+          ? { label: '👥 List teachers', action: 'view_school_teachers' }
+          : { label: '📊 More stats', action: 'get_school_stats' },
+    );
+
+    return { text, suggestions };
   }
 
-  // 8. Timetable — keep as-is, just add suggestion
-  if (TIMETABLE_RE.test(raw)) {
-    return {
-      text: raw,
-      suggestions: [
-        { label: '📅 What\'s today?', action: 'view_today_schedule' },
-      ],
-    };
+  // ─── Case 8: Timetable ──────────────────────────────────────────────
+  if (TIMETABLE_RE.test(text)) {
+    // Keep the timetable as-is (already nicely formatted), just add suggestions
+    suggestions.push({ label: '📅 What\'s today?', action: 'view_today_schedule' });
+
+    return { text, suggestions };
   }
 
-  // 9. Session status
-  if (raw.includes('active session') && raw.includes('No')) {
-    return {
-      text: raw,
-      suggestions: context?.role === 'TEACHER'
-        ? [{ label: '▶️ Start a session', action: 'start_session' }]
-        : [],
-    };
+  // ─── Case 9: No active sessions ─────────────────────────────────────
+  if (SESSION_NO_ACTIVE_RE.test(text)) {
+    text = text.replace(/No\s+active\s+sessions?\s+right\s*now\.?/i, 'No active sessions going on right now.');
+    if (context?.role === 'TEACHER') {
+      suggestions.push({ label: '▶️ Start a session', action: 'start_session' });
+    }
+
+    return { text, suggestions };
   }
 
-  // Fallback: keep original, suggest generic actions
-  if (raw.length < 300 && !raw.startsWith('❌') && !raw.startsWith('⚠️')) {
-    return {
-      text: raw,
-      suggestions: [],
-    };
+  // ─── Case 10: Active sessions ───────────────────────────────────────
+  const activeMatch = text.match(ACTIVE_SESSIONS_RE);
+  if (activeMatch) {
+    const count = parseInt(activeMatch[1], 10);
+    const userName = context?.userName || '';
+    const greeting = userName ? `${userName}, ` : '';
+    text = `${greeting}${count} session${count === 1 ? ' is' : 's are'} live right now:\n\n${text.replace(/^\d+\s*active\s*session.*?:\s*/i, '')}`;
+
+    return { text, suggestions };
   }
 
-  return { text: raw, suggestions: [] };
+  // ─── Case 11: No data ───────────────────────────────────────────────
+  if (NO_DATA_RE.test(text)) {
+    text = text.replace(/No\s+(attendance records|students|classes|entries|sessions)\./gi, "I couldn't find any $1.");
+
+    return { text, suggestions };
+  }
+
+  // ─── Case 12: Session started ───────────────────────────────────────
+  if (SESSION_STARTED_RE.test(text)) {
+    text = text.replace(/(?:started|created|launched)\s+session/i, 'started the session');
+    text = `✅ Done. ${text}`;
+
+    return { text, suggestions };
+  }
+
+  // ─── Case 13: Timetable generated ───────────────────────────────────
+  if (GENERATED_TIMETABLE_RE.test(text)) {
+    text = `✅ All set! ${text}`;
+
+    return { text, suggestions };
+  }
+
+  // ─── Fallback: pass through with minor cleanups ─────────────────────
+  // Add a conversational prefix when the raw text is data-like
+  if (text.length > 10 && text.length < 200 && !text.startsWith('❌') && !text.startsWith('⚠️') && !text.startsWith('✅') && !text.startsWith('📊') && !text.startsWith('📅') && !text.startsWith('📝') && !text.startsWith('📋') && !text.startsWith('👤') && !text.startsWith('🏆') && !text.startsWith('🚨') && !text.startsWith('📩') && !text.startsWith('📈')) {
+    // If it looks like a data dump, try to make it more human
+    const userName = context?.userName || '';
+    if (userName && !text.includes(userName)) {
+      text = `${userName}, ${text.charAt(0).toLowerCase()}${text.slice(1)}`;
+    }
+  }
+
+  return { text, suggestions };
 }
 
 /**
- * Make a single string more human for simple cases.
+ * Make raw database output sound human in the simplest cases.
+ * Used for quick inline fixes before the main formatter runs.
  */
 export function humanize(raw: string, userName?: string): string {
   if (!raw) return raw;
 
-  // Replace "X student(s)" with natural phrasing
   let result = raw
-    .replace(/\(?(\d+)\s*student\(s\)\)?/gi, (_, count) => {
-      const n = parseInt(count, 10);
-      return n === 1 ? '1 student' : `${n} students`;
-    })
+    // Fix "(s)" patterns
+    .replace(/\(s\)/gi, 's')
     .replace(/\bstudent\(s\)\b/gi, 'students')
     .replace(/\bteacher\(s\)\b/gi, 'teachers')
-    .replace(/\(s\)\b/gi, 's');
-
-  // Replace leading "The attendance rate is" with just the number
-  result = result.replace(/^The attendance rate is\s+(\d+\.?\d*)%/i, (_, pct) => {
-    const n = parseFloat(pct);
-    const label = qualityLabel(n);
-    const emoji = qualityEmoji(n);
-    return `${emoji} ${pct}% — ${label}`;
-  });
+    // Fix "X student(s) marked absent"
+    .replace(
+      /(\d+)\s*student(?:s)?\s*marked\s+absent/gi,
+      (_, count) => `${count} student${parseInt(count, 10) === 1 ? '' : 's'} absent`,
+    )
+    // Fix "There are X student(s)"
+    .replace(
+      /There\s+(?:are|is)\s+(\d+)\s+student(?:s)?/gi,
+      (_, count) => {
+        const n = parseInt(count, 10);
+        return n === 0 ? "There aren't any students" : n === 1 ? 'There is 1 student' : `There are ${n} students`;
+      },
+    )
+    // Fix "The attendance rate is X%" → just "X%"
+    .replace(/^The\s+attendance\s+rate\s+is\s+/i, '')
+    // Remove trailing period from percentages
+    .replace(/(\d{1,2}\.\d%)\.$/, '$1');
 
   return result;
 }

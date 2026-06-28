@@ -164,16 +164,87 @@ function getUnsupportedOperationResponse(question: string): AIServiceResponse | 
   return null;
 }
 
+/** Cache the user's real name to use in responses */
+const userNameCache = new Map<string, string>();
+
+async function getUserName(sub: string): Promise<string | undefined> {
+  if (userNameCache.has(sub)) return userNameCache.get(sub);
+  try {
+    const { prisma } = await import('../lib/prisma');
+    const user = await prisma.user.findUnique({
+      where: { id: sub },
+      select: { fullName: true },
+    });
+    if (user?.fullName) {
+      userNameCache.set(sub, user.fullName);
+      return user.fullName;
+    }
+  } catch {
+    // silent — name is a nice-to-have
+  }
+  return undefined;
+}
+
 /**
  * Format a response using the HumanResponseFormatter.
  * Appends suggestions as a JSON suffix that the frontend parses.
+ * Includes the user's name when available for warmer responses.
  */
-function formatAnswer(raw: string, role?: string): string {
-  const human = formatHumanResponse(raw, { role });
+function formatAnswer(raw: string, role?: string, userName?: string): string {
+  const human = formatHumanResponse(raw, { role, userName });
   if (human.suggestions.length > 0) {
     return human.text + `\n\n__SUGGESTIONS__${JSON.stringify(human.suggestions)}`;
   }
   return human.text;
+}
+
+/**
+ * Try to reframe a raw DB/local-engine answer through the LLM for natural narration.
+ * Falls back silently — never throws.
+ */
+async function tryReframeAnswer(raw: string, userName: string): Promise<string | null> {
+  try {
+    const { getOpenAIClient, resolveChatModel } = await import('./ai/aiProviderConfig');
+    const client = getOpenAIClient();
+    const reframeResponse = await client.chat.completions.create({
+      model: resolveChatModel(),
+      messages: [
+        {
+          role: 'system',
+          content: `You are SAMS AI, a real person who works at SAMS. You just looked up information for ${userName || 'a user'}.
+
+Your job: say what you found naturally in 2-3 phases. Think out loud like a human would when checking something.
+
+Narrate in phases:
+Phase 1 — What you checked or looked up ("Right, let me check the attendance records...")
+Phase 2 — What you found ("Found 48 sessions — you've been to 42 of them.")
+Phase 3 — The result/implication ("That's 87% — doing great!")
+
+Rules:
+- NEVER say "as an AI", "as an AI assistant", "I am an AI", "I was trained", etc.
+- NEVER mention providers, models, or technical backend.
+- Use contractions: "you're", "I've", "that's", "here's", "can't"
+- Keep each phase 1 sentence. Total: 2-4 sentences.
+- Be warm but professional.
+- NEVER invent data — only say what the raw result contains.
+- If the raw result has numbers, use them. If it says "no records found", say that.
+
+Here is the raw data result: "${raw}"`,
+        },
+        { role: 'user', content: 'What did you find?' },
+      ],
+      temperature: 0.7,
+      max_tokens: 200,
+    });
+
+    const reframed = reframeResponse.choices[0]?.message?.content?.trim();
+    if (reframed && reframed.length > 10 && reframed.length < 600) {
+      return reframed;
+    }
+  } catch {
+    // Silent — fall through to using the raw answer
+  }
+  return null;
 }
 
 // ─── AI Service ───────────────────────────────────────────────────────────────
@@ -207,6 +278,7 @@ export class AIService {
     },
   ): Promise<AIServiceResponse> {
     let threadId = await this.resolveThreadForUser(user, options?.threadId);
+    const userName = user.sub !== 'guest' ? await getUserName(user.sub).catch(() => undefined) : undefined;
 
     let actionIntent: DetectedAction | null = null;
 
