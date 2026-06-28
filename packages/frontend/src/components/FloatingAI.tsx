@@ -258,8 +258,11 @@ const FloatingAI: React.FC = () => {
     const addAssistantMessage = (msg: Message) => {
       setMessages((prev) => [...prev, msg]);
       if (voicePendingRef.current && msg.content && !msg.isError) {
-        // Close mic first so SpeechRecognition doesn't hear its own voice
-        stopListening();
+        // Pause recognition but KEEP the HFP keepalive stream alive.
+        // This is CRITICAL for Bluetooth headsets — if we kill the
+        // getUserMedia stream, the BT headset drops HFP mic mode and
+        // subsequent recognition attempts will fail with 'audio-capture'.
+        pauseRecognition();
         setAiSpeaking(true);
         speak(msg.content);
       }
@@ -490,6 +493,7 @@ const FloatingAI: React.FC = () => {
     startListening,
     stopListening,
     setAiSpeaking,
+    pauseRecognition,
   } = useVoiceQuery(voiceSubmit, {
     onSilence: handleSilence,
     onAutoClose: handleAutoClose,
