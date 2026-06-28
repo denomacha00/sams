@@ -393,6 +393,7 @@ const SuperAdminAI: React.FC = () => {
     const addAssistantWithVoice = (content: string, pendingAction?: PendingAction, isError?: boolean) => {
       appendAssistant(content, pendingAction, isError);
       if (voicePendingRef.current && content && !isError) {
+        stopListening(); // close mic before speaking — prevent echo loop
         setAiSpeaking(true);
         speak(content);
       }
