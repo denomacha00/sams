@@ -8,7 +8,10 @@ export const DEPRECATED_MODEL_MIGRATIONS: Record<string, string> = {
 };
 
 export const DEFAULT_GROQ_BASE_URL = 'https://api.groq.com/openai/v1';
-export const DEFAULT_GROQ_CHAT_MODEL = 'llama-3.3-70b-versatile';
+// Fast model for primary chat (8B is ~3x faster than 70B with comparable quality for most queries)
+export const DEFAULT_GROQ_CHAT_MODEL = 'llama-3.1-8b-instant';
+// Fallback model for complex queries that need more reasoning depth
+export const DEFAULT_GROQ_FALLBACK_MODEL = 'llama-3.3-70b-versatile';
 export const DEFAULT_OPENAI_CHAT_MODEL = 'gpt-4o-mini';
 export const DEFAULT_OPENROUTER_BASE_URL = 'https://openrouter.ai/api/v1';
 export const DEFAULT_OPENROUTER_FALLBACK_MODEL = 'meta-llama/llama-3.1-8b-instruct:free';

@@ -22,6 +22,11 @@ const CLASS_COMPARISON_RE = /Class\s+attendance\s+comparison:\s*([\s\S]+)/i;
 const TIMETABLE_RE = /📅\s*(?:Timetable|Your\s*Timetable|Today)/i;
 const NO_DATA_RE = /(?:No|no)\s+(attendance|records|students|entries|sessions?)/i;
 const STATS_COUNT_RE = /(?:There\s+are|Total:?)?\s*(\d+)\s*(student|teacher|user|school|class)/i;
+const ACTIVE_SESSIONS_RE = /(\d+)\s*active\s*session/i;
+const SESSION_NO_ACTIVE_RE = /(?:No|no)\s+active\s+sessions/i;
+const TIMETABLE_TODAY_RE = /📅\s*Today.+?No classes are scheduled/i;
+const SESSION_STARTED_RE = /(?:started|created|launched)\s+session/i;
+const GENERATED_TIMETABLE_RE = /Timetable.*generated|generated.*timetable|✅ Timetable/i;
 
 // ─── Quality indicators ──────────────────────────────────────────────────
 
