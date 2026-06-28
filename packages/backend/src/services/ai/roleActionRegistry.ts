@@ -1,6 +1,7 @@
 import { UserRole } from '@sams/shared';
 import { isActionForbiddenForRole } from './roleRestrictions';
 import { superAdminActions } from './handlers/superAdminHandlers';
+import { superAdminExtraActions } from './handlers/superAdminExtraHandlers';
 import { schoolAdminActions } from './handlers/schoolAdminHandlers';
 import { hodActions } from './handlers/hodHandlers';
 import { teacherActions } from './handlers/teacherHandlers';
@@ -72,6 +73,7 @@ export const roleActionRegistry: RoleActionMap = {};
 
 roleActionRegistry['SUPER_ADMIN'] = normalizeRoleActions([
   ...superAdminActions,
+  ...superAdminExtraActions,
   ...knowledgeActions,
   ...profileActions,
   ...virtualAssistantActions,
@@ -82,6 +84,7 @@ roleActionRegistry['SCHOOL_ADMIN'] = normalizeRoleActions([
   ...schoolAdminActions,
   ...classRepActions,
   ...guardianLinkActions,
+  ...timetableEditActions,
   ...knowledgeActions,
   ...examActions,
   ...teacherWorkbenchActions,

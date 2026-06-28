@@ -54,7 +54,7 @@ const FORBIDDEN_ACTION_NAMES: Partial<Record<UserRole, string[]>> = {
     'set_class_rep',
     'unset_class_rep',
   ],
-  ['GUARDIAN' as UserRole]: [
+  [UserRole.GUARDIAN]: [
     'start_session',
     'end_session',
     'mark_attendance',
@@ -108,9 +108,6 @@ const FORBIDDEN_ACTION_NAMES: Partial<Record<UserRole, string[]>> = {
     'extend_license',
     'get_system_stats',
     'clear_audit_logs',
-    'create_timetable_entry',
-    'remove_timetable_entry',
-    'view_timetable_by_class',
   ],
 };
 
@@ -125,7 +122,7 @@ const ROLE_SCOPE_NOTES: Partial<Record<UserRole, string>> = {
     'Your assigned class only: attendance sessions, class roster, in-app class messages to students, and student registration links (invite via link — same as Registration Links page; never add users directly). No user management, no department/school notify, no SMS via AI.',
   [UserRole.STUDENT]:
     'Your own attendance, class timetable, today\'s schedule, teachers assigned to your class, and your department Head of Department (same as the app). In-app announcements arrive when staff send them (Notifications page). No timed personal reminders, school-wide lists, admin stats, or outbound messaging actions.',
-  ['GUARDIAN' as UserRole]:
+  [UserRole.GUARDIAN]:
     'Parent/guardian access: linked children only. Can view linked students, child attendance, child timetable, export linked child attendance reports, and manage their own in-app notifications. No school-wide, class-wide, password, attendance marking, or staff management actions.',
 };
 
