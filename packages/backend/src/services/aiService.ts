@@ -52,7 +52,7 @@ const FAKE_LICENSE_PLACEHOLDER_RE = /\b(?:LK|LICEN[CS]E)[-_]?(?:X{3,}|[A-Z0-9]{8
 const TEMP_PASSWORD_LEAK_RE = /\b(?:temporary|temp)\s+pass\s*word\s*[:：]\s*`?[^\s`]{6,}`?/i;
 const RESET_CODE_LEAK_RE = /\b(?:otp|reset)\s+code\s*[:：]\s*`?\d{4,8}`?/i;
 const SAMS_AI_IDENTITY_ANSWER =
-  "I'm SAMS AI. Denis Macharia built me, and Denis is my boss. I don't represent any API provider, model company, or outside developer.";
+  "I'm SAMS AI. Denis Macharia built me, and Denis is my boss.";
 const SAMS_AI_IDENTITY_QUERY_RE =
   /\b(?:who\s+(?:are\s+you|built|created|made|developed|programmed|wrote|coded)|who\s+is\s+(?:your\s+)?(?:boss|creator|owner|maker|founder|developer|develper|master)|who\s+do\s+you\s+work\s+for|tell\s+me\s+about\s+(?:yourself|the\s+developer|the\s+develper|the\s+founder|your\s+creator|the\s+creator)|am\s+i\s+(?:your\s+)?(?:creator|owner|builder|maker|developer|develper|boss|founder))\b/i;
 const PROVIDER_IDENTITY_QUERY_RE =
@@ -507,9 +507,7 @@ export class AIService {
 
       if (containsGeneratedSecretLikeText(openaiResult.answer)) {
         const answer =
-          'I will not guess or invent license keys, temporary passwords, or reset codes. Those values must come only from a real SAMS action.\n\n' +
-          'For a license, ask: **generate licence for [School Name]** and confirm the action. The real key is shown once after SAMS creates it.\n\n' +
-          'For password reset, ask: **reset password for [username/email] at school [code]**. SAMS will set a real temporary password, unlock the account, and show it once.';
+          'I will not guess license keys, passwords, or reset codes. Those must come from a real SAMS action.';
         if (user.sub !== 'guest') {
           threadId = await this.safelyPersist(user, question, answer, threadId);
         }
