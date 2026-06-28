@@ -541,6 +541,7 @@ const SuperAdminAI: React.FC = () => {
       else if (!content.includes('Confirm Action')) pendingActionRef.current = null;
       setMessages((prev) => [...prev, { id: generateId(), role: 'assistant', content, timestamp: new Date(), pendingAction, isError }]);
       if (voicePendingRef.current && content && !isError) {
+        stopListening(); // close mic before speaking — prevent echo loop
         setAiSpeaking(true);
         speak(content);
       }
