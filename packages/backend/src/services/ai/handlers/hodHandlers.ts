@@ -663,14 +663,16 @@ export const hodActions: ActionDefinition[] = [
     destructive: true,
     patterns: [
       // Message-capturing patterns FIRST
-      /(?:notify|message|send)\s+(?:to\s+)?(?:my\s+)?department\s*[:,-]\s*(.+)/i,
+      /(?:notify|message|send|write)\s+(?:to\s+)?(?:my\s+)?department\s*[:,-]\s*(.+)/i,
       /notify\s+(?:the\s+)?(?:department\s+)?students?\s*[:,-]\s*(.+)/i,
       /notify\s+(?:the\s+)?(?:department\s+)?teachers?\s*[:,-]\s*(.+)/i,
       /send\s+(?:a\s+)?message\s+to\s+(?:my\s+)?(?:dep(?:artment)?|dept)\s*[:,-]\s*(.+)/i,
+      /write\s+(?:a\s+)?message\s+(?:to\s+)?(?:my\s+)?(?:department|dept)\s*[:,-]\s*(.+)/i,
+      /(?:need|want)\s+to\s+write\s+(?:a\s+)?(?:message|notification|announcement)/i,
       // Fallback patterns (no message — handler will ask for it)
-      /^(?:post|send)\s+(?:a\s+)?(?:notification|message|announcement)\s+to\s+(?:my\s+)?(?:department|dept)\s*$/i,
+      /^(?:post|send|write)\s+(?:a\s+)?(?:notification|message|announcement)\s+to\s+(?:my\s+)?(?:department|dept)\s*$/i,
       /^(?:notify|message)\s+(?:my\s+)?(?:department|dept)\s*$/i,
-      /^(?:post|send)\s+(?:a\s+)?(?:notification|message|announcement)\s*$/i,
+      /^(?:post|send|write)\s+(?:a\s+)?(?:notification|message|announcement)\s*$/i,
     ],
     extractParams: (message: string, match: RegExpMatchArray | null) => {
       // For message-capturing patterns

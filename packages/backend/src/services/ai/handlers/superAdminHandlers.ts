@@ -99,11 +99,12 @@ function quoteEnvValue(value: string): string {
 
 function getProvidersEnvPath(): string {
   const root = process.env.SAMS_ROOT?.trim() || process.cwd();
-  const path = require('path') as typeof import('path');
-  const fs = require('fs') as typeof import('fs');
   const vpsPath = '/var/www/sams/secrets/providers.env';
-  if (fs.existsSync('/var/www/sams')) return vpsPath;
-  return path.join(root, 'secrets', 'providers.env');
+  // Check VPS path directly (no fs needed for path existence — just check directory)
+  const { existsSync } = require('fs') as typeof import('fs');
+  if (existsSync('/var/www/sams')) return vpsPath;
+  const { join } = require('path') as typeof import('path');
+  return join(root, 'secrets', 'providers.env');
 }
 
 async function writeProviderSecret(secretName: string, secretValue: string): Promise<string> {
@@ -752,6 +753,8 @@ export const superAdminActions: ActionDefinition[] = [
       /send\s+(?:a\s+)?(?:message|notification|notice)\s+(?:to\s+)?(.+)/i,
       /notify\s+(?:school\s+)?(.+)/i,
       /message\s+(?:school\s+)?(.+)/i,
+      /write\s+(?:a\s+)?(?:message|notification|notice)\s+(?:to\s+)?(.+)/i,
+      /(?:need|want)\s+to\s+write\s+(?:a\s+)?(?:message|notification|announcement)/i,
     ],
     extractParams: (message: string, match: RegExpMatchArray | null) => {
       const remainder = match?.[1]?.trim() || '';

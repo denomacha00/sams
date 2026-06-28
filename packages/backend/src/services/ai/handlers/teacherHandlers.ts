@@ -386,16 +386,19 @@ export const teacherActions: ActionDefinition[] = [
     destructive: true,
     patterns: [
       // Message-capturing patterns FIRST (these extract the actual content)
-      /(?:send|message)\s+(?:to\s+)?(?:my\s+)?class\s*[:,-]?\s*(.+)/i,
+      /(?:send|write|create|post|message)\s+(?:to\s+)?(?:my\s+)?class\s*[:,-]?\s*(.+)/i,
       /notify\s+(?:my\s+)?class\s*[:,-]?\s*(.+)/i,
       /notify\s+(?:the\s+)?students?\s+in\s+(?:my\s+)?class\s*[:,-]?\s*(.+)/i,
       /tell\s+(?:my\s+)?class\s*[:,-]?\s*(.+)/i,
       /message\s+(?:all\s+)?(?:my\s+)?students?\s*[:,-]?\s*(.+)/i,
       /send\s+(?:a\s+)?message\s+to\s+(?:my\s+)?class\s*[:,-]?\s*(.+)/i,
+      /write\s+(?:a\s+)?message\s+(?:to\s+)?(?:my\s+)?class\s*[:,-]?\s*(.+)/i,
+      // Write patterns without colon — e.g. "I need to write a message to my class"
+      /(?:i\s+(?:need|want)\s+to\s+)?write\s+(?:a\s+)?message(?:\s+to\s+(?:my\s+)?class)?/i,
       // Fallback patterns (no message — handler will ask for it)
       /^notify\s+(?:my\s+)?class\s*$/i,
       /^notify\s+(?:my\s+)?students?\s*$/i,
-      /^(?:post|send)\s+(?:a\s+)?(?:notification|message)\s+to\s+(?:my\s+)?class\s*$/i,
+      /^(?:post|send|write)\s+(?:a\s+)?(?:notification|message)\s+to\s+(?:my\s+)?class\s*$/i,
     ],
     extractParams: (message: string, match: RegExpMatchArray | null) => {
       // For message-capturing patterns, match[1] is the message text

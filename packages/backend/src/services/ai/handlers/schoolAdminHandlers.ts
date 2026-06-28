@@ -534,13 +534,15 @@ export const schoolAdminActions: ActionDefinition[] = [
     destructive: true,
     patterns: [
       // Message-capturing patterns FIRST
-      /(?:notify|message|send)\s+(?:to\s+)?(?:the\s+)?(?:whole\s+)?school\s*[:,-]\s*(.+)/i,
-      /(?:notify|message)\s+(?:all\s+)?school\s+(?:students?|teachers?|staff)\s*[:,-]\s*(.+)/i,
+      /(?:notify|message|send|write)\s+(?:to\s+)?(?:the\s+)?(?:whole\s+)?school\s*[:,-]\s*(.+)/i,
+      /(?:notify|message|send)\s+(?:all\s+)?school\s+(?:students?|teachers?|staff)\s*[:,-]\s*(.+)/i,
       /school[\s-]wide\s+(?:message|notification)\s*[:,-]\s*(.+)/i,
+      /write\s+(?:a\s+)?message\s+(?:to\s+)?(?:the\s+)?(?:whole\s+)?school\s*[:,-]\s*(.+)/i,
+      /(?:need|want)\s+to\s+write\s+(?:a\s+)?(?:message|notification|announcement)/i,
       // Fallback patterns (no message — handler will ask)
-      /^(?:post|send)\s+(?:a\s+)?(?:notification|message|announcement)\s+to\s+(?:the\s+)?(?:whole\s+)?school\s*$/i,
+      /^(?:post|send|write)\s+(?:a\s+)?(?:notification|message|announcement)\s+to\s+(?:the\s+)?(?:whole\s+)?school\s*$/i,
       /^(?:notify|message)\s+(?:the\s+)?school\s*$/i,
-      /^(?:post|send)\s+(?:a\s+)?(?:notification|message|announcement)\s*$/i,
+      /^(?:post|send|write)\s+(?:a\s+)?(?:notification|message|announcement)\s*$/i,
     ],
     extractParams: (message: string, match: RegExpMatchArray | null) => {
       if (match && match[1] && match[1].trim()) {
