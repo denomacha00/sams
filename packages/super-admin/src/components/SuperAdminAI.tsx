@@ -185,7 +185,31 @@ const SuperAdminAI: React.FC = () => {
   // ── Voice biometrics + speech ───────────────────────────────────────────
   const { verify, isVerifying } = useVoiceBiometrics();
   const [voiceResult, setVoiceResult] = useState<{ match: boolean; score: number } | null>(null);
+  const [typingStage, setTypingStage] = useState<'idle' | 'thinking' | 'writing'>('idle');
+  const [isStreaming, setIsStreaming] = useState(false);
   const { speaking, speak, stop: stopSpeech } = useAiSpeech();
+
+  // ── Typing stage animation ──────────────────────────────────────────────
+  useEffect(() => {
+    if (!loading) {
+      setTypingStage('idle');
+      setIsStreaming(false);
+      return;
+    }
+
+    // Immediately show thinking
+    setTypingStage('thinking');
+    setIsStreaming(true);
+
+    // After 1s move to writing
+    const timer = setTimeout(() => {
+      setTypingStage('writing');
+    }, 1000);
+
+    return () => {
+      clearTimeout(timer);
+    };
+  }, [loading]);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -719,12 +743,27 @@ const SuperAdminAI: React.FC = () => {
                     <path d="M9 4.5a.75.75 0 01.721.544l.813 2.846a3.75 3.75 0 002.576 2.576l2.846.813a.75.75 0 010 1.442l-2.846.813a3.75 3.75 0 00-2.576 2.576l-.813 2.846a.75.75 0 01-1.442 0l-.813-2.846a3.75 3.75 0 00-2.576-2.576l-2.846-.813a.75.75 0 010-1.442l2.846-.813A3.75 3.75 0 007.466 7.89l.813-2.846A.75.75 0 019 4.5z" />
                   </svg>
                 </div>
-                <div className="bg-gray-800 border border-gray-700 rounded-xl px-3 py-2 text-sm text-gray-400">
-                  <span className="inline-flex gap-1">
-                    <span className="w-1.5 h-1.5 bg-indigo-400 rounded-full animate-bounce" />
-                    <span className="w-1.5 h-1.5 bg-indigo-400 rounded-full animate-bounce" style={{ animationDelay: '0.1s' }} />
-                    <span className="w-1.5 h-1.5 bg-indigo-400 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }} />
-                  </span>
+                <div className="bg-gray-800 border border-gray-700 rounded-xl px-3 py-2 text-sm text-gray-300">
+                  {typingStage === 'thinking' && (
+                    <span className="inline-flex items-center gap-1.5">
+                      <span className="text-indigo-300 font-medium">Thinking</span>
+                      <span className="inline-flex gap-[2px]">
+                        <span className="w-1.5 h-1.5 bg-indigo-400 rounded-full animate-bounce" />
+                        <span className="w-1.5 h-1.5 bg-indigo-400 rounded-full animate-bounce" style={{ animationDelay: '0.1s' }} />
+                        <span className="w-1.5 h-1.5 bg-indigo-400 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }} />
+                      </span>
+                    </span>
+                  )}
+                  {typingStage === 'writing' && (
+                    <span className="inline-flex items-center gap-1.5">
+                      <span className="text-emerald-300 font-medium">Writing</span>
+                      <span className="inline-flex gap-[2px]">
+                        <span className="w-1.5 h-1.5 bg-emerald-400 rounded-full animate-bounce" />
+                        <span className="w-1.5 h-1.5 bg-emerald-400 rounded-full animate-bounce" style={{ animationDelay: '0.1s' }} />
+                        <span className="w-1.5 h-1.5 bg-emerald-400 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }} />
+                      </span>
+                    </span>
+                  )}
                 </div>
               </div>
             )}
@@ -812,8 +851,16 @@ const SuperAdminAI: React.FC = () => {
                 </svg>
               </button>
             </div>
-            <p className="text-xs text-gray-500 mt-1.5">
-              🔊 Voice: {isVoiceEnrolled ? 'enrolled' : 'not enrolled'} • {isListening ? 'listening...' : 'tap mic to talk'}
+            <p className="text-xs text-gray-500 mt-1.5 flex items-center gap-2">
+              {loading && (
+                <span className="inline-flex items-center gap-1 text-indigo-400">
+                  <span className={`inline-block w-1.5 h-1.5 rounded-full ${typingStage === 'thinking' ? 'bg-indigo-400 animate-pulse' : 'bg-emerald-400 animate-pulse'}`} />
+                  {typingStage === 'thinking' ? 'Thinking...' : 'Writing...'}
+                </span>
+              )}
+              <span>
+                🔊 Voice: {isVoiceEnrolled ? 'enrolled' : 'not enrolled'} • {isListening ? 'listening...' : 'tap mic to talk'}
+              </span>
             </p>
           </div>
         </div>

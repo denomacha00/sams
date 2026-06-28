@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useTypewriter } from '../hooks/useTypewriter';
 import apiClient from '../services/apiClient';
 import { useVoiceQuery } from '../hooks/useVoiceQuery';
 import { useAuthStore } from '../store/authStore';
@@ -37,6 +38,7 @@ interface Message extends AiChatMessage {
   pendingAction?: PendingAction;
   actionData?: AiActionData;
   isError?: boolean;
+  isStreaming?: boolean;
 }
 
 const CONFIRM_RE = /^(yes|y|confirm|proceed|ok|do it|go ahead)\.?$/i;
@@ -82,6 +84,51 @@ const FloatingAI: React.FC = () => {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [streamingMessage, setStreamingMessage] = useState<string>('');
+  const [isStreaming, setIsStreaming] = useState(false);
+  const [typingStage, setTypingStage] = useState<'idle' | 'thinking' | 'writing'>('idle');
+  const pendingStreamContentRef = useRef<string>('');
+  const pendingStreamMsgIdRef = useRef<string | null>(null);
+
+  // ── Typewriter streaming ─────────────────────────────────────────────────
+  const { displayText: streamDisplayText, isComplete: streamComplete } = useTypewriter(
+    isStreaming ? streamingMessage : '',
+    20,
+  );
+
+  // Manage typing stages based on loading state
+  useEffect(() => {
+    if (loading) {
+      setTypingStage('thinking');
+      const timer = setTimeout(() => {
+        setTypingStage('writing');
+      }, 600);
+      return () => clearTimeout(timer);
+    } else {
+      setTypingStage('idle');
+      if (pendingStreamContentRef.current && pendingStreamMsgIdRef.current) {
+        setIsStreaming(true);
+        setStreamingMessage(pendingStreamContentRef.current);
+      }
+    }
+  }, [loading]);
+
+  // Finalize streaming when typewriter completes
+  useEffect(() => {
+    if (streamComplete && isStreaming && pendingStreamMsgIdRef.current) {
+      setMessages((prev) =>
+        prev.map((m) =>
+          m.id === pendingStreamMsgIdRef.current
+            ? { ...m, content: streamingMessage, isStreaming: false }
+            : m,
+        ),
+      );
+      setIsStreaming(false);
+      setStreamingMessage('');
+      pendingStreamContentRef.current = '';
+      pendingStreamMsgIdRef.current = null;
+    }
+  }, [streamComplete, isStreaming, streamingMessage]);
 
   // ── Voice tracking ──────────────────────────────────────────────────────
   const voicePendingRef = useRef(false);
@@ -294,6 +341,24 @@ const FloatingAI: React.FC = () => {
       }
     };
 
+    // Helper: add a streaming message that will be revealed character by character
+    const addStreamingMessage = (content: string, extra: Partial<Message> = {}) => {
+      const id = crypto.randomUUID();
+      pendingStreamContentRef.current = content;
+      pendingStreamMsgIdRef.current = id;
+      setMessages((prev) => [
+        ...prev,
+        {
+          id,
+          role: 'assistant',
+          content: '',
+          timestamp: new Date(),
+          isStreaming: true,
+          ...extra,
+        } as Message,
+      ]);
+    };
+
     try {
       // Theme command
       const themeCommand = selectedImages.length === 0 ? detectAiThemeRequest(text) : null;
@@ -334,11 +399,7 @@ const FloatingAI: React.FC = () => {
           setThreadId(data.threadId);
           saveAiThreadId(data.threadId, threadOwner);
         }
-        addAssistantMessage({
-          id: crypto.randomUUID(),
-          role: 'assistant',
-          content: data.answer,
-          timestamp: new Date(),
+        addStreamingMessage(data.answer, {
           actionData: data.data,
           isError:
             isAiUploadErrorIntent(data.intent) ||
@@ -407,11 +468,7 @@ const FloatingAI: React.FC = () => {
 
       pendingActionRef.current = null;
       const authHint = getAiAuthHint(data.intent);
-      addAssistantMessage({
-        id: crypto.randomUUID(),
-        role: 'assistant',
-        content: authHint ?? data.answer,
-        timestamp: new Date(),
+      addStreamingMessage(authHint ?? data.answer, {
         actionData: data.data,
         isError: isAiUnavailableIntent(data.intent) || isAiAuthIntent(data.intent),
       });
@@ -550,97 +607,123 @@ const FloatingAI: React.FC = () => {
 
         {/* Messages */}
         <div className="flex-1 overflow-y-auto p-3 space-y-3">
-          {messages.map((msg) => (
-            <div
-              key={msg.id}
-              className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
-            >
-              {msg.role === 'assistant' && (
-                <div className="w-6 h-6 rounded-full bg-brand flex items-center justify-center mr-2 mt-1 flex-shrink-0">
-                  <AISparkleIcon className="w-3 h-3 text-white" />
-                </div>
-              )}
+          {messages.map((msg) => {
+            // Use streaming display text if this message is currently being streamed
+            const displayContent = msg.isStreaming && msg.id === pendingStreamMsgIdRef.current
+              ? streamDisplayText
+              : msg.content;
+
+            return (
               <div
-                className={`max-w-[80%] rounded-xl px-3 py-2 text-sm ${
-                  msg.role === 'user'
-                    ? 'bg-brand text-white'
-                    : msg.isError
-                      ? 'bg-red-950/50 border border-red-500/40 text-red-200'
-                      : msg.isSystemNotice
-                        ? 'bg-indigo-950/50 border border-indigo-500/40 text-indigo-300'
-                        : 'bg-surface-muted border border-line text-ink'
-                }`}
+                key={msg.id}
+                className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
               >
-                {msg.userImages && msg.userImages.length > 0 && (
-                  <div className="flex gap-1 mb-2 flex-wrap">
-                    {msg.userImages.map((img, i) => (
-                      <img key={i} src={img} alt="Uploaded" className="h-16 w-16 object-cover rounded-lg" />
-                    ))}
+                {msg.role === 'assistant' && (
+                  <div className="w-6 h-6 rounded-full bg-brand flex items-center justify-center mr-2 mt-1 flex-shrink-0">
+                    <AISparkleIcon className="w-3 h-3 text-white" />
                   </div>
                 )}
-                <div className="flex items-start gap-1">
-                  <div className="flex-1">
-                    {msg.role === 'assistant' ? (
-                      <AiMessageContent content={msg.content} />
-                    ) : (
-                      <p className="whitespace-pre-wrap leading-relaxed">{msg.content}</p>
+                <div
+                  className={`max-w-[80%] rounded-xl px-3 py-2 text-sm ${
+                    msg.role === 'user'
+                      ? 'bg-brand text-white'
+                      : msg.isError
+                        ? 'bg-red-950/50 border border-red-500/40 text-red-200'
+                        : msg.isSystemNotice
+                          ? 'bg-indigo-950/50 border border-indigo-500/40 text-indigo-300'
+                          : 'bg-surface-muted border border-line text-ink'
+                  }`}
+                >
+                  {msg.userImages && msg.userImages.length > 0 && (
+                    <div className="flex gap-1 mb-2 flex-wrap">
+                      {msg.userImages.map((img, i) => (
+                        <img key={i} src={img} alt="Uploaded" className="h-16 w-16 object-cover rounded-lg" />
+                      ))}
+                    </div>
+                  )}
+                  <div className="flex items-start gap-1">
+                    <div className="flex-1">
+                      {msg.role === 'assistant' ? (
+                        <AiMessageContent content={displayContent} />
+                      ) : (
+                        <p className="whitespace-pre-wrap leading-relaxed">{displayContent}</p>
+                      )}
+                      {msg.isStreaming && msg.id === pendingStreamMsgIdRef.current && !streamComplete && (
+                        <span className="inline-block w-1 h-4 ml-0.5 bg-indigo-400 animate-typewriter-pulse" />
+                      )}
+                    </div>
+                    {msg.role === 'assistant' && msg.content.length > 0 && !msg.isStreaming && (
+                      <button
+                        type="button"
+                        onClick={(e) => { e.stopPropagation(); toggleSpeech(msg.content); }}
+                        className={`p-1 rounded-lg shrink-0 transition-all mt-0.5 ${
+                          speaking
+                            ? 'text-indigo-300 bg-indigo-500/20 animate-pulse'
+                            : 'text-ink-muted hover:text-brand hover:bg-surface-elevated'
+                        }`}
+                        aria-label={speaking ? 'Stop speaking' : 'Read aloud'}
+                        title={speaking ? 'Stop' : 'Listen'}
+                      >
+                        <svg className="w-3.5 h-3.5" viewBox="0 0 20 20" fill="currentColor">
+                          <path fillRule="evenodd" d="M9.383 3.076A1 1 0 0110 4v12a1 1 0 01-1.707.707L4.586 13H2a1 1 0 01-1-1V8a1 1 0 011-1h2.586l3.707-3.707a1 1 0 011.09-.217zM14.657 2.929a1 1 0 011.414 0A9.972 9.972 0 0119 10a9.972 9.972 0 01-2.929 7.071 1 1 0 01-1.414-1.414A7.971 7.971 0 0017 10c0-2.21-.894-4.208-2.343-5.657a1 1 0 010-1.414zm-2.829 2.828a1 1 0 011.415 0A5.983 5.983 0 0115 10a5.984 5.984 0 01-1.757 4.243 1 1 0 01-1.415-1.415A3.984 3.984 0 0013 10a3.983 3.983 0 00-1.172-2.828 1 1 0 010-1.415z" clipRule="evenodd" />
+                        </svg>
+                      </button>
                     )}
                   </div>
-                  {msg.role === 'assistant' && msg.content.length > 0 && (
+                  {msg.pendingAction && (
                     <button
                       type="button"
-                      onClick={(e) => { e.stopPropagation(); toggleSpeech(msg.content); }}
-                      className={`p-1 rounded-lg shrink-0 transition-all mt-0.5 ${
-                        speaking
-                          ? 'text-indigo-300 bg-indigo-500/20 animate-pulse'
-                          : 'text-ink-muted hover:text-brand hover:bg-surface-elevated'
-                      }`}
-                      aria-label={speaking ? 'Stop speaking' : 'Read aloud'}
-                      title={speaking ? 'Stop' : 'Listen'}
+                      onClick={() => void confirmPendingAction(msg.pendingAction!)}
+                      disabled={loading}
+                      className="mt-2 w-full bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white text-xs font-medium py-1.5 px-3 rounded-lg transition-colors"
                     >
-                      <svg className="w-3.5 h-3.5" viewBox="0 0 20 20" fill="currentColor">
-                        <path fillRule="evenodd" d="M9.383 3.076A1 1 0 0110 4v12a1 1 0 01-1.707.707L4.586 13H2a1 1 0 01-1-1V8a1 1 0 011-1h2.586l3.707-3.707a1 1 0 011.09-.217zM14.657 2.929a1 1 0 011.414 0A9.972 9.972 0 0119 10a9.972 9.972 0 01-2.929 7.071 1 1 0 01-1.414-1.414A7.971 7.971 0 0017 10c0-2.21-.894-4.208-2.343-5.657a1 1 0 010-1.414zm-2.829 2.828a1 1 0 011.415 0A5.983 5.983 0 0115 10a5.984 5.984 0 01-1.757 4.243 1 1 0 01-1.415-1.415A3.984 3.984 0 0013 10a3.983 3.983 0 00-1.172-2.828 1 1 0 010-1.415z" clipRule="evenodd" />
-                      </svg>
+                      Confirm: {msg.pendingAction.description}
                     </button>
                   )}
+                  {msg.actionData?.download && (
+                    <button
+                      type="button"
+                      onClick={() => void downloadAiFile(msg.actionData!.download!)}
+                      className="mt-2 w-full bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-medium py-1.5 px-3 rounded-lg transition-colors"
+                    >
+                      {msg.actionData.download.label}
+                    </button>
+                  )}
+                  {msg.imageUrl && (
+                    <img src={msg.imageUrl} alt="AI Generated" className="max-w-full rounded-lg mt-2 border border-white/10" loading="lazy" />
+                  )}
                 </div>
-                {msg.pendingAction && (
-                  <button
-                    type="button"
-                    onClick={() => void confirmPendingAction(msg.pendingAction!)}
-                    disabled={loading}
-                    className="mt-2 w-full bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white text-xs font-medium py-1.5 px-3 rounded-lg transition-colors"
-                  >
-                    Confirm: {msg.pendingAction.description}
-                  </button>
-                )}
-                {msg.actionData?.download && (
-                  <button
-                    type="button"
-                    onClick={() => void downloadAiFile(msg.actionData!.download!)}
-                    className="mt-2 w-full bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-medium py-1.5 px-3 rounded-lg transition-colors"
-                  >
-                    {msg.actionData.download.label}
-                  </button>
-                )}
-                {msg.imageUrl && (
-                  <img src={msg.imageUrl} alt="AI Generated" className="max-w-full rounded-lg mt-2 border border-white/10" loading="lazy" />
-                )}
               </div>
-            </div>
-          ))}
+            );
+          })}
 
+          {/* Multi-stage typing indicator: replaces the old simple bouncing dots */}
           {loading && (
             <div className="flex justify-start">
               <div className="w-6 h-6 rounded-full bg-brand flex items-center justify-center mr-2 mt-1 flex-shrink-0">
                 <AISparkleIcon className="w-3 h-3 text-white" />
               </div>
-              <div className="bg-surface-muted border border-line rounded-xl px-3 py-2">
-                <div className="flex space-x-1">
-                  <div className="w-1.5 h-1.5 bg-indigo-400 rounded-full animate-bounce" />
-                  <div className="w-1.5 h-1.5 bg-indigo-400 rounded-full animate-bounce" style={{ animationDelay: '0.1s' }} />
-                  <div className="w-1.5 h-1.5 bg-indigo-400 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }} />
-                </div>
+              <div className="bg-surface-muted border border-line rounded-xl px-3 py-2 min-w-[100px]">
+                {typingStage === 'thinking' && (
+                  <div className="flex items-center gap-2 text-xs text-ink-muted">
+                    <span className="flex space-x-0.5">
+                      <span className="w-1 h-1 bg-indigo-400 rounded-full animate-typewriter-pulse" />
+                      <span className="w-1 h-1 bg-indigo-400 rounded-full animate-typewriter-pulse" style={{ animationDelay: '0.2s' }} />
+                      <span className="w-1 h-1 bg-indigo-400 rounded-full animate-typewriter-pulse" style={{ animationDelay: '0.4s' }} />
+                    </span>
+                    <span>Thinking</span>
+                  </div>
+                )}
+                {typingStage === 'writing' && (
+                  <div className="flex items-center gap-2 text-xs text-ink-muted">
+                    <span className="flex space-x-0.5">
+                      <span className="w-1 h-1 bg-indigo-400 rounded-full animate-typewriter-pulse" />
+                      <span className="w-1 h-1 bg-indigo-400 rounded-full animate-typewriter-pulse" style={{ animationDelay: '0.2s' }} />
+                      <span className="w-1 h-1 bg-indigo-400 rounded-full animate-typewriter-pulse" style={{ animationDelay: '0.4s' }} />
+                    </span>
+                    <span>Writing</span>
+                  </div>
+                )}
               </div>
             </div>
           )}
@@ -650,6 +733,22 @@ const FloatingAI: React.FC = () => {
 
         {/* Input */}
         <div className="border-t border-line p-3 bg-surface rounded-b-2xl">
+          {/* Status text above input */}
+          {typingStage !== 'idle' && (
+            <div className="text-[10px] text-ink-muted mb-1.5 text-center font-medium tracking-wide">
+              {typingStage === 'thinking' ? (
+                <span className="inline-flex items-center gap-1">
+                  <span className="w-1 h-1 bg-indigo-400 rounded-full animate-typewriter-pulse" />
+                  SAMS AI is thinking...
+                </span>
+              ) : (
+                <span className="inline-flex items-center gap-1">
+                  <span className="w-1 h-1 bg-indigo-400 rounded-full animate-typewriter-pulse" />
+                  SAMS AI is writing...
+                </span>
+              )}
+            </div>
+          )}
           {imagePreviews.length > 0 && (
             <div className="flex gap-2 mb-2 flex-wrap">
               {imagePreviews.map((img, i) => (
@@ -743,6 +842,17 @@ const FloatingAI: React.FC = () => {
           <AISparkleIcon className="w-7 h-7 text-white" />
         )}
       </button>
+
+      {/* Global keyframes for typewriter-pulse animation */}
+      <style>{`
+        @keyframes typewriter-pulse {
+          0%, 100% { opacity: 0.3; transform: scale(1); }
+          50% { opacity: 1; transform: scale(1.3); }
+        }
+        .animate-typewriter-pulse {
+          animation: typewriter-pulse 1s ease-in-out infinite;
+        }
+      `}</style>
     </>
   );
 };
