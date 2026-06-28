@@ -96,22 +96,29 @@ const FloatingAI: React.FC = () => {
     20,
   );
 
-  // Manage typing stages based on loading state
+  // Show "thinking" during backend query, "writing" during typewriter streaming
   useEffect(() => {
     if (loading) {
       setTypingStage('thinking');
-      const timer = setTimeout(() => {
-        setTypingStage('writing');
-      }, 600);
-      return () => clearTimeout(timer);
     } else {
-      setTypingStage('idle');
+      // When loading ends, kick off streaming for any pending content
       if (pendingStreamContentRef.current && pendingStreamMsgIdRef.current) {
         setIsStreaming(true);
         setStreamingMessage(pendingStreamContentRef.current);
+      } else {
+        setTypingStage('idle');
       }
     }
   }, [loading]);
+
+  // When streaming starts → "writing", when it finishes → "idle"
+  useEffect(() => {
+    if (isStreaming) {
+      setTypingStage('writing');
+    } else if (!loading) {
+      setTypingStage('idle');
+    }
+  }, [isStreaming, loading]);
 
   // Finalize streaming when typewriter completes
   useEffect(() => {
