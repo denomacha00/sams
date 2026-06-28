@@ -10,6 +10,8 @@ export default defineConfig({
       '@': path.resolve(__dirname, './src'),
       // Types only — utils use Node.js crypto which cannot run in the browser
       '@sams/shared': path.resolve(__dirname, '../shared/src/types/index.ts'),
+      'use-voice-query': path.resolve(__dirname, '../frontend/src/hooks/useVoiceQuery.ts'),
+      'use-ai-speech': path.resolve(__dirname, '../frontend/src/hooks/useAiSpeech.ts'),
     },
   },
   server: {
