@@ -42,6 +42,7 @@ import {
   listTerminalCommandHelp,
   resolveTerminalCommand,
 } from './superAdminTerminalOps';
+import { formatHumanResponse, humanize, type FormattedSuggestion } from './ai/humanResponseFormatter';
 
 export type { PendingAction };
 
@@ -144,6 +145,18 @@ function getUnsupportedOperationResponse(question: string): AIServiceResponse | 
   return null;
 }
 
+/**
+ * Format a response using the HumanResponseFormatter.
+ * Appends suggestions as a JSON suffix that the frontend parses.
+ */
+function formatAnswer(raw: string, role?: string): string {
+  const human = formatHumanResponse(raw, { role });
+  if (human.suggestions.length > 0) {
+    return human.text + `\n\n__SUGGESTIONS__${JSON.stringify(human.suggestions)}`;
+  }
+  return human.text;
+}
+
 // ─── AI Service ───────────────────────────────────────────────────────────────
 
 /**
@@ -153,6 +166,8 @@ function getUnsupportedOperationResponse(question: string): AIServiceResponse | 
  *   cannot resolve the query (returns 'unknown' intent)
  * - Integrates conversation memory for contextual follow-up discussions
  * - Detects and executes role-specific action intents for all authenticated users
+ *
+ * All responses are piped through HumanResponseFormatter for natural language.
  *
  * Requirements: 1.1, 1.2, 1.6, 5.1, 5.2, 5.3, 5.5, 5.6, 6.1, 6.4, 6.5, 6.6, 11.1, 11.2, 11.3, 11.4, 11.5, 11.8, 11.9, 14.1, 14.7
  */
@@ -237,7 +252,7 @@ export class AIService {
         if (personnelResult) {
           threadId = await this.safelyPersist(user, question, personnelResult.answer, threadId);
           return {
-            answer: personnelResult.answer,
+            answer: formatAnswer(personnelResult.answer, user.role),
             intent: personnelResult.intent,
             engine: 'local',
             data: personnelResult.data,
@@ -273,7 +288,7 @@ export class AIService {
       if (user.sub !== 'guest') {
         threadId = await this.safelyPersist(user, question, localResult.answer, threadId);
         return {
-          answer: localResult.answer,
+          answer: formatAnswer(localResult.answer, user.role),
           intent: localResult.intent,
           engine: 'local',
           data: localResult.data,
@@ -281,7 +296,7 @@ export class AIService {
         };
       }
       return {
-        answer: localResult.answer,
+        answer: formatAnswer(localResult.answer),
         intent: localResult.intent,
         engine: 'local',
         data: localResult.data,
@@ -294,7 +309,7 @@ export class AIService {
       if (user.sub !== 'guest') {
         threadId = await this.safelyPersist(user, question, timetableResult.answer, threadId);
         return {
-          answer: timetableResult.answer,
+          answer: formatAnswer(timetableResult.answer),
           intent: timetableResult.intent,
           engine: 'local',
           data: timetableResult.data,
@@ -302,7 +317,7 @@ export class AIService {
         };
       }
       return {
-        answer: timetableResult.answer,
+        answer: formatAnswer(timetableResult.answer),
         intent: timetableResult.intent,
         engine: 'local',
         data: timetableResult.data,
@@ -318,7 +333,7 @@ export class AIService {
       if (user.sub !== 'guest') {
         threadId = await this.safelyPersist(user, question, studentContextResult.answer, threadId);
         return {
-          answer: studentContextResult.answer,
+          answer: formatAnswer(studentContextResult.answer),
           intent: studentContextResult.intent,
           engine: 'local',
           data: studentContextResult.data,
@@ -326,7 +341,7 @@ export class AIService {
         };
       }
       return {
-        answer: studentContextResult.answer,
+        answer: formatAnswer(studentContextResult.answer),
         intent: studentContextResult.intent,
         engine: 'local',
         data: studentContextResult.data,
@@ -339,7 +354,7 @@ export class AIService {
       if (user.sub !== 'guest') {
         threadId = await this.safelyPersist(user, question, dataFallback.answer, threadId);
         return {
-          answer: dataFallback.answer,
+          answer: formatAnswer(dataFallback.answer, user.role),
           intent: dataFallback.intent,
           engine: 'local',
           data: dataFallback.data,
@@ -347,7 +362,7 @@ export class AIService {
         };
       }
       return {
-        answer: dataFallback.answer,
+        answer: formatAnswer(dataFallback.answer),
         intent: dataFallback.intent,
         engine: 'local',
         data: dataFallback.data,
@@ -402,7 +417,6 @@ export class AIService {
     historyMessages = mergeHistoryMessages(historyMessages, clientHistory);
 
     // Local engine couldn't resolve — try the OpenAI-compatible provider chain.
-    // This blocks only when NO key is configured (primary, Atomesus, or fallback).
     if (!hasPrimaryAIKey() && !hasAtomesusAIKey()) {
       const answer = getMissingAIKeyMessage();
       if (user.sub !== 'guest') {
@@ -417,18 +431,11 @@ export class AIService {
     }
 
     // Step 4: Call the OpenAI-compatible provider chain with conversation history.
-    // The openaiEngine handles primary → fallback → Atomesus fallback chain internally.
     try {
-      // CRITICAL: Before sending to the LLM, re-check if the user's message matches an
-      // actionable intent. The actionIntentDetector already ran at the top, but it only
-      // uses regex patterns. The LLM may classify this as a request we can route to an action.
-      // This catches natural phrasing that regex patterns miss.
       const llmActionIntent = user.sub !== 'guest'
         ? await actionIntentDetector.detect(question, user.role)
         : null;
 
-      // If LLM re-check found an action AND it hasn't already been handled at Step 1
-      // (meaning regex didn't match but LLM classified it), execute it directly.
       if (llmActionIntent && llmActionIntent.isAction && !actionIntent?.isAction) {
         const llmAction = llmActionIntent.action!;
         if (isActionPermitted(user.role, llmAction)) {
@@ -460,7 +467,6 @@ export class AIService {
         };
       }
 
-      // If OpenAI also couldn't resolve (feature gated or error), return scope message
       if (openaiResult.intent === 'feature_gated') {
         return {
           answer: localResult.answer,
@@ -490,7 +496,6 @@ export class AIService {
         };
       }
 
-      // Step 5: Persist the new record (non-blocking, errors logged not thrown)
       if (user.sub !== 'guest') {
         threadId = await this.safelyPersist(user, question, openaiResult.answer, threadId);
       }
@@ -525,8 +530,6 @@ export class AIService {
    * Process a voice query (text from client-side speech-to-text).
    * The client performs speech-to-text conversion using Web Speech API,
    * then sends the transcribed text here for processing.
-   *
-   * Requirements: 14.6
    */
   async voiceQuery(
     user: AccessTokenPayload,
@@ -537,16 +540,11 @@ export class AIService {
       pendingAction?: PendingAction;
     },
   ): Promise<AIServiceResponse> {
-    // Voice queries are processed the same as text queries
-    // The client handles speech-to-text conversion
     return this.query(user, transcription, options);
   }
 
   // ─── Private Helpers ──────────────────────────────────────────────────
 
-  /**
-   * Multi-turn slot filling: merge user reply, ask next slot, confirm, or execute.
-   */
   private async continueSlotFilling(
     user: AccessTokenPayload,
     answer: string,
@@ -572,9 +570,6 @@ export class AIService {
     });
   }
 
-  /**
-   * Resolve slots → ask one question → confirm destructive → execute.
-   */
   private async processDetectedAction(
     user: AccessTokenPayload,
     intent: { action: string; params: Record<string, unknown>; description: string },
@@ -641,7 +636,6 @@ export class AIService {
     });
   }
 
-  /** Merge HOD departmentId from DB when JWT is stale. */
   private async enrichUserScope(user: AccessTokenPayload): Promise<AccessTokenPayload> {
     const departmentId = await resolveHodDepartmentId(user);
     if (departmentId && departmentId !== user.departmentId) {
@@ -663,10 +657,6 @@ export class AIService {
     }
   }
 
-  /**
-   * Safely persist a conversation record. Never throws — errors are logged.
-   * Returns the resolved threadId (or the original if persistence fails).
-   */
   private async safelyPersist(
     user: AccessTokenPayload,
     message: string,
@@ -699,21 +689,12 @@ export class AIService {
     }
   }
 
-  /**
-   * Unified action executor. Replaces the old executeSuperAdminAction.
-   * 1. Validates permission via registry lookup
-   * 2. Extracts scope from JWT
-   * 3. Dispatches to the action handler
-   * 4. Logs audit entry
-   * 5. Returns structured response
-   */
   private async executeAction(
     user: AccessTokenPayload,
     pendingAction: PendingAction,
   ): Promise<AIServiceResponse> {
     const { action, params } = pendingAction;
 
-    // Authorization check via registry
     const actionDef = findAction(user.role, action);
     if (!actionDef) {
       await this.logDeniedAction(user, action);
@@ -722,7 +703,6 @@ export class AIService {
 
     const scopedUser = await this.enrichUserScope(user);
 
-    // Build scope from JWT claims (HOD departmentId may come from DB)
     const scope: ActionScope = {
       userId: scopedUser.sub,
       role: scopedUser.role,
@@ -732,10 +712,8 @@ export class AIService {
     };
 
     try {
-      // Dispatch to handler
       const result = await actionDef.handler(params, scope);
 
-      // Audit log
       await auditService.log({
         eventType: 'AI_ACTION_EXECUTED',
         actorId: user.sub,
@@ -748,11 +726,7 @@ export class AIService {
         },
       });
 
-      // ─── Handler Response Reframe ──────────────────────────────────────
-      // Instead of returning the handler's hardcoded answer string directly,
-      // pipe it through the LLM so it comes out in the AI's natural voice.
-      // This makes notification sends, timetable generation, etc. sound like
-      // the AI is speaking, not a system message.
+      // Format the response with HumanResponseFormatter + optional LLM reframe
       try {
         const { getOpenAIClient, resolveChatModel } = await import('./ai/aiProviderConfig');
         const client = getOpenAIClient();
@@ -785,18 +759,18 @@ Here is the raw action result: "${result.answer}"`,
         const reframed = reframeResponse.choices[0]?.message?.content?.trim();
         if (reframed) {
           return {
-            answer: reframed,
+            answer: formatAnswer(reframed, user.role),
             intent: 'action_executed',
             engine: 'openai',
             data: result.data,
           };
         }
       } catch {
-        // Reframe failed — fall through to the raw handler answer
+        // Reframe failed — use formatter on raw handler answer
       }
 
       return {
-        answer: result.answer,
+        answer: formatAnswer(result.answer, user.role),
         intent: 'action_executed',
         engine: 'openai',
         data: result.data,
@@ -833,9 +807,6 @@ Here is the raw action result: "${result.answer}"`,
     }
   }
 
-  /**
-   * Build a denial response with role-appropriate suggestions.
-   */
   private buildDenialResponse(role: string, requestedAction: string): AIServiceResponse {
     const permitted = getActionNames(role);
     const suggestions = permitted.length > 0
@@ -849,9 +820,6 @@ Here is the raw action result: "${result.answer}"`,
     };
   }
 
-  /**
-   * Log a denied action attempt for audit purposes.
-   */
   private async logDeniedAction(user: AccessTokenPayload, action: string): Promise<void> {
     try {
       await auditService.log({
