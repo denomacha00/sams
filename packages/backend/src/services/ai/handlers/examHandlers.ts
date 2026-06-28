@@ -233,10 +233,127 @@ const viewClassAttendanceHandler: ActionHandler = async (params, scope) => {
   };
 };
 
+function extractScoreResultParams(message: string, _match: RegExpMatchArray | null): Record<string, unknown> {
+  const scoreMatch = message.match(/(\d+(?:\.\d+)?)\s*\/\s*(\d+(?:\.\d+)?)/);
+  const subjectMatch = message.match(/(?:for|subject|exam|test|assessment)\s+["']?([^"',.]+?)["']?\s*(?:score|result|marks?|grade)?/i) ||
+    message.match(/(?:score|result|marks?|grade)\s+(?:for|of|in)\s+["']?([^"',.]+?)["']?/i);
+  const studentMatch = message.match(/(?:student|for)\s+["']?([^"',.]+?)["']?\s*(?:scored|got|received)?/i);
+
+  let examType = 'Exam';
+  if (/\bcats?\b|continuous|assessment/i.test(message)) examType = 'CAT';
+  else if (/mid\s*(?:term|semester)/i.test(message)) examType = 'MID_TERM';
+  else if (/end\s*(?:term|semester)|final/i.test(message)) examType = 'END_TERM';
+  else if (/quiz/i.test(message)) examType = 'QUIZ';
+  else if (/practical/i.test(message)) examType = 'PRACTICAL';
+  else if (/project/i.test(message)) examType = 'PROJECT';
+
+  return {
+    studentName: studentMatch?.[1]?.trim() || '',
+    subject: subjectMatch?.[1]?.trim() || '',
+    score: scoreMatch ? parseFloat(scoreMatch[1]) : undefined,
+    maxScore: scoreMatch ? parseFloat(scoreMatch[2]) : undefined,
+    examType,
+  };
+}
+
+const enterExamResultHandler: ActionHandler = async (params, scope) => {
+  const studentName = String(params.studentName || '').trim();
+  const subject = String(params.subject || '').trim();
+  const score = typeof params.score === 'number' ? params.score : undefined;
+  const maxScore = typeof params.maxScore === 'number' ? params.maxScore : undefined;
+  const examType = String(params.examType || 'Exam').toUpperCase();
+
+  if (!studentName) return { answer: 'Which student scored this mark? Provide their name.' };
+  if (!subject) return { answer: 'Which subject? Provide the subject name.' };
+  if (score === undefined || maxScore === undefined || maxScore <= 0) {
+    return { answer: 'Provide the score like eg. **"John scored 30/50 in Math CAT"**.' };
+  }
+
+  const { prisma } = await import('../../../lib/prisma');
+
+  const student = await prisma.user.findFirst({
+    where: { schoolId: scope.schoolId, role: 'STUDENT', fullName: { contains: studentName, mode: 'insensitive' } },
+    select: { id: true, fullName: true },
+  });
+  if (!student) return { answer: `Student "${studentName}" not found.` };
+
+  // Find the active term
+  const term = await prisma.academicTerm.findFirst({
+    where: { schoolId: scope.schoolId, isActive: true },
+    select: { id: true, name: true },
+  });
+  if (!term) return { answer: 'No active academic term. Set one up in Exams & Grades first.' };
+
+  // Find or create the exam
+  let exam = await prisma.exam.findFirst({
+    where: { schoolId: scope.schoolId, termId: term.id, subject, examType },
+    select: { id: true, maxScore: true },
+  });
+  if (!exam) {
+    const studentClass = await prisma.user.findUnique({
+      where: { id: student.id },
+      select: { classId: true },
+    });
+    if (!studentClass?.classId) return { answer: `${student.fullName} is not assigned to a class.` };
+    exam = await prisma.exam.create({
+      data: {
+        schoolId: scope.schoolId,
+        termId: term.id,
+        classId: studentClass.classId,
+        subject,
+        examType,
+        maxScore,
+        date: new Date(),
+      },
+      select: { id: true, maxScore: true },
+    });
+  }
+
+  const existingMaxScore = exam.maxScore;
+  const finalMaxScore = maxScore || existingMaxScore;
+  if (finalMaxScore <= 0) return { answer: 'Max score must be greater than 0.' };
+
+  const result = await prisma.examResult.upsert({
+    where: { examId_studentId: { examId: exam.id, studentId: student.id } },
+    create: { examId: exam.id, studentId: student.id, score: score! },
+    update: { score: score! },
+  });
+
+  const pct = finalMaxScore > 0 ? ((score! / finalMaxScore) * 100).toFixed(1) : 'N/A';
+
+  return {
+    answer: `✅ **${student.fullName}** scored **${score}/${finalMaxScore}** (${pct}%) in **${subject}** (${examType}) — ${term.name}.`,
+    data: {
+      studentId: student.id,
+      examId: exam.id,
+      resultId: result.id,
+      subject,
+      score,
+      maxScore: finalMaxScore,
+      examType,
+      termId: term.id,
+    },
+  };
+};
+
 // ─── Action Definitions ───────────────────────────────────────────────────────
 // NOTE: Risk score actions are in riskViewHandlers.ts — only exam-related actions here
 
 export const examActions: ActionDefinition[] = [
+  {
+    action: 'enter_exam_result',
+    description: 'Enter or update a student\'s exam score for a subject. Use "John scored 30/50 in Math" format.',
+    destructive: false,
+    patterns: [
+      /(?:scored|got|received|marks?)\s+(\d+(?:\.\d+)?)\s*\/\s*(\d+(?:\.\d+)?)\s+(?:in|for|on)\s+(.+)/i,
+      /(?:enter|record|add|save|submit)\s+(?:marks?|results?|scores?|grade)\s+(?:for|of)\s+(.+?)(?:\s+(?:in|for|on)\s+(.+))?/i,
+      /(?:student|pupil)\s+(.+?)\s+(?:scored|got|received)\s+(\d+(?:\.\d+)?)\s*\/\s*(\d+(?:\.\d+)?)/i,
+    ],
+    extractParams: extractScoreResultParams,
+    descriptionTemplate: (params) =>
+      `Enter exam result: ${params.studentName || 'student'} scored ${params.score ?? '?'}/${params.maxScore ?? '?'} in ${params.subject || 'subject'}.`,
+    handler: enterExamResultHandler,
+  },
   {
     action: 'list_terms',
     description: 'List all academic terms for your school',

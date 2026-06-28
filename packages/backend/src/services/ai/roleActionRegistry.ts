@@ -84,6 +84,7 @@ roleActionRegistry['SCHOOL_ADMIN'] = normalizeRoleActions([
   ...guardianLinkActions,
   ...knowledgeActions,
   ...examActions,
+  ...teacherWorkbenchActions,
   ...profileActions,
   ...virtualAssistantActions,
   ...riskViewActions,
