@@ -167,6 +167,38 @@ describe('actionSlotFilling', () => {
     expect(params.schoolName).toBe('Mwihoko');
   });
 
+  it('Super Admin generate_license asks for plan tier after school name', async () => {
+    const superAdmin = {
+      sub: 'super-1',
+      role: UserRole.SUPER_ADMIN,
+      schoolId: 'platform',
+    };
+    const slot = await getNextMissingSlot(superAdmin as any, 'generate_license', {
+      schoolName: 'Mwihoko',
+    });
+    expect(slot).toBe('planTier');
+  });
+
+  it('Super Admin generate_license parses plan tier and expiry answers', () => {
+    const tierResult = applySlotAnswer(
+      'generate_license',
+      'planTier',
+      'pro',
+      { schoolName: 'Mwihoko' },
+      UserRole.SUPER_ADMIN,
+    );
+    expect(tierResult.params.planTier).toBe('PROFESSIONAL');
+
+    const expiryResult = applySlotAnswer(
+      'generate_license',
+      'expiryDays',
+      '6 months',
+      tierResult.params,
+      UserRole.SUPER_ADMIN,
+    );
+    expect(expiryResult.params.expiryDays).toBe(180);
+  });
+
   it('Super Admin generate_license ignores filler school name answers', () => {
     const { params } = applySlotAnswer(
       'generate_license',

@@ -29,6 +29,8 @@ export type SlotName =
   | 'schoolName'
   | 'secretName'
   | 'secretValue'
+  | 'planTier'
+  | 'expiryDays';
 
 const NOTIFICATION_ACTIONS = new Set([
   'send_class_message',
@@ -77,7 +79,7 @@ const ACTION_SLOT_ORDER: Record<string, SlotName[]> = {
   mark_attendance: ['studentName'],
   create_class: ['className'],
   create_department: ['departmentName'],
-  generate_license: ['schoolName'],
+  generate_license: ['schoolName', 'planTier', 'expiryDays'],
   update_provider_secret: ['secretName', 'secretValue'],
 };
 
@@ -119,6 +121,38 @@ function parseMaxUsesAnswer(text: string): number | undefined {
   if (!match) return undefined;
   const n = parseInt(match[0], 10);
   return n > 0 ? n : undefined;
+}
+
+function parsePlanTierAnswer(text: string): 'TRIAL' | 'BASIC' | 'PROFESSIONAL' | 'ENTERPRISE' | undefined {
+  const t = text.trim().toLowerCase();
+  if (/^trial$/.test(t)) return 'TRIAL';
+  if (/^basic$/.test(t)) return 'BASIC';
+  if (/^(pro|professional)$/.test(t)) return 'PROFESSIONAL';
+  if (/^(enterprise|ent)$/.test(t)) return 'ENTERPRISE';
+  const upper = text.trim().toUpperCase();
+  if (['TRIAL', 'BASIC', 'PROFESSIONAL', 'ENTERPRISE'].includes(upper)) {
+    return upper as 'TRIAL' | 'BASIC' | 'PROFESSIONAL' | 'ENTERPRISE';
+  }
+  return undefined;
+}
+
+function parseExpiryDaysAnswer(text: string): number | undefined {
+  const trimmed = text.trim();
+  if (/^default$/i.test(trimmed)) return 365;
+  const yearMatch = trimmed.match(/(\d+)\s*(?:year|years|yr|yrs)\b/i);
+  if (yearMatch) {
+    const years = parseInt(yearMatch[1], 10);
+    return years > 0 ? years * 365 : undefined;
+  }
+  const monthMatch = trimmed.match(/(\d+)\s*(?:month|months|mo)\b/i);
+  if (monthMatch) {
+    const months = parseInt(monthMatch[1], 10);
+    return months > 0 ? months * 30 : undefined;
+  }
+  const dayMatch = trimmed.match(/\d+/);
+  if (!dayMatch) return undefined;
+  const days = parseInt(dayMatch[0], 10);
+  return days > 0 ? days : undefined;
 }
 
 function isMeaningfulSchoolNameAnswer(text: string): boolean {
@@ -422,6 +456,16 @@ export function applySlotAnswer(
       if (uses) next.maxUses = uses;
       break;
     }
+    case 'planTier': {
+      const planTier = parsePlanTierAnswer(answer);
+      if (planTier) next.planTier = planTier;
+      break;
+    }
+    case 'expiryDays': {
+      const expiryDays = parseExpiryDaysAnswer(answer);
+      if (expiryDays) next.expiryDays = expiryDays;
+      break;
+    }
     default:
       next[slot] = answer.trim();
   }
@@ -501,6 +545,16 @@ export async function getNextMissingSlot(
 
     if (slot === 'maxUses') {
       if (!isFilled(resolved.maxUses)) return slot;
+      continue;
+    }
+
+    if (slot === 'planTier') {
+      if (!isFilled(resolved.planTier)) return slot;
+      continue;
+    }
+
+    if (slot === 'expiryDays') {
+      if (!isFilled(resolved.expiryDays)) return slot;
       continue;
     }
 
@@ -722,6 +776,10 @@ export async function buildSlotQuestion(
       return (
         `How many people can use this link? (Default on the dashboard is **${DEFAULT_REGISTRATION_MAX_USES}** — reply with a number, e.g. "50".)`
       );
+    case 'planTier':
+      return 'Which plan should this license use? Reply **trial**, **basic**, **professional**, or **enterprise**.';
+    case 'expiryDays':
+      return 'How long should the license last? Reply with days, months, or years, for example **365 days**, **6 months**, or **1 year**.';
     case 'className':
       return 'What should the new class be called?';
     default:

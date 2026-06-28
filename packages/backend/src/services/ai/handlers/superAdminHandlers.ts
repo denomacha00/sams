@@ -217,7 +217,7 @@ const generateLicenseHandler: ActionHandler = async (params, scope) => {
     return { answer: 'What school should the license be for? Say: "generate license for [School Name]"' };
   }
   const planTier = (params.planTier as string) || 'BASIC';
-  const daysValid = (params.daysValid as number) || 365;
+  const daysValid = (params.expiryDays as number) || (params.daysValid as number) || 365;
   const expiresAt = new Date();
   expiresAt.setDate(expiresAt.getDate() + daysValid);
 
