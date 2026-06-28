@@ -37,7 +37,6 @@ interface Message extends AiChatMessage {
   pendingAction?: PendingAction;
   actionData?: AiActionData;
   isError?: boolean;
-  isStreaming?: boolean;
 }
 
 const CONFIRM_RE = /^(yes|y|confirm|proceed|ok|do it|go ahead)\.?$/i;
@@ -83,32 +82,7 @@ const FloatingAI: React.FC = () => {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const [streamingMessage, setStreamingMessage] = useState<string>('');
-  const [isStreaming, setIsStreaming] = useState(false);
-  const [typingStage, setTypingStage] = useState<'idle' | 'thinking' | 'writing'>('idle');
-  const pendingStreamContentRef = useRef<string>('');
-  const pendingStreamMsgIdRef = useRef<string | null>(null);
 
-  // Show "thinking" while loading, then show result instantly (no typewriter)
-  useEffect(() => {
-    if (loading) {
-      setTypingStage('thinking');
-    } else {
-      // When loading ends, finalize any pending stream content into the message
-      if (pendingStreamContentRef.current && pendingStreamMsgIdRef.current) {
-        setMessages((prev) =>
-          prev.map((m) =>
-            m.id === pendingStreamMsgIdRef.current
-              ? { ...m, content: pendingStreamContentRef.current, isStreaming: false }
-              : m,
-          ),
-        );
-        pendingStreamContentRef.current = '';
-        pendingStreamMsgIdRef.current = null;
-      }
-      setTypingStage('idle');
-    }
-  }, [loading]);
 
   // ── Voice tracking ──────────────────────────────────────────────────────
   const voicePendingRef = useRef(false);
@@ -258,45 +232,6 @@ const FloatingAI: React.FC = () => {
     }
   }, [threadId, threadOwner]);
 
-  const confirmPendingAction = useCallback(async (pending: PendingAction) => {
-    setLoading(true);
-    try {
-      const { data } = await apiClient.post('/ai/query', {
-        question: 'yes',
-        threadId,
-        history: messagesToAiHistory(messages),
-        confirmAction: true,
-        pendingAction: pending,
-      });
-      if (data.threadId) {
-        setThreadId(data.threadId);
-        saveAiThreadId(data.threadId, threadOwner);
-      }
-      pendingActionRef.current = null;
-      const newMsg: Message = {
-        id: crypto.randomUUID(),
-        role: 'assistant',
-        content: data.answer,
-        timestamp: new Date(),
-        actionData: data.data,
-      };
-      setMessages((prev) => [...prev, newMsg]);
-      if (voicePendingRef.current && data.answer) {
-        setAiSpeaking(true);
-        speak(data.answer);
-      }
-    } catch {
-      setMessages((prev) => [...prev, {
-        id: crypto.randomUUID(),
-        role: 'assistant',
-        content: "I couldn't complete that action. Please try again.",
-        timestamp: new Date(),
-      }]);
-    } finally {
-      setLoading(false);
-    }
-  }, [messages, threadId, threadOwner, speak]);
-
   // ── Core query submission ──────────────────────────────────────────────
   const submitQuery = useCallback(async (text: string) => {
     if (!text.trim() && selectedImages.length === 0) return;
@@ -321,23 +256,6 @@ const FloatingAI: React.FC = () => {
       }
     };
 
-    // Helper: add a streaming message that will be revealed character by character
-    const addStreamingMessage = (content: string, extra: Partial<Message> = {}) => {
-      const id = crypto.randomUUID();
-      pendingStreamContentRef.current = content;
-      pendingStreamMsgIdRef.current = id;
-      setMessages((prev) => [
-        ...prev,
-        {
-          id,
-          role: 'assistant',
-          content: '',
-          timestamp: new Date(),
-          isStreaming: true,
-          ...extra,
-        } as Message,
-      ]);
-    };
 
     try {
       // Theme command
@@ -379,7 +297,11 @@ const FloatingAI: React.FC = () => {
           setThreadId(data.threadId);
           saveAiThreadId(data.threadId, threadOwner);
         }
-        addStreamingMessage(data.answer, {
+        addAssistantMessage({
+          id: crypto.randomUUID(),
+          role: 'assistant',
+          content: data.answer,
+          timestamp: new Date(),
           actionData: data.data,
           isError:
             isAiUploadErrorIntent(data.intent) ||
@@ -448,30 +370,15 @@ const FloatingAI: React.FC = () => {
 
       pendingActionRef.current = null;
       const authHint = getAiAuthHint(data.intent);
-      // Action results and data queries appear instantly — only pure LLM text should stream
-      if (data.intent === 'action_executed' || data.intent === 'action_slot_fill' || data.intent === 'action_confirmation' || data.intent === 'action_denied' || data.intent === 'data_not_found' || data.intent === 'action_error' || data.intent === 'action_denied') {
-        addAssistantMessage({
-          id: crypto.randomUUID(),
-          role: 'assistant',
-          content: authHint ?? data.answer,
-          timestamp: new Date(),
-          actionData: data.data,
-          isError: isAiUnavailableIntent(data.intent) || isAiAuthIntent(data.intent),
-        });
-      } else if (data.intent === 'local_response' || data.intent?.startsWith && data.intent.startsWith('local_')) {
-        addAssistantMessage({
-          id: crypto.randomUUID(),
-          role: 'assistant',
-          content: authHint ?? data.answer,
-          timestamp: new Date(),
-          actionData: data.data,
-        });
-      } else {
-        addStreamingMessage(authHint ?? data.answer, {
-          actionData: data.data,
-          isError: isAiUnavailableIntent(data.intent) || isAiAuthIntent(data.intent),
-        });
-      }
+      // All responses appear instantly — no typewriter/streaming
+      addAssistantMessage({
+        id: crypto.randomUUID(),
+        role: 'assistant',
+        content: authHint ?? data.answer,
+        timestamp: new Date(),
+        actionData: data.data,
+        isError: isAiUnavailableIntent(data.intent) || isAiAuthIntent(data.intent),
+      });
     } catch (err) {
       const errorMsg: Message = {
         id: crypto.randomUUID(),
@@ -489,6 +396,53 @@ const FloatingAI: React.FC = () => {
       setLoading(false);
     }
   }, [messages, selectedImages, imagePreviews, threadId, threadOwner, appendMemoryNotice, navigate, speak]);
+
+  // ── Confirm pending action (e.g. from a confirm button click) ───────────
+  const confirmPendingAction = useCallback(async (pending: PendingAction) => {
+    if (!pending) return;
+    setLoading(true);
+    try {
+      const history = messagesToAiHistory(messages);
+      const { data } = await apiClient.post('/ai/query', {
+        question: 'yes',
+        threadId,
+        history,
+        confirmAction: true,
+        pendingAction: pending,
+      });
+      if (data.threadId) {
+        setThreadId(data.threadId);
+        saveAiThreadId(data.threadId, threadOwner);
+      }
+      appendMemoryNotice(data.memoryNotice);
+      pendingActionRef.current = null;
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: crypto.randomUUID(),
+          role: 'assistant' as const,
+          content: data.answer,
+          timestamp: new Date(),
+          actionData: data.data,
+          pendingAction: data.pendingAction,
+          isError: isAiUnavailableIntent(data.intent),
+        },
+      ]);
+    } catch {
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: crypto.randomUUID(),
+          role: 'assistant' as const,
+          content: "I couldn't complete that action. Please try again.",
+          timestamp: new Date(),
+          isError: true,
+        },
+      ]);
+    } finally {
+      setLoading(false);
+    }
+  }, [messages, threadId, threadOwner, appendMemoryNotice]);
 
   // ── Voice integration ───────────────────────────────────────────────────
   // Silence callbacks
@@ -646,7 +600,7 @@ const FloatingAI: React.FC = () => {
                         <p className="whitespace-pre-wrap leading-relaxed">{displayContent}</p>
                       )}
                     </div>
-                    {msg.role === 'assistant' && msg.content.length > 0 && !msg.isStreaming && (
+                    {msg.role === 'assistant' && msg.content.length > 0 && (
                       <button
                         type="button"
                         onClick={(e) => { e.stopPropagation(); toggleSpeech(msg.content); }}
@@ -691,33 +645,20 @@ const FloatingAI: React.FC = () => {
             );
           })}
 
-          {/* Multi-stage typing indicator: replaces the old simple bouncing dots */}
           {loading && (
             <div className="flex justify-start">
               <div className="w-6 h-6 rounded-full bg-brand flex items-center justify-center mr-2 mt-1 flex-shrink-0">
                 <AISparkleIcon className="w-3 h-3 text-white" />
               </div>
               <div className="bg-surface-muted border border-line rounded-xl px-3 py-2 min-w-[100px]">
-                {typingStage === 'thinking' && (
-                  <div className="flex items-center gap-2 text-xs text-ink-muted">
-                    <span className="flex space-x-0.5">
-                      <span className="w-1 h-1 bg-indigo-400 rounded-full animate-typewriter-pulse" />
-                      <span className="w-1 h-1 bg-indigo-400 rounded-full animate-typewriter-pulse" style={{ animationDelay: '0.2s' }} />
-                      <span className="w-1 h-1 bg-indigo-400 rounded-full animate-typewriter-pulse" style={{ animationDelay: '0.4s' }} />
-                    </span>
-                    <span>Thinking</span>
-                  </div>
-                )}
-                {typingStage === 'writing' && (
-                  <div className="flex items-center gap-2 text-xs text-ink-muted">
-                    <span className="flex space-x-0.5">
-                      <span className="w-1 h-1 bg-indigo-400 rounded-full animate-typewriter-pulse" />
-                      <span className="w-1 h-1 bg-indigo-400 rounded-full animate-typewriter-pulse" style={{ animationDelay: '0.2s' }} />
-                      <span className="w-1 h-1 bg-indigo-400 rounded-full animate-typewriter-pulse" style={{ animationDelay: '0.4s' }} />
-                    </span>
-                    <span>Writing</span>
-                  </div>
-                )}
+                <div className="flex items-center gap-2 text-xs text-ink-muted">
+                  <span className="flex space-x-0.5">
+                    <span className="w-1 h-1 bg-indigo-400 rounded-full animate-typewriter-pulse" />
+                    <span className="w-1 h-1 bg-indigo-400 rounded-full animate-typewriter-pulse" style={{ animationDelay: '0.2s' }} />
+                    <span className="w-1 h-1 bg-indigo-400 rounded-full animate-typewriter-pulse" style={{ animationDelay: '0.4s' }} />
+                  </span>
+                  <span>Thinking</span>
+                </div>
               </div>
             </div>
           )}
@@ -728,19 +669,12 @@ const FloatingAI: React.FC = () => {
         {/* Input */}
         <div className="border-t border-line p-3 bg-surface rounded-b-2xl">
           {/* Status text above input */}
-          {typingStage !== 'idle' && (
+          {loading && (
             <div className="text-[10px] text-ink-muted mb-1.5 text-center font-medium tracking-wide">
-              {typingStage === 'thinking' ? (
-                <span className="inline-flex items-center gap-1">
-                  <span className="w-1 h-1 bg-indigo-400 rounded-full animate-typewriter-pulse" />
-                  SAMS AI is thinking...
-                </span>
-              ) : (
-                <span className="inline-flex items-center gap-1">
-                  <span className="w-1 h-1 bg-indigo-400 rounded-full animate-typewriter-pulse" />
-                  SAMS AI is writing...
-                </span>
-              )}
+              <span className="inline-flex items-center gap-1">
+                <span className="w-1 h-1 bg-indigo-400 rounded-full animate-typewriter-pulse" />
+                SAMS AI is thinking...
+              </span>
             </div>
           )}
           {imagePreviews.length > 0 && (
