@@ -112,7 +112,6 @@ const startSessionHandler: ActionHandler = async (params, scope) => {
       'Open **Sign In Students** and tap **Start Session** so SAMS can capture GPS before QR/link attendance starts.',
     data: { classId: selectedClass.id, timetableEntryId: currentEntry.id },
   };
-
 };
 
 const endSessionHandler: ActionHandler = async (_params, scope) => {
@@ -204,7 +203,7 @@ const viewClassRosterHandler: ActionHandler = async (_params, scope) => {
 
   const list = students.map((s, i) => `${i + 1}. ${s.fullName}`).join('\n');
   return {
-    answer: `📋 **Class roster — ${classRecord?.name ?? 'Your class'}** (${students.length} students)\n\n${list}`,
+    answer: `Class roster — ${classRecord?.name ?? 'Your class'} (${students.length} students)\n\n${list}`,
     data: { classId, count: students.length },
   };
 };
@@ -307,12 +306,43 @@ const sendClassMessageHandler: ActionHandler = async (params, scope) => {
   }
 };
 
+// ─── Teacher subjects handler ──────────────────────────────────────────────
+
+const viewTeacherSubjectsHandler: ActionHandler = async (_params, scope) => {
+  const { prisma } = await import('../../../lib/prisma');
+  const subjects = await prisma.teacherSubject.findMany({
+    where: { teacherId: scope.userId, schoolId: scope.schoolId },
+    orderBy: { createdAt: 'desc' },
+  });
+  if (subjects.length === 0) {
+    return { answer: 'No subjects are assigned to you yet in SAMS.' };
+  }
+  const lines = subjects.map((s) => `• ${s.subject}`);
+  return {
+    answer: `📚 **Your Subjects** (${subjects.length})\n\n${lines.join('\n')}`,
+    data: { count: subjects.length, subjects },
+  };
+};
+
 // ─── Action Definitions ───────────────────────────────────────────────────────
 
 export const teacherActions: ActionDefinition[] = [
   ...notificationInboxActions,
   buildExportReportActionDefForRole(UserRole.TEACHER),
   createRegistrationLinkActionDef,
+  {
+    action: 'view_teacher_subjects',
+    description: 'View subjects assigned to you as a teacher',
+    destructive: false,
+    patterns: [
+      /(?:my\s+)?subjects?/i,
+      /what\s+(?:subjects?|classes?)\s+(?:do\s+)?(?:i|you)\s+teach/i,
+      /(?:list|show|view)\s+(?:my\s+)?(?:subjects?|classes?)\s+(?:i\s+)?teach/i,
+    ],
+    extractParams: () => ({}),
+    descriptionTemplate: () => 'View your assigned teaching subjects.',
+    handler: viewTeacherSubjectsHandler,
+  },
   {
     action: 'start_session',
     description: 'Start an attendance session for your class',
@@ -323,7 +353,6 @@ export const teacherActions: ActionDefinition[] = [
       /open\s+(?:a\s+)?(?:session|attendance)/i,
     ],
     extractParams: (message: string) => {
-      // Try to extract subject from "start session for Math" or "start Math session"
       const forMatch = message.match(/(?:session|class|attendance)\s+(?:for\s+)?(.+)/i);
       const subject = forMatch && forMatch[1] ? forMatch[1].trim() : undefined;
       return { subject };
@@ -357,7 +386,6 @@ export const teacherActions: ActionDefinition[] = [
     ],
     extractParams: (message: string, match: RegExpMatchArray | null) => {
       const studentName = match && match[1] ? match[1].trim() : '';
-      // Extract status
       const statusMatch = message.match(/(?:as\s+)?(present|absent|late)/i);
       const status = statusMatch ? statusMatch[1].toUpperCase() : 'PRESENT';
       return { studentName, status };
@@ -385,7 +413,6 @@ export const teacherActions: ActionDefinition[] = [
     description: 'Send an in-app message to all students in your class (not SMS)',
     destructive: true,
     patterns: [
-      // Message-capturing patterns FIRST (these extract the actual content)
       /(?:send|write|create|post|message)\s+(?:to\s+)?(?:my\s+)?class\s*[:,-]?\s*(.+)/i,
       /notify\s+(?:my\s+)?class\s*[:,-]?\s*(.+)/i,
       /notify\s+(?:the\s+)?students?\s+in\s+(?:my\s+)?class\s*[:,-]?\s*(.+)/i,
@@ -393,19 +420,15 @@ export const teacherActions: ActionDefinition[] = [
       /message\s+(?:all\s+)?(?:my\s+)?students?\s*[:,-]?\s*(.+)/i,
       /send\s+(?:a\s+)?message\s+to\s+(?:my\s+)?class\s*[:,-]?\s*(.+)/i,
       /write\s+(?:a\s+)?message\s+(?:to\s+)?(?:my\s+)?class\s*[:,-]?\s*(.+)/i,
-      // Write patterns without colon — e.g. "I need to write a message to my class"
       /(?:i\s+(?:need|want)\s+to\s+)?write\s+(?:a\s+)?message(?:\s+to\s+(?:my\s+)?class)?/i,
-      // Fallback patterns (no message — handler will ask for it)
       /^notify\s+(?:my\s+)?class\s*$/i,
       /^notify\s+(?:my\s+)?students?\s*$/i,
       /^(?:post|send|write)\s+(?:a\s+)?(?:notification|message)\s+to\s+(?:my\s+)?class\s*$/i,
     ],
     extractParams: (message: string, match: RegExpMatchArray | null) => {
-      // For message-capturing patterns, match[1] is the message text
       if (match && match[1] && match[1].trim()) {
         return { message: match[1].trim() };
       }
-      // For fallback patterns with no capture group, try to extract from remaining text after colon/dash
       const colonMatch = message.match(/[:,-]\s*(.+)$/);
       if (colonMatch) {
         return { message: colonMatch[1].trim() };

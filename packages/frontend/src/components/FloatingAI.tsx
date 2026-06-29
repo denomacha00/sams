@@ -112,8 +112,22 @@ const FloatingAI: React.FC = () => {
 
   const { speaking, speak, toggle: toggleSpeech, stop: stopSpeech } = useAiSpeech({
     onEnd: () => {
-      if (voicePendingRef.current && !isListeningRef.current) {
-        startListeningRef.current();
+      // After AI finishes speaking in voice mode, reopen the mic
+      if (voicePendingRef.current) {
+        // Close mic first (safety), then reopen
+        if (isListeningRef.current) stopListeningRef.current();
+        setTimeout(() => {
+          if (voicePendingRef.current && !isListeningRef.current) {
+            setAiSpeakingRef.current(false);
+            startListeningRef.current();
+          }
+        }, 300);
+      }
+    },
+    onStart: () => {
+      // When AI starts speaking in voice mode, close mic to prevent echo
+      if (voicePendingRef.current && isListeningRef.current) {
+        stopListeningRef.current();
       }
     },
   });

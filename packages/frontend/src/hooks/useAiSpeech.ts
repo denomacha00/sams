@@ -18,20 +18,25 @@ function cleanTextForSpeech(text: string): string {
 }
 
 /**
- * Bluetooth headset fix:
- * - speechSynthesis uses A2DP (media), SpeechRecognition uses HFP (mic).
- * - Most BT headsets CANNOT do both at once. When speechSynthesis plays,
- *   headset locks into A2DP → mic dies → 'audio-capture' error.
- * - In voice mode: SKIP speechSynthesis, play a phone-speaker beep instead.
- * - Manual "speaker" button tap still reads aloud normally.
+ * Voice chat flow (man-to-man):
+ * - User taps mic → SpeechRecognition listens
+ * - Mic captures query → mic closes immediately
+ * - AI processes query → AI speaks response aloud via speechSynthesis
+ * - After AI finishes speaking → mic reopens for user to reply
+ *
+ * For non-voice (manual "speaker" button) the text is read aloud normally.
+ * The isVoiceMode flag is tracked via ref so it can be read in callbacks.
  */
-export function useAiSpeech(options?: { onEnd?: () => void }) {
+export function useAiSpeech(options?: { onEnd?: () => void; onStart?: () => void }) {
   const [speaking, setSpeaking] = useState(false);
   const speakingRef = useRef(false);
   const utteranceRef = useRef<SpeechSynthesisUtterance | null>(null);
   const onEndRef = useRef(options?.onEnd);
+  const onStartRef = useRef(options?.onStart);
+  const voiceModeRef = useRef(false);
   const audioCtxRef = useRef<AudioContext | null>(null);
   onEndRef.current = options?.onEnd;
+  onStartRef.current = options?.onStart;
 
   useEffect(() => {
     if (typeof window === 'undefined' || !window.speechSynthesis) return;
@@ -78,21 +83,23 @@ export function useAiSpeech(options?: { onEnd?: () => void }) {
     if (typeof window === 'undefined' || !window.speechSynthesis) return;
     window.speechSynthesis.cancel();
     speakingRef.current = false;
+    voiceModeRef.current = !!isVoiceMode;
 
-    if (isVoiceMode) {
-      speakingRef.current = true;
-      setSpeaking(true);
-      playNotification();
-      setTimeout(() => {
-        speakingRef.current = false;
-        setSpeaking(false);
-        onEndRef.current?.();
-      }, 400);
+    // Only play notification beep in voice mode
+    if (isVoiceMode) playNotification();
+
+    const cleanText = cleanTextForSpeech(text);
+    if (!cleanText) {
+      speakingRef.current = false;
+      setSpeaking(false);
+      voiceModeRef.current = false;
+      onEndRef.current?.();
       return;
     }
 
-    const cleanText = cleanTextForSpeech(text);
-    if (!cleanText) return;
+    speakingRef.current = true;
+    setSpeaking(true);
+
     const utterance = new SpeechSynthesisUtterance(cleanText);
     const preferredVoice = resolveVoice();
     if (preferredVoice) utterance.voice = preferredVoice;
@@ -100,15 +107,33 @@ export function useAiSpeech(options?: { onEnd?: () => void }) {
     utterance.pitch = 1.0;
     utterance.volume = 1.0;
     utterance.lang = 'en';
-    utterance.onstart = () => { speakingRef.current = true; setSpeaking(true); };
-    utterance.onend = () => { speakingRef.current = false; setSpeaking(false); onEndRef.current?.(); };
-    utterance.onerror = () => { speakingRef.current = false; setSpeaking(false); };
+
+    utterance.onstart = () => {
+      onStartRef.current?.();
+    };
+    utterance.onend = () => {
+      const wasVoice = voiceModeRef.current;
+      speakingRef.current = false;
+      voiceModeRef.current = false;
+      setSpeaking(false);
+      window.speechSynthesis.cancel();
+      // Only run onEnd (which reopens mic) when in voice mode
+      if (wasVoice) onEndRef.current?.();
+    };
+    utterance.onerror = () => {
+      voiceModeRef.current = false;
+      speakingRef.current = false;
+      setSpeaking(false);
+      onEndRef.current?.();
+    };
+
     utteranceRef.current = utterance;
     window.speechSynthesis.speak(utterance);
   }, [resolveVoice, playNotification]);
 
   const stop = useCallback(() => {
     if (typeof window !== 'undefined' && window.speechSynthesis) window.speechSynthesis.cancel();
+    voiceModeRef.current = false;
     speakingRef.current = false;
     setSpeaking(false);
   }, []);
@@ -127,5 +152,5 @@ export function useAiSpeech(options?: { onEnd?: () => void }) {
     };
   }, []);
 
-  return { speaking, speak, stop, toggle };
+  return { speaking, speak, stop, toggle, voiceModeRef };
 }

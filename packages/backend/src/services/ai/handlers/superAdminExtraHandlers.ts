@@ -68,6 +68,48 @@ const triggerJobHandler: ActionHandler = async (params) => {
   return { answer: `✅ ${job.name} scheduled to run now.`, data: { jobId: job.id } };
 };
 
+// ─── REVENUE FORECAST ──────────────────────────────────────────────────────
+
+const viewRevenueForecastHandler: ActionHandler = async () => {
+  const { superAdminFeaturesService } = await import('../../superAdminFeaturesService');
+  const forecast = await superAdminFeaturesService.getRevenueForecast(6);
+  const lines = [
+    `📊 **Revenue Forecast** (6 months)`,
+    '',
+    `• **Current MRR:** KES ${forecast.currentMRR.toLocaleString()}`,
+    `• **Projected MRR (6mo):** KES ${forecast.projectedMRR.toLocaleString()}`,
+    `• **MRR Growth:** ${forecast.mrrGrowth > 0 ? '+' : ''}${forecast.mrrGrowth}%`,
+    `• **Churn Risk:** ${forecast.churnRisk}%`,
+    `• **Trend:** ${forecast.trend === 'up' ? '📈 Up' : forecast.trend === 'down' ? '📉 Down' : '➡️ Stable'}`,
+    '',
+    '**Monthly Breakdown:**',
+    ...forecast.monthlyBreakdown.map((m) =>
+      `• ${m.month}: KES ${m.projectedRevenue.toLocaleString()} (${m.activeSchools} schools${m.churnedSchools > 0 ? `, ${m.churnedSchools} churned` : ''})`
+    ),
+  ];
+  return {
+    answer: lines.join('\n'),
+    data: forecast,
+  };
+};
+
+// ─── SCHOOL ADMIN ACTIVITY VIEW ────────────────────────────────────────────
+
+const viewSchoolAdminActivityHandler: ActionHandler = async () => {
+  const { superAdminFeaturesService } = await import('../../superAdminFeaturesService');
+  const activities = await superAdminFeaturesService.getSchoolAdminActivity(48);
+  if (activities.length === 0) {
+    return { answer: 'No school admin activity found in the last 48 hours.', data: [] };
+  }
+  const lines = activities.slice(0, 20).map((a) =>
+    `• ${a.createdAt.toLocaleString()} — ${(a as any).actor?.fullName || 'Unknown'} at ${(a as any).school?.name || 'N/A'}: ${a.eventType}`
+  );
+  return {
+    answer: `📋 **School Admin Activity** (last 48h — ${activities.length} events)\n\n${lines.join('\n')}`,
+    data: { count: activities.length, activities: activities.slice(0, 20) },
+  };
+};
+
 // ─── DATA EXPORT ────────────────────────────────────────────────────────────
 
 const triggerDataExportHandler: ActionHandler = async (params) => {
@@ -87,6 +129,32 @@ const triggerDataExportHandler: ActionHandler = async (params) => {
 // ─── ACTION DEFINITIONS ─────────────────────────────────────────────────────
 
 export const superAdminExtraActions: ActionDefinition[] = [
+  {
+    action: 'view_revenue_forecast',
+    description: 'View revenue forecast for the next 6 months (MRR, growth, churn risk)',
+    destructive: false,
+    patterns: [
+      /(?:revenue\s+)?forecast/i,
+      /revenue\s+project(?:ion|ed)/i,
+      /mrr\b/i,
+      /projected\s+revenue/i,
+    ],
+    extractParams: () => ({}),
+    descriptionTemplate: () => 'View revenue forecast.',
+    handler: viewRevenueForecastHandler,
+  },
+  {
+    action: 'view_school_admin_activity',
+    description: 'View recent school admin activity across the platform (last 48h)',
+    destructive: false,
+    patterns: [
+      /(?:school\s+)?admin\s+activity/i,
+      /what\s+(?:are|have)\s+(?:school\s+)?admins?\s+(?:doing|up\s+to)/i,
+    ],
+    extractParams: () => ({}),
+    descriptionTemplate: () => 'View school admin activity.',
+    handler: viewSchoolAdminActivityHandler,
+  },
   {
     action: 'list_feature_flags',
     description: 'List all feature flags across the platform',

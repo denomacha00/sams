@@ -5,8 +5,8 @@ import { prepareImagesForAiUpload } from '../lib/aiImageUpload';
 import { useAuthStore } from '../store/authStore';
 import AiChartRenderer from './AiChartRenderer';
 import { useVoiceBiometrics, loadVoicePrint } from '../hooks/useVoiceBiometrics';
-import { useVoiceQuery } from 'use-voice-query';
-import { useAiSpeech } from 'use-ai-speech';
+import { useVoiceQuery } from '../hooks/useVoiceQuery';
+import { useAiSpeech } from '../hooks/useAiSpeech';
 
 interface PendingAction {
   action: string;
