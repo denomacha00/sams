@@ -71,6 +71,15 @@ export function useVoiceQuery(
         audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true },
       });
       hfpStreamRef.current = stream;
+      // Periodically refresh the stream to prevent BT headsets from dropping HFP mode
+      hfpTimerRef.current = setInterval(() => {
+        if (!shouldRestartRef.current && !hfpStreamRef.current) return;
+        navigator.mediaDevices.getUserMedia({ audio: true }).then((ns) => {
+          const os = hfpStreamRef.current;
+          hfpStreamRef.current = ns;
+          if (os) os.getTracks().forEach(t => t.stop());
+        }).catch(() => {});
+      }, 30000); // every 30s (less aggressive than original 5s)
     } catch {
       // Mic unavailable — recognition will fail with audio-capture, handled below
     }
@@ -109,6 +118,10 @@ export function useVoiceQuery(
     // HFP stream stays alive for quick resume
   }, [clearSilenceTimer, clearScheduledRestart]);
 
+  // Ref to always have the latest submitQuery callback (avoids stale closures)
+  const submitQueryRef = useRef(submitQuery);
+  submitQueryRef.current = submitQuery;
+
   const createAndStartRecognition = useCallback(() => {
     const SpeechRecognition =
       (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
@@ -125,7 +138,10 @@ export function useVoiceQuery(
     }
 
     const recognition = new SpeechRecognition();
-    recognition.lang = 'en-KE';
+    // Chrome's SpeechRecognition does NOT support en-KE. Setting it silently
+    // succeeds but then the recognition fails immediately with 'language-not-supported'.
+    // Use en-US which handles Kenyan English well through its general English model.
+    recognition.lang = 'en-US';
     recognition.continuous = false;
     recognition.interimResults = false;
     recognition.maxAlternatives = 1;
@@ -148,7 +164,8 @@ export function useVoiceQuery(
         // Reset audio-capture retries on successful result
         audioCaptureRetriesRef.current = 0;
         if (confidence > 0.3 || transcript.length > 3) {
-          submitQuery(transcript);
+          // Use ref to avoid stale closure — submitQuery changes when messages change
+          submitQueryRef.current(transcript);
         }
       }
     };
