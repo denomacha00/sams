@@ -11,7 +11,6 @@ interface SpeechRecognitionErrorEvent {
 }
 
 const RESTART_DELAY_MS = 600;
-const MAX_AUDIO_CAPTURE_RETRIES = 3;
 
 export function useVoiceQuery(
   submitQuery: (transcript: string) => void,
@@ -28,9 +27,6 @@ export function useVoiceQuery(
   const silenceStageRef = useRef<'none' | 'prompted' | 'closing'>('none');
   const isAiSpeakingRef = useRef(false);
   const scheduledRestartRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const hfpStreamRef = useRef<MediaStream | null>(null);
-  const hfpTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const audioCaptureRetriesRef = useRef(0);
 
   const clearSilenceTimer = useCallback(() => {
     if (silenceTimerRef.current) {
@@ -63,62 +59,31 @@ export function useVoiceQuery(
     }, 20000);
   }, [clearSilenceTimer, options]);
 
-  // ── HFP keepalive: hold an audio stream to keep BT in HFP mode ──
-  const startHfpKeepalive = useCallback(async () => {
-    stopHfpKeepalive();
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({
-        audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true },
-      });
-      hfpStreamRef.current = stream;
-      // Periodically refresh the stream to prevent BT headsets from dropping HFP mode
-      hfpTimerRef.current = setInterval(() => {
-        if (!shouldRestartRef.current && !hfpStreamRef.current) return;
-        navigator.mediaDevices.getUserMedia({ audio: true }).then((ns) => {
-          const os = hfpStreamRef.current;
-          hfpStreamRef.current = ns;
-          if (os) os.getTracks().forEach(t => t.stop());
-        }).catch(() => {});
-      }, 30000); // every 30s (less aggressive than original 5s)
-    } catch {
-      // Mic unavailable — recognition will fail with audio-capture, handled below
-    }
-  }, []);
-
-  const stopHfpKeepalive = useCallback(() => {
-    if (hfpTimerRef.current) { clearInterval(hfpTimerRef.current); hfpTimerRef.current = null; }
-    if (hfpStreamRef.current) { hfpStreamRef.current.getTracks().forEach(t => t.stop()); hfpStreamRef.current = null; }
-  }, []);
-
   const stopListeningInternal = useCallback(() => {
     shouldRestartRef.current = false;
     clearSilenceTimer();
     clearScheduledRestart();
     silenceStageRef.current = 'none';
-    audioCaptureRetriesRef.current = 0;
     if (recognitionRef.current) {
       try { recognitionRef.current.abort(); } catch { /* ignore */ }
       recognitionRef.current = null;
     }
-    stopHfpKeepalive();
     setIsListening(false);
-  }, [clearSilenceTimer, clearScheduledRestart, stopHfpKeepalive]);
+  }, [clearSilenceTimer, clearScheduledRestart]);
 
   const pauseRecognition = useCallback(() => {
     clearSilenceTimer();
     clearScheduledRestart();
     silenceStageRef.current = 'none';
-    // Prevent onend from auto-restarting while AI is speaking
     shouldRestartRef.current = false;
     if (recognitionRef.current) {
       try { recognitionRef.current.abort(); } catch { /* ignore */ }
       recognitionRef.current = null;
     }
     setIsListening(false);
-    // HFP stream stays alive for quick resume
   }, [clearSilenceTimer, clearScheduledRestart]);
 
-  // Ref to always have the latest submitQuery callback (avoids stale closures)
+  // Ref to always have the latest submitQuery callback
   const submitQueryRef = useRef(submitQuery);
   submitQueryRef.current = submitQuery;
 
@@ -131,22 +96,16 @@ export function useVoiceQuery(
       return null;
     }
 
-    // Clean up any previous instance before creating a new one
     if (recognitionRef.current) {
       try { recognitionRef.current.abort(); } catch { /* ignore */ }
       recognitionRef.current = null;
     }
 
     const recognition = new SpeechRecognition();
-    // Chrome's SpeechRecognition does NOT support en-KE. Setting it silently
-    // succeeds but then the recognition fails immediately with 'language-not-supported'.
-    // Use en-US which handles Kenyan English well through its general English model.
     recognition.lang = 'en-US';
     recognition.continuous = false;
     recognition.interimResults = false;
     recognition.maxAlternatives = 1;
-
-    let endedNormally = false;
 
     recognition.onstart = () => {
       setError(null);
@@ -157,14 +116,13 @@ export function useVoiceQuery(
     recognition.onresult = (event: SpeechRecognitionEvent) => {
       clearSilenceTimer();
       silenceStageRef.current = 'none';
-      const result = event.results[0]?.[0];
-      const transcript = result?.transcript;
-      const confidence = result?.confidence ?? 0;
+      // Non-continuous: there's exactly one final result
+      const result = event.results[event.resultIndex];
+      if (!result || !result.isFinal) return;
+      const transcript = result[0]?.transcript;
       if (transcript && transcript.trim()) {
-        // Reset audio-capture retries on successful result
-        audioCaptureRetriesRef.current = 0;
+        const confidence = result[0]?.confidence ?? 0;
         if (confidence > 0.3 || transcript.length > 3) {
-          // Use ref to avoid stale closure — submitQuery changes when messages change
           submitQueryRef.current(transcript);
         }
       }
@@ -173,38 +131,10 @@ export function useVoiceQuery(
     recognition.onerror = (event: SpeechRecognitionErrorEvent) => {
       if (event.error === 'no-speech' || event.error === 'aborted') return;
 
-      if (event.error === 'audio-capture' || event.error === 'not-allowed') {
-        endedNormally = true;
-
-        if (event.error === 'not-allowed') {
-          setError('Microphone access denied. Check browser permissions and tap the mic again.');
-          shouldRestartRef.current = false;
-          stopListeningInternal();
-          return;
-        }
-
-        // audio-capture: BT headset switching — retry with backoff
-        audioCaptureRetriesRef.current += 1;
-        if (audioCaptureRetriesRef.current > MAX_AUDIO_CAPTURE_RETRIES) {
-          setError('Mic keeps disconnecting. Try a different headset or use the text box.');
-          shouldRestartRef.current = false;
-          stopListeningInternal();
-          return;
-        }
-
-        setError(`Bluetooth mic switching… (${audioCaptureRetriesRef.current}/${MAX_AUDIO_CAPTURE_RETRIES})`);
-        if (shouldRestartRef.current) {
-          clearScheduledRestart();
-          scheduledRestartRef.current = setTimeout(() => {
-            if (!shouldRestartRef.current) return;
-            // Refresh HFP stream then create new recognition
-            startHfpKeepalive().then(() => {
-              if (!shouldRestartRef.current) return;
-              const nr = createAndStartRecognition();
-              recognitionRef.current = nr;
-            });
-          }, RESTART_DELAY_MS * audioCaptureRetriesRef.current);
-        }
+      if (event.error === 'not-allowed') {
+        setError('Microphone access denied. Check browser permissions and tap the mic again.');
+        shouldRestartRef.current = false;
+        stopListeningInternal();
         return;
       }
 
@@ -215,7 +145,7 @@ export function useVoiceQuery(
           if (!shouldRestartRef.current) return;
           const nr = createAndStartRecognition();
           recognitionRef.current = nr;
-        }, 1000);
+        }, 1500);
       } else {
         setIsListening(false);
       }
@@ -226,17 +156,12 @@ export function useVoiceQuery(
         setIsListening(false);
         return;
       }
-
-      // AI is speaking — don't restart yet; onEnd from speak() will call startListening()
       if (isAiSpeakingRef.current) return;
-
-      // If we already have a restart scheduled, don't double-schedule
       if (scheduledRestartRef.current) return;
 
       resetSilenceTimer();
       scheduledRestartRef.current = setTimeout(() => {
         if (!shouldRestartRef.current) return;
-        // Always create a new instance — cannot restart an ended recognition on most browsers
         const nr = createAndStartRecognition();
         recognitionRef.current = nr;
       }, RESTART_DELAY_MS);
@@ -250,7 +175,7 @@ export function useVoiceQuery(
       setIsListening(false);
       return null;
     }
-  }, [submitQuery, resetSilenceTimer, clearScheduledRestart, startHfpKeepalive, stopListeningInternal]);
+  }, [clearScheduledRestart, stopListeningInternal, resetSilenceTimer]);
 
   const setAiSpeaking = useCallback((speaking: boolean) => {
     isAiSpeakingRef.current = speaking;
@@ -263,7 +188,7 @@ export function useVoiceQuery(
           if (!shouldRestartRef.current) return;
           if (recognitionRef.current) {
             try { recognitionRef.current.start(); return; }
-            catch { /* fall through — create new instance */ }
+            catch { /* fall through */ }
           }
           const nr = createAndStartRecognition();
           recognitionRef.current = nr;
@@ -277,24 +202,16 @@ export function useVoiceQuery(
     clearSilenceTimer();
     clearScheduledRestart();
     silenceStageRef.current = 'none';
-    audioCaptureRetriesRef.current = 0;
     shouldRestartRef.current = true;
-
-    // First refresh the HFP stream to ensure mic is available
-    startHfpKeepalive().then(() => {
-      if (!shouldRestartRef.current) return;
-      const recognition = createAndStartRecognition();
-      recognitionRef.current = recognition;
-    });
-  }, [clearSilenceTimer, clearScheduledRestart, startHfpKeepalive, createAndStartRecognition]);
+    const recognition = createAndStartRecognition();
+    recognitionRef.current = recognition;
+  }, [clearSilenceTimer, clearScheduledRestart, createAndStartRecognition]);
 
   const stopListening = useCallback(() => {
-    audioCaptureRetriesRef.current = 0;
     stopListeningInternal();
   }, [stopListeningInternal]);
 
   const reInitMic = useCallback(() => {
-    audioCaptureRetriesRef.current = 0;
     stopListeningInternal();
     setError(null);
     setTimeout(() => { startListening(); }, 300);
