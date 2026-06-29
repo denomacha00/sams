@@ -37,6 +37,7 @@ interface Message extends AiChatMessage {
   pendingAction?: PendingAction;
   actionData?: AiActionData;
   isError?: boolean;
+  replyTo?: { id: string; content: string; role: 'user' | 'assistant' };
 }
 
 const CONFIRM_RE = /^(yes|y|confirm|proceed|ok|do it|go ahead)\.?$/i;
@@ -79,6 +80,7 @@ const FloatingAI: React.FC = () => {
   const pendingActionRef = useRef<PendingAction | null>(null);
   const [selectedImages, setSelectedImages] = useState<File[]>([]);
   const [imagePreviews, setImagePreviews] = useState<string[]>([]);
+  const [replyTo, setReplyTo] = useState<{ id: string; content: string; role: 'user' | 'assistant' } | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -254,9 +256,11 @@ const FloatingAI: React.FC = () => {
       content: text.trim() || 'What is in this image?',
       userImages: imagePreviews.length > 0 ? [...imagePreviews] : undefined,
       timestamp: new Date(),
+      replyTo: replyTo ?? undefined,
     };
     setMessages((prev) => [...prev, userMessage]);
     setInput('');
+    setReplyTo(null);
     setLoading(true);
 
     // Helper: add assistant message. In voice mode, DO NOT use
@@ -586,6 +590,9 @@ const FloatingAI: React.FC = () => {
         <div className="flex-1 overflow-y-auto p-3 space-y-3">
           {messages.map((msg) => {
             const displayContent = msg.content;
+            const time = msg.timestamp
+              ? new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+              : '';
 
             return (
               <div
@@ -598,7 +605,12 @@ const FloatingAI: React.FC = () => {
                   </div>
                 )}
                 <div
-                  className={`max-w-[80%] rounded-xl px-3 py-2 text-sm ${
+                  onClick={() => {
+                    if (msg.id !== 'welcome' && msg.content.trim()) {
+                      setReplyTo({ id: msg.id, content: msg.content, role: msg.role });
+                    }
+                  }}
+                  className={`max-w-[80%] rounded-xl px-3 py-2 text-sm relative group cursor-pointer ${
                     msg.role === 'user'
                       ? 'bg-brand text-white'
                       : msg.isError
@@ -608,6 +620,16 @@ const FloatingAI: React.FC = () => {
                           : 'bg-surface-muted border border-line text-ink'
                   }`}
                 >
+                  {/* Reply quote indicator */}
+                  {msg.replyTo && (
+                    <div className={`mb-2 pl-2 border-l-2 ${msg.role === 'user' ? 'border-white/50' : 'border-indigo-400/60'} rounded-sm`}>
+                      <p className={`text-[10px] leading-tight ${msg.role === 'user' ? 'text-white/70' : 'text-ink-muted'}`}>
+                        <span className="font-semibold">{msg.replyTo.role === 'user' ? 'You' : 'AI'}</span>
+                        <span className="ml-1 opacity-70">{msg.replyTo.content.length > 80 ? msg.replyTo.content.slice(0, 80) + '…' : msg.replyTo.content}</span>
+                      </p>
+                    </div>
+                  )}
+
                   {msg.userImages && msg.userImages.length > 0 && (
                     <div className="flex gap-1 mb-2 flex-wrap">
                       {msg.userImages.map((img, i) => (
@@ -638,6 +660,25 @@ const FloatingAI: React.FC = () => {
                         <svg className="w-3.5 h-3.5" viewBox="0 0 20 20" fill="currentColor">
                           <path fillRule="evenodd" d="M9.383 3.076A1 1 0 0110 4v12a1 1 0 01-1.707.707L4.586 13H2a1 1 0 01-1-1V8a1 1 0 011-1h2.586l3.707-3.707a1 1 0 011.09-.217zM14.657 2.929a1 1 0 011.414 0A9.972 9.972 0 0119 10a9.972 9.972 0 01-2.929 7.071 1 1 0 01-1.414-1.414A7.971 7.971 0 0017 10c0-2.21-.894-4.208-2.343-5.657a1 1 0 010-1.414zm-2.829 2.828a1 1 0 011.415 0A5.983 5.983 0 0115 10a5.984 5.984 0 01-1.757 4.243 1 1 0 01-1.415-1.415A3.984 3.984 0 0013 10a3.983 3.983 0 00-1.172-2.828 1 1 0 010-1.415z" clipRule="evenodd" />
                         </svg>
+                      </button>
+                    )}
+                  </div>
+                  {/* Timestamp */}
+                  <div className={`flex items-center gap-2 mt-1 ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+                    <span className={`text-[10px] ${msg.role === 'user' ? 'text-white/60' : 'text-ink-subtle'}`}>{time}</span>
+                    {msg.id !== 'welcome' && msg.content.trim() && (
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setReplyTo({ id: msg.id, content: msg.content, role: msg.role });
+                        }}
+                        className={`text-[10px] opacity-0 group-hover:opacity-100 transition-opacity ${
+                          msg.role === 'user' ? 'text-white/70 hover:text-white' : 'text-ink-subtle hover:text-brand'
+                        }`}
+                        title="Reply to this message"
+                      >
+                        Reply
                       </button>
                     )}
                   </div>
@@ -715,6 +756,26 @@ const FloatingAI: React.FC = () => {
                   <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>
                 </button>
               )}
+            </div>
+          )}
+          {/* Reply indicator bar above input */}
+          {replyTo && (
+            <div className="mb-2 flex items-start gap-2 px-3 py-2 rounded-lg bg-surface-elevated border border-line">
+              <div className="flex-1 min-w-0">
+                <p className="text-[11px] font-semibold text-brand">
+                  Replying to <span className="capitalize">{replyTo.role}</span>
+                </p>
+                <p className="text-xs text-ink-muted truncate mt-0.5">
+                  {replyTo.content.length > 100 ? replyTo.content.slice(0, 100) + '…' : replyTo.content}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setReplyTo(null)}
+                className="p-1 rounded text-ink-subtle hover:text-ink hover:bg-surface-muted transition-colors"
+              >
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+              </button>
             </div>
           )}
           <form onSubmit={handleSubmit} className="flex gap-2">
