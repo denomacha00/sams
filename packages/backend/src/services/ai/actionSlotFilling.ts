@@ -105,13 +105,14 @@ function normalizeRoleAnswer(text: string): string | undefined {
   return undefined;
 }
 
-function parseTargetRoleAnswer(text: string): 'STUDENT' | 'TEACHER' | 'HOD' | undefined {
+function parseTargetRoleAnswer(text: string): 'STUDENT' | 'TEACHER' | 'HOD' | 'SCHOOL_ADMIN' | undefined {
   const t = text.trim().toLowerCase();
   if (/^(student|pupil)s?$/.test(t)) return 'STUDENT';
   if (/^(teacher|staff)s?$/.test(t)) return 'TEACHER';
   if (/^(hod|head)s?$/.test(t)) return 'HOD';
+  if (/^(school\s*admin|admin|administrator)s?$/.test(t)) return 'SCHOOL_ADMIN';
   const upper = text.trim().toUpperCase();
-  if (upper === 'STUDENT' || upper === 'TEACHER' || upper === 'HOD') return upper;
+  if (upper === 'STUDENT' || upper === 'TEACHER' || upper === 'HOD' || upper === 'SCHOOL_ADMIN') return upper;
   return undefined;
 }
 

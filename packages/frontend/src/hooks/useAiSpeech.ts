@@ -1,69 +1,41 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
 
-/**
- * Strip emojis and markdown syntax from text before speaking.
- * Preserves punctuation (commas, periods, question marks, etc.)
- * so the browser's SpeechSynthesis creates natural pauses.
- *
- * Only removes: emoji characters, markdown formatting symbols,
- * and Unicode dingbats that would be read as words.
- */
 function cleanTextForSpeech(text: string): string {
   return text
-    // Remove emoji characters (ranges common in Unicode)
-    .replace(/[\u{1F600}-\u{1F64F}]/gu, '') // emoticons
-    .replace(/[\u{1F300}-\u{1F5FF}]/gu, '') // symbols & pictographs
-    .replace(/[\u{1F680}-\u{1F6FF}]/gu, '') // transport & map
-    .replace(/[\u{1F1E0}-\u{1F1FF}]/gu, '') // flags
-    .replace(/[\u{2600}-\u{26FF}]/gu, '')   // misc symbols
-    .replace(/[\u{2700}-\u{27BF}]/gu, '')   // dingbats
-    .replace(/[\u{FE00}-\u{FE0F}]/gu, '')   // variation selectors
-    .replace(/[\u{200D}]/gu, '')            // zero-width joiner
-    // Remove markdown formatting symbols ONLY — keep punctuation for pauses
-    .replace(/[*_`~#|\\@<>^$+=]/g, '')      // markdown syntax
-    // Remove double/triple hyphens but keep single dash
+    .replace(/[\u{1F600}-\u{1F64F}]/gu, '')
+    .replace(/[\u{1F300}-\u{1F5FF}]/gu, '')
+    .replace(/[\u{1F680}-\u{1F6FF}]/gu, '')
+    .replace(/[\u{1F1E0}-\u{1F1FF}]/gu, '')
+    .replace(/[\u{2600}-\u{26FF}]/gu, '')
+    .replace(/[\u{2700}-\u{27BF}]/gu, '')
+    .replace(/[\u{FE00}-\u{FE0F}]/gu, '')
+    .replace(/[\u{200D}]/gu, '')
+    .replace(/[*_`~#|\\@<>^$+=]/g, '')
     .replace(/---+/g, ' ')
-    // Remove consecutive ellipsis dots (3+)
     .replace(/\.{3,}/g, '...')
-    // Collapse multiple spaces into one
     .replace(/\s{2,}/g, ' ')
     .trim();
 }
 
 /**
- * Browser SpeechSynthesis hook — reads AI responses aloud.
- * Built into Chrome, Safari, Firefox, Edge. No API key needed.
- * Kenyan voice preferred when available, falls back to default.
- *
- * Fixes the common browser bug where getVoices() returns empty on first call:
- * we trigger voices loading on mount and re-check if still empty.
- *
- * Strips emojis and markdown symbols before speaking so the voice
- * only reads clean words — no emoji names or markdown artifacts.
- * Punctuation is preserved for natural pauses.
+ * Bluetooth headset fix:
+ * - speechSynthesis uses A2DP (media), SpeechRecognition uses HFP (mic).
+ * - Most BT headsets CANNOT do both at once. When speechSynthesis plays,
+ *   headset locks into A2DP → mic dies → 'audio-capture' error.
+ * - In voice mode: SKIP speechSynthesis, play a phone-speaker beep instead.
+ * - Manual "speaker" button tap still reads aloud normally.
  */
 export function useAiSpeech(options?: { onEnd?: () => void }) {
   const [speaking, setSpeaking] = useState(false);
   const speakingRef = useRef(false);
   const utteranceRef = useRef<SpeechSynthesisUtterance | null>(null);
   const onEndRef = useRef(options?.onEnd);
+  const audioCtxRef = useRef<AudioContext | null>(null);
   onEndRef.current = options?.onEnd;
-  const voicesLoadedRef = useRef(false);
 
-  // Force browsers to load voices on mount (getVoices returns [] on first call)
   useEffect(() => {
     if (typeof window === 'undefined' || !window.speechSynthesis) return;
-
-    // Kick-start voice loading
-    const voices = window.speechSynthesis.getVoices();
-    if (voices.length > 0) {
-      voicesLoadedRef.current = true;
-    }
-
-    // Listen for the async load event
-    const handler = () => {
-      voicesLoadedRef.current = true;
-    };
+    const handler = () => {};
     window.speechSynthesis.addEventListener('voiceschanged', handler);
     return () => window.speechSynthesis.removeEventListener('voiceschanged', handler);
   }, []);
@@ -72,7 +44,6 @@ export function useAiSpeech(options?: { onEnd?: () => void }) {
     if (typeof window === 'undefined' || !window.speechSynthesis) return null;
     const voices = window.speechSynthesis.getVoices();
     if (voices.length === 0) return null;
-
     return (
       voices.find((v) => v.lang.startsWith('en') && v.name.includes('Kenya')) ||
       voices.find((v) => v.lang.startsWith('en') && v.name.includes('Africa')) ||
@@ -83,65 +54,78 @@ export function useAiSpeech(options?: { onEnd?: () => void }) {
     );
   }, []);
 
-  const speak = useCallback((text: string) => {
+  const playNotification = useCallback(() => {
+    try {
+      const Ctor = (window as any).AudioContext || (window as any).webkitAudioContext;
+      if (!Ctor) return;
+      if (!audioCtxRef.current) audioCtxRef.current = new Ctor();
+      const ctx = audioCtxRef.current!;
+      if (ctx.state === 'suspended') void ctx.resume();
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = 'sine';
+      osc.frequency.value = 880;
+      gain.gain.setValueAtTime(0.3, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.15);
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start();
+      osc.stop(ctx.currentTime + 0.15);
+    } catch {}
+  }, []);
+
+  const speak = useCallback((text: string, isVoiceMode?: boolean) => {
     if (typeof window === 'undefined' || !window.speechSynthesis) return;
-
-    // Cancel any current speech
     window.speechSynthesis.cancel();
+    speakingRef.current = false;
 
-    // Strip emojis, punctuation, markdown so voice only reads clean words
-    const cleanText = cleanTextForSpeech(text);
-    if (!cleanText) return;
-
-    const utterance = new SpeechSynthesisUtterance(cleanText);
-
-    // Try to find a good voice — prefer African English or any English voice
-    const preferredVoice = resolveVoice();
-    if (preferredVoice) {
-      utterance.voice = preferredVoice;
-    }
-
-    utterance.rate = 1.0;  // Normal speed
-    utterance.pitch = 1.0; // Normal pitch
-    utterance.volume = 1.0;
-    // Always set a valid lang — empty string causes Chrome to silently fail
-    utterance.lang = 'en';
-
-    utterance.onstart = () => {
+    if (isVoiceMode) {
       speakingRef.current = true;
       setSpeaking(true);
-    };
+      playNotification();
+      setTimeout(() => {
+        speakingRef.current = false;
+        setSpeaking(false);
+        onEndRef.current?.();
+      }, 400);
+      return;
+    }
 
-    utterance.onend = () => {
-      speakingRef.current = false;
-      setSpeaking(false);
-      onEndRef.current?.();
-    };
-
-    utterance.onerror = () => {
-      speakingRef.current = false;
-      setSpeaking(false);
-    };
-
+    const cleanText = cleanTextForSpeech(text);
+    if (!cleanText) return;
+    const utterance = new SpeechSynthesisUtterance(cleanText);
+    const preferredVoice = resolveVoice();
+    if (preferredVoice) utterance.voice = preferredVoice;
+    utterance.rate = 1.0;
+    utterance.pitch = 1.0;
+    utterance.volume = 1.0;
+    utterance.lang = 'en';
+    utterance.onstart = () => { speakingRef.current = true; setSpeaking(true); };
+    utterance.onend = () => { speakingRef.current = false; setSpeaking(false); onEndRef.current?.(); };
+    utterance.onerror = () => { speakingRef.current = false; setSpeaking(false); };
     utteranceRef.current = utterance;
     window.speechSynthesis.speak(utterance);
-  }, [resolveVoice]);
+  }, [resolveVoice, playNotification]);
 
   const stop = useCallback(() => {
-    if (typeof window !== 'undefined' && window.speechSynthesis) {
-      window.speechSynthesis.cancel();
-    }
+    if (typeof window !== 'undefined' && window.speechSynthesis) window.speechSynthesis.cancel();
     speakingRef.current = false;
     setSpeaking(false);
   }, []);
 
-  const toggle = useCallback((text: string) => {
-    if (speakingRef.current) {
-      stop();
-    } else {
-      speak(text);
-    }
+  const toggle = useCallback((text: string, isVoiceMode?: boolean) => {
+    if (speakingRef.current) stop();
+    else speak(text, isVoiceMode);
   }, [speak, stop]);
+
+  useEffect(() => {
+    return () => {
+      if (audioCtxRef.current) {
+        audioCtxRef.current.close().catch(() => {});
+        audioCtxRef.current = null;
+      }
+    };
+  }, []);
 
   return { speaking, speak, stop, toggle };
 }

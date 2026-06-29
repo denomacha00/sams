@@ -1,9 +1,9 @@
 {
-  "lastUpdated": "2026-06-17T10:12:00+03:00",
-  "gitCommit": "266cc272",
+  "lastUpdated": "2026-06-28T14:58:00+03:00",
+  "gitCommit": "c9eb0473",
   "branch": "main",
   "currentTask": {
-    "description": "Parent Portal & Exam Management - Complete implementation and VPS deployment",
+    "description": "AI action handlers for all page gaps + FloatingAI instant responses",
     "status": "DEPLOYED",
     "pendingDeploy": false
   },
@@ -24,70 +24,63 @@
       "status": "DEPLOYED"
     },
     {
-      "name": "Exams API Routes",
-      "path": "packages/backend/src/routes/exams.ts",
+      "name": "Guardian Registration Links",
+      "path": "packages/frontend/src/pages/admin/RegistrationLinksPage.tsx",
       "status": "DEPLOYED"
     },
     {
-      "name": "Guardians API Routes",
-      "path": "packages/backend/src/routes/guardians.ts",
+      "name": "AI Action Handlers (10 new handlers)",
+      "path": "packages/backend/src/services/ai/handlers/",
       "status": "DEPLOYED"
     },
     {
-      "name": "Risk Service Update",
-      "path": "packages/backend/src/services/riskService.ts",
-      "status": "DEPLOYED"
-    },
-    {
-      "name": "Registration Link Service",
-      "path": "packages/backend/src/services/registrationLinkService.ts",
+      "name": "FloatingAI Instant Response",
+      "path": "packages/frontend/src/components/FloatingAI.tsx",
       "status": "DEPLOYED"
     }
   ],
   "filesModified": [
-    "packages/backend/prisma/schema.prisma",
-    "packages/backend/src/registerApplication.ts",
-    "packages/backend/src/services/riskService.ts",
-    "packages/frontend/src/main.tsx",
-    "packages/frontend/src/pages/DashboardPage.tsx",
-    "packages/shared/src/types/index.ts"
+    "packages/frontend/src/components/FloatingAI.tsx",
+    "packages/backend/src/services/ai/roleActionRegistry.ts",
+    "packages/backend/src/services/ai/roleRestrictions.ts"
   ],
   "filesCreated": [
-    "packages/backend/src/routes/exams.ts",
-    "packages/backend/src/routes/guardians.ts",
-    "packages/frontend/src/pages/ParentDashboardPage.tsx",
-    "packages/frontend/src/pages/admin/ExamsPage.tsx",
-    "packages/frontend/src/pages/admin/GuardianManagementPage.tsx"
+    "packages/backend/src/services/ai/handlers/examHandlers.ts",
+    "packages/backend/src/services/ai/handlers/guardianLinkAction.ts",
+    "packages/backend/src/services/ai/handlers/timetableEditAction.ts",
+    "packages/backend/src/services/ai/handlers/knowledgeHandlers.ts",
+    "packages/backend/src/services/ai/handlers/userProfileHandlers.ts",
+    "packages/backend/src/services/ai/handlers/virtualAssistantActions.ts",
+    "packages/backend/src/services/ai/handlers/teacherStudentWorkbenchActions.ts",
+    "packages/backend/src/services/ai/handlers/classRepAction.ts"
   ],
-  "databaseChanges": {
-    "description": "Prisma schema updated with Exam, Grade, Term, GuardianLink models",
-    "status": "MIGRATED_ON_VPS"
-  },
   "deployment": {
-    "method": "GitHub Actions + SSH deploy",
+    "method": "SSH deploy via deploy-production.sh",
     "vpsDir": "/var/www/sams",
-    "deployScript": "bash scripts/deploy-production.sh",
     "appUrl": "https://app.smart-managment.com",
     "superAdminUrl": "https://super.smart-managment.com",
-    "lastDeployCommit": "266cc272",
-    "lastDeployRun": 352
+    "lastDeployCommit": "c9eb0473",
+    "lastDeployTime": "2026-06-28T13:55:00+02:00",
+    "healthStatus": "ALL CRITICAL CHECKS PASSED"
   },
-  "knownIssues": [],
-  "nextSteps": [
-    "Verify Parent Portal login flow end-to-end",
-    "Test Exam management CRUD",
-    "Wire up any remaining menu links or navigation items"
-  ],
   "environment": {
     "localDir": "c:/Users/NETFLIX ENTERTAINMEN/Desktop/SAMS",
     "os": "Windows 10",
     "VPS": {
       "ip": "185.143.228.182",
-      "os": "Ubuntu (managed via SSH deploy via GitHub Actions)",
+      "os": "Ubuntu (Node 18 — needs upgrade to Node 20)",
       "appDir": "/var/www/sams"
     },
     "database": "PostgreSQL on VPS",
-    "pm2": "sams-api process"
+    "pm2": "sams-api (2 instances, online)"
   },
-  "resumeInstructions": "1. Run: git log --oneline -1 (should show 266cc272)\n2. Check VPS: open https://app.smart-managment.com to verify deploy\n3. If deployed, verify endpoints. If not, push or run deploy script\n4. Read .sixth-memory/CHECKPOINT.md for full context"
+  "knownIssues": [
+    "Node v18.20.8 on VPS — needs upgrade to Node 20+"
+  ],
+  "recommendedNext": [
+    "Fee Management (biggest pain point for Kenyan schools)",
+    "Parent-Teacher Chat (two-way messaging)",
+    "Student ID Card Generator",
+    "Push Notifications (FCM for mobile app)"
+  ]
 }

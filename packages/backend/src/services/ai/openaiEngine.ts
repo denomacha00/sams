@@ -557,6 +557,7 @@ async function dispatchFunctionCall(
   name: string,
   args: string,
   user: AccessTokenPayload,
+  options?: { restrictSqlToSuperAdmin?: boolean },
 ): Promise<string> {
   try {
     const parsedArgs = JSON.parse(args);
@@ -572,6 +573,11 @@ async function dispatchFunctionCall(
         result = await dispatchQueryReports(parsedArgs, user);
         break;
       case 'query_database': {
+        // Restrict raw SQL to Super Admin only
+        if (options?.restrictSqlToSuperAdmin && user.role !== 'SUPER_ADMIN') {
+          result = { error: 'Only Super Admins can run raw SQL queries.' };
+          break;
+        }
         const { runRawQuery } = await import('../superAdminDbAccess');
         const sql = parsedArgs.sql as string;
         try {
@@ -662,57 +668,7 @@ async function handleToolCalls(
 
   let result: string;
   try {
-    const parsedArgs = JSON.parse(msg.function.arguments);
-    switch (msg.function.name) {
-      case 'query_attendance':
-        result = await dispatchFunctionCall('query_attendance', msg.function.arguments, user);
-        break;
-      case 'query_risk_scores':
-        result = await dispatchFunctionCall('query_risk_scores', msg.function.arguments, user);
-        break;
-      case 'query_reports':
-        result = await dispatchFunctionCall('query_reports', msg.function.arguments, user);
-        break;
-      case 'query_database': {
-        const { runRawQuery } = await import('../superAdminDbAccess');
-        const sql = parsedArgs.sql as string;
-        try {
-          const queryResult = await runRawQuery(sql);
-          result = JSON.stringify({ columns: queryResult.columns, rows: queryResult.rows.slice(0, 20), total: queryResult.totalRows });
-        } catch (qErr) {
-          result = JSON.stringify({ error: qErr instanceof Error ? qErr.message : String(qErr) });
-        }
-        break;
-      }
-      case 'lookup_school': {
-        const { prisma } = await import('../../lib/prisma');
-        const name = parsedArgs.name as string;
-        const school = await prisma.school.findFirst({
-          where: { name: { contains: name || '', mode: 'insensitive' } },
-          include: { _count: { select: { users: true, sessions: true } } },
-        });
-        result = school ? JSON.stringify(school) : JSON.stringify({ error: 'Not found' });
-        break;
-      }
-      case 'lookup_user': {
-        const { prisma } = await import('../../lib/prisma');
-        const search = parsedArgs.search as string;
-        const role = parsedArgs.role as string | undefined;
-        const where: Record<string, unknown> = {
-          OR: [
-            { fullName: { contains: search, mode: 'insensitive' } },
-            { email: { contains: search, mode: 'insensitive' } },
-            { username: { contains: search, mode: 'insensitive' } },
-          ],
-        };
-        if (role) where.role = role;
-        const users = await prisma.user.findMany({ where, take: 5, select: { id: true, fullName: true, email: true, role: true, phone: true } });
-        result = JSON.stringify(users.length > 0 ? users : { error: 'No users found' });
-        break;
-      }
-      default:
-        result = JSON.stringify({ error: `Unknown tool: ${msg.function.name}` });
-    }
+    result = await dispatchFunctionCall(msg.function.name, msg.function.arguments, user, { restrictSqlToSuperAdmin: true });
   } catch (err) {
     result = JSON.stringify({ error: err instanceof Error ? err.message : String(err) });
   }
