@@ -302,7 +302,14 @@ const FloatingAI: React.FC = () => {
     setMessages((prev) => [...prev, { id: crypto.randomUUID(), role: 'assistant', content: 'I closed the mic since I didn\'t hear anything. Tap the mic button when you need me.', timestamp: new Date() }]);
   }, []);
 
-  const voiceSubmit = useCallback((transcript: string) => { voicePendingRef.current = true; submitQuery(transcript); }, [submitQuery]);
+  const voiceSubmit = useCallback((transcript: string) => {
+    voicePendingRef.current = true;
+    // Close mic immediately when speech is captured,
+    // so it doesn't pick up the AI response or ambient noise
+    // while waiting for the API.
+    pauseRecognitionRef.current();
+    submitQuery(transcript);
+  }, [submitQuery]);
 
   const { isListening, startListening, stopListening, setAiSpeaking, pauseRecognition, error: micError } = useVoiceQuery(voiceSubmit, { onSilence: handleSilence, onAutoClose: handleAutoClose });
 
