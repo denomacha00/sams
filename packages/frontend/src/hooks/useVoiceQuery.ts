@@ -12,21 +12,6 @@ interface SpeechRecognitionErrorEvent {
 
 const RESTART_DELAY_MS = 600;
 
-/**
- * Hook for voice conversation with Bluetooth headset support.
- *
- * On Android Chrome, SpeechRecognition uses the OS communication device.
- * Bluetooth headsets use HFP (Hands-Free Profile) for mic. Unlike media
- * playback (A2DP), HFP is only active when the mic is actually being
- * used by an app.
- *
- * The approach here:
- * 1. Start SpeechRecognition directly (no HFP keepalive - that can
- *    conflict on some phones)
- * 2. When AI speaks in voice mode, pause recognition, show text
- * 3. After AI is done, restart recognition
- * 4. Console.log everything so we can diagnose
- */
 export function useVoiceQuery(
   submitQuery: (transcript: string) => void,
   options?: {
@@ -42,6 +27,8 @@ export function useVoiceQuery(
   const silenceStageRef = useRef<'none' | 'prompted' | 'closing'>('none');
   const isAiSpeakingRef = useRef(false);
   const scheduledRestartRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const hfpStreamRef = useRef<MediaStream | null>(null);
+  const hfpTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const clearSilenceTimer = useCallback(() => {
     if (silenceTimerRef.current) {
@@ -74,17 +61,54 @@ export function useVoiceQuery(
     }, 20000);
   }, [clearSilenceTimer, options]);
 
+  // ── HFP keepalive: hold an audio stream to keep BT in HFP mode ──
+  const startHfpKeepalive = useCallback(async () => {
+    stopHfpKeepalive();
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true },
+      });
+      hfpStreamRef.current = stream;
+      hfpTimerRef.current = setInterval(async () => {
+        if (!shouldRestartRef.current) return;
+        try {
+          const ns = await navigator.mediaDevices.getUserMedia({ audio: true });
+          const os = hfpStreamRef.current;
+          hfpStreamRef.current = ns;
+          if (os) os.getTracks().forEach(t => t.stop());
+        } catch {}
+      }, 5000);
+    } catch {}
+  }, []);
+
+  const stopHfpKeepalive = useCallback(() => {
+    if (hfpTimerRef.current) { clearInterval(hfpTimerRef.current); hfpTimerRef.current = null; }
+    if (hfpStreamRef.current) { hfpStreamRef.current.getTracks().forEach(t => t.stop()); hfpStreamRef.current = null; }
+  }, []);
+
   const stopListeningInternal = useCallback(() => {
-    console.log('[VoiceQuery] stopListeningInternal');
     shouldRestartRef.current = false;
     clearSilenceTimer();
     clearScheduledRestart();
     silenceStageRef.current = 'none';
     if (recognitionRef.current) {
-      try { recognitionRef.current.abort(); console.log('[VoiceQuery] recognition aborted'); } catch { /* ignore */ }
+      try { recognitionRef.current.abort(); } catch { /* ignore */ }
+      recognitionRef.current = null;
+    }
+    stopHfpKeepalive();
+    setIsListening(false);
+  }, [clearSilenceTimer, clearScheduledRestart, stopHfpKeepalive]);
+
+  const pauseRecognition = useCallback(() => {
+    clearSilenceTimer();
+    clearScheduledRestart();
+    silenceStageRef.current = 'none';
+    if (recognitionRef.current) {
+      try { recognitionRef.current.abort(); } catch { /* ignore */ }
       recognitionRef.current = null;
     }
     setIsListening(false);
+    // HFP stream stays alive
   }, [clearSilenceTimer, clearScheduledRestart]);
 
   const createAndStartRecognition = useCallback(() => {
@@ -92,7 +116,6 @@ export function useVoiceQuery(
       (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
 
     if (!SpeechRecognition) {
-      console.error('[VoiceQuery] Speech recognition NOT supported');
       setError('Speech recognition not supported.');
       return null;
     }
@@ -108,20 +131,17 @@ export function useVoiceQuery(
     recognition.maxAlternatives = 1;
 
     recognition.onstart = () => {
-      console.log('[VoiceQuery] recognition.onstart fired');
       setError(null);
       setIsListening(true);
       resetSilenceTimer();
     };
 
     recognition.onresult = (event: SpeechRecognitionEvent) => {
-      console.log('[VoiceQuery] recognition.onresult fired', event.results.length, 'results');
       clearSilenceTimer();
       silenceStageRef.current = 'none';
       const result = event.results[0]?.[0];
       const transcript = result?.transcript;
       const confidence = result?.confidence ?? 0;
-      console.log(`[VoiceQuery] transcript="${transcript}" confidence=${confidence}`);
       if (transcript && transcript.trim()) {
         if (confidence > 0.3 || transcript.length > 3) {
           submitQuery(transcript);
@@ -130,14 +150,27 @@ export function useVoiceQuery(
     };
 
     recognition.onerror = (event: SpeechRecognitionErrorEvent) => {
-      console.log('[VoiceQuery] recognition.onerror', event.error, event.message);
       if (event.error === 'no-speech' || event.error === 'aborted') return;
-
+      if (event.error === 'audio-capture' || event.error === 'not-allowed') {
+        setError('Bluetooth mic switching... tap again if it fails.');
+        if (shouldRestartRef.current) {
+          clearScheduledRestart();
+          scheduledRestartRef.current = setTimeout(() => {
+            if (shouldRestartRef.current) {
+              startHfpKeepalive().then(() => {
+                if (!shouldRestartRef.current) return;
+                const nr = createAndStartRecognition();
+                recognitionRef.current = nr;
+              });
+            }
+          }, 600);
+        }
+        return;
+      }
       setError(`Mic: ${event.error}. Tap mic again.`);
       if (shouldRestartRef.current) {
         setTimeout(() => {
           if (shouldRestartRef.current) {
-            console.log('[VoiceQuery] retrying after error');
             const nr = createAndStartRecognition();
             recognitionRef.current = nr;
           }
@@ -148,23 +181,17 @@ export function useVoiceQuery(
     };
 
     recognition.onend = () => {
-      console.log('[VoiceQuery] recognition.onend fired, shouldRestart=', shouldRestartRef.current, 'isAiSpeaking=', isAiSpeakingRef.current);
       if (shouldRestartRef.current) {
         resetSilenceTimer();
         if (isAiSpeakingRef.current) return;
-
         clearScheduledRestart();
         scheduledRestartRef.current = setTimeout(() => {
           if (!shouldRestartRef.current) return;
-          try {
-            console.log('[VoiceQuery] restarting recognition');
-            recognition.start();
-          } catch (e: any) {
-            console.log('[VoiceQuery] recognition.start() threw:', e?.message);
+          try { recognition.start(); }
+          catch {
             if (shouldRestartRef.current) {
               scheduledRestartRef.current = setTimeout(() => {
                 if (shouldRestartRef.current) {
-                  console.log('[VoiceQuery] creating new recognition after start() failure');
                   const nr = createAndStartRecognition();
                   recognitionRef.current = nr;
                 }
@@ -177,35 +204,17 @@ export function useVoiceQuery(
       setIsListening(false);
     };
 
-    try {
-      console.log('[VoiceQuery] calling recognition.start()');
-      recognition.start();
-      console.log('[VoiceQuery] recognition.start() succeeded');
-    } catch (e: any) {
-      console.error('[VoiceQuery] recognition.start() threw', e?.message);
+    try { recognition.start(); }
+    catch {
       setError('Could not start mic.');
       setIsListening(false);
       return null;
     }
 
     return recognition;
-  }, [submitQuery, resetSilenceTimer, clearScheduledRestart]);
-
-  // ── pauseRecognition: stop recognition WITHOUT releasing mic ─────
-  const pauseRecognition = useCallback(() => {
-    console.log('[VoiceQuery] pauseRecognition');
-    clearSilenceTimer();
-    clearScheduledRestart();
-    silenceStageRef.current = 'none';
-    if (recognitionRef.current) {
-      try { recognitionRef.current.abort(); } catch { /* ignore */ }
-      recognitionRef.current = null;
-    }
-    setIsListening(false);
-  }, [clearSilenceTimer, clearScheduledRestart]);
+  }, [submitQuery, resetSilenceTimer, clearScheduledRestart, startHfpKeepalive]);
 
   const setAiSpeaking = useCallback((speaking: boolean) => {
-    console.log('[VoiceQuery] setAiSpeaking', speaking);
     isAiSpeakingRef.current = speaking;
     if (speaking) {
       clearSilenceTimer();
@@ -220,7 +229,6 @@ export function useVoiceQuery(
             try { recognitionRef.current.start(); return; }
             catch { /* fall through */ }
           }
-          console.log('[VoiceQuery] creating new recognition after AI done');
           const nr = createAndStartRecognition();
           recognitionRef.current = nr;
         }, RESTART_DELAY_MS);
@@ -229,29 +237,27 @@ export function useVoiceQuery(
   }, [resetSilenceTimer, clearScheduledRestart, createAndStartRecognition]);
 
   const startListening = useCallback(() => {
-    console.log('[VoiceQuery] startListening');
     setError(null);
     clearSilenceTimer();
     clearScheduledRestart();
     silenceStageRef.current = 'none';
     shouldRestartRef.current = true;
 
-    const recognition = createAndStartRecognition();
-    recognitionRef.current = recognition;
-  }, [clearSilenceTimer, clearScheduledRestart, createAndStartRecognition]);
+    startHfpKeepalive().then(() => {
+      if (!shouldRestartRef.current) return;
+      const recognition = createAndStartRecognition();
+      recognitionRef.current = recognition;
+    });
+  }, [clearSilenceTimer, clearScheduledRestart, startHfpKeepalive, createAndStartRecognition]);
 
   const stopListening = useCallback(() => {
-    console.log('[VoiceQuery] stopListening');
     stopListeningInternal();
   }, [stopListeningInternal]);
 
   const reInitMic = useCallback(() => {
-    console.log('[VoiceQuery] reInitMic');
     stopListeningInternal();
     setError(null);
-    setTimeout(() => {
-      startListening();
-    }, 300);
+    setTimeout(() => { startListening(); }, 300);
   }, [stopListeningInternal, startListening]);
 
   return {
