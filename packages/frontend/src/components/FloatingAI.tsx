@@ -82,6 +82,12 @@ const FloatingAI: React.FC = () => {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const voicePendingRef = useRef(false);
+  // Refs to break circular dependency between submitQuery and useVoiceQuery hooks
+  const pauseRecognitionRef = useRef<() => void>(() => {});
+  const setAiSpeakingRef = useRef<(v: boolean) => void>(() => {});
+  const startListeningRef = useRef<() => void>(() => {});
+  const stopListeningRef = useRef<() => void>(() => {});
+  const isListeningRef = useRef(false);
 
   const IMAGE_GEN_PATTERNS = [
     /^generate\s+(?:an?\s+)?image/i,
@@ -106,8 +112,8 @@ const FloatingAI: React.FC = () => {
 
   const { speaking, speak, toggle: toggleSpeech, stop: stopSpeech } = useAiSpeech({
     onEnd: () => {
-      if (voicePendingRef.current && !isListening) {
-        startListening();
+      if (voicePendingRef.current && !isListeningRef.current) {
+        startListeningRef.current();
       }
     },
   });
@@ -194,7 +200,7 @@ const FloatingAI: React.FC = () => {
     finally {
       pendingActionRef.current = null;
       voicePendingRef.current = false;
-      if (isListening) stopListening();
+      if (isListeningRef.current) stopListeningRef.current();
       setThreadId(null);
       saveAiThreadId(null, threadOwner);
       clearImages();
@@ -214,7 +220,10 @@ const FloatingAI: React.FC = () => {
 
     const addAssistantMessage = (msg: Message) => {
       setMessages((prev) => [...prev, msg]);
-      if (voicePendingRef.current && msg.content && !msg.isError) { pauseRecognition(); setAiSpeaking(true); setTimeout(() => { setAiSpeaking(false); }, 100); }
+      if (voicePendingRef.current && msg.content && !msg.isError) {
+        pauseRecognitionRef.current();
+        speak(msg.content, true);
+      }
     };
 
     try {
@@ -243,7 +252,7 @@ const FloatingAI: React.FC = () => {
       }
 
       if (voicePendingRef.current && DONE_RE.test(text.trim())) {
-        voicePendingRef.current = false; stopListening(); stopSpeech();
+        voicePendingRef.current = false; stopListeningRef.current(); stopSpeech();
         setMessages((prev) => [...prev, { id: crypto.randomUUID(), role: 'assistant', content: 'Alright, I\'m here if you need me. Tap the mic again anytime.', timestamp: new Date() }]);
         return;
       }
@@ -263,7 +272,7 @@ const FloatingAI: React.FC = () => {
     } catch (err) {
       const errorMsg: Message = { id: crypto.randomUUID(), role: 'assistant', content: getAiErrorMessage(err, "I'm having trouble connecting. Please try again."), timestamp: new Date(), isError: true };
       setMessages((prev) => [...prev, errorMsg]);
-      if (voicePendingRef.current) { setAiSpeaking(true); setTimeout(() => { setAiSpeaking(false); }, 100); }
+      if (voicePendingRef.current) { speak(getAiErrorMessage(err, "I'm having trouble connecting. Please try again."), true); }
     } finally { setLoading(false); }
   }, [messages, selectedImages, imagePreviews, threadId, threadOwner, appendMemoryNotice, navigate, speak]);
 
@@ -281,10 +290,11 @@ const FloatingAI: React.FC = () => {
     finally { setLoading(false); }
   }, [messages, threadId, threadOwner, appendMemoryNotice]);
 
+  // These callbacks use refs to avoid circular deps with useVoiceQuery
   const handleSilence = useCallback(() => {
     setMessages((prev) => [...prev, { id: crypto.randomUUID(), role: 'assistant', content: "Are you still talking to me? I didn't hear anything for a while.", timestamp: new Date() }]);
-    setAiSpeaking(true);
-    setTimeout(() => { setAiSpeaking(false); }, 100);
+    setAiSpeakingRef.current(true);
+    setTimeout(() => { setAiSpeakingRef.current(false); }, 500);
   }, []);
 
   const handleAutoClose = useCallback(() => {
@@ -295,6 +305,13 @@ const FloatingAI: React.FC = () => {
   const voiceSubmit = useCallback((transcript: string) => { voicePendingRef.current = true; submitQuery(transcript); }, [submitQuery]);
 
   const { isListening, startListening, stopListening, setAiSpeaking, pauseRecognition } = useVoiceQuery(voiceSubmit, { onSilence: handleSilence, onAutoClose: handleAutoClose });
+
+  // Sync refs after useVoiceQuery returns
+  isListeningRef.current = isListening;
+  startListeningRef.current = startListening;
+  stopListeningRef.current = stopListening;
+  setAiSpeakingRef.current = setAiSpeaking;
+  pauseRecognitionRef.current = pauseRecognition;
 
   const handleVoiceToggle = useCallback(() => {
     if (isListening) { voicePendingRef.current = false; stopListening(); }

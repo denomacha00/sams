@@ -11,6 +11,7 @@ interface SpeechRecognitionErrorEvent {
 }
 
 const RESTART_DELAY_MS = 600;
+const MAX_AUDIO_CAPTURE_RETRIES = 3;
 
 export function useVoiceQuery(
   submitQuery: (transcript: string) => void,
@@ -28,7 +29,8 @@ export function useVoiceQuery(
   const isAiSpeakingRef = useRef(false);
   const scheduledRestartRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const hfpStreamRef = useRef<MediaStream | null>(null);
-  const hfpTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const hfpTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const audioCaptureRetriesRef = useRef(0);
 
   const clearSilenceTimer = useCallback(() => {
     if (silenceTimerRef.current) {
@@ -69,16 +71,9 @@ export function useVoiceQuery(
         audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true },
       });
       hfpStreamRef.current = stream;
-      hfpTimerRef.current = setInterval(async () => {
-        if (!shouldRestartRef.current) return;
-        try {
-          const ns = await navigator.mediaDevices.getUserMedia({ audio: true });
-          const os = hfpStreamRef.current;
-          hfpStreamRef.current = ns;
-          if (os) os.getTracks().forEach(t => t.stop());
-        } catch {}
-      }, 5000);
-    } catch {}
+    } catch {
+      // Mic unavailable — recognition will fail with audio-capture, handled below
+    }
   }, []);
 
   const stopHfpKeepalive = useCallback(() => {
@@ -91,6 +86,7 @@ export function useVoiceQuery(
     clearSilenceTimer();
     clearScheduledRestart();
     silenceStageRef.current = 'none';
+    audioCaptureRetriesRef.current = 0;
     if (recognitionRef.current) {
       try { recognitionRef.current.abort(); } catch { /* ignore */ }
       recognitionRef.current = null;
@@ -103,12 +99,14 @@ export function useVoiceQuery(
     clearSilenceTimer();
     clearScheduledRestart();
     silenceStageRef.current = 'none';
+    // Prevent onend from auto-restarting while AI is speaking
+    shouldRestartRef.current = false;
     if (recognitionRef.current) {
       try { recognitionRef.current.abort(); } catch { /* ignore */ }
       recognitionRef.current = null;
     }
     setIsListening(false);
-    // HFP stream stays alive
+    // HFP stream stays alive for quick resume
   }, [clearSilenceTimer, clearScheduledRestart]);
 
   const createAndStartRecognition = useCallback(() => {
@@ -116,12 +114,14 @@ export function useVoiceQuery(
       (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
 
     if (!SpeechRecognition) {
-      setError('Speech recognition not supported.');
+      setError('Speech recognition not supported in this browser.');
       return null;
     }
 
+    // Clean up any previous instance before creating a new one
     if (recognitionRef.current) {
       try { recognitionRef.current.abort(); } catch { /* ignore */ }
+      recognitionRef.current = null;
     }
 
     const recognition = new SpeechRecognition();
@@ -129,6 +129,8 @@ export function useVoiceQuery(
     recognition.continuous = false;
     recognition.interimResults = false;
     recognition.maxAlternatives = 1;
+
+    let endedNormally = false;
 
     recognition.onstart = () => {
       setError(null);
@@ -143,6 +145,8 @@ export function useVoiceQuery(
       const transcript = result?.transcript;
       const confidence = result?.confidence ?? 0;
       if (transcript && transcript.trim()) {
+        // Reset audio-capture retries on successful result
+        audioCaptureRetriesRef.current = 0;
         if (confidence > 0.3 || transcript.length > 3) {
           submitQuery(transcript);
         }
@@ -151,29 +155,49 @@ export function useVoiceQuery(
 
     recognition.onerror = (event: SpeechRecognitionErrorEvent) => {
       if (event.error === 'no-speech' || event.error === 'aborted') return;
+
       if (event.error === 'audio-capture' || event.error === 'not-allowed') {
-        setError('Bluetooth mic switching... tap again if it fails.');
+        endedNormally = true;
+
+        if (event.error === 'not-allowed') {
+          setError('Microphone access denied. Check browser permissions and tap the mic again.');
+          shouldRestartRef.current = false;
+          stopListeningInternal();
+          return;
+        }
+
+        // audio-capture: BT headset switching — retry with backoff
+        audioCaptureRetriesRef.current += 1;
+        if (audioCaptureRetriesRef.current > MAX_AUDIO_CAPTURE_RETRIES) {
+          setError('Mic keeps disconnecting. Try a different headset or use the text box.');
+          shouldRestartRef.current = false;
+          stopListeningInternal();
+          return;
+        }
+
+        setError(`Bluetooth mic switching… (${audioCaptureRetriesRef.current}/${MAX_AUDIO_CAPTURE_RETRIES})`);
         if (shouldRestartRef.current) {
           clearScheduledRestart();
           scheduledRestartRef.current = setTimeout(() => {
-            if (shouldRestartRef.current) {
-              startHfpKeepalive().then(() => {
-                if (!shouldRestartRef.current) return;
-                const nr = createAndStartRecognition();
-                recognitionRef.current = nr;
-              });
-            }
-          }, 600);
+            if (!shouldRestartRef.current) return;
+            // Refresh HFP stream then create new recognition
+            startHfpKeepalive().then(() => {
+              if (!shouldRestartRef.current) return;
+              const nr = createAndStartRecognition();
+              recognitionRef.current = nr;
+            });
+          }, RESTART_DELAY_MS * audioCaptureRetriesRef.current);
         }
         return;
       }
+
       setError(`Mic: ${event.error}. Tap mic again.`);
       if (shouldRestartRef.current) {
-        setTimeout(() => {
-          if (shouldRestartRef.current) {
-            const nr = createAndStartRecognition();
-            recognitionRef.current = nr;
-          }
+        clearScheduledRestart();
+        scheduledRestartRef.current = setTimeout(() => {
+          if (!shouldRestartRef.current) return;
+          const nr = createAndStartRecognition();
+          recognitionRef.current = nr;
         }, 1000);
       } else {
         setIsListening(false);
@@ -181,45 +205,40 @@ export function useVoiceQuery(
     };
 
     recognition.onend = () => {
-      if (shouldRestartRef.current) {
-        resetSilenceTimer();
-        if (isAiSpeakingRef.current) return;
-        clearScheduledRestart();
-        scheduledRestartRef.current = setTimeout(() => {
-          if (!shouldRestartRef.current) return;
-          try { recognition.start(); }
-          catch {
-            if (shouldRestartRef.current) {
-              scheduledRestartRef.current = setTimeout(() => {
-                if (shouldRestartRef.current) {
-                  const nr = createAndStartRecognition();
-                  recognitionRef.current = nr;
-                }
-              }, RESTART_DELAY_MS);
-            }
-          }
-        }, RESTART_DELAY_MS);
+      if (!shouldRestartRef.current) {
+        setIsListening(false);
         return;
       }
-      setIsListening(false);
+
+      // AI is speaking — don't restart yet; onEnd from speak() will call startListening()
+      if (isAiSpeakingRef.current) return;
+
+      // If we already have a restart scheduled, don't double-schedule
+      if (scheduledRestartRef.current) return;
+
+      resetSilenceTimer();
+      scheduledRestartRef.current = setTimeout(() => {
+        if (!shouldRestartRef.current) return;
+        // Always create a new instance — cannot restart an ended recognition on most browsers
+        const nr = createAndStartRecognition();
+        recognitionRef.current = nr;
+      }, RESTART_DELAY_MS);
     };
 
-    try { recognition.start(); }
-    catch {
-      setError('Could not start mic.');
+    try {
+      recognition.start();
+      return recognition;
+    } catch {
+      setError('Could not start microphone. Check permissions and try again.');
       setIsListening(false);
       return null;
     }
-
-    return recognition;
-  }, [submitQuery, resetSilenceTimer, clearScheduledRestart, startHfpKeepalive]);
+  }, [submitQuery, resetSilenceTimer, clearScheduledRestart, startHfpKeepalive, stopListeningInternal]);
 
   const setAiSpeaking = useCallback((speaking: boolean) => {
     isAiSpeakingRef.current = speaking;
-    if (speaking) {
-      clearSilenceTimer();
-      clearScheduledRestart();
-    } else {
+    clearSilenceTimer();
+    if (!speaking) {
       resetSilenceTimer();
       if (shouldRestartRef.current) {
         clearScheduledRestart();
@@ -227,7 +246,7 @@ export function useVoiceQuery(
           if (!shouldRestartRef.current) return;
           if (recognitionRef.current) {
             try { recognitionRef.current.start(); return; }
-            catch { /* fall through */ }
+            catch { /* fall through — create new instance */ }
           }
           const nr = createAndStartRecognition();
           recognitionRef.current = nr;
@@ -241,8 +260,10 @@ export function useVoiceQuery(
     clearSilenceTimer();
     clearScheduledRestart();
     silenceStageRef.current = 'none';
+    audioCaptureRetriesRef.current = 0;
     shouldRestartRef.current = true;
 
+    // First refresh the HFP stream to ensure mic is available
     startHfpKeepalive().then(() => {
       if (!shouldRestartRef.current) return;
       const recognition = createAndStartRecognition();
@@ -251,10 +272,12 @@ export function useVoiceQuery(
   }, [clearSilenceTimer, clearScheduledRestart, startHfpKeepalive, createAndStartRecognition]);
 
   const stopListening = useCallback(() => {
+    audioCaptureRetriesRef.current = 0;
     stopListeningInternal();
   }, [stopListeningInternal]);
 
   const reInitMic = useCallback(() => {
+    audioCaptureRetriesRef.current = 0;
     stopListeningInternal();
     setError(null);
     setTimeout(() => { startListening(); }, 300);
