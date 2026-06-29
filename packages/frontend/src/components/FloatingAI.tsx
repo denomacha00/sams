@@ -81,6 +81,9 @@ const FloatingAI: React.FC = () => {
   const [selectedImages, setSelectedImages] = useState<File[]>([]);
   const [imagePreviews, setImagePreviews] = useState<string[]>([]);
   const [replyTo, setReplyTo] = useState<{ id: string; content: string; role: 'user' | 'assistant' } | null>(null);
+  const [swipedMsgId, setSwipedMsgId] = useState<string | null>(null);
+  const touchStartXRef = useRef(0);
+  const touchStartIdRef = useRef<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -593,6 +596,21 @@ const FloatingAI: React.FC = () => {
             const time = msg.timestamp
               ? new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
               : '';
+            const isSwiped = swipedMsgId === msg.id;
+
+            const handleTouchStart = (e: React.TouchEvent) => {
+              touchStartXRef.current = e.touches[0].clientX;
+              touchStartIdRef.current = msg.id;
+            };
+            const handleTouchEnd = (e: React.TouchEvent) => {
+              if (touchStartIdRef.current !== msg.id) return;
+              const dx = e.changedTouches[0].clientX - touchStartXRef.current;
+              if (Math.abs(dx) > 60 && msg.id !== 'welcome' && msg.content.trim()) {
+                setSwipedMsgId(msg.id);
+                setReplyTo({ id: msg.id, content: msg.content, role: msg.role });
+                setTimeout(() => setSwipedMsgId(null), 600);
+              }
+            };
 
             return (
               <div
@@ -605,12 +623,11 @@ const FloatingAI: React.FC = () => {
                   </div>
                 )}
                 <div
-                  onClick={() => {
-                    if (msg.id !== 'welcome' && msg.content.trim()) {
-                      setReplyTo({ id: msg.id, content: msg.content, role: msg.role });
-                    }
-                  }}
-                  className={`max-w-[80%] rounded-xl px-3 py-2 text-sm relative group cursor-pointer ${
+                  onTouchStart={handleTouchStart}
+                  onTouchEnd={handleTouchEnd}
+                  className={`max-w-[80%] rounded-xl px-3 py-2 text-sm relative group select-none touch-pan-y ${
+                    isSwiped ? 'ring-2 ring-brand/50 scale-[0.97]' : ''
+                  } ${
                     msg.role === 'user'
                       ? 'bg-brand text-white'
                       : msg.isError
@@ -620,6 +637,15 @@ const FloatingAI: React.FC = () => {
                           : 'bg-surface-muted border border-line text-ink'
                   }`}
                 >
+                  {/* Swipe reply hint */}
+                  {isSwiped && (
+                    <div className="absolute inset-0 flex items-center justify-center bg-brand/10 backdrop-blur-[1px] rounded-xl z-10">
+                      <span className="text-xs font-bold text-brand flex items-center gap-1.5">
+                        <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6" /></svg>
+                        Reply
+                      </span>
+                    </div>
+                  )}
                   {/* Reply quote indicator */}
                   {msg.replyTo && (
                     <div className={`mb-2 pl-2 border-l-2 ${msg.role === 'user' ? 'border-white/50' : 'border-indigo-400/60'} rounded-sm`}>
@@ -667,19 +693,7 @@ const FloatingAI: React.FC = () => {
                   <div className={`flex items-center gap-2 mt-1 ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
                     <span className={`text-[10px] ${msg.role === 'user' ? 'text-white/60' : 'text-ink-subtle'}`}>{time}</span>
                     {msg.id !== 'welcome' && msg.content.trim() && (
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setReplyTo({ id: msg.id, content: msg.content, role: msg.role });
-                        }}
-                        className={`text-[10px] opacity-0 group-hover:opacity-100 transition-opacity ${
-                          msg.role === 'user' ? 'text-white/70 hover:text-white' : 'text-ink-subtle hover:text-brand'
-                        }`}
-                        title="Reply to this message"
-                      >
-                        Reply
-                      </button>
+                      <span className="text-[10px] text-ink-subtle/50 italic">swipe → reply</span>
                     )}
                   </div>
                   {msg.pendingAction && (
