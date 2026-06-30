@@ -295,7 +295,7 @@ const FloatingAI: React.FC = () => {
       setMessages((prev) => [...prev, errorMsg]);
       if (voicePendingRef.current) { speak(getAiErrorMessage(err, "I'm having trouble connecting. Please try again."), true); }
     } finally { setLoading(false); }
-  }, [messages, selectedImages, imagePreviews, threadId, threadOwner, appendMemoryNotice, navigate, speak]);
+  }, [messages, selectedImages, imagePreviews, threadId, threadOwner, appendMemoryNotice, navigate, speak, replyTo]);
 
   const confirmPendingAction = useCallback(async (pending: PendingAction) => {
     if (!pending) return;
