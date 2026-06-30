@@ -6,7 +6,7 @@
  * thinks out loud in phases, and never sounds like a bot.
  *
  * Instead of: "The attendance rate is 87.5% (42 present/late out of 48 total records)"
- * Now: "Alright, let me check your attendance... You're at 87% — doing great. 42 out of 48 sessions."
+ * Now: "Sawa, lemme check your attendance... You're at 87% — doing great. 42 out of 48 sessions."
  *
  * Instead of: "3 student(s) marked absent today: Alice, Bob, Charlie"
  * Now: "3 students are out today: Alice, Bob, and Charlie. Want me to notify their guardians?"
@@ -32,19 +32,47 @@ const GENERATED_TIMETABLE_RE = /Timetable.*generated|generated.*timetable|✅ Ti
 // ─── Quality indicators ──────────────────────────────────────────────────
 
 function qualityLabel(pct: number): string {
-  if (pct >= 95) return 'excellent — near perfect attendance';
-  if (pct >= 85) return 'doing great';
-  if (pct >= 75) return 'okay — room to improve';
+  if (pct >= 95) return 'near perfect — that\'s impressive';
+  if (pct >= 85) return 'solid work';
+  if (pct >= 75) return 'decent — room to improve';
   if (pct >= 60) return 'concerning — needs attention';
-  return 'critical — needs urgent intervention';
+  return 'critical — we need to talk about this';
 }
 
 function qualityEmoji(pct: number): string {
-  if (pct >= 95) return '⭐';
+  if (pct >= 95) return '💪';
   if (pct >= 85) return '✅';
   if (pct >= 75) return '👌';
   if (pct >= 60) return '⚠️';
   return '🚨';
+}
+
+// ─── Kenyan casual greetings ─────────────────────────────────────────────
+
+function getGreeting(userName?: string): string {
+  const greetings = [
+    'Sawa,',
+    'Alright,',
+    'Okay,',
+    'One sec —',
+    'Lemme check... ',
+    'Hang on... ',
+  ];
+  const prefix = greetings[Math.floor(Math.random() * greetings.length)];
+  if (!userName) return prefix;
+  return `${prefix} ${userName} — `;
+}
+
+function getTransition(): string {
+  const transitions = [
+    'Okay here\'s what I got:',
+    'So here\'s the deal:',
+    'Here\'s what I found:',
+    'Right, so:',
+    'Got it:',
+    'Here:',
+  ];
+  return transitions[Math.floor(Math.random() * transitions.length)];
 }
 
 // ─── Main formatter ──────────────────────────────────────────────────────
@@ -102,10 +130,20 @@ export function formatHumanResponse(
     const emoji = qualityEmoji(pct);
 
     const userName = context?.userName || '';
-    const greeting = userName ? `Hey ${userName}, ` : '';
+    const greeting = getGreeting(userName);
     const subject = context?.role === 'STUDENT' ? "you're" : "it's";
 
-    text = `${greeting}${emoji} ${subject} at **${pct}%** — ${label}. You've got ${present} out of ${total} sessions.`;
+    const userPhrase = userName ? `${userName}, ` : '';
+
+    if (pct >= 95) {
+      text = `${greeting}${emoji} Damn, ${subject} at **${pct}%** — ${label}. ${present} out of ${total} sessions. Keep it up!`;
+    } else if (pct >= 85) {
+      text = `${greeting}${emoji} ${subject} at **${pct}%** — ${label}. ${present} out of ${total} sessions.`;
+    } else if (pct >= 75) {
+      text = `${greeting}${emoji} ${subject} at **${pct}%** — ${label}. ${present} out of ${total} sessions. You can do better.`;
+    } else {
+      text = `${greeting}${emoji} ${subject} at **${pct}%** — ${label}. Only ${present} out of ${total} sessions. Let's work on this.`;
+    }
 
     // Suggestions based on percentage
     if (pct < 75 && context?.role === 'STUDENT') {
@@ -132,10 +170,10 @@ export function formatHumanResponse(
     const count = parseInt(absentMatch[1], 10);
     const names = absentMatch[2].replace(/,([^,]*)$/, ', and$1'); // Oxford comma
     const userName = context?.userName || '';
-    const greeting = userName ? `Hey ${userName}, ` : '';
+    const greeting = getGreeting(userName);
 
     if (count === 0) {
-      text = `${greeting}No absent students today. 👍 Everyone's here.`;
+      text = `${greeting}No absent students today. Everyone's here. 👍`;
     } else {
       text = `${greeting}${count} student${count === 1 ? ' is' : 's are'} out today: **${names}**.`;
     }
@@ -156,7 +194,7 @@ export function formatHumanResponse(
   if (absentShortMatch) {
     const count = parseInt(absentShortMatch[1], 10);
     const userName = context?.userName || '';
-    const greeting = userName ? `${userName}, ` : '';
+    const greeting = getGreeting(userName);
 
     text = `${greeting}${count} student${count === 1 ? '' : 's'} absent today.`;
     suggestions.push(
@@ -190,7 +228,7 @@ export function formatHumanResponse(
         { label: '📩 Send intervention notice', action: 'send_class_notification', params: { message: 'Attendance intervention needed for at-risk students.' } },
       );
     } else {
-      text = 'No students at risk right now. ✅ All clear.';
+      text = 'No students at risk right now. All clear. ✅';
     }
 
     return { text, suggestions };
@@ -211,7 +249,7 @@ export function formatHumanResponse(
     const count = parseInt(statsMatch[1], 10);
     const entity = statsMatch[2].toLowerCase();
     const userName = context?.userName || '';
-    const greeting = userName ? `${userName}, ` : '';
+    const greeting = getGreeting(userName);
 
     const plural = entity + (count !== 1 ? 's' : '');
     const verb = count === 1 ? 'is' : 'are';
@@ -251,7 +289,7 @@ export function formatHumanResponse(
   if (activeMatch) {
     const count = parseInt(activeMatch[1], 10);
     const userName = context?.userName || '';
-    const greeting = userName ? `${userName}, ` : '';
+    const greeting = getGreeting(userName);
     text = `${greeting}${count} session${count === 1 ? ' is' : 's are'} live right now:\n\n${text.replace(/^\d+\s*active\s*session.*?:\s*/i, '')}`;
 
     return { text, suggestions };
@@ -280,7 +318,7 @@ export function formatHumanResponse(
   }
 
   // ─── Fallback: pass through with minor cleanups ─────────────────────
-  // Add a conversational prefix when the raw text is data-like
+  // Add a conversational prefix when the text is data-like
   if (text.length > 10 && text.length < 200 && !text.startsWith('❌') && !text.startsWith('⚠️') && !text.startsWith('✅') && !text.startsWith('📊') && !text.startsWith('📅') && !text.startsWith('📝') && !text.startsWith('📋') && !text.startsWith('👤') && !text.startsWith('🏆') && !text.startsWith('🚨') && !text.startsWith('📩') && !text.startsWith('📈')) {
     // If it looks like a data dump, try to make it more human
     const userName = context?.userName || '';

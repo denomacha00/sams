@@ -131,7 +131,7 @@ async function doStreamCompletion(
   const stream = await client.chat.completions.create({
     model,
     messages,
-    temperature: 0.7,
+    temperature: 0.85,
     max_tokens: 800,
     stream: true,
     ...(useTools ? { tools: getRoleScopedTools(user.role), tool_choice: 'auto' as const } : {}),
@@ -201,7 +201,7 @@ async function doStreamCompletion(
       const followUpStream = await client.chat.completions.create({
         model,
         messages: toolResultsMessages,
-        temperature: 0.7,
+        temperature: 0.85,
         max_tokens: 800,
         stream: true,
       });
