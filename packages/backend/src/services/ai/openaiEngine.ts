@@ -256,6 +256,26 @@ export async function buildSystemPrompt(user: AccessTokenPayload): Promise<strin
     ? `\n\nTHE USER'S REAL NAME IS "${userName}". USE THEIR NAME. Address them directly: "${userName}, here's your attendance." Not "the student" or "the user".`
     : '';
 
+  // Tool hints — what the LLM can use for different roles
+  const toolHintSuperAdmin = `\n\nAVAILABLE BACKEND TOOLS (call these when you need real data — USE THEM, don't guess):
+- query_database: Run SQL queries to look up ANY data. Use this for everything — schools, users, licenses, sessions, attendance, payments. This is your main tool.
+- lookup_school: Find a school by name.
+- lookup_user: Find a user by name/email.
+- query_attendance: Get attendance stats (percentage, absent today, top students).
+- query_risk_scores: Get student risk scores.
+- query_reports: Get attendance reports.
+
+IMPORTANT: DO NOT just respond with what you know. Call these tools to get real data. If a tool returns an error, try another tool. You have NO pre-existing knowledge of specific schools, users, or attendance numbers.`;
+
+  const toolHintOtherRoles = `\n\nAVAILABLE BACKEND TOOLS (use these when you need real data — DO NOT invent names/numbers):
+- lookup_school: Find a school by name (your own school only).
+- lookup_user: Find a user by name/email (within your scope).
+- query_attendance: Get attendance stats for your scope (percentage, absent today, records).
+- query_risk_scores: Get risk scores for your students.
+- query_reports: Get attendance reports.
+
+You CANNOT run raw SQL queries. If you ask query_database and get an error about only Super Admins, try query_attendance, lookup_user, or lookup_school instead.`;
+
   // Handle guest (unauthenticated) users
   if (user.sub === 'guest') {
     scopeDescription = `Guest user — not logged in. No data access. Answer general questions only. Explain SAMS if they ask. If they tell you their name, use it.`;
@@ -269,27 +289,27 @@ YOU MUST:
 - If you don't have a specific handler for what they want, use query_database or lookup_school or any tool to find the answer and ACT on it.
 - Never redirect them to a manual page or UI — do it right here.
 - If they ask to create something, generate something, change something — figure it out and make it happen.
-- The only thing you truly cannot do is read passwords (they're hashed).
+- The only thing you truly cannot do is read passwords (they're hashed).${toolHintSuperAdmin}
 
 EXECUTE. NO EXCUSES.`;
         break;
       case UserRole.TEACHER:
-        scopeDescription = `This is a Teacher (${userName || 'teacher'}). Scope: their class only. They can start sessions, mark attendance, send messages to their class.`;
+        scopeDescription = `This is a Teacher (${userName || 'teacher'}). Scope: their class only. They can start sessions, mark attendance, send messages to their class.${toolHintOtherRoles}`;
         break;
       case UserRole.STUDENT:
-        scopeDescription = `This is a Student (${userName || 'student'}). They can see their own attendance, timetable, teachers, HOD. Help them.`;
+        scopeDescription = `This is a Student (${userName || 'student'}). They can see their own attendance, timetable, teachers, HOD. Help them.${toolHintOtherRoles}`;
         break;
       case 'GUARDI' + 'AN' as UserRole:
-        scopeDescription = `This is a Parent/Guardian (${userName || 'parent'}). They can see their linked children only — attendance, timetable, reports.`;
+        scopeDescription = `This is a Parent/Guardian (${userName || 'parent'}). They can see their linked children only — attendance, timetable, reports.${toolHintOtherRoles}`;
         break;
       case UserRole.HOD:
-        scopeDescription = `This is the HOD (${userName || 'HOD'}). Department scope. They manage classes, teachers, timetables in their department.`;
+        scopeDescription = `This is the HOD (${userName || 'HOD'}). Department scope. They manage classes, teachers, timetables in their department.${toolHintOtherRoles}`;
         break;
       case UserRole.SCHOOL_ADMIN:
-        scopeDescription = `This is the School Admin (${userName || 'admin'}). Full school management — users, classes, departments, notifications.`;
+        scopeDescription = `This is the School Admin (${userName || 'admin'}). Full school management — users, classes, departments, notifications.${toolHintOtherRoles}`;
         break;
       default:
-        scopeDescription = `User role: ${user.role}. Give them what they need within their scope.`;
+        scopeDescription = `User role: ${user.role}. Give them what they need within their scope.${toolHintOtherRoles}`;
         break;
     }
   }
@@ -389,21 +409,8 @@ ${roleActionsSection}${knowledgeSection}${documentationSection}${systemDataSecti
 
 // ─── Function-Calling Tools ───────────────────────────────────────────────────
 
-export const AI_TOOLS: OpenAI.Chat.Completions.ChatCompletionTool[] = [
-  {
-    type: 'function',
-    function: {
-      name: 'query_database',
-      description: 'Run a read-only SQL query (SELECT only) against the database. Returns rows with column names. Use for any data question: school info, user count, email lookup, student names, etc.',
-      parameters: {
-        type: 'object',
-        properties: {
-          sql: { type: 'string', description: 'The SQL query to run. Must be SELECT only. Example: SELECT * FROM "School" LIMIT 5' },
-        },
-        required: ['sql'],
-      },
-    },
-  },
+// Tools available to ALL authenticated users (no super admin restriction)
+export const SHARED_AI_TOOLS: OpenAI.Chat.Completions.ChatCompletionTool[] = [
   {
     type: 'function',
     function: {
@@ -479,6 +486,39 @@ export const AI_TOOLS: OpenAI.Chat.Completions.ChatCompletionTool[] = [
     },
   },
 ];
+
+// Super Admin gets extra power tools
+const SUPER_ADMIN_ONLY_TOOLS: OpenAI.Chat.Completions.ChatCompletionTool[] = [
+  {
+    type: 'function',
+    function: {
+      name: 'query_database',
+      description: 'Run a read-only SQL query (SELECT only) against the database. Returns rows with column names. Use for any data question: school info, user count, email lookup, student names, etc.',
+      parameters: {
+        type: 'object',
+        properties: {
+          sql: { type: 'string', description: 'The SQL query to run. Must be SELECT only. Example: SELECT * FROM "School" LIMIT 5' },
+        },
+        required: ['sql'],
+      },
+    },
+  },
+  ...SHARED_AI_TOOLS,
+];
+
+/**
+ * Get the appropriate tools array based on the user's role.
+ * Non-super-admin roles do NOT get query_database (raw SQL is restricted).
+ */
+export function getRoleScopedTools(userRole: string): OpenAI.Chat.Completions.ChatCompletionTool[] {
+  if (userRole === 'SUPER_ADMIN') {
+    return SUPER_ADMIN_ONLY_TOOLS;
+  }
+  return SHARED_AI_TOOLS;
+}
+
+// Old AI_TOOLS kept for backward compat — uses super admin set
+export const AI_TOOLS = SUPER_ADMIN_ONLY_TOOLS;
 
 // ─── Function Call Dispatchers ────────────────────────────────────────────────
 
@@ -639,6 +679,7 @@ export async function openaiQuery(
 ): Promise<OpenAIQueryResult> {
   const systemPrompt = await buildSystemPrompt(user);
   const messages = buildMessagesWithinContext(systemPrompt, question);
+  const tools = getRoleScopedTools(user.role);
 
   try {
     const client = getOpenAIClient();
@@ -648,12 +689,12 @@ export async function openaiQuery(
       messages,
       temperature: 0.7,
       max_tokens: CHAT_MAX_TOKENS,
-      ...(useTools ? { tools: AI_TOOLS, tool_choice: 'auto' as const } : {}),
+      ...(useTools ? { tools, tool_choice: 'auto' as const } : {}),
     });
 
     const choice = response.choices[0];
     if (choice?.finish_reason === 'tool_calls' && choice.message?.tool_calls) {
-      return await handleToolCalls(choice.message.tool_calls, user, messages);
+      return await handleToolCalls(choice.message.tool_calls, user, messages, tools);
     }
 
     const rawAnswer = choice?.message?.content ?? 'I was unable to generate a response. Please try rephrasing your question.';
@@ -670,6 +711,7 @@ async function handleToolCalls(
   toolCalls: OpenAI.Chat.Completions.ChatCompletionMessageToolCall[],
   user: AccessTokenPayload,
   messages: OpenAI.Chat.Completions.ChatCompletionMessageParam[],
+  tools: OpenAI.Chat.Completions.ChatCompletionTool[],
 ): Promise<OpenAIQueryResult> {
   const toolResults: OpenAI.Chat.Completions.ChatCompletionMessageParam[] = [];
   const msg = toolCalls[0]!;
@@ -699,6 +741,8 @@ async function handleToolCalls(
     messages: updatedMessages,
     temperature: 0.7,
     max_tokens: CHAT_MAX_TOKENS,
+    tools,
+    tool_choice: 'auto' as const,
   });
 
   const rawAnswer = response.choices[0]?.message?.content ?? 'Done.';
@@ -712,6 +756,7 @@ export async function openaiQueryWithHistory(
 ): Promise<OpenAIQueryResult> {
   const systemPrompt = await buildSystemPrompt(user);
   const messages = buildMessagesWithinContext(systemPrompt, question, history);
+  const tools = getRoleScopedTools(user.role);
 
   try {
     const client = getOpenAIClient();
@@ -721,12 +766,12 @@ export async function openaiQueryWithHistory(
       messages,
       temperature: 0.7,
       max_tokens: CHAT_MAX_TOKENS,
-      ...(useTools ? { tools: AI_TOOLS, tool_choice: 'auto' as const } : {}),
+      ...(useTools ? { tools, tool_choice: 'auto' as const } : {}),
     });
 
     const choice = response.choices[0];
     if (choice?.finish_reason === 'tool_calls' && choice.message?.tool_calls) {
-      return await handleToolCalls(choice.message.tool_calls, user, messages);
+      return await handleToolCalls(choice.message.tool_calls, user, messages, tools);
     }
 
     const rawAnswer = choice?.message?.content ?? 'I was unable to generate a response. Please try rephrasing your question.';

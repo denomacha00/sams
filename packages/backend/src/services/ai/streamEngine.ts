@@ -16,7 +16,7 @@ import {
   hasAtomesusAIKey,
   getMissingAIKeyMessage,
 } from './aiProviderConfig';
-import { buildSystemPrompt, AI_TOOLS, dispatchFunctionCall } from './openaiEngine';
+import { buildSystemPrompt, getRoleScopedTools, dispatchFunctionCall } from './openaiEngine';
 
 export interface StreamChunk {
   text: string;
@@ -134,7 +134,7 @@ async function doStreamCompletion(
     temperature: 0.7,
     max_tokens: 800,
     stream: true,
-    ...(useTools ? { tools: AI_TOOLS, tool_choice: 'auto' as const } : {}),
+    ...(useTools ? { tools: getRoleScopedTools(user.role), tool_choice: 'auto' as const } : {}),
   });
 
   let accumulatedAnswer = '';
