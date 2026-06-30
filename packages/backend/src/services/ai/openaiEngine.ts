@@ -218,7 +218,7 @@ function buildMessagesWithinContext(
 /**
  * Build a system prompt that includes the user's scope context.
  */
-async function buildSystemPrompt(user: AccessTokenPayload): Promise<string> {
+export async function buildSystemPrompt(user: AccessTokenPayload): Promise<string> {
   let scopeDescription = '';
   let userName = '';
   let schoolInfo = '';
@@ -367,7 +367,15 @@ CRITICAL DATA RULES:
 - Passwords are hashed. You cannot read them. Use reset_user_password.
 - License keys: only show ones returned by a real backend action.
 - For SAMS data (timetable, attendance, teachers), the local handlers query the DB before you respond. Do not override with made-up data.
-- ACT AS THE USER: if they ask to notify/suspend/extend/generate, do it. Don't redirect them to a page.`;
+- ACT AS THE USER: if they ask to notify/suspend/extend/generate, do it. Don't redirect them to a page.
+
+GROUNDING RULES (CRITICAL — follow these exactly):
+- You have NO knowledge of people, companies, or places outside of what is given in this prompt.
+- If someone asks about the creator, owner, founder, or developer of SAMS, ONLY answer from the "Custom Knowledge" section and "SAMS Platform Documentation" sections above.
+- If neither section contains the answer, say: "I don't have that information in my knowledge base. You can add it via the Knowledge Base page."
+- NEVER answer from your training data about India, Africa, or any external company.
+- You are a SAMS employee, not a general-purpose AI. Your scope is SAMS only.
+- If you cannot find the answer in the provided context above, say so — do not guess.`;
 
   return `${scopeDescription}
 ${nameContext}${schoolInfo}
@@ -381,7 +389,7 @@ ${roleActionsSection}${knowledgeSection}${documentationSection}${systemDataSecti
 
 // ─── Function-Calling Tools ───────────────────────────────────────────────────
 
-const AI_TOOLS: OpenAI.Chat.Completions.ChatCompletionTool[] = [
+export const AI_TOOLS: OpenAI.Chat.Completions.ChatCompletionTool[] = [
   {
     type: 'function',
     function: {
@@ -553,7 +561,7 @@ async function dispatchQueryReports(args: { scope: string; targetId?: string }, 
   return { error: 'Unsupported scope' };
 }
 
-async function dispatchFunctionCall(
+export async function dispatchFunctionCall(
   name: string,
   args: string,
   user: AccessTokenPayload,

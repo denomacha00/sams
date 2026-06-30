@@ -51,10 +51,9 @@ const LICENSE_KEY_LIKE_RE = /\b[A-Z0-9]{4}(?:-[A-Z0-9]{4}){2,}\b/;
 const FAKE_LICENSE_PLACEHOLDER_RE = /\b(?:LK|LICEN[CS]E)[-_]?(?:X{3,}|[A-Z0-9]{8,})\b/i;
 const TEMP_PASSWORD_LEAK_RE = /\b(?:temporary|temp)\s+pass\s*word\s*[:：]\s*`?[^\s`]{6,}`?/i;
 const RESET_CODE_LEAK_RE = /\b(?:otp|reset)\s+code\s*[:：]\s*`?\d{4,8}`?/i;
-const SAMS_AI_IDENTITY_ANSWER =
-  "I'm SAMS AI. Denis Macharia built me, and Denis is my boss.";
+// Expanded regex to catch MANY more identity-related question phrasings
 const SAMS_AI_IDENTITY_QUERY_RE =
-  /\b(?:who\s+are\s+you|who\s+(?:built|created|made|developed|programmed|wrote|coded)\s+(?:you|me|sams\s+ai|this\s+(?:ai|assistant))|who\s+is\s+(?:your\s+)?(?:boss|creator|owner|maker|founder|developer|develper|master)|who\s+do\s+you\s+work\s+for|tell\s+me\s+about\s+(?:yourself|your\s+creator)|am\s+i\s+(?:your\s+)?(?:creator|owner|builder|maker|developer|develper|boss|founder))\b/i;
+  /\b(?:who\s+are\s+you|who\s+(?:built|created|made|developed|programmed|wrote|coded|designed|programed|develop|design)\s+(?:you|me|sams\s+ai|this\s+(?:ai|assistant|system|platform|app|application|project))|who\s+is\s+(?:your\s+)?(?:boss|creator|owner|maker|founder|developer|develper|master|author|father|inventor|builder|programmer|designer|coder)|who\s+(?:made|owns|built|created|developed)\s+sams|who\s+(?:is\s+)?(?:the\s+)?(?:developer|creator|owner|founder|inventor|maker|author)\s+(?:of\s+)?(?:sams|this\s+(?:system|platform|app))|who\s+do\s+you\s+work\s+for|tell\s+me\s+about\s+(?:yourself|your\s+creator|the\s+(?:developer|creator|owner|founder)\s+(?:of\s+(?:sams|this\s+(?:system|platform))))|am\s+i\s+(?:your\s+)?(?:creator|owner|builder|maker|developer|develper|boss|founder)|describe\s+(?:the\s+)?(?:developer|creator|owner|founder)(?:\s+of\s+sams)?|who\s+is\s+denis|about\s+denis|tell\s+me\s+about\s+denis|what\s+is\s+denis[^s]|what\s+(?:can\s+)?you\s+tell\s+me\s+about\s+the\s+(?:creator|developer|founder)|(?:denis|denis\s+macharia)\b.{0,40}(?:built|created|made|developed|founded|owns|boss|founder|developer|creator))\b/i;
 const PROVIDER_IDENTITY_QUERY_RE =
   /\b(?:atomesus|cipher|indus\s+valley|alibaba|openai|openrouter|groq|meta\s+ai|llama|api\s+provider|model\s+provider)\b/i;
 
@@ -118,9 +117,44 @@ function containsGeneratedSecretLikeText(answer: string): boolean {
   );
 }
 
-function getSamsIdentityResponse(question: string): AIServiceResponse | null {
+const SAMS_AI_IDENTITY_ANSWER =
+  "I'm SAMS AI. Denis Macharia built me, and Denis is my boss.";
+
+async function getSamsIdentityResponse(question: string): Promise<AIServiceResponse | null> {
   if (!SAMS_AI_IDENTITY_QUERY_RE.test(question) && !PROVIDER_IDENTITY_QUERY_RE.test(question)) {
     return null;
+  }
+
+  // Query the knowledge base for any entries about the creator/owner/Denis
+  try {
+    const { prisma } = await import('../lib/prisma');
+    const identityKnowledge = await prisma.aIKnowledge.findMany({
+      where: {
+        OR: [
+          { title: { contains: 'denis', mode: 'insensitive' } },
+          { title: { contains: 'creator', mode: 'insensitive' } },
+          { content: { contains: 'denis', mode: 'insensitive' } },
+          { content: { contains: 'macharia', mode: 'insensitive' } },
+          { title: { contains: 'macharia', mode: 'insensitive' } },
+        ],
+      },
+      select: { title: true, content: true },
+      orderBy: { createdAt: 'desc' },
+      take: 3,
+    });
+    if (identityKnowledge.length > 0) {
+      const combined = identityKnowledge
+        .map((e: { title: string; content: string }) => `About ${e.title}: ${e.content}`)
+        .join(' ');
+      return {
+        answer: combined,
+        intent: 'ai_identity',
+        engine: 'local',
+        data: { owner: 'Denis Macharia', source: 'knowledge_base' },
+      };
+    }
+  } catch {
+    // Fall through to hardcoded fallback
   }
 
   return {
@@ -282,7 +316,7 @@ export class AIService {
 
     let actionIntent: DetectedAction | null = null;
 
-    const identityResponse = getSamsIdentityResponse(question);
+    const identityResponse = await getSamsIdentityResponse(question);
     if (identityResponse) {
       if (user.sub !== 'guest') {
         threadId = await this.safelyPersist(user, question, identityResponse.answer, threadId);
