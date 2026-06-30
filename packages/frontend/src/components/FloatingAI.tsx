@@ -281,7 +281,7 @@ const FloatingAI: React.FC = () => {
       const isConfirm = CONFIRM_RE.test(text.trim()) && pendingActionRef.current;
       const pending = pendingActionRef.current;
       const history = messagesToAiHistory(messages);
-      const { data } = await apiClient.post('/ai/query', { question: text.trim(), threadId, history, ...(isConfirm && pending ? { confirmAction: true, pendingAction: pending } : pending ? { pendingAction: pending } : {}) });
+      const { data } = await apiClient.post('/ai/query', { question: effectiveText, threadId, history, ...(isConfirm && pending ? { confirmAction: true, pendingAction: pending } : pending ? { pendingAction: pending } : {}) });
       if (data.threadId) { setThreadId(data.threadId); saveAiThreadId(data.threadId, threadOwner); }
       appendMemoryNotice(data.memoryNotice);
 
