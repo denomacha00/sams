@@ -226,7 +226,14 @@ const FloatingAI: React.FC = () => {
 
   const submitQuery = useCallback(async (text: string) => {
     if (!text.trim() && selectedImages.length === 0) return;
-    const userMessage: Message = { id: crypto.randomUUID(), role: 'user', content: text.trim() || 'What is in this image?', userImages: imagePreviews.length > 0 ? [...imagePreviews] : undefined, timestamp: new Date(), replyTo: replyTo ?? undefined };
+    // Capture reply context before clearing so both user and assistant messages carry it
+    const currentReplyTo = replyTo;
+    let effectiveText = text.trim() || 'What is in this image?';
+    if (currentReplyTo) {
+      const prefix = currentReplyTo.role === 'assistant' ? 'AI said' : 'You said';
+      effectiveText = `[${prefix}: "${currentReplyTo.content.slice(0, 200)}"]\n\n${effectiveText}`;
+    }
+    const userMessage: Message = { id: crypto.randomUUID(), role: 'user', content: effectiveText, userImages: imagePreviews.length > 0 ? [...imagePreviews] : undefined, timestamp: new Date(), replyTo: currentReplyTo ?? undefined };
     setMessages((prev) => [...prev, userMessage]);
     setInput('');
     setReplyTo(null);
