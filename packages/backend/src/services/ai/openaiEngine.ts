@@ -520,6 +520,38 @@ export function getRoleScopedTools(userRole: string): OpenAI.Chat.Completions.Ch
 // Old AI_TOOLS kept for backward compat — uses super admin set
 export const AI_TOOLS = SUPER_ADMIN_ONLY_TOOLS;
 
+/**
+ * Atomesus/Cipher does NOT support OpenAI function calling.
+ * Groq only supports a subset of models.
+ * Only send tools to providers we know support them:
+ * - OpenRouter (supports function calling on most models)
+ * - OpenAI directly
+ * NOT: Atomesus Cipher model
+ */
+export function providerSupportsToolCalling(): boolean {
+  const baseUrl = (process.env.OPENAI_BASE_URL || '').toLowerCase();
+  const model = (process.env.OPENAI_MODEL || '').toLowerCase();
+  // Atomesus / Cipher does NOT support tool calling
+  if (baseUrl.includes('atomesus.com') || model.includes('cipher')) return false;
+  // Groq requires specific models with tool-call-parser flag
+  if (baseUrl.includes('groq.com')) {
+    // Groq's llama-3.3-70b-versatile and llama-3.1-8b-instant do support tools
+    return true;
+  }
+  // OpenAI / OpenRouter generally support tools
+  return true;
+}
+
+/**
+ * Determine if we should send tools for this user.
+ * Guests never get tools.
+ * If the provider doesn't support tool calling, skip tools entirely.
+ */
+export function shouldUseTools(user: AccessTokenPayload): boolean {
+  if (user.sub === 'guest') return false;
+  return providerSupportsToolCalling();
+}
+
 // ─── Function Call Dispatchers ────────────────────────────────────────────────
 
 async function dispatchQueryAttendance(
@@ -683,7 +715,7 @@ export async function openaiQuery(
 
   try {
     const client = getOpenAIClient();
-    const useTools = user.sub !== 'guest';
+    const useTools = shouldUseTools(user);
     const response = await client.chat.completions.create({
       model: resolveChatModel(),
       messages,
@@ -760,7 +792,7 @@ export async function openaiQueryWithHistory(
 
   try {
     const client = getOpenAIClient();
-    const useTools = user.sub !== 'guest';
+    const useTools = shouldUseTools(user);
     const response = await client.chat.completions.create({
       model: resolveChatModel(),
       messages,

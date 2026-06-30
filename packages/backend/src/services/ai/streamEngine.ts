@@ -16,7 +16,7 @@ import {
   hasAtomesusAIKey,
   getMissingAIKeyMessage,
 } from './aiProviderConfig';
-import { buildSystemPrompt, getRoleScopedTools, dispatchFunctionCall } from './openaiEngine';
+import { buildSystemPrompt, getRoleScopedTools, dispatchFunctionCall, shouldUseTools } from './openaiEngine';
 
 export interface StreamChunk {
   text: string;
@@ -48,7 +48,7 @@ export async function streamFromProvider(
 
   const systemPrompt = await buildSystemPrompt(user);
   const messages = buildStreamMessages(systemPrompt, question, history);
-  const useTools = user.sub !== 'guest';
+  const useTools = shouldUseTools(user);
 
   // Try providers in order: primary → fallback → atomesus
   const errors: string[] = [];
