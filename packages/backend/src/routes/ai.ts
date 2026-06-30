@@ -209,6 +209,143 @@ aiRouter.delete('/conversations', asyncHandler(async (req: Request, res: Respons
   res.json({ message: 'All conversation data deleted' });
 }));
 
+// ─── Streaming SSE Endpoint ─────────────────────────────────────────────────
+
+/**
+ * POST /api/v1/ai/stream
+ * Server-Sent Events endpoint for streaming AI responses word-by-word.
+ * Same auth/fallback logic as /api/v1/ai/query but streams tokens via SSE.
+ */
+aiRouter.post('/stream', asyncHandler(async (req: Request, res: Response): Promise<void> => {
+  const { question, threadId, history: clientHistory } = req.body;
+
+  if (!question || typeof question !== 'string' || !question.trim()) {
+    res.status(400).json({ error: 'A non-empty "question" field is required.' });
+    return;
+  }
+
+  // Set SSE headers
+  res.setHeader('Content-Type', 'text/event-stream');
+  res.setHeader('Cache-Control', 'no-cache');
+  res.setHeader('Connection', 'keep-alive');
+  res.setHeader('X-Accel-Buffering', 'no');
+  res.flushHeaders();
+
+  // Build guest user if not authenticated
+  let user = req.user;
+  if (!user) {
+    if (req.aiAuthRejected) {
+      res.write(`data: ${JSON.stringify({ error: 'Session expired. Sign in again.', code: 'SESSION_EXPIRED' })}\n\n`);
+      res.end();
+      return;
+    }
+    user = {
+      sub: 'guest',
+      schoolId: 'none',
+      role: 'STUDENT' as any,
+      iat: 0,
+      exp: 0,
+    };
+  }
+
+  // Check for data queries without auth
+  if (req.user === undefined && user.sub === 'guest') {
+    const { detectIntent } = require('../services/ai/localEngine');
+    const { isSamsDataQuestion } = require('../routes/ai');
+    const intent = detectIntent(question.trim());
+    if (isSamsDataQuestion(question.trim(), intent)) {
+      res.write(`data: ${JSON.stringify({ text: 'Sign in to access school data like attendance, timetables, and reports. I can answer general questions without login.\n\nTry asking: "What is SAMS?" or "What is photosynthesis?"' })}\n\n`);
+      res.write(`data: ${JSON.stringify({ done: true })}\n\n`);
+      res.end();
+      return;
+    }
+  }
+
+  // Load history
+  const formattedHistory: Array<{ role: 'user' | 'assistant'; content: string }> = [];
+  if (Array.isArray(clientHistory)) {
+    formattedHistory.push(
+      ...clientHistory
+        .slice(-10)
+        .filter((m: any) => m?.role && m?.content)
+        .map((m: any) => ({ role: m.role as 'user' | 'assistant', content: String(m.content).slice(0, 2000) })),
+    );
+  }
+
+  // Load conversation memory
+  if (user.sub !== 'guest' && threadId) {
+    try {
+      const { conversationMemoryService } = await import('../services/conversationMemoryService');
+      const context = await conversationMemoryService.getContextWindow(
+        user.sub,
+        user.schoolId,
+        threadId,
+        20,
+      );
+      if (context.records.length > 0) {
+        const stored = context.records.map((r: any) => [
+          { role: 'user' as const, content: String(r.message).slice(0, 2000) },
+          { role: 'assistant' as const, content: String(r.response).slice(0, 2000) },
+        ]).flat().filter(Boolean);
+        // Merge with client history, preferring client hints for freshness
+        const seen = new Set(formattedHistory.map((m) => `${m.role}:${m.content}`));
+        for (const msg of stored) {
+          const key = `${msg.role}:${msg.content}`;
+          if (!seen.has(key)) {
+            formattedHistory.push(msg);
+            seen.add(key);
+          }
+        }
+      }
+    } catch {
+      // memory unavailable — proceed without history
+    }
+  }
+
+  // Send a start event
+  res.write(`data: ${JSON.stringify({ start: true })}\n\n`);
+
+  try {
+    const { streamFromProvider } = await import('../services/ai/streamEngine');
+
+    // Stream the response
+    const result = await streamFromProvider(
+      user,
+      question.trim(),
+      formattedHistory.slice(-20),
+      (chunk: { text: string }) => {
+        res.write(`data: ${JSON.stringify({ text: chunk.text })}\n\n`);
+      },
+    );
+
+    // Persist to conversation memory for authenticated users
+    if (user.sub !== 'guest') {
+      try {
+        const { conversationMemoryService } = await import('../services/conversationMemoryService');
+        const resolvedThreadId = threadId
+          || await conversationMemoryService.resolveThread(user.sub, user.schoolId);
+        await conversationMemoryService.persistRecord(
+          user.sub,
+          user.schoolId,
+          resolvedThreadId,
+          question.trim().slice(0, 2000),
+          result.answer.slice(0, 10000),
+        );
+      } catch (memErr) {
+        console.error('[AI/Stream] Failed to persist conversation:', memErr);
+      }
+    }
+
+    // Send intent + done
+    res.write(`data: ${JSON.stringify({ intent: result.intent, engine: result.engine, done: true })}\n\n`);
+  } catch (err) {
+    console.error('[AI/Stream] Error:', err);
+    res.write(`data: ${JSON.stringify({ text: "I'm having trouble connecting. Please try again.", error: true, done: true })}\n\n`);
+  }
+
+  res.end();
+}));
+
 // ─── AI Query Endpoints ───────────────────────────────────────────────────────
 
 /**

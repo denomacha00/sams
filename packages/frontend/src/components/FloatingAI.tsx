@@ -23,6 +23,7 @@ import { AiMessageContent } from '../lib/aiMessageContent';
 import { detectAiNavigationRequest } from '../lib/aiNavigation';
 import { applyAiThemeCommand, detectAiThemeRequest } from '../lib/aiThemeCommand';
 import { useAiSpeech } from '../hooks/useAiSpeech';
+import { useAiStream } from '../hooks/useAiStream';
 
 interface PendingAction {
   action: string;
@@ -82,7 +83,6 @@ const FloatingAI: React.FC = () => {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const voicePendingRef = useRef(false);
-  // Refs to break circular dependency between submitQuery and useVoiceQuery hooks
   const pauseRecognitionRef = useRef<() => void>(() => {});
   const setAiSpeakingRef = useRef<(v: boolean) => void>(() => {});
   const startListeningRef = useRef<() => void>(() => {});
@@ -110,11 +110,10 @@ const FloatingAI: React.FC = () => {
     setMessages([WELCOME_MESSAGE]);
   }, [threadOwner]);
 
+  const { streamQuery, cancelStream } = useAiStream();
   const { speaking, speak, toggle: toggleSpeech, stop: stopSpeech } = useAiSpeech({
     onEnd: () => {
-      // After AI finishes speaking in voice mode, reopen the mic
       if (voicePendingRef.current) {
-        // Close mic first (safety), then reopen
         if (isListeningRef.current) stopListeningRef.current();
         setTimeout(() => {
           if (voicePendingRef.current && !isListeningRef.current) {
@@ -125,7 +124,6 @@ const FloatingAI: React.FC = () => {
       }
     },
     onStart: () => {
-      // When AI starts speaking in voice mode, close mic to prevent echo
       if (voicePendingRef.current && isListeningRef.current) {
         stopListeningRef.current();
       }
@@ -137,11 +135,9 @@ const FloatingAI: React.FC = () => {
     const remaining = 4 - selectedImages.length;
     const slice = files.slice(0, remaining);
     if (slice.length === 0) return;
-
     try {
       const toAdd = await prepareImagesForAiUpload(slice);
       if (toAdd.length === 0) return;
-
       setSelectedImages((prev) => [...prev, ...toAdd]);
       toAdd.forEach((file) => {
         const reader = new FileReader();
@@ -209,6 +205,7 @@ const FloatingAI: React.FC = () => {
   }, []);
 
   const clearConversation = useCallback(async () => {
+    cancelStream();
     setLoading(true);
     try { if (threadId) await apiClient.delete(`/ai/conversations/${threadId}`); } catch {}
     finally {
@@ -222,11 +219,10 @@ const FloatingAI: React.FC = () => {
       setHistoryLoaded(true);
       setLoading(false);
     }
-  }, [threadId, threadOwner]);
+  }, [threadId, threadOwner, cancelStream]);
 
   const submitQuery = useCallback(async (text: string) => {
     if (!text.trim() && selectedImages.length === 0) return;
-    // Capture reply context before clearing so both user and assistant messages carry it
     const currentReplyTo = replyTo;
     let effectiveText = text.trim() || 'What is in this image?';
     if (currentReplyTo) {
@@ -280,22 +276,76 @@ const FloatingAI: React.FC = () => {
 
       const isConfirm = CONFIRM_RE.test(text.trim()) && pendingActionRef.current;
       const pending = pendingActionRef.current;
+
+      // Streaming via SSE for normal text queries
+      const streamMsgId = crypto.randomUUID();
       const history = messagesToAiHistory(messages);
-      const { data } = await apiClient.post('/ai/query', { question: effectiveText, threadId, history, ...(isConfirm && pending ? { confirmAction: true, pendingAction: pending } : pending ? { pendingAction: pending } : {}) });
-      if (data.threadId) { setThreadId(data.threadId); saveAiThreadId(data.threadId, threadOwner); }
-      appendMemoryNotice(data.memoryNotice);
 
-      if (data.pendingAction) { pendingActionRef.current = data.pendingAction; addAssistantMessage({ id: crypto.randomUUID(), role: 'assistant', content: data.answer, timestamp: new Date(), pendingAction: data.pendingAction, actionData: data.data }); return; }
+      setMessages((prev) => [...prev, { id: streamMsgId, role: 'assistant', content: '', timestamp: new Date() }]);
+      setLoading(true);
 
-      pendingActionRef.current = null;
-      const authHint = getAiAuthHint(data.intent);
-      addAssistantMessage({ id: crypto.randomUUID(), role: 'assistant', content: authHint ?? data.answer, timestamp: new Date(), actionData: data.data, isError: isAiUnavailableIntent(data.intent) || isAiAuthIntent(data.intent) });
+      void streamQuery(effectiveText, {
+        onStart: () => {},
+        onToken: (token) => {
+          setMessages((prev) =>
+            prev.map((m) => (m.id === streamMsgId ? { ...m, content: m.content + token } : m)),
+          );
+        },
+        onDone: (fullText, intent) => {
+          if (intent === 'auth_required') {
+            setMessages((prev) =>
+              prev.map((m) =>
+                m.id === streamMsgId
+                  ? { ...m, content: 'Sign in to access school data. I can answer general questions without login.\n\nTry asking: "What is SAMS?"', isError: true }
+                  : m,
+              ),
+            );
+          } else if (intent === 'ai_error') {
+            setMessages((prev) =>
+              prev.map((m) =>
+                m.id === streamMsgId ? { ...m, isError: true } : m,
+              ),
+            );
+          }
+          pendingActionRef.current = null;
+          setLoading(false);
+          if (voicePendingRef.current && fullText) {
+            speak(fullText, true);
+          }
+        },
+        onError: () => {
+          // Fallback to standard /ai/query
+          console.warn('[Stream] SSE failed, falling back to standard query');
+          setMessages((prev) => prev.filter((m) => m.id !== streamMsgId));
+          void (async () => {
+            try {
+              const { data } = await apiClient.post('/ai/query', {
+                question: effectiveText,
+                threadId,
+                history,
+                ...(isConfirm && pending ? { confirmAction: true, pendingAction: pending } : pending ? { pendingAction: pending } : {}),
+              });
+              if (data.threadId) { setThreadId(data.threadId); saveAiThreadId(data.threadId, threadOwner); }
+              appendMemoryNotice(data.memoryNotice);
+              if (data.pendingAction) { pendingActionRef.current = data.pendingAction; addAssistantMessage({ id: crypto.randomUUID(), role: 'assistant', content: data.answer, timestamp: new Date(), pendingAction: data.pendingAction, actionData: data.data }); return; }
+              pendingActionRef.current = null;
+              const authHint = getAiAuthHint(data.intent);
+              addAssistantMessage({ id: crypto.randomUUID(), role: 'assistant', content: authHint ?? data.answer, timestamp: new Date(), actionData: data.data, isError: isAiUnavailableIntent(data.intent) || isAiAuthIntent(data.intent) });
+            } catch (fallbackErr) {
+              const errMsg = getAiErrorMessage(fallbackErr, "I'm having trouble connecting. Please try again.");
+              addAssistantMessage({ id: crypto.randomUUID(), role: 'assistant', content: errMsg, timestamp: new Date(), isError: true });
+            } finally {
+              setLoading(false);
+            }
+          })();
+        },
+      }, { threadId, history });
     } catch (err) {
       const errorMsg: Message = { id: crypto.randomUUID(), role: 'assistant', content: getAiErrorMessage(err, "I'm having trouble connecting. Please try again."), timestamp: new Date(), isError: true };
       setMessages((prev) => [...prev, errorMsg]);
       if (voicePendingRef.current) { speak(getAiErrorMessage(err, "I'm having trouble connecting. Please try again."), true); }
     } finally { setLoading(false); }
-  }, [messages, selectedImages, imagePreviews, threadId, threadOwner, appendMemoryNotice, navigate, speak, replyTo]);
+  }, [messages, selectedImages, imagePreviews, threadId, threadOwner, appendMemoryNotice, navigate, speak, replyTo, streamQuery, cancelStream]);
 
   const confirmPendingAction = useCallback(async (pending: PendingAction) => {
     if (!pending) return;
@@ -311,7 +361,6 @@ const FloatingAI: React.FC = () => {
     finally { setLoading(false); }
   }, [messages, threadId, threadOwner, appendMemoryNotice]);
 
-  // These callbacks use refs to avoid circular deps with useVoiceQuery
   const handleSilence = useCallback(() => {
     setMessages((prev) => [...prev, { id: crypto.randomUUID(), role: 'assistant', content: "Are you still talking to me? I didn't hear anything for a while.", timestamp: new Date() }]);
     setAiSpeakingRef.current(true);
@@ -325,16 +374,12 @@ const FloatingAI: React.FC = () => {
 
   const voiceSubmit = useCallback((transcript: string) => {
     voicePendingRef.current = true;
-    // Close mic immediately when speech is captured,
-    // so it doesn't pick up the AI response or ambient noise
-    // while waiting for the API.
     pauseRecognitionRef.current();
     submitQuery(transcript);
   }, [submitQuery]);
 
   const { isListening, startListening, stopListening, setAiSpeaking, pauseRecognition, error: micError } = useVoiceQuery(voiceSubmit, { onSilence: handleSilence, onAutoClose: handleAutoClose });
 
-  // Sync refs after useVoiceQuery returns
   isListeningRef.current = isListening;
   startListeningRef.current = startListening;
   stopListeningRef.current = stopListening;
