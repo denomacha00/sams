@@ -113,7 +113,7 @@ const FORBIDDEN_ACTION_NAMES: Partial<Record<UserRole, string[]>> = {
 
 const ROLE_SCOPE_NOTES: Partial<Record<UserRole, string>> = {
   [UserRole.SUPER_ADMIN]:
-    'Full platform access. Can manage schools, licenses, system-wide audit logs, and reset user passwords (temporary password shown once — never read or list passwords).',
+    'Full platform-level access. Can manage schools, licenses, audit logs, database queries, code access, terminal commands, provider secrets, feature flags, performance metrics, system health, backups, batch operations, revenue forecast, data exports, brand templates, scheduled jobs, security events, school admin activity, platform email summary, registration links, knowledge base, risk view, user profile, and reset user passwords (temp password shown once — never read/list actual passwords). NOT responsible for school-internal day-to-day operations (attendance marking, classroom sessions, timetables, class messages, parent chat, student/teacher class management). Platform owner.',
   [UserRole.SCHOOL_ADMIN]:
     'School-wide user, class, and department management; reset passwords for users at your school (temp password once — never read passwords; not other school admins). In-app school/department notifications via chat. No platform license/suspend (Super Admin only). SMS is reserved for OTP/password-reset flows while notifications stay app-only.',
   [UserRole.HOD]:

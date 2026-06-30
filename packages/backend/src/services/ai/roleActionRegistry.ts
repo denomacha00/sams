@@ -2,6 +2,7 @@ import { UserRole } from '@sams/shared';
 import { isActionForbiddenForRole } from './roleRestrictions';
 import { superAdminActions } from './handlers/superAdminHandlers';
 import { superAdminExtraActions } from './handlers/superAdminExtraHandlers';
+import { superAdminPlatformActions } from './handlers/superAdminPlatformHandlers';
 import { schoolAdminActions } from './handlers/schoolAdminHandlers';
 import { hodActions } from './handlers/hodHandlers';
 import { teacherActions } from './handlers/teacherHandlers';
@@ -10,6 +11,7 @@ import { guardianActions } from './handlers/guardianHandlers';
 import { examActions, classAttendanceAction } from './handlers/examHandlers';
 import { guardianLinkActions } from './handlers/guardianLinkAction';
 import { timetableEditActions } from './handlers/timetableEditAction';
+import { generateTimetableActionDef } from './handlers/timetableGenerationAction';
 import { knowledgeActions } from './handlers/knowledgeHandlers';
 import { profileActions } from './handlers/userProfileHandlers';
 import { virtualAssistantActions } from './handlers/virtualAssistantActions';
@@ -71,13 +73,21 @@ function normalizeRoleActions(actions: ActionDefinition[]): ActionDefinition[] {
 // Registry - populated by handler imports
 export const roleActionRegistry: RoleActionMap = {};
 
+// SUPER_ADMIN = platform owner. Full platform control: schools, licenses, audit, DB, code,
+// terminal, providers, platform settings (feature flags, security, performance, backups,
+// brand templates, scheduled jobs, batch ops, revenue forecast, data export, system health,
+// license expiry). Plus knowledge, profile, virtual assistant, risk view.
+// NOT school-internal actions (attendance, timetables, class messages, student/teacher ops).
 roleActionRegistry['SUPER_ADMIN'] = normalizeRoleActions([
   ...superAdminActions,
   ...superAdminExtraActions,
+  ...superAdminPlatformActions,
   ...knowledgeActions,
   ...profileActions,
   ...virtualAssistantActions,
   ...riskViewActions,
+  ...guardianLinkActions,
+  // db_find, db_query, read_file, search_code — already in superAdminActions
 ]);
 
 roleActionRegistry['SCHOOL_ADMIN'] = normalizeRoleActions([
