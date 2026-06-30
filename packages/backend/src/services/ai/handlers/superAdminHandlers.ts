@@ -367,6 +367,7 @@ const dbFindHandler: ActionHandler = async (params) => {
 const sendSchoolNotificationHandler: ActionHandler = async (params, scope) => {
   const { prisma } = await import('../../../index');
   const { auditService } = await import('../../auditService');
+  const { getSocketIO } = await import('../../../lib/socket');
   const target = String(params.target || '').trim();
   const messageText = String(params.message || 'Notification from Super Admin').trim();
 
@@ -381,15 +382,33 @@ const sendSchoolNotificationHandler: ActionHandler = async (params, scope) => {
   const users = await prisma.user.findMany({ where: { schoolId: school.id }, select: { id: true } });
   if (users.length === 0) return { answer: `No users in "${school.name}".` };
 
+  const batchId = `super-admin-${Date.now()}`;
   await prisma.notification.createMany({
     data: users.map((u) => ({
       userId: u.id,
       schoolId: school.id,
-      title: 'Super Admin Notification',
+      senderId: scope.userId,
+      batchId,
+      title: 'Super Admin',
       message: messageText,
       type: 'SYSTEM' as const,
     })),
   });
+
+  // Emit real-time socket event so users see the notification immediately
+  const io = getSocketIO();
+  const payload = {
+    title: 'Super Admin',
+    message: messageText,
+    type: 'SYSTEM',
+    senderId: scope.userId,
+    batchId,
+    timestamp: new Date().toISOString(),
+  };
+  for (const u of users) {
+    io.to(`user:${u.id}`).emit('notification:new', payload);
+  }
+  io.to(`school:${school.id}`).emit('notification:new', payload);
 
   await auditService.log({
     eventType: 'NOTIFICATION_SENT',
