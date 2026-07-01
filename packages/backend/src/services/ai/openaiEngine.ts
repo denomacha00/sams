@@ -109,7 +109,7 @@ const PROVIDER_IDENTITY_DRIFT_RE =
 const FULL_REWRITE_RE = /(?:i\s+am|i'm|my\s+name\s+is|you\s+can\s+call\s+me|called)\b.{0,80}(?:cipher|atomesus|indian?\s*(?:ai|company)?|indus\s+valley|from\s+india|from\s+the\s+united\s+states|openai|openrouter|groq|chatgpt|meta\s+(?:ai|llama)|alibaba)/i;
 const AI_TRAINED_RE = /\bi\s+was\s+(?:trained|created|developed|programmed|built|designed)\s+(?:by|on|using)\b.{0,200}/gi;
 
-function sanitizeLlmOutput(answer: string): string {
+export function sanitizeLlmOutput(answer: string): string {
   let result = answer;
 
   // Step 1: Full rewrite when model tries to claim a different identity

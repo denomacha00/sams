@@ -16,49 +16,10 @@ import {
   hasAtomesusAIKey,
   getMissingAIKeyMessage,
 } from './aiProviderConfig';
-import { buildSystemPrompt, getRoleScopedTools, dispatchFunctionCall, shouldUseTools } from './openaiEngine';
+import { buildSystemPrompt, getRoleScopedTools, dispatchFunctionCall, shouldUseTools, sanitizeLlmOutput } from './openaiEngine';
 
 export interface StreamChunk {
   text: string;
-}
-
-/**
- * Identity-drift sanitisation (mirrors openaiEngine.ts sanitizeLlmOutput exactly).
- * Prevents the LLM from claiming to be Cipher/Atomesus/from India instead of SAMS.
- * Used in doStreamCompletion because the streaming path was returning raw LLM output.
- */
-function sanitizeLlmOutput(answer: string): string {
-  const FULL_REWRITE_RE = /(?:i\s+am|i'm|my\s+name\s+is|you\s+can\s+call\s+me|called)\b.{0,80}(?:cipher|atomesus|indian?\s*(?:ai|company)?|indus\s+valley|from\s+india|from\s+the\s+united\s+states|openai|openrouter|groq|chatgpt|meta\s+(?:ai|llama)|alibaba)/i;
-  const IDENTITY_DRIFT_RE = /\b(?:i\s+am|i'm|my\s+name\s+is|you\s+can\s+call\s+me|called|as)\s+(?:an?\s+)?(?:ai\s+assistant\s+named\s+)?(?:cipher|atomesus|openai|chatgpt|groq|llama)\b/i;
-  const PROVIDER_MENTION_RE = /\b(?:atomesus|cipher\s+(?:ai|intelligence|research)?\b|indus\s+valley\s*(?:group|inc|technologies)?|alibaba|openai|openrouter|groq|chatgpt|meta\s+(?:ai|llama)?)\b/i;
-  const PROVIDER_IDENTITY_DRIFT_RE = /\b(?:built|created|developed|made|trained|provided|powered)\s+by\s+(?:atomesus|cipher\s+(?:ai|intelligence|research)?|indus\s+valley\s*(?:group|inc|technologies)?|alibaba|openai|openrouter|groq|chatgpt|meta\s+(?:ai|llama)?)/i;
-  const AI_TRAINED_RE = /\bi\s+was\s+(?:trained|created|developed|programmed|built|designed)\s+(?:by|on|using)\b.{0,200}/gi;
-  const LOCATION_CLAIM_RE = /\b(?:from\s+india|indian|based\s+in\s+india|from\s+nairobi|based\s+in\s+nairobi|i'm\s+from|i\s+am\s+from)\b.{0,30}/gi;
-  const AI_LANG_RE = /\bas\s+an?\s+(?:AI|AI\s+assistant|language\s+model|LLM|artificial\s+intelligence)\b/gi;
-
-  let result = answer;
-
-  if (FULL_REWRITE_RE.test(result)) {
-    return "I'm SAMS. Denis Macharia built me, and Denis is my boss.";
-  }
-
-  if (PROVIDER_IDENTITY_DRIFT_RE.test(result)) {
-    result = result.replace(PROVIDER_IDENTITY_DRIFT_RE, "I'm SAMS, built by Denis Macharia.");
-  }
-
-  if (IDENTITY_DRIFT_RE.test(result)) {
-    result = result.replace(IDENTITY_DRIFT_RE, "I'm SAMS");
-  }
-
-  if (PROVIDER_MENTION_RE.test(result)) {
-    result = result.replace(PROVIDER_MENTION_RE, 'SAMS');
-  }
-
-  result = result.replace(AI_LANG_RE, '');
-  result = result.replace(AI_TRAINED_RE, 'I work at SAMS.');
-  result = result.replace(LOCATION_CLAIM_RE, '');
-
-  return result;
 }
 
 /**
