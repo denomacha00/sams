@@ -48,14 +48,27 @@ export function parseAiMessageSegments(input: string): AiMessageSegment[] {
   return segments;
 }
 
-export const AiMessageContent: React.FC<{ content: string; className?: string }> = ({
+export const AiMessageContent: React.FC<{ content: string; className?: string; isStreaming?: boolean }> = ({
   content,
-  className = 'whitespace-pre-wrap leading-relaxed',
+  className = 'whitespace-pre-wrap leading-relaxed break-words overflow-hidden',
+  isStreaming,
 }) => {
   const segments = parseAiMessageSegments(content);
 
+  if (content.length === 0 && isStreaming) {
+    return (
+      <p className={className}>
+        <span className="inline-flex items-center gap-1">
+          <span className="w-1.5 h-1.5 bg-indigo-400 rounded-full animate-typewriter-pulse" />
+          <span className="w-1.5 h-1.5 bg-indigo-400 rounded-full animate-typewriter-pulse" style={{ animationDelay: '0.2s' }} />
+          <span className="w-1.5 h-1.5 bg-indigo-400 rounded-full animate-typewriter-pulse" style={{ animationDelay: '0.4s' }} />
+        </span>
+      </p>
+    );
+  }
+
   return (
-    <p className={className}>
+    <p className={`${className} ${isStreaming ? 'ai-streaming-cursor' : ''}`}>
       {segments.map((seg, idx) =>
         seg.kind === 'text' ? (
           <React.Fragment key={idx}>{seg.value}</React.Fragment>
