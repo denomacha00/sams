@@ -138,8 +138,8 @@ export function sanitizeLlmOutput(answer: string): string {
   // Remove "I was trained/created/built by..." sentences
   result = result.replace(AI_TRAINED_RE, 'I work at SAMS.');
 
-  // Step 3: Strip any location claims entirely (no from Nairobi, no from India, nothing)
-  result = result.replace(/\b(?:from\s+india|indian|based\s+in\s+india|from\s+nairobi|based\s+in\s+nairobi|i'm\s+from|i\s+am\s+from)\b.{0,30}/gi, '');
+  // Step 3: Strip location claims only (no from Nairobi, no from India)
+  result = result.replace(/\b(?:from\s+india|indian|based\s+in\s+india|from\s+nairobi|based\s+in\s+nairobi)\b/gi, '');
 
   return result;
 }
