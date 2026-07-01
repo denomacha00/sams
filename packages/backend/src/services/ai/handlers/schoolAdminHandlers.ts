@@ -8,7 +8,7 @@ import { notificationInboxActions } from './notificationInboxActions';
 // ─── Handlers ─────────────────────────────────────────────────────────────────
 
 const addUserHandler: ActionHandler = async (params, scope) => {
-  const { prisma } = await import('../../../index');
+  const { prisma } = await import('../../../lib/prisma');
 
   const fullName = params.fullName as string;
   const role = (params.role as string) || 'STUDENT';
@@ -33,7 +33,7 @@ const addUserHandler: ActionHandler = async (params, scope) => {
 };
 
 const removeUserHandler: ActionHandler = async (params, scope) => {
-  const { prisma } = await import('../../../index');
+  const { prisma } = await import('../../../lib/prisma');
 
   const userId = params.userId as string | undefined;
   const fullName = params.fullName as string | undefined;
@@ -57,7 +57,7 @@ const removeUserHandler: ActionHandler = async (params, scope) => {
 };
 
 const createClassHandler: ActionHandler = async (params, scope) => {
-  const { prisma } = await import('../../../index');
+  const { prisma } = await import('../../../lib/prisma');
 
   const className = params.className as string;
   const departmentId = params.departmentId as string | undefined;
@@ -81,7 +81,7 @@ const createClassHandler: ActionHandler = async (params, scope) => {
 };
 
 const createDepartmentHandler: ActionHandler = async (params, scope) => {
-  const { prisma } = await import('../../../index');
+  const { prisma } = await import('../../../lib/prisma');
 
   const departmentName = params.departmentName as string;
   if (!departmentName) return { answer: 'Please provide the department name.' };
@@ -140,7 +140,7 @@ const sendSchoolNotificationHandler: ActionHandler = async (params, scope) => {
 };
 
 const sendClassNotificationHandler: ActionHandler = async (params, scope) => {
-  const { prisma } = await import('../../../index');
+  const { prisma } = await import('../../../lib/prisma');
   const {
     assertAiNotificationChannels,
     ScopedNotificationError,
@@ -203,7 +203,7 @@ const sendClassNotificationHandler: ActionHandler = async (params, scope) => {
 };
 
 const sendDepartmentNotificationHandler: ActionHandler = async (params, scope) => {
-  const { prisma } = await import('../../../index');
+  const { prisma } = await import('../../../lib/prisma');
   const {
     assertAiNotificationChannels,
     ScopedNotificationError,
@@ -294,7 +294,7 @@ const resetUserPasswordHandler: ActionHandler = async (params, scope) => {
 };
 
 const getSchoolStatsHandler: ActionHandler = async (_params, scope) => {
-  const { prisma } = await import('../../../index');
+  const { prisma } = await import('../../../lib/prisma');
 
   const [totalStudents, totalTeachers, totalHODs, totalDepartments, totalClasses, totalSessions, students, teachers] = await Promise.all([
     prisma.user.count({ where: { schoolId: scope.schoolId, role: 'STUDENT' } }),
@@ -351,7 +351,7 @@ const getSchoolStatsHandler: ActionHandler = async (_params, scope) => {
 };
 
 const viewSchoolStudentsHandler: ActionHandler = async (_params, scope) => {
-  const { prisma } = await import('../../../index');
+  const { prisma } = await import('../../../lib/prisma');
 
   const students = await prisma.user.findMany({
     where: { schoolId: scope.schoolId, role: 'STUDENT' },
@@ -377,7 +377,7 @@ const viewSchoolStudentsHandler: ActionHandler = async (_params, scope) => {
 };
 
 const viewSchoolTeachersHandler: ActionHandler = async (_params, scope) => {
-  const { prisma } = await import('../../../index');
+  const { prisma } = await import('../../../lib/prisma');
 
   const teachers = await prisma.user.findMany({
     where: { schoolId: scope.schoolId, role: 'TEACHER' },

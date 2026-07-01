@@ -133,7 +133,7 @@ const endSessionHandler: ActionHandler = async (_params, scope) => {
 };
 
 const markAttendanceHandler: ActionHandler = async (params, scope) => {
-  const { prisma } = await import('../../../index');
+  const { prisma } = await import('../../../lib/prisma');
 
   const studentName = params.studentName as string;
   const status = (params.status as string) || 'PRESENT';
@@ -177,7 +177,7 @@ const markAttendanceHandler: ActionHandler = async (params, scope) => {
 };
 
 const viewClassRosterHandler: ActionHandler = async (_params, scope) => {
-  const { prisma } = await import('../../../index');
+  const { prisma } = await import('../../../lib/prisma');
   const { resolveTeacherClassId } = await import('../../../lib/teacherScope');
 
   const classId = await resolveTeacherClassId(scope.userId, scope.classId);
@@ -209,7 +209,7 @@ const viewClassRosterHandler: ActionHandler = async (_params, scope) => {
 };
 
 const viewTaughtClassRosterHandler: ActionHandler = async (_params, scope) => {
-  const { prisma } = await import('../../../index');
+  const { prisma } = await import('../../../lib/prisma');
   const classes = await listTeacherClasses(scope);
 
   if (classes.length === 0) {

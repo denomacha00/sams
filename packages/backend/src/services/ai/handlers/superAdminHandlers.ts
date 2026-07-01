@@ -151,7 +151,7 @@ function extractSecretValueFromMessage(message: string): string | undefined {
 // ─── Handlers ─────────────────────────────────────────────────────────────────
 
 const suspendSchoolHandler: ActionHandler = async (params, scope) => {
-  const { prisma } = await import('../../../index');
+  const { prisma } = await import('../../../lib/prisma');
   const { licenseService } = await import('../../licenseService');
   const { auditService } = await import('../../auditService');
 
