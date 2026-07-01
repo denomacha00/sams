@@ -118,7 +118,7 @@ function containsGeneratedSecretLikeText(answer: string): boolean {
 }
 
 const SAMS_AI_IDENTITY_ANSWER =
-  "I'm SAMS AI. Denis Macharia built me, and Denis is my boss.";
+  "I'm your SAMS AI assistant. My name is SAMS — I help you with attendance, timetables, reports, and anything in the school system. Ask me whatever you need!";
 
 async function getSamsIdentityResponse(question: string): Promise<AIServiceResponse | null> {
   if (!SAMS_AI_IDENTITY_QUERY_RE.test(question) && !PROVIDER_IDENTITY_QUERY_RE.test(question)) {

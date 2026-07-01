@@ -248,13 +248,53 @@ aiRouter.post('/stream', asyncHandler(async (req: Request, res: Response): Promi
     };
   }
 
-  // Intercept identity questions before they reach the LLM provider.
-  // The streaming path bypasses aiService.ts where identity interception normally lives.
+  // ─── Local intents (intercepted BEFORE the LLM provider) ────────────
+  // These run instantly without any external API call.
+  const trimmedQuestion = question.trim();
+
+  // 1. Greetings — handle "hi", "hello", "hey", "sasa", "vipi" locally
+  const GREETING_RE = /^(?:\s*)(?:hi|hello|hey|sasa|vipi|hujambo|sup|what'?s\s+up|howdy|habari|niaje|hei)(?:\s*|[!.]*)$/i;
+  if (GREETING_RE.test(trimmedQuestion)) {
+    const greetingAnswers = [
+      "Hey there! How can I help you today?",
+      "Hi! What do you need?",
+      "Hello! I'm your SAMS AI assistant — what can I do for you?",
+      "Sasa! I'm here to help. What's up?",
+      "Hey! I'm your SAMS assistant. What are you looking for?",
+    ];
+    const answer = greetingAnswers[Math.floor(Math.random() * greetingAnswers.length)];
+    res.write(`data: ${JSON.stringify({ text: answer })}\n\n`);
+    res.write(`data: ${JSON.stringify({ done: true })}\n\n`);
+    res.end();
+    return;
+  }
+
+  // 2. About SAMS — answer locally without hitting the LLM provider
+  const ABOUT_SAMS_RE = /\b(?:what\s+is\s+sams|about\s+sams|tell\s+me\s+about\s+sams|how\s+does\s+sams\s+work|explain\s+sams|describe\s+sams|what\s+does\s+sams\s+do|what\s+can\s+you\s+do|sams\s+features)\b/i;
+  if (ABOUT_SAMS_RE.test(trimmedQuestion)) {
+    const answer =
+      "🎓 **SAMS — Smart Attendance Management System**\n\n" +
+      "SAMS is a multi-school platform built for Kenyan schools to manage attendance and daily operations.\n\n" +
+      "**Key features:**\n" +
+      "• QR Code & Biometric attendance\n" +
+      "• Live timetables & session management\n" +
+      "• Risk scoring & attendance analytics\n" +
+      "• M-Pesa payment integration\n" +
+      "• SMS + push notifications for parents & staff\n" +
+      "• Role-based access for students, teachers, HODs, admins\n\n" +
+      "Built by Denis Macharia. Ask me anything specific!";
+    res.write(`data: ${JSON.stringify({ text: answer })}\n\n`);
+    res.write(`data: ${JSON.stringify({ done: true })}\n\n`);
+    res.end();
+    return;
+  }
+
+  // 3. Identity questions ("who are you", "who built you") — intercepted locally
   const SAMS_AI_IDENTITY_QUERY_RE =
     /\b(?:who\s+are\s+you|what\s+(?:is\s+)?your\s+(?:name|identity)|tell\s+me\s+about\s+(?:yourself|your\s+creator)|who\s+(?:built|created|made)\s+(?:you|sams)|who\s+is\s+(?:your\s+)?(?:boss|creator|owner|maker|founder|developer)|who\s+do\s+you\s+work\s+for|are\s+you\s+(?:atomus|atomesus|cipher|an?\s+ai))\b/i;
   const SAMS_STREAM_IDENTITY_ANSWER =
-    "I'm SAMS AI. Denis Macharia built me, and Denis is my boss.";
-  if (SAMS_AI_IDENTITY_QUERY_RE.test(question.trim())) {
+    "I'm your SAMS AI assistant. My name is SAMS — I help you with attendance, timetables, reports, and anything in the school system. Ask me whatever you need!";
+  if (SAMS_AI_IDENTITY_QUERY_RE.test(trimmedQuestion)) {
     res.write(`data: ${JSON.stringify({ text: SAMS_STREAM_IDENTITY_ANSWER })}\n\n`);
     res.write(`data: ${JSON.stringify({ intent: 'ai_identity', done: true })}\n\n`);
     res.end();

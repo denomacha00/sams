@@ -11,6 +11,7 @@ export interface AIQueryResult {
 }
 
 export type DetectedIntent =
+  | 'greeting'
   | 'attendance_percentage'
   | 'absent_students'
   | 'risk_scores'
@@ -30,6 +31,13 @@ export type DetectedIntent =
 // ─── Intent Detection ─────────────────────────────────────────────────────────
 
 const INTENT_PATTERNS: { intent: DetectedIntent; patterns: RegExp[] }[] = [
+  {
+    intent: 'greeting',
+    patterns: [
+      /^(?:\s*)(?:hi|hello|hey|sasa|vipi|hujambo|sup|what'?s\s+up|howdy|habari|niaje|hei)(?:\s*|[!.]*)$/i,
+      /^(?:\s*)(?:good\s+)(?:morning|afternoon|evening)(?:\s*|[!.]*)$/i,
+    ],
+  },
   {
     intent: 'about_sams',
     patterns: [
@@ -1743,6 +1751,17 @@ export async function localQuery(
 
   try {
     switch (intent) {
+      case 'greeting': {
+        const greetings = [
+          "Hey there! How can I help you today?",
+          "Hi! What do you need?",
+          "Hello! I'm your SAMS AI assistant — what can I do for you?",
+          "Sasa! I'm here to help. What's up?",
+          "Hey! I'm your SAMS assistant. What are you looking for?",
+        ];
+        const answer = greetings[Math.floor(Math.random() * greetings.length)];
+        return { answer, intent: 'greeting' };
+      }
       case 'about_sams':
         return await handleAboutSams(user);
       case 'super_admin_help':
