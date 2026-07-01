@@ -117,6 +117,7 @@ roleActionRegistry['HOD'] = normalizeRoleActions([
   ...virtualAssistantActions,
   ...riskViewActions,
   classAttendanceAction,
+  exportReportActionDef,
 ]);
 
 roleActionRegistry['TEACHER'] = normalizeRoleActions([
@@ -130,6 +131,7 @@ roleActionRegistry['TEACHER'] = normalizeRoleActions([
   ...parentChatTeacherActions,
   ...riskViewActions,
   classAttendanceAction,
+  exportReportActionDef,
 ]);
 
 roleActionRegistry['STUDENT'] = normalizeRoleActions([
@@ -137,6 +139,7 @@ roleActionRegistry['STUDENT'] = normalizeRoleActions([
   ...examActions,
   ...profileActions,
   ...virtualAssistantActions,
+  exportReportActionDef,
 ]);
 
 roleActionRegistry['GUARDIAN'] = normalizeRoleActions([
@@ -146,6 +149,7 @@ roleActionRegistry['GUARDIAN'] = normalizeRoleActions([
   ...examActions,
   ...parentChatGuardianActions,
   ...riskViewActions,
+  exportReportActionDef,
 ]);
 
 // ─── Lookup Utilities ─────────────────────────────────────────────────────────
