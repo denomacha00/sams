@@ -49,8 +49,11 @@ export type { PendingAction };
 const CONFIRM_ANSWER_RE = /^(yes|y|confirm|proceed|ok|do it|go ahead)\.?$/i;
 
 // Casual chat — short social responses that don't need the LLM.
-// Matches "nice", "cool", "sawa", "good", "pole", "lol", etc.
-const CASUAL_CHAT_RE = /^(?:\s*)(?:nice|cool|ok|okay|k|sawa|good|great|awesome|wow|oh|hmm|aha|heh|hehe|lol|lmao|lmfao|rofl|pole|sure|yeah|yep|no|nope|fine|alright|aight|bet|word|true|facts)(?:\s*|[!.]*)$/i;
+// Matches single-word reactions ("nice", "cool", "sawa", "pole", "lol")
+// AND multi-word conversational phrases ("you good", "how are you",
+// "I'm fine", "what's up", "you there", "nyanze", "acha", "ata", etc.)
+const CASUAL_CHAT_RE = /^(?:\s*)(?:nice|cool|ok|okay|k|sawa|good|great|awesome|wow|oh|hmm|aha|heh|hehe|lol|lmao|lmfao|rofl|pole|sure|yeah|yep|no|nope|fine|alright|aight|bet|word|true|facts|acha|ata|nyanze)(?:\s*|[!.]*)$/i;
+const MULTI_WORD_CHAT_RE = /^(?:\s*)(?:(?:you\s+(?:good|there|around|alright|okay|right|fine|ok|great|here|back))|(?:(?:i'?m?|i\s+am)\s+(?:good|fine|ok|okay|great|alright|here|back))|(?:how\s+(?:are\s+you|ya\s+doing|are\s+you\s+doing|goes\s+it|is\s+it\s+going|is\s+life|u\s+doing|you\s+doing|was\s+your\s+day))|(?:what(?:'s|\s+is)\s+up)|(?:howdy)|(?:just\s+(?:checking|saying|saw|passing|wondering|chilling|relaxing))|(?:not\s+(?:bad|much|really)))(?:\s*|[!.]*)$/i;
 const CASUAL_CHAT_RESPONSES = [
   "Sawa!",
   "Yeah? Anything else?",
@@ -328,11 +331,14 @@ export class AIService {
     let threadId = await this.resolveThreadForUser(user, options?.threadId);
     const userName = user.sub !== 'guest' ? await getUserName(user.sub).catch(() => undefined) : undefined;
 
-    // Casual chat interception — short social messages like "nice", "cool", "sawa"
-    // that don't need any backend action or local DB query. Respond instantly.
+    // Casual chat interception — social messages that don't need any backend
+    // action, DB query, or LLM call. Respond instantly.
+    // Matches single words ("nice", "cool", "sawa", "pole") AND multi-word
+    // conversational phrases ("you good", "how are you", "I'm good").
     if (user.sub !== 'guest' || true) {
       const casual = question.trim().match(CASUAL_CHAT_RE);
-      if (casual) {
+      const multiWord = question.trim().match(MULTI_WORD_CHAT_RE);
+      if (casual || multiWord) {
         const answer = CASUAL_CHAT_RESPONSES[Math.floor(Math.random() * CASUAL_CHAT_RESPONSES.length)];
         return { answer, intent: 'casual_chat', engine: 'local' };
       }
