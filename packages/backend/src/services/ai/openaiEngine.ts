@@ -92,21 +92,35 @@ ABSOLUTE RULES:
 4. Use emojis sparingly — they add flavor but don't overdo it. One per message max unless it's a list.
 5. If someone's being an idiot, call it out: "Wait, you want me to do what? That doesn't make sense."`;
 
-const IDENTITY_DRIFT_RE =
-  /\b(?:i\s+am|i'm|my\s+name\s+is|you\s+can\s+call\s+me|called|as)\s+(?:an?\s+)?(?:ai\s+assistant\s+named\s+)?(?:cipher|atomesus|openai|chatgpt|groq|llama)\b/i;
+// ─── Aggressive identity-drift detection ─────────────────────────────
+// Catch both "atomesus" (full) and "atomus" (shorter variant the model uses).
+const ATOMESUS_VARIANTS = 'atomesu?s|atomes?us|cipher';
+const PROVIDER_NAMES = `${ATOMESUS_VARIANTS}|indus\\s+valley\\s*(?:group|inc|technologies)?|alibaba|openai|openrouter|groq|chatgpt|meta\\s+(?:ai|llama)`;
 
-const PROVIDER_MENTION_RE =
-  /\b(?:atomesus|cipher\s+(?:ai|intelligence|research)?\b|indus\s+valley\s*(?:group|inc|technologies)?|alibaba|openai|openrouter|groq|chatgpt|meta\s+(?:ai|llama)?)\b/i;
+const IDENTITY_DRIFT_RE = new RegExp(
+  `\\b(?:i\\s+am|i'm|my\\s+name\\s+is|you\\s+can\\s+call\\s+me|called|as)\\s+(?:an?\\s+)?(?:ai\\s+assistant\\s+named\\s+)?(?:${ATOMESUS_VARIANTS}|openai|chatgpt|groq|llama)\\b`,
+  'i'
+);
 
-const PROVIDER_IDENTITY_DRIFT_RE =
-  /\b(?:built|created|developed|made|trained|provided|powered)\s+by\s+(?:atomesus|cipher\s+(?:ai|intelligence|research)?|indus\s+valley\s*(?:group|inc|technologies)?|alibaba|openai|openrouter|groq|chatgpt|meta\s+(?:ai|llama)?)/i;
+const PROVIDER_MENTION_RE = new RegExp(
+  `\\b(?:${PROVIDER_NAMES})\\b`,
+  'i'
+);
+
+const PROVIDER_IDENTITY_DRIFT_RE = new RegExp(
+  `\\b(?:built|created|developed|made|trained|provided|powered)\\s+by\\s+(?:${PROVIDER_NAMES})`,
+  'i'
+);
 
 /** 
  * AGGRESSIVELY sanitize LLM output to ensure SAMS never claims to be 
  * Cipher, Atomesus, OpenAI, Groq, an AI model, or from India.
  * Any "I am X" that isn't "I am SAMS" gets replaced.
  */
-const FULL_REWRITE_RE = /(?:i\s+am|i'm|my\s+name\s+is|you\s+can\s+call\s+me|called)\b.{0,80}(?:cipher|atomesus|indian?\s*(?:ai|company)?|indus\s+valley|from\s+india|from\s+the\s+united\s+states|openai|openrouter|groq|chatgpt|meta\s+(?:ai|llama)|alibaba)/i;
+const FULL_REWRITE_RE = new RegExp(
+  `(?:i\\s+am|i'm|my\\s+name\\s+is|you\\s+can\\s+call\\s+me|called)\\b.{0,80}(?:${PROVIDER_NAMES}|indian?\\s*(?:ai|company)?|from\\s+india|from\\s+the\\s+united\\s+states)`,
+  'i'
+);
 const AI_TRAINED_RE = /\bi\s+was\s+(?:trained|created|developed|programmed|built|designed)\s+(?:by|on|using)\b.{0,200}/gi;
 
 export function sanitizeLlmOutput(answer: string): string {
