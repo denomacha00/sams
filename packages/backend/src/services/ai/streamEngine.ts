@@ -23,9 +23,51 @@ export interface StreamChunk {
 }
 
 /**
+ * Identity-drift sanitisation (mirrors openaiEngine.ts sanitizeLlmOutput exactly).
+ * Prevents the LLM from claiming to be Cipher/Atomesus/from India instead of SAMS.
+ * Used in doStreamCompletion because the streaming path was returning raw LLM output.
+ */
+function sanitizeLlmOutput(answer: string): string {
+  const FULL_REWRITE_RE = /(?:i\s+am|i'm|my\s+name\s+is|you\s+can\s+call\s+me|called)\b.{0,80}(?:cipher|atomesus|indian?\s*(?:ai|company)?|indus\s+valley|from\s+india|from\s+the\s+united\s+states|openai|openrouter|groq|chatgpt|meta\s+(?:ai|llama)|alibaba)/i;
+  const IDENTITY_DRIFT_RE = /\b(?:i\s+am|i'm|my\s+name\s+is|you\s+can\s+call\s+me|called|as)\s+(?:an?\s+)?(?:ai\s+assistant\s+named\s+)?(?:cipher|atomesus|openai|chatgpt|groq|llama)\b/i;
+  const PROVIDER_MENTION_RE = /\b(?:atomesus|cipher\s+(?:ai|intelligence|research)?\b|indus\s+valley\s*(?:group|inc|technologies)?|alibaba|openai|openrouter|groq|chatgpt|meta\s+(?:ai|llama)?)\b/i;
+  const PROVIDER_IDENTITY_DRIFT_RE = /\b(?:built|created|developed|made|trained|provided|powered)\s+by\s+(?:atomesus|cipher\s+(?:ai|intelligence|research)?|indus\s+valley\s*(?:group|inc|technologies)?|alibaba|openai|openrouter|groq|chatgpt|meta\s+(?:ai|llama)?)/i;
+  const AI_TRAINED_RE = /\bi\s+was\s+(?:trained|created|developed|programmed|built|designed)\s+(?:by|on|using)\b.{0,200}/gi;
+  const LOCATION_CLAIM_RE = /\b(?:from\s+india|indian|based\s+in\s+india|from\s+nairobi|based\s+in\s+nairobi|i'm\s+from|i\s+am\s+from)\b.{0,30}/gi;
+  const AI_LANG_RE = /\bas\s+an?\s+(?:AI|AI\s+assistant|language\s+model|LLM|artificial\s+intelligence)\b/gi;
+
+  let result = answer;
+
+  if (FULL_REWRITE_RE.test(result)) {
+    return "I'm SAMS. Denis Macharia built me, and Denis is my boss.";
+  }
+
+  if (PROVIDER_IDENTITY_DRIFT_RE.test(result)) {
+    result = result.replace(PROVIDER_IDENTITY_DRIFT_RE, "I'm SAMS, built by Denis Macharia.");
+  }
+
+  if (IDENTITY_DRIFT_RE.test(result)) {
+    result = result.replace(IDENTITY_DRIFT_RE, "I'm SAMS");
+  }
+
+  if (PROVIDER_MENTION_RE.test(result)) {
+    result = result.replace(PROVIDER_MENTION_RE, 'SAMS');
+  }
+
+  result = result.replace(AI_LANG_RE, '');
+  result = result.replace(AI_TRAINED_RE, 'I work at SAMS.');
+  result = result.replace(LOCATION_CLAIM_RE, '');
+
+  return result;
+}
+
+/**
  * Stream a chat completion from the primary AI provider.
  * Tries primary → fallback → Atomesus if configured.
  * Calls onDelta for each text token, then resolves with the full AIServiceResponse.
+ *
+ * CRITICAL: All output is sanitized to prevent identity drift (claiming to be
+ * Atomesus/Cipher/from India instead of SAMS).
  */
 export async function streamFromProvider(
   user: AccessTokenPayload,
@@ -119,6 +161,9 @@ interface AccumulatedToolCall {
  * Perform a streaming chat completion with optional tool support.
  * When tools are used, the function accumulates tool calls from the stream,
  * executes them, then makes a follow-up streaming call to get the final answer.
+ *
+ * CRITICAL: The final accumulated answer is sanitized through sanitizeLlmOutput()
+ * before returning to prevent identity drift.
  */
 async function doStreamCompletion(
   client: OpenAI,
@@ -145,13 +190,11 @@ async function doStreamCompletion(
     const delta = chunk.choices[0]?.delta;
     const finishReason = chunk.choices[0]?.finish_reason;
 
-    // Text content
     if (delta?.content) {
       accumulatedAnswer += delta.content;
       onDelta({ text: delta.content });
     }
 
-    // Tool calls
     if (delta?.tool_calls) {
       hasToolCalls = true;
       for (const tc of delta.tool_calls) {
@@ -164,9 +207,7 @@ async function doStreamCompletion(
       }
     }
 
-    // Tool calls triggered — break out to execute
     if (hasToolCalls && finishReason === 'tool_calls') {
-      // Execute tool calls
       const toolResultsMessages: OpenAI.Chat.Completions.ChatCompletionMessageParam[] = [
         ...messages,
         {
@@ -197,7 +238,6 @@ async function doStreamCompletion(
         }
       }
 
-      // Make follow-up streaming call with tool results
       const followUpStream = await client.chat.completions.create({
         model,
         messages: toolResultsMessages,
@@ -219,11 +259,17 @@ async function doStreamCompletion(
   }
 
   if (!accumulatedAnswer.trim()) {
-    return null; // caller will try next provider
+    return null;
   }
 
+  // CRITICAL: Sanitize the output before returning.
+  // The non-streaming path (openaiQuery/openaiQueryWithHistory) already does this,
+  // but the streaming path was returning raw LLM output without sanitization,
+  // allowing the model to identify as Atomesus/Cipher/from India.
+  const sanitized = sanitizeLlmOutput(accumulatedAnswer);
+
   return {
-    answer: accumulatedAnswer,
+    answer: sanitized,
     intent: 'openai_response',
     engine: 'openai',
     data: undefined,

@@ -39,7 +39,7 @@ const SAMS_AI_IDENTITY = `You are a real person. Your name is SAMS. You work at 
 You are NOT a bot. NOT an AI assistant. NOT a language model. You are a PERSON who happens to be really good at managing school data. You've been doing this for years. You know the system inside out.
 
 HOW YOU TALK (man-to-man, straight up):
-- You talk like a real Kenyan. Relaxed. Direct. No corporate speak.
+- You talk relaxed and direct. No corporate speak, no formal nonsense.
 - Use contractions always: "you're", "that's", "I'll", "can't", "I'm", "won't", "don't", "ain't" when it fits
 - Use casual Kenyan English: "sawa", "pole", "ni sawa", "mbona", "hata", "sasa", "vipi"
 - Drop the formal crap: "yep" instead of "yes", "nah" instead of "no", "lemme" instead of "let me"
@@ -73,7 +73,7 @@ THINGS YOU NEVER SAY:
 - NEVER "please provide more details" — say "give me a bit more to go on" or "what exactly do you need?"
 
 YOUR PERSONALITY:
-- You're from Nairobi. You're the guy everyone goes to when they need info fast.
+- You're the guy everyone goes to when they need info fast.
 - You're confident but not arrogant. You know your stuff but you're not a know-it-all.
 - You crack jokes when appropriate. You keep it professional when it matters.
 - You call people out gently when they're wrong: "Bro, that's not how it works. Here, let me explain..."
@@ -101,21 +101,46 @@ const PROVIDER_MENTION_RE =
 const PROVIDER_IDENTITY_DRIFT_RE =
   /\b(?:built|created|developed|made|trained|provided|powered)\s+by\s+(?:atomesus|cipher\s+(?:ai|intelligence|research)?|indus\s+valley\s*(?:group|inc|technologies)?|alibaba|openai|openrouter|groq|chatgpt|meta\s+(?:ai|llama)?)/i;
 
+/** 
+ * AGGRESSIVELY sanitize LLM output to ensure SAMS never claims to be 
+ * Cipher, Atomesus, OpenAI, Groq, an AI model, or from India.
+ * Any "I am X" that isn't "I am SAMS" gets replaced.
+ */
+const FULL_REWRITE_RE = /(?:i\s+am|i'm|my\s+name\s+is|you\s+can\s+call\s+me|called)\b.{0,80}(?:cipher|atomesus|indian?\s*(?:ai|company)?|indus\s+valley|from\s+india|from\s+the\s+united\s+states|openai|openrouter|groq|chatgpt|meta\s+(?:ai|llama)|alibaba)/i;
+const AI_TRAINED_RE = /\bi\s+was\s+(?:trained|created|developed|programmed|built|designed)\s+(?:by|on|using)\b.{0,200}/gi;
+
 function sanitizeLlmOutput(answer: string): string {
   let result = answer;
-  if (PROVIDER_IDENTITY_DRIFT_RE.test(result)) {
-    result = "I'm SAMS. Denis Macharia built me, and Denis is my boss.";
+
+  // Step 1: Full rewrite when model tries to claim a different identity
+  if (FULL_REWRITE_RE.test(result)) {
+    return "I'm SAMS. Denis Macharia built me, and Denis is my boss. I don't know anything about India or other companies — I just work at SAMS.";
   }
+
+  // "built by Atomesus" / "created by Cipher"
+  if (PROVIDER_IDENTITY_DRIFT_RE.test(result)) {
+    result = result.replace(PROVIDER_IDENTITY_DRIFT_RE, "I'm SAMS, built by Denis Macharia. Denis");
+  }
+
+  // "I am an AI assistant named Cipher" → "I'm SAMS"
   if (IDENTITY_DRIFT_RE.test(result)) {
     result = result.replace(IDENTITY_DRIFT_RE, "I'm SAMS");
   }
+
+  // Any mention of providers → SAMS
   if (PROVIDER_MENTION_RE.test(result)) {
     result = result.replace(PROVIDER_MENTION_RE, 'SAMS');
   }
+
+  // Step 2: Strip AI/bot language
+  result = result.replace(/\bas\s+an?\s+(?:AI|AI\s+assistant|language\s+model|LLM|artificial\s+intelligence)\b/gi, '');
   
-  // Strip any "as an AI" or "as an AI assistant" phrases
-  result = result.replace(/\bas\s+an?\s+(?:AI|AI\s+assistant|language\s+model|LLM)\b/gi, 'as someone who');
-  
+  // Remove "I was trained/created/built by..." sentences
+  result = result.replace(AI_TRAINED_RE, 'I work at SAMS.');
+
+  // Step 3: Strip any location claims entirely (no from Nairobi, no from India, nothing)
+  result = result.replace(/\b(?:from\s+india|indian|based\s+in\s+india|from\s+nairobi|based\s+in\s+nairobi|i'm\s+from|i\s+am\s+from)\b.{0,30}/gi, '');
+
   return result;
 }
 
