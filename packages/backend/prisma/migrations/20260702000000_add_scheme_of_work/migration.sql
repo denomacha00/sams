@@ -22,11 +22,11 @@ CREATE TABLE "scheme_of_work" (
     "rejection_reason" VARCHAR(500),
     "created_at" TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updated_at" TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    CONSTRAINT "fk_scheme_school" FOREIGN KEY ("school_id") REFERENCES "school"("id"),
-    CONSTRAINT "fk_scheme_class" FOREIGN KEY ("class_id") REFERENCES "class"("id"),
-    CONSTRAINT "fk_scheme_term" FOREIGN KEY ("term_id") REFERENCES "academic_term"("id"),
-    CONSTRAINT "fk_scheme_creator" FOREIGN KEY ("created_by_id") REFERENCES "user"("id"),
-    CONSTRAINT "fk_scheme_approver" FOREIGN KEY ("approved_by_id") REFERENCES "user"("id")
+    CONSTRAINT "fk_scheme_school" FOREIGN KEY ("school_id") REFERENCES "School"("id"),
+    CONSTRAINT "fk_scheme_class" FOREIGN KEY ("class_id") REFERENCES "Class"("id"),
+    CONSTRAINT "fk_scheme_term" FOREIGN KEY ("term_id") REFERENCES "AcademicTerm"("id"),
+    CONSTRAINT "fk_scheme_creator" FOREIGN KEY ("created_by_id") REFERENCES "User"("id"),
+    CONSTRAINT "fk_scheme_approver" FOREIGN KEY ("approved_by_id") REFERENCES "User"("id")
 );
 
 CREATE INDEX "idx_scheme_school_status" ON "scheme_of_work"("school_id", "status");
