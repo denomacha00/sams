@@ -147,13 +147,22 @@ async function doStreamCompletion(
   const toolCalls: Map<number, AccumulatedToolCall> = new Map();
   let hasToolCalls = false;
 
+  let lastSanitizedLength = 0;
+
   for await (const chunk of stream) {
     const delta = chunk.choices[0]?.delta;
     const finishReason = chunk.choices[0]?.finish_reason;
 
     if (delta?.content) {
       accumulatedAnswer += delta.content;
-      onDelta({ text: delta.content });
+      // Sanitize in real-time: the full accumulated text gets sanitized,
+      // then we diff against what was already sent to avoid sending bad tokens.
+      const sanitizedSoFar = sanitizeLlmOutput(accumulatedAnswer);
+      const newChars = sanitizedSoFar.slice(lastSanitizedLength);
+      if (newChars) {
+        onDelta({ text: newChars });
+        lastSanitizedLength = sanitizedSoFar.length;
+      }
     }
 
     if (delta?.tool_calls) {
