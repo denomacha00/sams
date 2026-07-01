@@ -47,6 +47,20 @@ import { formatHumanResponse, humanize, type FormattedSuggestion } from './ai/hu
 export type { PendingAction };
 
 const CONFIRM_ANSWER_RE = /^(yes|y|confirm|proceed|ok|do it|go ahead)\.?$/i;
+
+// Casual chat — short social responses that don't need the LLM.
+// Matches "nice", "cool", "sawa", "good", "pole", "lol", etc.
+const CASUAL_CHAT_RE = /^(?:\s*)(?:nice|cool|ok|okay|k|sawa|good|great|awesome|wow|oh|hmm|aha|heh|hehe|lol|lmao|lmfao|rofl|pole|sure|yeah|yep|no|nope|fine|alright|aight|bet|word|true|facts)(?:\s*|[!.]*)$/i;
+const CASUAL_CHAT_RESPONSES = [
+  "Sawa!",
+  "Yeah? Anything else?",
+  "Got it. What else?",
+  "Right. What do you need?",
+  "Mmh. How can I help?",
+  "Okay, what next?",
+  "Alright. What's up?",
+  "I hear you. What else can I do for you?",
+];
 const LICENSE_KEY_LIKE_RE = /\b[A-Z0-9]{4}(?:-[A-Z0-9]{4}){2,}\b/;
 const FAKE_LICENSE_PLACEHOLDER_RE = /\b(?:LK|LICEN[CS]E)[-_]?(?:X{3,}|[A-Z0-9]{8,})\b/i;
 const TEMP_PASSWORD_LEAK_RE = /\b(?:temporary|temp)\s+pass\s*word\s*[:：]\s*`?[^\s`]{6,}`?/i;
@@ -313,6 +327,16 @@ export class AIService {
   ): Promise<AIServiceResponse> {
     let threadId = await this.resolveThreadForUser(user, options?.threadId);
     const userName = user.sub !== 'guest' ? await getUserName(user.sub).catch(() => undefined) : undefined;
+
+    // Casual chat interception — short social messages like "nice", "cool", "sawa"
+    // that don't need any backend action or local DB query. Respond instantly.
+    if (user.sub !== 'guest' || true) {
+      const casual = question.trim().match(CASUAL_CHAT_RE);
+      if (casual) {
+        const answer = CASUAL_CHAT_RESPONSES[Math.floor(Math.random() * CASUAL_CHAT_RESPONSES.length)];
+        return { answer, intent: 'casual_chat', engine: 'local' };
+      }
+    }
 
     let actionIntent: DetectedAction | null = null;
 

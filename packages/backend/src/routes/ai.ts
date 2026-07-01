@@ -269,6 +269,29 @@ aiRouter.post('/stream', asyncHandler(async (req: Request, res: Response): Promi
     return;
   }
 
+  // 1b. Casual chat — short, conversational responses that don't need the LLM.
+  //     Handles "nice", "cool", "sawa", "good", "okay", "pole", "lol", one-word
+  //     affirmations, acknowledgements, reactions — anything < 4 words that's
+  //     clearly social/chatty rather than a data query or action request.
+  const SHORT_CHAT_RE = /^(?:\s*)(?:nice|cool|ok|okay|k|sawa|good|great|awesome|wow|oh|hmm|aha|heh|hehe|lol|lmao|lmfao|rofl|pole|sure|yeah|yep|no|nope|fine|alright|aight|bet|word|true|facts)?(?:\s*|[!.]*)$/i;
+  if (SHORT_CHAT_RE.test(trimmedQuestion)) {
+    const chatResponses = [
+      "Sawa!",
+      "Yeah? Anything else?",
+      "Got it. What else?",
+      "Right. What do you need?",
+      "Mmh. How can I help?",
+      "Okay, what next?",
+      "Alright. What's up?",
+      "I hear you. What else can I do for you?",
+    ];
+    const answer = chatResponses[Math.floor(Math.random() * chatResponses.length)];
+    res.write(`data: ${JSON.stringify({ text: answer })}\n\n`);
+    res.write(`data: ${JSON.stringify({ done: true })}\n\n`);
+    res.end();
+    return;
+  }
+
   // 2. About SAMS — answer locally without hitting the LLM provider
   const ABOUT_SAMS_RE = /\b(?:what\s+is\s+sams|about\s+sams|tell\s+me\s+about\s+sams|how\s+does\s+sams\s+work|explain\s+sams|describe\s+sams|what\s+does\s+sams\s+do|what\s+can\s+you\s+do|sams\s+features)\b/i;
   if (ABOUT_SAMS_RE.test(trimmedQuestion)) {
