@@ -19,6 +19,7 @@ import { teacherWorkbenchActions } from './handlers/teacherStudentWorkbenchActio
 import { classRepActions } from './handlers/classRepAction';
 import { parentChatTeacherActions, parentChatGuardianActions } from './handlers/parentChatHandlers';
 import { riskViewActions } from './handlers/riskViewHandlers';
+import { exportReportActionDef } from './handlers/reportExportAction';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -87,6 +88,7 @@ roleActionRegistry['SUPER_ADMIN'] = normalizeRoleActions([
   ...virtualAssistantActions,
   ...riskViewActions,
   ...guardianLinkActions,
+  exportReportActionDef,
   // db_find, db_query, read_file, search_code — already in superAdminActions
 ]);
 
@@ -101,6 +103,7 @@ roleActionRegistry['SCHOOL_ADMIN'] = normalizeRoleActions([
   ...profileActions,
   ...virtualAssistantActions,
   ...riskViewActions,
+  exportReportActionDef,
 ]);
 
 roleActionRegistry['HOD'] = normalizeRoleActions([
