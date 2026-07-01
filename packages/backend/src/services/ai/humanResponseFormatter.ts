@@ -156,7 +156,7 @@ export function formatHumanResponse(
       if (pct < 80) {
         suggestions.push({
           label: '📋 Show absent students',
-          action: 'absent_students',
+          action: 'view_class_attendance',
         });
       }
     }
@@ -198,7 +198,7 @@ export function formatHumanResponse(
 
     text = `${greeting}${count} student${count === 1 ? '' : 's'} absent today.`;
     suggestions.push(
-      { label: '👤 Show names', action: 'absent_students' },
+      { label: '👤 Show names', action: 'view_class_attendance' },
       { label: '📩 Notify parents', action: 'send_class_notification', params: { message: 'Your child was absent today.' } },
     );
 
@@ -211,8 +211,8 @@ export function formatHumanResponse(
     const list = topMatch[1].trim();
     text = `🏆 **Top performers:**\n${list}`;
     suggestions.push(
-      { label: '📊 See bottom performers', action: 'risk_scores' },
-      { label: '📋 Full class comparison', action: 'class_comparison' },
+      { label: '📊 See bottom performers', action: 'view_risk_scores' },
+      { label: '📋 Full class comparison', action: 'view_class_attendance' },
     );
 
     return { text, suggestions };
@@ -238,7 +238,7 @@ export function formatHumanResponse(
   const classMatch = text.match(CLASS_COMPARISON_RE);
   if (classMatch) {
     text = `📊 ${classMatch[1].trim()}`;
-    suggestions.push({ label: '📈 Show risk scores', action: 'risk_scores' });
+    suggestions.push({ label: '📈 Show risk scores', action: 'view_risk_scores' });
 
     return { text, suggestions };
   }
