@@ -248,6 +248,19 @@ aiRouter.post('/stream', asyncHandler(async (req: Request, res: Response): Promi
     };
   }
 
+  // Intercept identity questions before they reach the LLM provider.
+  // The streaming path bypasses aiService.ts where identity interception normally lives.
+  const SAMS_AI_IDENTITY_QUERY_RE =
+    /\b(?:who\s+are\s+you|what\s+(?:is\s+)?your\s+(?:name|identity)|tell\s+me\s+about\s+(?:yourself|your\s+creator)|who\s+(?:built|created|made)\s+(?:you|sams)|who\s+is\s+(?:your\s+)?(?:boss|creator|owner|maker|founder|developer)|who\s+do\s+you\s+work\s+for|are\s+you\s+(?:atomus|atomesus|cipher|an?\s+ai))\b/i;
+  const SAMS_STREAM_IDENTITY_ANSWER =
+    "I'm SAMS AI. Denis Macharia built me, and Denis is my boss.";
+  if (SAMS_AI_IDENTITY_QUERY_RE.test(question.trim())) {
+    res.write(`data: ${JSON.stringify({ text: SAMS_STREAM_IDENTITY_ANSWER })}\n\n`);
+    res.write(`data: ${JSON.stringify({ intent: 'ai_identity', done: true })}\n\n`);
+    res.end();
+    return;
+  }
+
   // Check for data queries without auth
   if (req.user === undefined && user.sub === 'guest') {
     const { detectIntent } = require('../services/ai/localEngine');
