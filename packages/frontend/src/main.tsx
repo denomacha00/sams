@@ -43,6 +43,7 @@ import KnowledgeManagementPage from './pages/admin/KnowledgeManagementPage';
 import ExamsPage from './pages/admin/ExamsPage';
 import GuardianManagementPage from './pages/admin/GuardianManagementPage';
 import ParentDashboardPage from './pages/ParentDashboardPage';
+import SchemeOfWorkPage from './pages/SchemeOfWorkPage';
 
 import { registerServiceWorker } from './workers/swRegistration';
 
@@ -124,6 +125,11 @@ ReactDOM.createRoot(document.getElementById('root') as HTMLElement).render(
             <Route element={<AuthGuard allowedRoles={[UserRole.SCHOOL_ADMIN]} />}>
               <Route path="/admin/departments" element={<DepartmentsPage />} />
               <Route path="/admin/guardians" element={<GuardianManagementPage />} />
+            </Route>
+
+            {/* Scheme of Work */}
+            <Route element={<AuthGuard allowedRoles={[UserRole.HOD, UserRole.TEACHER, UserRole.SCHOOL_ADMIN]} />}>
+              <Route path="/schemes" element={<SchemeOfWorkPage />} />
             </Route>
 
             {/* Registration Links */}

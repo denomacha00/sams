@@ -610,6 +610,78 @@ model TeacherSubject {
   @@index([teacherId])
 }
 
+// ─── Scheme of Work & Lesson Planning ─────────────────────────────────────────
+
+model SchemeOfWork {
+  id              String      @id @default(cuid())
+  schoolId        String
+  subject         String      @db.VarChar(200)
+  classId         String
+  termId          String
+  title           String      @db.VarChar(300)
+  description     String?     @db.Text
+  status          String      @default("DRAFT") @db.VarChar(20) // DRAFT | PENDING_APPROVAL | APPROVED | REJECTED
+  createdById     String
+  approvedById    String?
+  approvedAt      DateTime?
+  rejectionReason String?     @db.VarChar(500)
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+
+  school   School        @relation(fields: [schoolId], references: [id])
+  class    Class         @relation(fields: [classId], references: [id])
+  term     AcademicTerm  @relation(fields: [termId], references: [id])
+  creator  User          @relation("SchemeCreator", fields: [createdById], references: [id])
+  approver User?         @relation("SchemeApprover", fields: [approvedById], references: [id])
+  weeks    SchemeWeek[]
+
+  @@index([schoolId, status])
+  @@index([schoolId, classId, subject])
+  @@index([schoolId, termId])
+  @@index([createdById])
+}
+
+model SchemeWeek {
+  id              String       @id @default(cuid())
+  schemeId        String
+  weekNumber      Int
+  topic           String       @db.VarChar(300)
+  objectives      String?      @db.Text
+  teachingMethods String?      @db.VarChar(500)
+  resources       String?      @db.VarChar(500)
+  assessment      String?      @db.VarChar(500)
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+
+  scheme      SchemeOfWork @relation(fields: [schemeId], references: [id], onDelete: Cascade)
+  lessonPlans LessonPlan[]
+
+  @@unique([schemeId, weekNumber])
+  @@index([schemeId])
+}
+
+model LessonPlan {
+  id             String    @id @default(cuid())
+  schemeWeekId   String
+  dayOfWeek      Int
+  topic          String    @db.VarChar(300)
+  objectives     String?   @db.Text
+  introduction   String?   @db.Text
+  mainActivity   String?   @db.Text
+  conclusion     String?   @db.Text
+  materials      String?   @db.VarChar(500)
+  homework       String?   @db.VarChar(500)
+  status         String    @default("DRAFT") @db.VarChar(20) // DRAFT | COMPLETED | SKIPPED
+  completedAt    DateTime?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  schemeWeek SchemeWeek @relation(fields: [schemeWeekId], references: [id], onDelete: Cascade)
+
+  @@unique([schemeWeekId, dayOfWeek])
+  @@index([schemeWeekId])
+}
+
 // ─── Super Admin Feature Tables ───────────────────────────────────────────────
 
 model SchoolFeatureFlag {
