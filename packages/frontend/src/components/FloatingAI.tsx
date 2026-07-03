@@ -24,6 +24,7 @@ import { detectAiNavigationRequest } from '../lib/aiNavigation';
 import { applyAiThemeCommand, detectAiThemeRequest } from '../lib/aiThemeCommand';
 import { useAiSpeech } from '../hooks/useAiSpeech';
 import { useAiStream } from '../hooks/useAiStream';
+import { useAiTypingStage } from '../hooks/useAiTypingStage';
 
 interface PendingAction {
   action: string;
@@ -77,6 +78,8 @@ const FloatingAI: React.FC = () => {
   const [replyTo, setReplyTo] = useState<{ id: string; content: string; role: 'user' | 'assistant' } | null>(null);
   const [swipedMsgId, setSwipedMsgId] = useState<string | null>(null);
   const [streamingMsgId, setStreamingMsgId] = useState<string | null>(null);
+  const [hasStreamedToken, setHasStreamedToken] = useState(false);
+  const typingStage = useAiTypingStage(loading, Boolean(streamingMsgId && hasStreamedToken));
   const touchStartXRef = useRef(0);
   const touchStartIdRef = useRef<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -207,6 +210,7 @@ const FloatingAI: React.FC = () => {
 
   const clearConversation = useCallback(async () => {
     cancelStream();
+    setHasStreamedToken(false);
     setLoading(true);
     try { if (threadId) await apiClient.delete(`/ai/conversations/${threadId}`); } catch {}
     finally {
@@ -224,6 +228,7 @@ const FloatingAI: React.FC = () => {
 
   const submitQuery = useCallback(async (text: string) => {
     if (!text.trim() && selectedImages.length === 0) return;
+    let keepLoadingForStream = false;
     const currentReplyTo = replyTo;
     let effectiveText = text.trim() || 'What is in this image?';
     if (currentReplyTo) {
@@ -284,17 +289,21 @@ const FloatingAI: React.FC = () => {
 
       setMessages((prev) => [...prev, { id: streamMsgId, role: 'assistant', content: '', timestamp: new Date() }]);
       setStreamingMsgId(streamMsgId);
+      setHasStreamedToken(false);
       setLoading(true);
+      keepLoadingForStream = true;
 
       void streamQuery(effectiveText, {
         onStart: () => {},
         onToken: (token) => {
+          if (token) setHasStreamedToken(true);
           setMessages((prev) =>
             prev.map((m) => (m.id === streamMsgId ? { ...m, content: m.content + token } : m)),
           );
         },
         onDone: (fullText, intent) => {
           setStreamingMsgId((prev) => prev === streamMsgId ? null : prev);
+          setHasStreamedToken(false);
           if (intent === 'auth_required') {
             setMessages((prev) =>
               prev.map((m) =>
@@ -318,6 +327,7 @@ const FloatingAI: React.FC = () => {
         },
         onError: () => {
           setStreamingMsgId((prev) => prev === streamMsgId ? null : prev);
+          setHasStreamedToken(false);
           // Fallback to standard /ai/query
           console.warn('[Stream] SSE failed, falling back to standard query');
           setMessages((prev) => prev.filter((m) => m.id !== streamMsgId));
@@ -339,6 +349,7 @@ const FloatingAI: React.FC = () => {
               const errMsg = getAiErrorMessage(fallbackErr, "I'm having trouble connecting. Please try again.");
               addAssistantMessage({ id: crypto.randomUUID(), role: 'assistant', content: errMsg, timestamp: new Date(), isError: true });
             } finally {
+              setHasStreamedToken(false);
               setLoading(false);
             }
           })();
@@ -348,7 +359,9 @@ const FloatingAI: React.FC = () => {
       const errorMsg: Message = { id: crypto.randomUUID(), role: 'assistant', content: getAiErrorMessage(err, "I'm having trouble connecting. Please try again."), timestamp: new Date(), isError: true };
       setMessages((prev) => [...prev, errorMsg]);
       if (voicePendingRef.current) { speak(getAiErrorMessage(err, "I'm having trouble connecting. Please try again."), true); }
-    } finally { setLoading(false); }
+    } finally {
+      if (!keepLoadingForStream) setLoading(false);
+    }
   }, [messages, selectedImages, imagePreviews, threadId, threadOwner, appendMemoryNotice, navigate, speak, replyTo, streamQuery, cancelStream]);
 
   const confirmPendingAction = useCallback(async (pending: PendingAction) => {
@@ -482,13 +495,13 @@ const FloatingAI: React.FC = () => {
             <div className="flex justify-start">
               <div className="w-6 h-6 rounded-full bg-brand flex items-center justify-center mr-2 mt-1 flex-shrink-0"><AISparkleIcon className="w-3 h-3 text-white" /></div>
               <div className="bg-surface-muted border border-line rounded-xl px-3 py-2 min-w-[100px]">
-                <div className="flex items-center gap-2 text-xs text-ink-muted">
+                <div className="flex items-center gap-2 text-xs font-medium text-ink-muted">
                   <span className="flex space-x-0.5">
-                    <span className="w-1 h-1 bg-indigo-400 rounded-full animate-typewriter-pulse" />
-                    <span className="w-1 h-1 bg-indigo-400 rounded-full animate-typewriter-pulse" style={{ animationDelay: '0.2s' }} />
-                    <span className="w-1 h-1 bg-indigo-400 rounded-full animate-typewriter-pulse" style={{ animationDelay: '0.4s' }} />
+                    <span className={`w-1 h-1 rounded-full animate-typewriter-pulse ${typingStage === 'writing' ? 'bg-emerald-400' : 'bg-indigo-400'}`} />
+                    <span className={`w-1 h-1 rounded-full animate-typewriter-pulse ${typingStage === 'writing' ? 'bg-emerald-400' : 'bg-indigo-400'}`} style={{ animationDelay: '0.2s' }} />
+                    <span className={`w-1 h-1 rounded-full animate-typewriter-pulse ${typingStage === 'writing' ? 'bg-emerald-400' : 'bg-indigo-400'}`} style={{ animationDelay: '0.4s' }} />
                   </span>
-                  <span>Thinking</span>
+                  <span>{typingStage === 'writing' ? 'Writing...' : 'Thinking...'}</span>
                 </div>
               </div>
             </div>
@@ -497,7 +510,14 @@ const FloatingAI: React.FC = () => {
         </div>
 
         <div className="border-t border-line p-3 bg-surface rounded-b-2xl">
-          {loading && <div className="text-[10px] text-ink-muted mb-1.5 text-center font-medium tracking-wide"><span className="inline-flex items-center gap-1"><span className="w-1 h-1 bg-indigo-400 rounded-full animate-typewriter-pulse" /> SAMS AI is thinking...</span></div>}
+          {loading && (
+            <div className="text-[10px] text-ink-muted mb-1.5 text-center font-medium tracking-wide">
+              <span className="inline-flex items-center gap-1">
+                <span className={`w-1 h-1 rounded-full animate-typewriter-pulse ${typingStage === 'writing' ? 'bg-emerald-400' : 'bg-indigo-400'}`} />
+                SAMS AI is {typingStage === 'writing' ? 'writing' : 'thinking'}...
+              </span>
+            </div>
+          )}
           {imagePreviews.length > 0 && (
             <div className="flex gap-2 mb-2 flex-wrap">
               {imagePreviews.map((img, i) => (

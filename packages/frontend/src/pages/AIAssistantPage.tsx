@@ -23,6 +23,7 @@ import { AiMessageContent } from '../lib/aiMessageContent';
 import { readAccessToken } from '../lib/authTokens';
 import { detectAiNavigationRequest } from '../lib/aiNavigation';
 import { applyAiThemeCommand, detectAiThemeRequest } from '../lib/aiThemeCommand';
+import { useAiTypingStage } from '../hooks/useAiTypingStage';
 
 interface PendingAction {
   action: string;
@@ -57,6 +58,7 @@ const AIAssistantPage: React.FC = () => {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
+  const typingStage = useAiTypingStage(loading);
   const [threadId, setThreadId] = useState<string | null>(() => loadAiThreadId(threadOwner));
   const [historyLoaded, setHistoryLoaded] = useState(false);
   const pendingActionRef = useRef<PendingAction | null>(null);
@@ -487,10 +489,13 @@ const AIAssistantPage: React.FC = () => {
           {loading && (
             <div className="flex justify-start">
               <div className="bg-surface-muted border border-line rounded-2xl px-5 py-4">
-                <div className="flex space-x-1.5">
-                  <div className="w-2 h-2 bg-indigo-500 rounded-full animate-bounce" />
-                  <div className="w-2 h-2 bg-indigo-500 rounded-full animate-bounce" style={{ animationDelay: '0.1s' }} />
-                  <div className="w-2 h-2 bg-indigo-500 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }} />
+                <div className="flex items-center gap-2 text-sm font-medium text-ink-muted">
+                  <span
+                    className={`w-2 h-2 rounded-full animate-pulse ${
+                      typingStage === 'writing' ? 'bg-emerald-400' : 'bg-indigo-500'
+                    }`}
+                  />
+                  <span>{typingStage === 'writing' ? 'Writing...' : 'Thinking...'}</span>
                 </div>
               </div>
             </div>

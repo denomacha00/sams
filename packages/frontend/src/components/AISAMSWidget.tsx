@@ -6,6 +6,7 @@ import { loadAiThreadId, messagesToAiHistory, saveAiThreadId } from '../lib/aiCh
 import { AiMessageContent } from '../lib/aiMessageContent';
 import { detectAiNavigationRequest } from '../lib/aiNavigation';
 import { applyAiThemeCommand, detectAiThemeRequest } from '../lib/aiThemeCommand';
+import { useAiTypingStage } from '../hooks/useAiTypingStage';
 
 interface PendingAction {
   action: string;
@@ -45,6 +46,7 @@ const AISAMSWidget: React.FC = () => {
   const [messages, setMessages] = useState<Message[]>([WELCOME_MESSAGE]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
+  const typingStage = useAiTypingStage(loading);
   const [threadId, setThreadId] = useState<string | null>(() => loadAiThreadId());
   const pendingActionRef = useRef<PendingAction | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -281,10 +283,13 @@ const AISAMSWidget: React.FC = () => {
           {loading && (
             <div className="flex justify-start">
               <div className="bg-surface-muted border border-line rounded-xl px-3 py-2">
-                <div className="flex space-x-1">
-                  <div className="w-1.5 h-1.5 bg-indigo-400 rounded-full animate-bounce" />
-                  <div className="w-1.5 h-1.5 bg-indigo-400 rounded-full animate-bounce" style={{ animationDelay: '0.1s' }} />
-                  <div className="w-1.5 h-1.5 bg-indigo-400 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }} />
+                <div className="flex items-center gap-2 text-xs font-medium text-ink-muted">
+                  <span
+                    className={`w-1.5 h-1.5 rounded-full animate-pulse ${
+                      typingStage === 'writing' ? 'bg-emerald-400' : 'bg-indigo-400'
+                    }`}
+                  />
+                  <span>{typingStage === 'writing' ? 'Writing...' : 'Thinking...'}</span>
                 </div>
               </div>
             </div>
