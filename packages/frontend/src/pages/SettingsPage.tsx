@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useEffect } from 'react';
+import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuthStore } from '../store/authStore';
 import apiClient from '../services/apiClient';
@@ -38,6 +38,9 @@ const SettingsPage: React.FC = () => {
   // Biometric face enrollment state
   const [bioLoading, setBioLoading] = useState(false);
   const [bioEnrolled, setBioEnrolled] = useState(false);
+  const [faceScanStatus, setFaceScanStatus] = useState('');
+  const faceVideoRef = useRef<HTMLVideoElement | null>(null);
+  const faceStreamRef = useRef<MediaStream | null>(null);
 
   // Sent notifications state
   const canSend = user && ['SCHOOL_ADMIN', 'HOD', 'TEACHER'].includes(user.role);
@@ -200,11 +203,21 @@ const SettingsPage: React.FC = () => {
     }
   }, []);
 
+  const stopFaceCamera = useCallback(() => {
+    faceStreamRef.current?.getTracks().forEach((track) => track.stop());
+    faceStreamRef.current = null;
+    if (faceVideoRef.current) faceVideoRef.current.srcObject = null;
+  }, []);
+
+  useEffect(() => stopFaceCamera, [stopFaceCamera]);
+
   // Face biometric enrollment (students)
   const handleFaceEnroll = useCallback(async () => {
     setBioLoading(true);
+    setFaceScanStatus('Loading face scanner...');
     clearMessages();
     try {
+      await new Promise((resolve) => setTimeout(resolve, 100));
       const faceapi = (window as any).faceapi;
       if (!faceapi) { setError('Face detection library not loaded. Refresh the page.'); setBioLoading(false); return; }
 
@@ -214,28 +227,35 @@ const SettingsPage: React.FC = () => {
         faceapi.nets.faceRecognitionNet.loadFromUri(FACE_API_MODELS_URI),
       ]);
 
+      setFaceScanStatus('Opening front camera...');
       const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user', width: 640, height: 480 } });
-      const video = document.createElement('video');
+      faceStreamRef.current = stream;
+      const video = faceVideoRef.current ?? document.createElement('video');
       video.srcObject = stream;
       video.playsInline = true;
+      video.muted = true;
       await video.play();
-      // Wait a moment for camera to stabilize
+      setFaceScanStatus('Keep your face inside the frame...');
       await new Promise((r) => setTimeout(r, 1500));
 
+      setFaceScanStatus('Scanning face...');
       const detection = await faceapi.detectSingleFace(video, new faceapi.TinyFaceDetectorOptions()).withFaceLandmarks().withFaceDescriptor();
-      stream.getTracks().forEach((t: MediaStreamTrack) => t.stop());
+      stopFaceCamera();
 
       if (!detection) { setError('No face detected. Try in better lighting.'); setBioLoading(false); return; }
+      setFaceScanStatus('Saving face enrollment...');
       const descriptor = Array.from(detection.descriptor as Float32Array);
       await apiClient.post('/biometric/enroll', { descriptor, studentId: user?.id });
       setBioEnrolled(true);
       setSuccess('Face enrolled for attendance!');
     } catch (err: any) {
+      stopFaceCamera();
       setError(err.response?.data?.error || 'Face enrollment failed.');
     } finally {
       setBioLoading(false);
+      setFaceScanStatus('');
     }
-  }, [user?.id]);
+  }, [stopFaceCamera, user?.id]);
 
   const handleFaceDisable = useCallback(async () => {
     if (!confirm('Remove your face enrollment for attendance? You can enroll again later.')) return;
@@ -349,6 +369,28 @@ const SettingsPage: React.FC = () => {
                 <p className="text-xs text-ink-muted">Register your face for attendance</p>
               </div>
             </div>
+            {bioLoading && (
+              <div className="mb-4 overflow-hidden rounded-2xl border border-indigo-500/30 bg-slate-950">
+                <div className="relative aspect-[4/3] w-full">
+                  <video
+                    ref={faceVideoRef}
+                    className="h-full w-full object-cover"
+                    autoPlay
+                    muted
+                    playsInline
+                  />
+                  <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                    <div className="h-44 w-36 rounded-[50%] border-2 border-emerald-300/90 shadow-[0_0_0_999px_rgba(2,6,23,0.35)]" />
+                  </div>
+                  <div className="absolute left-3 right-3 bottom-3 rounded-xl border border-white/10 bg-slate-950/75 px-3 py-2 backdrop-blur-sm">
+                    <div className="flex items-center gap-2 text-xs font-semibold text-emerald-200">
+                      <span className="h-2 w-2 rounded-full bg-emerald-300 animate-pulse" />
+                      <span>{faceScanStatus || 'Scanning face...'}</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
             {bioEnrolled ? (
               <div className="space-y-3">
                 <div className="flex items-center gap-3 p-3 bg-indigo-500/10 border border-indigo-400/20 rounded-xl">
