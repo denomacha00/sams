@@ -219,6 +219,29 @@ function getUnsupportedOperationResponse(question: string): AIServiceResponse | 
   return null;
 }
 
+function getUnhandledActionRequestResponse(question: string): AIServiceResponse | null {
+  const q = question.trim().toLowerCase();
+
+  if (/^(?:how|what|why|when|where|who)\b/.test(q)) return null;
+
+  const actionLike =
+    /\b(?:send|message|notify|email|sms|export|download|generate|create|add|delete|remove|clear|update|change|set|reset|suspend|unsuspend|start|stop|end|open|close|trigger|run|mark)\b/i
+      .test(q);
+  if (!actionLike) return null;
+
+  const actionNoun =
+    /\b(?:message|notification|notice|email|sms|report|export|file|pdf|excel|csv|user|student|teacher|school|class|department|attendance|session|password|license|licence|key|plan|payment|invoice|backup|job|feature|flag)\b/i
+      .test(q);
+  if (!actionNoun) return null;
+
+  return {
+    answer:
+      'I did not do that action. SAMS only says an action is done after a real backend handler runs and returns confirmation. Give me the exact target and message/report/action details, then I will ask for confirmation before running it.',
+    intent: 'unsupported_action',
+    engine: 'local',
+  };
+}
+
 /** Cache the user's real name to use in responses */
 const userNameCache = new Map<string, string>();
 
@@ -534,6 +557,14 @@ export class AIService {
         engine: 'local',
         data: dataFallback.data,
       };
+    }
+
+    const unhandledAction = getUnhandledActionRequestResponse(question);
+    if (unhandledAction) {
+      if (user.sub !== 'guest') {
+        threadId = await this.safelyPersist(user, question, unhandledAction.answer, threadId);
+      }
+      return { ...unhandledAction, threadId };
     }
 
     if (isSamsDataQuery(question)) {

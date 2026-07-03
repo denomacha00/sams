@@ -474,7 +474,7 @@ School Admin can generate HOD, Teacher, Student, and Guardian/Parent links. HOD 
 ## 8. AI Assistant
 
 ### Documentation context injection
-- At runtime the backend loads **`DOCUMENTATION.md`** from the repo root (truncated excerpt, ~8-10k chars) and injects it into the OpenAI-compatible system prompt for how-to and feature questions (`systemDocumentation.ts`).
+- At runtime the backend loads **`DOCUMENTATION.md`** from the repo root and injects a prioritized excerpt into the OpenAI-compatible system prompt for how-to and feature questions (`systemDocumentation.ts`). Super Admin also receives prioritized excerpts from `docs/SAMS-OPS-RUNBOOK.md` and `docs/SAMS-DEVELOPER-OPS-BOOK-DENIS.md`.
 - Keep this file accurate after feature changes; `post-deploy-verify.sh` warns if it is missing on the VPS.
 - Super Admin can also maintain an **AI knowledge base** via the super-admin API for extra school-neutral facts.
 
@@ -502,6 +502,15 @@ Handles SAMS-specific queries via regex pattern matching:
 - Answers any general knowledge question
 - Handles misspellings and natural language
 - No plan tier restriction
+
+### AI grounding and action safety
+- SAMS-specific facts must come from database-backed local handlers, scoped OpenAI tool calls, safe Super Admin `@` operations, or scoped AI Knowledge. AI must not invent names, counts, timetables, attendance, reports, security/audit facts, license keys, passwords, or reset codes.
+- If a SAMS data question cannot be answered from the system, the response stays local (`data_not_found`) instead of using provider fallback to guess.
+- General outside questions such as "what is physics?" may use the provider.
+- Action-looking prompts (send/message/notify/export/create/update/delete/reset/suspend/start/mark, etc.) must not claim success unless a real backend action handler executes through `AIService.executeAction()`.
+- Unclear or unsupported action requests return `unsupported_action` and say the action was not done, then ask for the target/details needed.
+- Super Admin can control the platform through AI, but Super Admin actions still require confirmation before execution and are audited.
+- Non-Super Admin tool calls are scoped: no raw SQL, and school/user/attendance/report data is limited to the caller's role, school, department, class, or linked children.
 
 ### Super Admin AI Actions
 Can execute via natural language:

@@ -259,6 +259,15 @@ Required: `OPENAI_API_KEY`, `OPENAI_BASE_URL`, `OPENAI_MODEL`, optional fallback
 bash scripts/restart-api.sh
 ```
 
+### Current AI safety contract (2026-07-03)
+
+- SAMS-specific facts must come from the database, local DB-backed handlers, approved tool calls, or scoped AI Knowledge. If nothing is found, AI must say nothing came up instead of inventing names, counts, schedules, reports, messages, license keys, passwords, or reset codes.
+- General outside questions such as "what is physics?" may use the provider, but SAMS data questions are blocked from pure provider fallback when local/DB handlers cannot answer.
+- Action-looking requests must not be claimed as done unless `AIService.executeAction()` runs a real handler and returns success. If a send/export/action request is unclear or unsupported, AI must say it did not do it and ask for the exact target/details.
+- Message and notification actions are in-app only unless a dedicated OTP/password-reset/SMS flow is used. A "sent" answer must include the real backend result such as recipient count or a download/action payload.
+- Super Admin still gets platform control, but every Super Admin action, including safe `@` operations, goes through confirmation first and is audited.
+- OpenAI function tools are role scoped: non-Super Admin users cannot run raw SQL; school/user/attendance/report tools are limited to the logged-in role scope.
+
 ### Symptom: AI talks but won't execute actions (suspend/unsuspend)
 
 - Use explicit commands: `unsuspend school [name]`, `suspend school [name]`

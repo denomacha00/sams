@@ -14,7 +14,10 @@ import {
 
 /** Broad SAMS data keywords — used only when intent is still unknown. */
 const SAMS_DATA_KEYWORD_RE =
-  /\b(?:attendance|absent|present\s+today|timetable|time\s*table|schedule|risk\s*score|at[\s-]?risk|roster|class\s+list|active\s+session|student\s+count|how\s+many\s+students)\b/i;
+  /\b(?:attendance|absent|present\s+today|timetable|time\s*table|schedule|risk\s*score|at[\s-]?risk|roster|class\s+list|active\s+session|students?|teachers?|classes?|users?|guardians?|parents?|school\s+admin|hod|department|school|license|licence|payment|revenue|invoice|security|audit|system\s+(?:stats|status|health)|platform\s+(?:stats|status|health)|how\s+many\s+(?:students?|teachers?|classes?|users?|schools?))\b/i;
+
+const EXPLICIT_SAMS_REFERENCE_RE =
+  /\b(?:sams|attendance|absent|present\s+today|timetable|time\s*table|schedule|risk\s*score|at[\s-]?risk|roster|class\s+list|active\s+session|students?|teachers?|classes?|users?|guardians?|parents?|school\s+admin|hod|department|school|license|licence|payment|revenue|invoice|security|audit|system|platform)\b/i;
 
 /** Questions that are general knowledge / how-to, not live SAMS data pulls. */
 const NON_DATA_QUESTION_RE =
@@ -38,6 +41,10 @@ export function detectDataIntent(question: string): DetectedIntent {
 export function isSamsDataQuery(question: string): boolean {
   const q = question.trim();
   if (!q) return false;
+
+  if (NON_DATA_QUESTION_RE.test(q) && !EXPLICIT_SAMS_REFERENCE_RE.test(q)) {
+    return false;
+  }
 
   if (isTimetableViewQuery(q) || isTimetableManageQuery(q)) return true;
   if (isStudentContextQuery(q)) return true;

@@ -279,6 +279,36 @@ describe('AIService anti-hallucination routing', () => {
     expect(r.answer).toMatch(/did not start/i);
   });
 
+  it('does not let the provider fake a sent message when no backend action matched', async () => {
+    localQuery.mockResolvedValue({ answer: 'help', intent: 'unknown' });
+    vi.mocked(openaiQueryWithHistory).mockResolvedValue({
+      answer: 'Done, I sent the message.',
+      intent: 'openai_response',
+    });
+
+    const service = new AIService();
+    const r = await service.query(teacherUser as never, 'send message to parent');
+
+    expect(openaiQueryWithHistory).not.toHaveBeenCalled();
+    expect(r.intent).toBe('unsupported_action');
+    expect(r.answer).toMatch(/did not do that action/i);
+  });
+
+  it('does not let the provider fake an export when no backend action matched', async () => {
+    localQuery.mockResolvedValue({ answer: 'help', intent: 'unknown' });
+    vi.mocked(openaiQueryWithHistory).mockResolvedValue({
+      answer: 'I exported the Excel file.',
+      intent: 'openai_response',
+    });
+
+    const service = new AIService();
+    const r = await service.query(teacherUser as never, 'export report to excel');
+
+    expect(openaiQueryWithHistory).not.toHaveBeenCalled();
+    expect(r.intent).toBe('unsupported_action');
+    expect(r.answer).toMatch(/did not do that action/i);
+  });
+
   it('blocks fake license keys from LLM answers', async () => {
     localQuery.mockResolvedValue({ answer: 'help', intent: 'unknown' });
     vi.mocked(openaiQueryWithHistory).mockResolvedValue({

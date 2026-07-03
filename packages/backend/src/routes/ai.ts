@@ -4,6 +4,7 @@ import multer, { type Multer } from 'multer';
 import { type AccessTokenPayload, UserRole } from '@sams/shared';
 import { aiService } from '../services/aiService';
 import { openaiQuery } from '../services/ai/openaiEngine';
+import { isSamsDataQuery } from '../services/ai/dataQueryRouter';
 import { conversationMemoryService } from '../services/conversationMemoryService';
 import { AppError } from '../middleware/errors';
 import { asyncHandler } from '../middleware/asyncHandler';
@@ -123,10 +124,10 @@ const SAMS_DATA_KEYWORDS = [
 
 /** True when a question needs a logged-in user (attendance, timetables, etc.). */
 export function isSamsDataQuestion(question: string, intent: string): boolean {
-  const lowerQuestion = question.trim().toLowerCase();
   return (
     DATA_INTENTS.includes(intent) ||
-    SAMS_DATA_KEYWORDS.some((kw) => lowerQuestion.includes(kw))
+    isSamsDataQuery(question) ||
+    SAMS_DATA_KEYWORDS.some((kw) => question.trim().toLowerCase().includes(kw))
   );
 }
 
@@ -274,7 +275,6 @@ aiRouter.post('/stream', asyncHandler(async (req: Request, res: Response): Promi
   // Check for data queries without auth
   if (req.user === undefined && user.sub === 'guest') {
     const { detectIntent } = require('../services/ai/localEngine');
-    const { isSamsDataQuestion } = require('../routes/ai');
     const intent = detectIntent(question.trim());
     if (isSamsDataQuestion(question.trim(), intent)) {
       res.write(`data: ${JSON.stringify({ text: 'Sign in to access school data like attendance, timetables, and reports. I can answer general questions without login.\n\nTry asking: "What is SAMS?" or "What is photosynthesis?"' })}\n\n`);

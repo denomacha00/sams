@@ -30,6 +30,22 @@ const SUPER_ADMIN_DEVBOOK_MAX_CHARS = 7_000;
 const SUPER_ADMIN_PLATFORM_DOC_MAX_CHARS = 5_000;
 const SUPER_ADMIN_TOTAL_MAX_CHARS = 18_000;
 
+const RUNBOOK_PRIORITY_HEADINGS = [
+  /^## 8\. AI not working\b/i,
+  /^## 18\. Load this runbook into Super Admin AI\b/i,
+];
+
+const DEVBOOK_PRIORITY_HEADINGS = [
+  /^## 9\. Super Admin AI\b/i,
+  /^## 15\. Security & rotation\b/i,
+  /^### 16\.3 Super Admin AI context loading\b/i,
+];
+
+const PLATFORM_DOC_PRIORITY_HEADINGS = [
+  /^## 8\. AI Assistant\b/i,
+  /^## 10\. Security\b/i,
+];
+
 function loadFullDocumentation(): string {
   if (cachedFullDoc !== null) return cachedFullDoc;
 
@@ -91,12 +107,59 @@ function truncateExcerpt(raw: string, limit: number, label: string): string {
     : `${raw.slice(0, limit)}\n\n[${label} truncated for context length.]`;
 }
 
+function extractPrioritySections(raw: string, headingPatterns: RegExp[]): string {
+  if (!raw || headingPatterns.length === 0) return '';
+
+  const lines = raw.split(/\r?\n/);
+  const sections: string[] = [];
+
+  for (let index = 0; index < lines.length; index += 1) {
+    const line = lines[index];
+    const matched = headingPatterns.some((pattern) => pattern.test(line));
+    if (!matched) continue;
+
+    const headingLevel = line.match(/^(#+)\s/)?.[1].length ?? 2;
+    const collected: string[] = [line];
+    for (let cursor = index + 1; cursor < lines.length; cursor += 1) {
+      const next = lines[cursor];
+      const nextLevel = next.match(/^(#+)\s/)?.[1].length;
+      if (nextLevel && nextLevel <= headingLevel) break;
+      collected.push(next);
+    }
+    sections.push(collected.join('\n').trim());
+  }
+
+  return sections.filter(Boolean).join('\n\n---\n\n');
+}
+
+function buildPrioritizedExcerpt(
+  raw: string,
+  limit: number,
+  label: string,
+  headingPatterns: RegExp[],
+): string {
+  if (!raw) return '';
+
+  const priority = extractPrioritySections(raw, headingPatterns);
+  if (!priority) return truncateExcerpt(raw, limit, label);
+
+  const introBudget = Math.max(0, limit - priority.length - 80);
+  const intro = introBudget > 250 ? truncateExcerpt(raw, introBudget, `${label} intro`) : '';
+  const combined = intro ? `${priority}\n\n---\n\n${intro}` : priority;
+  return truncateExcerpt(combined, limit, label);
+}
+
 /**
  * Ops runbook excerpt for Super Admin AI troubleshooting context.
  */
 export function getOpsRunbookExcerpt(maxChars?: number): string {
   const limit = maxChars ?? SUPER_ADMIN_RUNBOOK_MAX_CHARS;
-  return truncateExcerpt(loadOpsRunbook(), limit, 'Ops runbook');
+  return buildPrioritizedExcerpt(
+    loadOpsRunbook(),
+    limit,
+    'Ops runbook',
+    RUNBOOK_PRIORITY_HEADINGS,
+  );
 }
 
 /**
@@ -104,7 +167,12 @@ export function getOpsRunbookExcerpt(maxChars?: number): string {
  */
 export function getDeveloperBookExcerpt(maxChars?: number): string {
   const limit = maxChars ?? SUPER_ADMIN_DEVBOOK_MAX_CHARS;
-  return truncateExcerpt(loadDeveloperBook(), limit, 'Developer ops book');
+  return buildPrioritizedExcerpt(
+    loadDeveloperBook(),
+    limit,
+    'Developer ops book',
+    DEVBOOK_PRIORITY_HEADINGS,
+  );
 }
 
 /**
@@ -126,10 +194,11 @@ function buildSuperAdminDocumentationExcerpt(): string {
   const platformDoc = loadFullDocumentation();
   if (platformDoc) {
     parts.push(
-      `# Platform Documentation (features)\n\n${truncateExcerpt(
+      `# Platform Documentation (features)\n\n${buildPrioritizedExcerpt(
         platformDoc,
         SUPER_ADMIN_PLATFORM_DOC_MAX_CHARS,
         'Platform documentation',
+        PLATFORM_DOC_PRIORITY_HEADINGS,
       )}`,
     );
   }

@@ -5,7 +5,7 @@
 | Item | Value |
 |------|--------|
 | **Version** | 1.0.0 |
-| **Last updated** | 2026-06-18 |
+| **Last updated** | 2026-07-03 |
 | **Author / owner** | Denis Macharia (Super Admin) |
 | **Production VPS** | `182.143.228.182` |
 | **Deploy path** | `/var/www/sams` |
@@ -744,6 +744,18 @@ aiService.ts → openaiEngine.ts
 | `services/ai/handlers/superAdminHandlers.ts` | Suspend, license, stats, … |
 | `services/ai/aiProviderConfig.ts` | OpenRouter/Groq clients, health |
 | `routes/ai.ts` | HTTP endpoints, multer for images |
+
+### 9.1.1 Current AI safety contract
+
+SAMS AI is allowed to sound natural, but it is not allowed to fake SAMS data or fake completed actions.
+
+- **SAMS data grounding:** Attendance, timetable, people, schools, licenses, reports, security, audit, payment, and system-status questions must use local DB-backed handlers, scoped OpenAI tool calls, safe `@` operations, or scoped AI Knowledge. If a handler cannot find data, answer "nothing came up" or ask for a clearer target.
+- **General knowledge stays allowed:** Non-SAMS questions such as "what is physics?" can go to the provider.
+- **No fake action success:** Send/export/create/update/delete/reset/suspend/start/mark requests must not fall through to a provider answer claiming success. `AIService` blocks unhandled action-like prompts with `unsupported_action` until a real handler runs.
+- **Real actions only:** A successful action answer must come from `AIService.executeAction()` and the action handler result. For notifications this means real in-app rows/socket delivery with recipient count. For exports this means a real download payload or data-export record.
+- **Confirmation first:** Super Admin is the platform owner, but every Super Admin action still asks for confirmation before execution. Other destructive role actions use the configured confirmation rules.
+- **Tool scoping:** Non-Super Admin OpenAI function tools cannot run raw SQL. `lookup_school`, `lookup_user`, attendance, risk, and report tools are scoped to the caller role and school/department/class/linked-child visibility.
+- **Secrets:** AI must never output `.env`, provider keys, JWT secrets, DB passwords, existing passwords, guessed license keys, temporary passwords, or reset codes unless a real reset/license action generated that one-time value.
 
 ### 9.2 AI provider config
 

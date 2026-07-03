@@ -615,19 +615,120 @@ export function shouldUseTools(user: AccessTokenPayload): boolean {
 
 // ─── Function Call Dispatchers ────────────────────────────────────────────────
 
+async function getGuardianStudentIds(user: AccessTokenPayload): Promise<string[]> {
+  const links = await prisma.guardian.findMany({
+    where: { guardianId: user.sub, schoolId: user.schoolId },
+    select: { studentId: true },
+  });
+  return links.map((link) => link.studentId);
+}
+
+async function getTeacherVisibleClassIds(user: AccessTokenPayload): Promise<string[]> {
+  const { resolveTeacherTeachingClassIds } = await import('../../lib/teacherScope');
+  return resolveTeacherTeachingClassIds(user.sub, user.classId);
+}
+
+async function getHodVisibleClassIds(user: AccessTokenPayload): Promise<string[]> {
+  const { resolveHodDepartmentId } = await import('../../lib/hodScope');
+  const departmentId = await resolveHodDepartmentId(user);
+  if (!departmentId) return [];
+  const classes = await prisma.class.findMany({
+    where: { schoolId: user.schoolId, departmentId },
+    select: { id: true },
+  });
+  return classes.map((cls) => cls.id);
+}
+
+async function getVisibleStudentIds(user: AccessTokenPayload): Promise<string[] | undefined> {
+  if (user.role === UserRole.SUPER_ADMIN || user.role === UserRole.SCHOOL_ADMIN) return undefined;
+  if (user.role === UserRole.STUDENT) return [user.sub];
+  if (user.role === UserRole.GUARDIAN) return getGuardianStudentIds(user);
+
+  let classIds: string[] = [];
+  if (user.role === UserRole.TEACHER) classIds = await getTeacherVisibleClassIds(user);
+  if (user.role === UserRole.HOD) classIds = await getHodVisibleClassIds(user);
+  if (classIds.length === 0) return [];
+
+  const students = await prisma.user.findMany({
+    where: { schoolId: user.schoolId, role: UserRole.STUDENT, classId: { in: classIds } },
+    select: { id: true },
+  });
+  return students.map((student) => student.id);
+}
+
+async function canViewStudent(user: AccessTokenPayload, studentId: string): Promise<boolean> {
+  if (user.role === UserRole.SUPER_ADMIN) return true;
+  if (user.role === UserRole.SCHOOL_ADMIN) {
+    const student = await prisma.user.findFirst({
+      where: { id: studentId, schoolId: user.schoolId, role: UserRole.STUDENT },
+      select: { id: true },
+    });
+    return Boolean(student);
+  }
+  const visibleStudentIds = await getVisibleStudentIds(user);
+  return Boolean(visibleStudentIds?.includes(studentId));
+}
+
+async function buildUserLookupScope(user: AccessTokenPayload): Promise<Record<string, unknown>> {
+  if (user.role === UserRole.SUPER_ADMIN) return {};
+  if (user.role === UserRole.SCHOOL_ADMIN) return { schoolId: user.schoolId };
+  if (user.role === UserRole.STUDENT) return { id: user.sub, schoolId: user.schoolId };
+  if (user.role === UserRole.GUARDIAN) {
+    const studentIds = await getGuardianStudentIds(user);
+    return { schoolId: user.schoolId, OR: [{ id: user.sub }, { id: { in: studentIds } }] };
+  }
+
+  const visibleStudentIds = await getVisibleStudentIds(user);
+  if (user.role === UserRole.TEACHER) {
+    return {
+      schoolId: user.schoolId,
+      OR: [
+        { id: user.sub },
+        { id: { in: visibleStudentIds ?? [] } },
+      ],
+    };
+  }
+
+  if (user.role === UserRole.HOD) {
+    const { resolveHodDepartmentId } = await import('../../lib/hodScope');
+    const departmentId = user.departmentId ?? await resolveHodDepartmentId(user);
+    return departmentId
+      ? { schoolId: user.schoolId, OR: [{ id: user.sub }, { departmentId }, { id: { in: visibleStudentIds ?? [] } }] }
+      : { schoolId: user.schoolId, id: user.sub };
+  }
+
+  return { schoolId: user.schoolId, id: user.sub };
+}
+
 async function dispatchQueryAttendance(
   args: { type: string; limit?: number },
   user: AccessTokenPayload,
 ): Promise<unknown> {
   const limit = args.limit ?? 10;
   const schoolId = user.schoolId;
-  const baseWhere: Record<string, unknown> = { schoolId };
+  const baseWhere: Record<string, unknown> = user.role === UserRole.SUPER_ADMIN && schoolId === 'none'
+    ? {}
+    : { schoolId };
 
   if (user.role === UserRole.STUDENT) {
     baseWhere.studentId = user.sub;
-  } else if (user.role === UserRole.TEACHER && user.classId) {
+  } else if (user.role === UserRole.GUARDIAN) {
+    const studentIds = await getGuardianStudentIds(user);
+    if (studentIds.length === 0) return { error: 'No linked children found in your scope.' };
+    baseWhere.studentId = { in: studentIds };
+  } else if (user.role === UserRole.TEACHER) {
+    const classIds = await getTeacherVisibleClassIds(user);
+    if (classIds.length === 0) return { error: 'No classes are linked to your teacher account.' };
     const sessions = await prisma.attendanceSession.findMany({
-      where: { schoolId, classId: user.classId },
+      where: { schoolId, classId: { in: classIds } },
+      select: { id: true },
+    });
+    baseWhere.sessionId = { in: sessions.map((s: any) => s.id) };
+  } else if (user.role === UserRole.HOD) {
+    const classIds = await getHodVisibleClassIds(user);
+    if (classIds.length === 0) return { error: 'No department classes are linked to your HOD account.' };
+    const sessions = await prisma.attendanceSession.findMany({
+      where: { schoolId, classId: { in: classIds } },
       select: { id: true },
     });
     baseWhere.sessionId = { in: sessions.map((s: any) => s.id) };
@@ -669,8 +770,14 @@ async function dispatchQueryRiskScores(
   user: AccessTokenPayload,
 ): Promise<unknown> {
   const limit = args.limit ?? 10;
-  const where: Record<string, unknown> = { schoolId: user.schoolId };
-  if (user.role === UserRole.STUDENT) where.studentId = user.sub;
+  const where: Record<string, unknown> = user.role === UserRole.SUPER_ADMIN && user.schoolId === 'none'
+    ? {}
+    : { schoolId: user.schoolId };
+  const visibleStudentIds = await getVisibleStudentIds(user);
+  if (visibleStudentIds) {
+    if (visibleStudentIds.length === 0) return [];
+    where.studentId = { in: visibleStudentIds };
+  }
   if (args.filter === 'high_risk') where.riskLevel = { in: ['HIGH', 'CRITICAL'] };
   else if (args.filter === 'critical') where.riskLevel = 'CRITICAL';
 
@@ -686,6 +793,7 @@ async function dispatchQueryReports(args: { scope: string; targetId?: string }, 
   if (args.scope === 'student') {
     const targetId = user.role === UserRole.STUDENT ? user.sub : args.targetId;
     if (!targetId) return { error: 'targetId required' };
+    if (!(await canViewStudent(user, targetId))) return { error: 'Student is outside your scope.' };
     const total = await prisma.attendanceRecord.count({ where: { studentId: targetId, schoolId } });
     const present = await prisma.attendanceRecord.count({ where: { studentId: targetId, schoolId, status: { in: ['PRESENT', 'LATE'] } } });
     const percentage = total > 0 ? ((present / total) * 100).toFixed(1) : '0.0';
@@ -733,7 +841,9 @@ export async function dispatchFunctionCall(
         const { prisma } = await import('../../lib/prisma');
         const name = parsedArgs.name as string;
         const school = await prisma.school.findFirst({
-          where: { name: { contains: name || '', mode: 'insensitive' } },
+          where: user.role === UserRole.SUPER_ADMIN
+            ? { name: { contains: name || '', mode: 'insensitive' } }
+            : { id: user.schoolId, name: { contains: name || '', mode: 'insensitive' } },
           include: { _count: { select: { users: true, sessions: true } } },
         });
         result = school ?? { error: 'School not found' };
@@ -743,14 +853,21 @@ export async function dispatchFunctionCall(
         const { prisma } = await import('../../lib/prisma');
         const search = parsedArgs.search as string;
         const role = parsedArgs.role as string | undefined;
-        const where: Record<string, unknown> = {
+        const searchWhere: Record<string, unknown> = {
           OR: [
             { fullName: { contains: search, mode: 'insensitive' } },
             { email: { contains: search, mode: 'insensitive' } },
             { username: { contains: search, mode: 'insensitive' } },
           ],
         };
-        if (role) where.role = role;
+        const scopeWhere = await buildUserLookupScope(user);
+        const where: Record<string, unknown> = Object.keys(scopeWhere).length > 0
+          ? { AND: [scopeWhere, searchWhere] }
+          : searchWhere;
+        if (role) {
+          if (where.AND) (where.AND as Record<string, unknown>[]).push({ role });
+          else where.role = role;
+        }
         const users = await prisma.user.findMany({ where, take: 5, select: { id: true, fullName: true, email: true, role: true, phone: true } });
         result = users.length > 0 ? users : { error: 'No users found' };
         break;
