@@ -93,9 +93,23 @@ export function decodeLicenseKey(key: string, secret: string): LicensePayload | 
 
   const rawToken = key.replace(/-/g, '');
 
-  // Strip trailing padding chars (they were added during encoding)
-  const stripped = rawToken.replace(/0+$/, '');
+  // Padding is at most 3 chars because keys are padded to 4-char groups.
+  // The checksum itself can legitimately end in 0, so try each possible
+  // padding length and accept only a candidate with a valid HMAC and payload.
+  for (let padLength = 0; padLength <= 3; padLength += 1) {
+    if (padLength > 0 && !rawToken.endsWith(PAD_CHAR.repeat(padLength))) {
+      continue;
+    }
 
+    const stripped = padLength === 0 ? rawToken : rawToken.slice(0, -padLength);
+    const decoded = decodeRawLicenseToken(stripped, secret);
+    if (decoded) return decoded;
+  }
+
+  return null;
+}
+
+function decodeRawLicenseToken(stripped: string, secret: string): LicensePayload | null {
   // Need at least HMAC_LENGTH + 2 chars (minimum 1-char hex payload is 2 hex chars)
   if (stripped.length <= HMAC_LENGTH) {
     return null;

@@ -109,6 +109,7 @@ const INTENT_PATTERNS: { intent: DetectedIntent; patterns: RegExp[] }[] = [
       /custom\s*knowledge/i,
       /knowledge\s*base/i,
       /what\s*do\s*you\s*know\s*about/i,
+      /tell\s+me\s+about\s+(?!sams\b)/i,
     ],
   },
   // ⚠️ ORDER MATTERS: "remake_timetable" MUST come before "generate_timetable"
@@ -1693,7 +1694,27 @@ ${planBreakdown || '  • No schools registered yet'}`;
 
 // ─── Custom Knowledge Handler ─────────────────────────────────────────────────
 
-async function handleCustomKnowledge(user: AccessTokenPayload): Promise<AIQueryResult> {
+function extractKnowledgeQuery(question: string): string | null {
+  const patterns = [
+    /what\s+do\s+you\s+know\s+about\s+(.+)/i,
+    /tell\s+me\s+about\s+(?!sams\b)(.+)/i,
+    /find\s+(?:knowledge|info)\s+(?:about\s+)?(.+)/i,
+    /search\s+(?:knowledge|kb|articles?|notes?)\s+(?:for\s+)?(.+)/i,
+  ];
+
+  for (const pattern of patterns) {
+    const match = question.match(pattern);
+    const value = match?.[1]?.trim().replace(/[?.!]+$/, '');
+    if (value) return value;
+  }
+
+  return null;
+}
+
+async function handleCustomKnowledge(
+  user: AccessTokenPayload,
+  question: string,
+): Promise<AIQueryResult> {
   let entries: Array<{ title: string; content: string; category: string }> = [];
   if (user.sub !== 'guest' && user.schoolId && user.schoolId !== 'none') {
     const { knowledgeService } = await import('../knowledgeService');
@@ -1704,6 +1725,24 @@ async function handleCustomKnowledge(user: AccessTokenPayload): Promise<AIQueryR
       select: { title: true, content: true, category: true },
       orderBy: { createdAt: 'desc' },
     });
+  }
+
+  const query = extractKnowledgeQuery(question);
+  if (query) {
+    const needle = query.toLowerCase();
+    entries = entries.filter((entry) =>
+      entry.title.toLowerCase().includes(needle) ||
+      entry.content.toLowerCase().includes(needle) ||
+      entry.category.toLowerCase().includes(needle)
+    );
+
+    if (entries.length === 0) {
+      return {
+        answer: '',
+        intent: 'unknown',
+        data: { count: 0, query },
+      };
+    }
   }
 
   if (entries.length === 0) {
@@ -1783,7 +1822,7 @@ export async function localQuery(
         }
         return await handleSystemStats();
       case 'custom_knowledge':
-        return await handleCustomKnowledge(user);
+        return await handleCustomKnowledge(user, question);
       case 'attendance_percentage':
         return await handleAttendancePercentage(scope);
       case 'absent_students':

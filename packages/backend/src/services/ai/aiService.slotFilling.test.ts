@@ -42,6 +42,7 @@ vi.mock('./openaiEngine', () => ({
 
 vi.mock('./aiProviderConfig', () => ({
   hasPrimaryAIKey: vi.fn().mockReturnValue(false),
+  hasAtomesusAIKey: vi.fn().mockReturnValue(false),
   getMissingAIKeyMessage: vi.fn().mockReturnValue('no key'),
   formatProviderError: vi.fn(),
 }));
@@ -156,5 +157,31 @@ describe('AIService multi-turn notification flow', () => {
         channels: ['inapp'],
       }),
     );
+  });
+
+  it('super admin control actions always ask for confirmation before executing', async () => {
+    vi.mocked(actionIntentDetector.detect).mockResolvedValue({
+      isAction: true,
+      action: 'run_terminal_command',
+      params: { command: '@check ai' },
+      requiresConfirmation: true,
+      description: 'Run AI diagnostics.',
+    });
+
+    const superAdmin = {
+      sub: 'super-1',
+      role: UserRole.SUPER_ADMIN,
+      schoolId: 'platform',
+    } as const;
+
+    const r = await service.query(superAdmin as any, '@check ai');
+
+    expect(r.intent).toBe('action_confirmation');
+    expect(r.requiresConfirmation).toBe(true);
+    expect(r.pendingAction).toMatchObject({
+      action: 'run_terminal_command',
+      params: { command: '@check ai' },
+    });
+    expect(mockSendScoped).not.toHaveBeenCalled();
   });
 });

@@ -282,6 +282,14 @@ describe('actionIntentDetector role scoping (regex path)', () => {
     expect(schoolAdminResult.isAction).toBe(false);
   });
 
+  it('understands fuzzy @ control commands for super admin', async () => {
+    const result = await actionIntentDetector.detect('@check ai', UserRole.SUPER_ADMIN);
+    expect(result.isAction).toBe(true);
+    expect(result.action).toBe('run_terminal_command');
+    expect(result.description).toBe('Run AI diagnostics.');
+    expect(result.requiresConfirmation).toBe(true);
+  });
+
   it('detects super admin provider secret updates as confirmed actions', async () => {
     const result = await actionIntentDetector.detect(
       'set Atomesus API key to atms_sk_testvalue123456789',

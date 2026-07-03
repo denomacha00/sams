@@ -469,7 +469,7 @@ const resetUserPasswordHandler: ActionHandler = async (params, scope) => {
   const mode = modeRaw === 'trigger_reset' ? 'trigger_reset' : 'temp_password';
 
   if (!identifier.trim()) {
-    return { answer: 'Who needs a reset? Say: "reset password for [username] at school [code]"' };
+    return { answer: 'Who needs a password reset? Say: "reset password for [username] at school [code]"' };
   }
 
   const { resetUserPasswordByAdmin } = await import('../../passwordResetService');
@@ -537,12 +537,16 @@ const runSystemReadinessCheckHandler: ActionHandler = async () => {
     s.timetableEntry ? isTimetableWindowExpired(s.timetableEntry) : false,
   );
   const ai = getAIHealthSummary();
+  const memoryEnabled = isConversationMemoryEnabled();
 
   const lines = [
+    'System readiness check',
     `Schools: ${totalSchools} (${suspendedSchools} suspended, ${expiredLicenses} expired)`,
     `Users: ${totalUsers}`,
     `Active sessions: ${activeSessions.length}, stale: ${staleSessions.length}`,
+    `Stale active sessions: ${staleSessions.length} past timetable window`,
     `AI: primary ${ai.primaryKey ? 'yes' : 'no'}, fallback ${ai.fallbackKey ? 'yes' : 'no'}`,
+    `Conversation memory: ${memoryEnabled ? 'enabled' : 'disabled'}`,
   ];
 
   return {
@@ -606,7 +610,11 @@ const databaseOverviewHandler: ActionHandler = async () => {
 const runTerminalCommandHandler: ActionHandler = async (params) => {
   const requestedCommand = String(params.command ?? '').trim();
   const resolved = resolveTerminalCommand(requestedCommand);
-  if (!resolved) return { answer: `Not allowed.\n\n${listTerminalCommandHelp()}` };
+  if (!resolved) {
+    return {
+      answer: `I understand this is a Super Admin control command, but I need to map it to a safe SAMS operation before I can ask for confirmation.\n\n${listTerminalCommandHelp()}`,
+    };
+  }
 
   const result = await runSafeTerminalCommand(requestedCommand);
   return {
@@ -651,8 +659,8 @@ export const superAdminActions: ActionDefinition[] = [
     destructive: false,
     patterns: [
       /^@\s*school\s+(.+)/i,
-      /(?:can\s+(?:you\s+)?)?see\s+(?:the\s+)?school\s+(.+)/i,
-      /(?:can\s+(?:you\s+)?)?school\s+(.+)/i,
+      /^(?:can\s+(?:you\s+)?)?see\s+(?:the\s+)?school\s+(.+)/i,
+      /^(?:can\s+(?:you\s+)?)?school\s+(?!info\b)(.+)/i,
       /(?:info|information)\s+(?:about|on|for)\s+(.+)/i,
       /details?\s+(?:of|about|for)\s+(.+)/i,
       /show\s+(.+?)\s+info/i,
@@ -667,7 +675,12 @@ export const superAdminActions: ActionDefinition[] = [
     ],
     extractParams: (_message: string, match: RegExpMatchArray | null) => {
       if (!match || !match[1]) return { schoolName: '' };
-      return { schoolName: match[1].trim().replace(/\s*(?:school|please|now)\s*$/i, '') };
+      return {
+        schoolName: match[1]
+          .trim()
+          .replace(/^(?:info|information)\s+(?:about|on|for)\s+/i, '')
+          .replace(/\s*(?:school|please|now)\s*$/i, ''),
+      };
     },
     descriptionTemplate: (params) => `Get info for "${params.schoolName}".`,
     handler: getSchoolInfoHandler,
@@ -685,7 +698,7 @@ export const superAdminActions: ActionDefinition[] = [
       /who\s+are\s+you/i,
       /what\s+(?:are|is)\s+you/i,
       /tell\s+me\s+about\s+(?:yourself|the\s+developer|the\s+founder|your\s+creator|the\s+creator)/i,
-      /\b(?:atomesus|cipher|indus\s+valley|alibaba|meta)\b/i,
+      /^(?!.*\b(?:set|change|update|replace)\b).*\b(?:atomesus|cipher|indus\s+valley|alibaba|meta)\b/i,
       /do\s+you\s+know\s+(?:who\s+)?(?:i\s+am|me)/i,
       /am\s+i\s+(?:your\s+)?(?:creator|owner|builder|maker|developer|boss|founder)/i,
     ],
@@ -796,11 +809,11 @@ export const superAdminActions: ActionDefinition[] = [
     action: 'run_terminal_command',
     description: 'Run an allowlisted SAMS terminal operation. Only works when message starts with @.',
     destructive: true,
-    patterns: [/^@\s*(.+)$/i],
+    patterns: [/^@\s*(?!db\b|database\b)(.+)$/i],
     extractParams: (_message: string, match: RegExpMatchArray | null) => ({ command: match && match[1] ? `@${match[1].trim()}` : '' }),
     descriptionTemplate: (params) => {
       const resolved = resolveTerminalCommand(String(params.command ?? ''));
-      return resolved ? `Run ${resolved.label}.` : 'Blocked command.';
+      return resolved ? `Run ${resolved.label}.` : 'Choose a safe SAMS control command.';
     },
     handler: runTerminalCommandHandler,
   },

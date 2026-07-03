@@ -1,4 +1,4 @@
-import { getActionsForRole, normalizeActionPatterns } from './roleActionRegistry';
+import { getActionsForRole, isActionPermitted, normalizeActionPatterns } from './roleActionRegistry';
 import { classifyIntent } from './llmActionClassifier';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -39,9 +39,37 @@ class ActionIntentDetector {
       return regexResult;
     }
 
+    if (this.isClearlyForbiddenActionPhrase(trimmed, userRole)) {
+      return { isAction: false, requiresConfirmation: false };
+    }
+
     // Step 2: LLM fallback with role-scoped action candidates
     const llmResult = await this.detectByLLM(trimmed, userRole);
     return llmResult;
+  }
+
+  private isClearlyForbiddenActionPhrase(message: string, role: string): boolean {
+    const q = message.toLowerCase();
+    if (
+      /\bhow\s+many\s+(?:teachers|students|classes|users)\b/.test(q) &&
+      !isActionPermitted(role, 'get_school_stats') &&
+      !isActionPermitted(role, 'view_department_stats')
+    ) {
+      return true;
+    }
+
+    const checks: Array<[RegExp, string]> = [
+      [/^@\w+/, 'run_terminal_command'],
+      [/\b(?:add|create|register)\s+(?:a\s+)?(?:user|teacher|staff|admin)\b/, 'add_user'],
+      [/\b(?:my|show\s+my|view\s+my)\s+attendance\b/, 'view_attendance'],
+      [/\b(?:notify|message|send\s+(?:a\s+)?(?:message|notification|notice)\s+to)\s+(?:the\s+)?school\b/, 'send_school_notification'],
+      [/\b(?:notify|message|send\s+(?:a\s+)?(?:message|notification|notice)\s+to)\s+(?:the\s+)?department\b/, 'send_department_notification'],
+      [/\b(?:reset|change|new)\s+(?:user\s+)?pass\s*word\b/, 'reset_user_password'],
+      [/\b(?:suspend|unsuspend|block|unblock)\s+(?:the\s+)?school\b/, 'suspend_school'],
+      [/\b(?:generate|create|new)\s+(?:a\s+)?(?:license|licence|key)\b/, 'generate_license'],
+    ];
+
+    return checks.some(([pattern, action]) => pattern.test(q) && !isActionPermitted(role, action));
   }
 
   /**
@@ -77,6 +105,9 @@ class ActionIntentDetector {
   private async detectByLLM(message: string, role: string): Promise<DetectedAction> {
     const actions = getActionsForRole(role);
     if (actions.length === 0) {
+      return { isAction: false, requiresConfirmation: false };
+    }
+    if (!actions.some((a) => normalizeActionPatterns(a.patterns).length > 0)) {
       return { isAction: false, requiresConfirmation: false };
     }
 

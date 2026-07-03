@@ -60,23 +60,35 @@ const searchKnowledgeHandler: ActionHandler = async (params, scope) => {
   const query = (params.query as string)?.trim();
   if (!query) return { answer: 'What would you like to search for?' };
 
-  const where: Record<string, unknown> =
+  const scopeFilter: Record<string, unknown> =
     scope.role === 'SUPER_ADMIN'
       ? { createdBy: { role: 'SUPER_ADMIN' } }
       : { schoolId: scope.schoolId };
+
   if (scope.role === 'HOD' && scope.departmentId) {
-    where.OR = [
+    scopeFilter.OR = [
       { departmentId: null, classId: null },
       { departmentId: scope.departmentId },
+    ];
+  } else if ((scope.role === 'TEACHER' || scope.role === 'STUDENT') && scope.classId) {
+    scopeFilter.OR = [
+      { departmentId: null, classId: null },
+      { departmentId: scope.departmentId, classId: null },
+      { classId: scope.classId },
     ];
   }
 
   const entries = await prisma.aIKnowledge.findMany({
     where: {
-      ...where,
-      OR: [
-        { title: { contains: query, mode: 'insensitive' } },
-        { content: { contains: query, mode: 'insensitive' } },
+      AND: [
+        scopeFilter,
+        {
+          OR: [
+            { title: { contains: query, mode: 'insensitive' } },
+            { content: { contains: query, mode: 'insensitive' } },
+            { category: { contains: query, mode: 'insensitive' } },
+          ],
+        },
       ],
     },
     include: { createdBy: { select: { fullName: true } } },
@@ -136,6 +148,9 @@ export const knowledgeActions: ActionDefinition[] = [
     patterns: [
       /search\s+(?:knowledge|kb|articles?|notes?)\s+(?:for\s+)?(.+)/i,
       /find\s+(?:knowledge|info)\s+(?:about\s+)?(.+)/i,
+      /what\s+do\s+you\s+know\s+about\s+(.+)/i,
+      /tell\s+me\s+about\s+(?!sams\b)(.+)/i,
+      /what\s+is\s+(.+)\s+in\s+(?:the\s+)?knowledge\s+base/i,
     ],
     extractParams: (_message: string, match: RegExpMatchArray | null) => ({
       query: match?.[1]?.trim() || '',

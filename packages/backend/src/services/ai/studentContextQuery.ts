@@ -51,7 +51,6 @@ export const STUDENT_TEACHERS_QUERY_PATTERNS: RegExp[] = [
   /who\s+is\s+(?:my|our)\s+(?:class\s+)?teacher/i,
   /teachers?\s+for\s+(?:my|our)\s+class/i,
   /list\s+(?:my|our)\s+teachers?/i,
-  /\bteachers?\b/,
   /(?:tell\s+me\s+about|show\s+me|what\s+(?:is|are)|give\s+me|can\s+i\s+(?:get|have|see))\s+.*\bteachers?/i,
   /(?:my\s+)?teachers?\s+(?:contact|details?|info(?:rmation)?|profile|name|email|phone|mobile|number)/i,
   /(?:contact|details?|info(?:rmation)?|profile|name|email|phone|mobile|number)\s+(?:of\s+)?(?:my|our)?\s*teachers?/i,

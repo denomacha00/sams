@@ -781,7 +781,9 @@ export class AIService {
       };
     }
 
-    const needsConfirm = actionRequiresConfirmation(scopedUser.role, action);
+    const needsConfirm =
+      scopedUser.role === UserRole.SUPER_ADMIN ||
+      actionRequiresConfirmation(scopedUser.role, action);
     if (needsConfirm) {
       const description = mergePendingDescription(scopedUser.role, action, params);
       const confirmAnswer = `⚠️ **Confirm Action**: ${description}\n\nReply **yes** to proceed.`;

@@ -77,6 +77,9 @@ export async function fetchDepartmentStats(
 }
 
 export function formatDepartmentStatsAnswer(stats: DepartmentStatsCounts): string {
+  const teacherNames = stats.teacherNames ?? [];
+  const studentNames = stats.studentNames ?? [];
+
   const lines: string[] = [
     `📊 **${stats.className ? `${stats.className} Department` : 'Department'} Stats**`,
     '',
@@ -85,19 +88,19 @@ export function formatDepartmentStatsAnswer(stats: DepartmentStatsCounts): strin
     `• Classes: ${stats.classCount}`,
   ];
 
-  if (stats.teacherNames.length > 0) {
+  if (teacherNames.length > 0) {
     lines.push('');
     lines.push(`**Teachers:**`);
     stats.teacherNames.forEach((name) => lines.push(`  👤 ${name}`));
   }
 
-  if (stats.studentNames.length > 0) {
+  if (studentNames.length > 0) {
     lines.push('');
     lines.push(`**Students:**`);
     stats.studentNames.forEach((name) => lines.push(`  🧑‍🎓 ${name}`));
   }
 
-  if (stats.studentNames.length === 0 && stats.teacherNames.length === 0) {
+  if (studentNames.length === 0 && teacherNames.length === 0) {
     lines.push('');
     lines.push('No teachers or students are assigned to this department yet.');
   }

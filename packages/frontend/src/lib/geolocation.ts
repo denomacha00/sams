@@ -23,11 +23,16 @@ function normalizePosition(pos: GeolocationPosition): GeoCoordinates {
     throw new Error('GPS_INVALID');
   }
 
-  return {
+  const coordinates: GeoCoordinates = {
     lat,
     lng,
-    accuracy: Number.isFinite(pos.coords.accuracy) ? pos.coords.accuracy : null,
   };
+
+  if (Number.isFinite(pos.coords.accuracy)) {
+    coordinates.accuracy = pos.coords.accuracy;
+  }
+
+  return coordinates;
 }
 
 function readPositionOnce(
@@ -40,7 +45,7 @@ function readPositionOnce(
 
   return new Promise((resolve, reject) => {
     let settled = false;
-    const timer = window.setTimeout(() => {
+    const timer = globalThis.setTimeout(() => {
       if (settled) return;
       settled = true;
       reject(new Error('GPS_TIMEOUT'));
@@ -50,7 +55,7 @@ function readPositionOnce(
       (pos) => {
         if (settled) return;
         settled = true;
-        window.clearTimeout(timer);
+        globalThis.clearTimeout(timer);
         try {
           resolve(normalizePosition(pos));
         } catch (error) {
@@ -60,7 +65,7 @@ function readPositionOnce(
       (error) => {
         if (settled) return;
         settled = true;
-        window.clearTimeout(timer);
+        globalThis.clearTimeout(timer);
         reject(normalizeGpsError(error));
       },
       options,

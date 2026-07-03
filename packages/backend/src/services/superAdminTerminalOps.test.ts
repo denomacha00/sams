@@ -27,6 +27,14 @@ describe('superAdminTerminalOps', () => {
     expect(resolveTerminalCommand('@deploy')?.key).toBe('deploy');
   });
 
+  it('infers boss-style @ control commands without requiring exact wording', () => {
+    expect(resolveTerminalCommand('@health')?.key).toBe('readiness');
+    expect(resolveTerminalCommand('@check ai')?.key).toBe('diagnose-ai');
+    expect(resolveTerminalCommand('@restart the backend')?.key).toBe('restart-api');
+    expect(resolveTerminalCommand('@pull latest code')?.key).toBe('git-pull');
+    expect(resolveTerminalCommand('@ship it')?.key).toBe('deploy');
+  });
+
   it('blocks arbitrary shell commands', () => {
     expect(resolveTerminalCommand('@rm -rf /')).toBeNull();
     expect(resolveTerminalCommand('@cat secrets/providers.env')).toBeNull();

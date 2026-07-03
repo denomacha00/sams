@@ -190,6 +190,13 @@ const COMMANDS: Record<TerminalCommandKey, TerminalCommandDefinition> = {
 const ALIASES: Record<string, TerminalCommandKey> = {
   status: 'status',
   'pm2 status': 'status',
+  health: 'readiness',
+  'system health': 'readiness',
+  'app health': 'readiness',
+  'check health': 'readiness',
+  'check system': 'readiness',
+  'check app': 'readiness',
+  'system check': 'readiness',
   test: 'test',
   smoke: 'test',
   'smoke test': 'test',
@@ -212,12 +219,19 @@ const ALIASES: Record<string, TerminalCommandKey> = {
   'diagnose ai': 'diagnose-ai',
   'diagnose-ai': 'diagnose-ai',
   ai: 'diagnose-ai',
+  'ai check': 'diagnose-ai',
+  'ai status': 'diagnose-ai',
+  'check ai': 'diagnose-ai',
+  'fix ai': 'diagnose-ai',
   traffic: 'traffic',
   load: 'traffic',
   'load test': 'traffic',
   restart: 'restart-api',
   'restart api': 'restart-api',
   'restart-api': 'restart-api',
+  'restart backend': 'restart-api',
+  'restart server': 'restart-api',
+  'restart system': 'restart-api',
   'app only': 'ready-app-only',
   'app-only': 'ready-app-only',
   'ready app only': 'ready-app-only',
@@ -238,10 +252,40 @@ const ALIASES: Record<string, TerminalCommandKey> = {
   pull: 'git-pull',
   'git pull': 'git-pull',
   'git-pull': 'git-pull',
+  'pull latest': 'git-pull',
+  'update code': 'git-pull',
+  'sync code': 'git-pull',
   deploy: 'deploy',
   'deploy production': 'deploy',
   'deploy-production': 'deploy',
+  publish: 'deploy',
+  'go live': 'deploy',
+  'ship it': 'deploy',
 };
+
+function inferCommandKey(normalized: string): TerminalCommandKey | null {
+  if (
+    /\b(?:rm|del|erase|format|shutdown|reboot|powershell|cmd|bash|sh|cat|type|more|less|nano|vim|vi|node|tsx|python|curl|wget)\b/.test(normalized) ||
+    /[;&|`><]/.test(normalized)
+  ) {
+    return null;
+  }
+
+  if (/\b(?:ai|atomesus|openai|provider|model)\b/.test(normalized)) return 'diagnose-ai';
+  if (/\b(?:secret|secrets|env|key|keys)\b/.test(normalized)) return 'secrets';
+  if (/\b(?:log|logs|error|errors)\b/.test(normalized)) return 'logs';
+  if (/\b(?:restart|reload|bounce)\b/.test(normalized)) return 'restart-api';
+  if (/\b(?:unlock|unblock)\b.*\busers?\b|\busers?\b.*\b(?:unlock|unblock)\b/.test(normalized)) return 'unlock-users';
+  if (/\b(?:migration|migrate|prisma)\b.*\b(?:deploy|apply|run)\b/.test(normalized)) return 'migrate-deploy';
+  if (/\b(?:migration|migrate|prisma)\b/.test(normalized)) return 'migrate-status';
+  if (/\b(?:git|code)\b.*\b(?:pull|sync|update|latest)\b|\bpull\s+latest\b/.test(normalized)) return 'git-pull';
+  if (/\b(?:deploy|publish|release|go\s+live|ship)\b/.test(normalized)) return 'deploy';
+  if (/\b(?:traffic|load|stress)\b/.test(normalized)) return 'traffic';
+  if (/\b(?:test|smoke)\b/.test(normalized)) return 'test';
+  if (/\b(?:verify|post\s+deploy)\b/.test(normalized)) return 'verify';
+  if (/\b(?:ready|readiness|health|diagnose|diagnostic|check|status)\b/.test(normalized)) return 'readiness';
+  return null;
+}
 
 export function listTerminalCommandHelp(): string {
   return [
@@ -270,7 +314,7 @@ export function listTerminalCommandHelp(): string {
 
 export function resolveTerminalCommand(input: string): TerminalCommandDefinition | null {
   const normalized = normalizeCommand(input);
-  const key = ALIASES[normalized];
+  const key = ALIASES[normalized] ?? inferCommandKey(normalized);
   return key ? COMMANDS[key] : null;
 }
 
