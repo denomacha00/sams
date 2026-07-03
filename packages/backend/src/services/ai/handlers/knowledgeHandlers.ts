@@ -60,7 +60,10 @@ const searchKnowledgeHandler: ActionHandler = async (params, scope) => {
   const query = (params.query as string)?.trim();
   if (!query) return { answer: 'What would you like to search for?' };
 
-  const where: Record<string, unknown> = { schoolId: scope.schoolId };
+  const where: Record<string, unknown> =
+    scope.role === 'SUPER_ADMIN'
+      ? { createdBy: { role: 'SUPER_ADMIN' } }
+      : { schoolId: scope.schoolId };
   if (scope.role === 'HOD' && scope.departmentId) {
     where.OR = [
       { departmentId: null, classId: null },
@@ -86,7 +89,7 @@ const searchKnowledgeHandler: ActionHandler = async (params, scope) => {
   }
 
   const lines = entries.map((e, i) =>
-    `${i + 1}. **${e.title}** — ${e.content.slice(0, 100)}...`
+    `${i + 1}. **${e.title}**\n${e.content}`
   );
 
   return {

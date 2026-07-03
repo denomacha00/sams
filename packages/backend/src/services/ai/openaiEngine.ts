@@ -128,12 +128,12 @@ export function sanitizeLlmOutput(answer: string): string {
 
   // Step 1: Full rewrite when model tries to claim a different identity
   if (FULL_REWRITE_RE.test(result)) {
-    return "I'm SAMS. Denis Macharia built me, and Denis is my boss. I don't know anything about India or other companies — I just work at SAMS.";
+    return "I'm SAMS AI. Denis Macharia built me, and Denis is my boss.";
   }
 
   // "built by Atomesus" / "created by Cipher"
   if (PROVIDER_IDENTITY_DRIFT_RE.test(result)) {
-    result = result.replace(PROVIDER_IDENTITY_DRIFT_RE, "I'm SAMS, built by Denis Macharia. Denis");
+    result = result.replace(PROVIDER_IDENTITY_DRIFT_RE, 'built by Denis Macharia');
   }
 
   // "I am an AI assistant named Cipher" → "I'm SAMS"

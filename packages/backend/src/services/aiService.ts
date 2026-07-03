@@ -137,6 +137,9 @@ function containsGeneratedSecretLikeText(answer: string): boolean {
 const SAMS_AI_IDENTITY_ANSWER =
   "I'm your SAMS AI assistant. My name is SAMS — I help you with attendance, timetables, reports, and anything in the school system. Ask me whatever you need!";
 
+const SAMS_AI_IDENTITY_FALLBACK_ANSWER =
+  "I'm SAMS AI. Denis Macharia built me, and Denis is my boss.";
+
 async function getSamsIdentityResponse(question: string): Promise<AIServiceResponse | null> {
   if (!SAMS_AI_IDENTITY_QUERY_RE.test(question) && !PROVIDER_IDENTITY_QUERY_RE.test(question)) {
     return null;
@@ -147,6 +150,7 @@ async function getSamsIdentityResponse(question: string): Promise<AIServiceRespo
     const { prisma } = await import('../lib/prisma');
     const identityKnowledge = await prisma.aIKnowledge.findMany({
       where: {
+        createdBy: { role: UserRole.SUPER_ADMIN },
         OR: [
           { title: { contains: 'denis', mode: 'insensitive' } },
           { title: { contains: 'creator', mode: 'insensitive' } },
@@ -175,7 +179,7 @@ async function getSamsIdentityResponse(question: string): Promise<AIServiceRespo
   }
 
   return {
-    answer: SAMS_AI_IDENTITY_ANSWER,
+    answer: SAMS_AI_IDENTITY_FALLBACK_ANSWER,
     intent: 'ai_identity',
     engine: 'local',
     data: { owner: 'Denis Macharia' },
@@ -335,7 +339,7 @@ export class AIService {
     // action, DB query, or LLM call. Respond instantly.
     // Matches single words ("nice", "cool", "sawa", "pole") AND multi-word
     // conversational phrases ("you good", "how are you", "I'm good").
-    if (user.sub !== 'guest' || true) {
+    if (!options?.pendingAction && !options?.confirmAction) {
       const casual = question.trim().match(CASUAL_CHAT_RE);
       const multiWord = question.trim().match(MULTI_WORD_CHAT_RE);
       if (casual || multiWord) {
@@ -887,6 +891,13 @@ export class AIService {
         },
       });
 
+      return {
+        answer: result.answer,
+        intent: 'action_executed',
+        engine: 'local',
+        data: result.data,
+      };
+
       // Format the response with HumanResponseFormatter + optional LLM reframe
       try {
         const { getOpenAIClient, resolveChatModel } = await import('./ai/aiProviderConfig');
@@ -924,7 +935,7 @@ Here is the raw result: "${result.answer}"`,
         const reframed = reframeResponse.choices[0]?.message?.content?.trim();
         if (reframed) {
           return {
-            answer: formatAnswer(reframed, user.role),
+            answer: formatAnswer(reframed ?? '', user.role),
             intent: 'action_executed',
             engine: 'openai',
             data: result.data,

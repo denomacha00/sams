@@ -10,6 +10,11 @@ export const schemeOfWorkRouter = Router();
 
 const DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'];
 
+function routeParam(req: Request, name: string): string {
+  const value = req.params[name];
+  return Array.isArray(value) ? value[0] : value;
+}
+
 // ─── GET /api/v1/schemes ───────────────────────────────────────────────────
 // List schemes visible to the current user
 schemeOfWorkRouter.get('/', requirePermission('view:schemes'), async (req: Request, res: Response): Promise<void> => {
@@ -28,9 +33,43 @@ schemeOfWorkRouter.get('/', requirePermission('view:schemes'), async (req: Reque
 });
 
 // ─── GET /api/v1/schemes/:id ───────────────────────────────────────────────
+// Returns data needed by the frontend to build scheme: classes, terms, subjects.
+// This route must stay before "/:id" so "generate-info" is not treated as an ID.
+schemeOfWorkRouter.get('/generate-info', requirePermission('view:schemes'), async (req: Request, res: Response): Promise<void> => {
+  try {
+    const [classes, terms, teacherSubjects] = await Promise.all([
+      prisma.class.findMany({
+        where: { schoolId: req.schoolId },
+        select: { id: true, name: true, departmentId: true },
+        orderBy: { name: 'asc' },
+      }),
+      prisma.academicTerm.findMany({
+        where: { schoolId: req.schoolId },
+        select: { id: true, name: true, isActive: true },
+        orderBy: { startDate: 'desc' },
+      }),
+      prisma.teacherSubject.findMany({
+        where: { teacherId: req.user.sub, schoolId: req.schoolId },
+        select: { subject: true },
+        distinct: ['subject'],
+        orderBy: { subject: 'asc' },
+      }),
+    ]);
+
+    const subjects = teacherSubjects.map((s) => s.subject);
+
+    res.json({ classes, terms, subjects });
+  } catch (err) {
+    if (err instanceof AppError) throw err;
+    throw new AppError(500, 'INTERNAL_ERROR', 'Failed to load generator info');
+  }
+});
+
+// GET /api/v1/schemes/:id
 schemeOfWorkRouter.get('/:id', requirePermission('view:schemes'), async (req: Request, res: Response): Promise<void> => {
   try {
-    const scheme = await schemeOfWorkService.getById(req.params.id, req.schoolId);
+    const id = routeParam(req, 'id');
+    const scheme = await schemeOfWorkService.getById(id, req.schoolId);
     if (!scheme) {
       res.status(404).json({ error: 'Scheme of work not found', code: 'NOT_FOUND' });
       return;
@@ -82,14 +121,15 @@ const updateSchemeSchema = z.object({
 
 schemeOfWorkRouter.put('/:id', requirePermission('manage:schemes'), async (req: Request, res: Response): Promise<void> => {
   try {
+    const id = routeParam(req, 'id');
     const parsed = updateSchemeSchema.safeParse(req.body);
     if (!parsed.success) {
       res.status(400).json({ error: 'Validation failed', code: 'VALIDATION_ERROR', details: parsed.error.flatten().fieldErrors });
       return;
     }
 
-    await schemeOfWorkService.updateMeta(req.params.id, req.schoolId, parsed.data);
-    const scheme = await schemeOfWorkService.getById(req.params.id, req.schoolId);
+    await schemeOfWorkService.updateMeta(id, req.schoolId, parsed.data);
+    const scheme = await schemeOfWorkService.getById(id, req.schoolId);
     res.json(scheme);
   } catch (err) {
     if (err instanceof AppError) throw err;
@@ -112,14 +152,15 @@ const generateWeeksSchema = z.object({
 
 schemeOfWorkRouter.post('/:id/generate-weeks', requirePermission('manage:schemes'), async (req: Request, res: Response): Promise<void> => {
   try {
+    const id = routeParam(req, 'id');
     const parsed = generateWeeksSchema.safeParse(req.body);
     if (!parsed.success) {
       res.status(400).json({ error: 'Validation failed', code: 'VALIDATION_ERROR', details: parsed.error.flatten().fieldErrors });
       return;
     }
 
-    await schemeOfWorkService.generateWeeksForScheme(req.params.id, req.schoolId, parsed.data.weeks);
-    const scheme = await schemeOfWorkService.getById(req.params.id, req.schoolId);
+    await schemeOfWorkService.generateWeeksForScheme(id, req.schoolId, parsed.data.weeks);
+    const scheme = await schemeOfWorkService.getById(id, req.schoolId);
     res.json(scheme);
   } catch (err) {
     if (err instanceof AppError) throw err;
@@ -131,7 +172,8 @@ schemeOfWorkRouter.post('/:id/generate-weeks', requirePermission('manage:schemes
 // Submit for HOD approval
 schemeOfWorkRouter.post('/:id/submit', requirePermission('manage:schemes'), async (req: Request, res: Response): Promise<void> => {
   try {
-    const count = await schemeOfWorkService.submitForApproval(req.params.id, req.schoolId);
+    const id = routeParam(req, 'id');
+    const count = await schemeOfWorkService.submitForApproval(id, req.schoolId);
     if (count.count === 0) {
       res.status(400).json({ error: 'Scheme cannot be submitted (not in DRAFT status or not found)', code: 'INVALID_STATUS' });
       return;
@@ -147,7 +189,8 @@ schemeOfWorkRouter.post('/:id/submit', requirePermission('manage:schemes'), asyn
 // HOD approves
 schemeOfWorkRouter.post('/:id/approve', requirePermission('approve:schemes'), async (req: Request, res: Response): Promise<void> => {
   try {
-    const count = await schemeOfWorkService.approve(req.params.id, req.schoolId, req.user.sub);
+    const id = routeParam(req, 'id');
+    const count = await schemeOfWorkService.approve(id, req.schoolId, req.user.sub);
     if (count.count === 0) {
       res.status(400).json({ error: 'Scheme cannot be approved (not PENDING_APPROVAL or not found)', code: 'INVALID_STATUS' });
       return;
@@ -167,13 +210,14 @@ const rejectSchema = z.object({
 
 schemeOfWorkRouter.post('/:id/reject', requirePermission('approve:schemes'), async (req: Request, res: Response): Promise<void> => {
   try {
+    const id = routeParam(req, 'id');
     const parsed = rejectSchema.safeParse(req.body);
     if (!parsed.success) {
       res.status(400).json({ error: 'Rejection reason required', code: 'VALIDATION_ERROR' });
       return;
     }
 
-    const count = await schemeOfWorkService.reject(req.params.id, req.schoolId, parsed.data.reason);
+    const count = await schemeOfWorkService.reject(id, req.schoolId, parsed.data.reason);
     if (count.count === 0) {
       res.status(400).json({ error: 'Scheme cannot be rejected (not PENDING_APPROVAL or not found)', code: 'INVALID_STATUS' });
       return;
@@ -188,7 +232,8 @@ schemeOfWorkRouter.post('/:id/reject', requirePermission('approve:schemes'), asy
 // ─── DELETE /api/v1/schemes/:id ───────────────────────────────────────────
 schemeOfWorkRouter.delete('/:id', requirePermission('manage:schemes'), async (req: Request, res: Response): Promise<void> => {
   try {
-    await schemeOfWorkService.delete(req.params.id, req.schoolId);
+    const id = routeParam(req, 'id');
+    await schemeOfWorkService.delete(id, req.schoolId);
     res.json({ message: 'Scheme deleted' });
   } catch (err) {
     if (err instanceof AppError) throw err;
@@ -212,12 +257,13 @@ const updateWeekSchema = z.object({
 
 schemeOfWorkRouter.patch('/weeks/:weekId', requirePermission('manage:schemes'), async (req: Request, res: Response): Promise<void> => {
   try {
+    const weekId = routeParam(req, 'weekId');
     const parsed = updateWeekSchema.safeParse(req.body);
     if (!parsed.success) {
       res.status(400).json({ error: 'Validation failed', code: 'VALIDATION_ERROR' });
       return;
     }
-    const updated = await schemeOfWorkService.updateWeek(req.params.weekId, parsed.data);
+    const updated = await schemeOfWorkService.updateWeek(weekId, parsed.data);
     res.json(updated);
   } catch (err) {
     if (err instanceof AppError) throw err;
@@ -240,12 +286,13 @@ const updateLessonPlanSchema = z.object({
 
 schemeOfWorkRouter.patch('/lesson-plans/:planId', requirePermission('manage:schemes'), async (req: Request, res: Response): Promise<void> => {
   try {
+    const planId = routeParam(req, 'planId');
     const parsed = updateLessonPlanSchema.safeParse(req.body);
     if (!parsed.success) {
       res.status(400).json({ error: 'Validation failed', code: 'VALIDATION_ERROR' });
       return;
     }
-    const updated = await schemeOfWorkService.updateLessonPlan(req.params.planId, parsed.data);
+    const updated = await schemeOfWorkService.updateLessonPlan(planId, parsed.data);
     res.json(updated);
   } catch (err) {
     if (err instanceof AppError) throw err;
@@ -253,34 +300,3 @@ schemeOfWorkRouter.patch('/lesson-plans/:planId', requirePermission('manage:sche
   }
 });
 
-// ─── GET /api/v1/schemes/generate-info ─────────────────────────────────────
-// Returns data needed by the frontend to build scheme: classes, terms, subjects
-schemeOfWorkRouter.get('/generate-info', requirePermission('view:schemes'), async (req: Request, res: Response): Promise<void> => {
-  try {
-    const [classes, terms, teacherSubjects] = await Promise.all([
-      prisma.class.findMany({
-        where: { schoolId: req.schoolId },
-        select: { id: true, name: true, departmentId: true },
-        orderBy: { name: 'asc' },
-      }),
-      prisma.academicTerm.findMany({
-        where: { schoolId: req.schoolId },
-        select: { id: true, name: true, isActive: true },
-        orderBy: { startDate: 'desc' },
-      }),
-      prisma.teacherSubject.findMany({
-        where: { teacherId: req.user.sub, schoolId: req.schoolId },
-        select: { subject: true },
-        distinct: ['subject'],
-        orderBy: { subject: 'asc' },
-      }),
-    ]);
-
-    const subjects = teacherSubjects.map((s) => s.subject);
-
-    res.json({ classes, terms, subjects });
-  } catch (err) {
-    if (err instanceof AppError) throw err;
-    throw new AppError(500, 'INTERNAL_ERROR', 'Failed to load generator info');
-  }
-});

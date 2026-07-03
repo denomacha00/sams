@@ -1,5 +1,19 @@
 -- Add Scheme of Work & Lesson Planning models
 
+-- AcademicTerm may be missing on some instances; create if absent
+CREATE TABLE IF NOT EXISTS "AcademicTerm" (
+    "id" TEXT NOT NULL PRIMARY KEY,
+    "schoolId" TEXT NOT NULL,
+    "name" VARCHAR(100) NOT NULL,
+    "startDate" TIMESTAMP(3) NOT NULL,
+    "endDate" TIMESTAMP(3) NOT NULL,
+    "isActive" BOOLEAN NOT NULL DEFAULT false,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT "AcademicTerm_schoolId_fkey" FOREIGN KEY ("schoolId") REFERENCES "School"("id") ON DELETE RESTRICT ON UPDATE CASCADE
+);
+CREATE UNIQUE INDEX IF NOT EXISTS "AcademicTerm_schoolId_name_key" ON "AcademicTerm"("schoolId", "name");
+CREATE INDEX IF NOT EXISTS "AcademicTerm_schoolId_isActive_idx" ON "AcademicTerm"("schoolId", "isActive");
+
 -- BLOB guard — skip if already applied
 DO $$ BEGIN
   IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'scheme_of_work') THEN
