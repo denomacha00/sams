@@ -3,7 +3,7 @@ import apiClient from '../services/apiClient';
 import { readAccessToken } from '../lib/authTokens';
 import { AiApiHistoryMessage } from '../lib/aiChat';
 
-const AI_STREAM_TIMEOUT_MS = 45_000;
+const AI_STREAM_TIMEOUT_MS = 20_000;
 
 export interface StreamCallbacks {
   onStart?: () => void;

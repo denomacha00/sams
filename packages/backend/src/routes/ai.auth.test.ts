@@ -25,6 +25,14 @@ vi.mock('../services/ai/openaiEngine', () => ({
   openaiQueryWithHistory: vi.fn(),
 }));
 
+vi.mock('../services/ai/streamEngine', () => ({
+  streamFromProvider: vi.fn(async (_user, question: string, _history, onDelta: (chunk: { text: string }) => void) => {
+    const answer = `${question} is answered by the provider.`;
+    onDelta({ text: answer });
+    return { answer, intent: 'openai_response', engine: 'openai' };
+  }),
+}));
+
 vi.mock('../services/conversationMemoryService', () => ({
   conversationMemoryService: {
     getThreads: vi.fn(),
@@ -111,6 +119,18 @@ describe('AI optional auth', () => {
     expect(res.body).toMatchObject({ answer: 'Hi there', intent: 'greeting', engine: 'local' });
     expect(localQuery).toHaveBeenCalled();
     expect(openaiQuery).not.toHaveBeenCalled();
+  });
+
+  it('streams guest general-knowledge questions without hidden aiService pre-query', async () => {
+    vi.mocked(detectIntent).mockReturnValue('unknown');
+    const app = createAiApp();
+
+    const res = await request(app).post('/ai/stream').send({ question: 'what is physics' });
+
+    expect(res.status).toBe(200);
+    expect(res.text).toContain('what is physics is answered by the provider.');
+    expect(res.text).toContain('"done":true');
+    expect(aiService.query).not.toHaveBeenCalled();
   });
 
   it('passes voice confirmation context through to aiService', async () => {

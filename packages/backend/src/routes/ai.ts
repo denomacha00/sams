@@ -164,7 +164,7 @@ aiRouter.get('/conversations/:threadId', asyncHandler(async (req: Request, res: 
   } catch (err) {
     if (err instanceof Error && err.message === 'Thread not found') {
       res.status(404).json({ error: 'Thread not found' });
-      return;
+        return;
     }
     throw err;
   }
@@ -258,27 +258,26 @@ aiRouter.post('/stream', asyncHandler(async (req: Request, res: Response): Promi
   // identity, data queries, action detection) so the streaming path
   // has the SAME instant-response coverage as the non-streaming path.
   const trimmedQuestion = question.trim();
+  const intent = detectIntent(trimmedQuestion);
 
   // Check against the non-streaming AI service first for local-only intents.
   // If it returns a non-unknown, non-openai intent, use it instantly.
-  try {
-    const localResult = await aiService.query(user, trimmedQuestion, {
-      threadId: threadId || undefined,
-      history: req.body.history,
-    });
-    if (localResult.engine === 'local' && localResult.intent !== 'unknown') {
-      res.write(`data: ${JSON.stringify({ text: localResult.answer })}\n\n`);
-      res.write(`data: ${JSON.stringify({ intent: localResult.intent, done: true })}\n\n`);
-      res.end();
+  if (intent !== 'unknown') {
+    try {
+      const localResult = await localQuery(user, trimmedQuestion);
+      if (localResult.intent !== 'unknown') {
+        res.write(`data: ${JSON.stringify({ text: localResult.answer })}\n\n`);
+        res.write(`data: ${JSON.stringify({ intent: localResult.intent, engine: 'local', done: true })}\n\n`);
+        res.end();
       return;
     }
   } catch {
     // Fall through to streaming — local engine failed
   }
+  }
 
   // Check for data queries without auth
   if (req.user === undefined && user.sub === 'guest') {
-    const intent = detectIntent(question.trim());
     if (isSamsDataQuestion(question.trim(), intent)) {
       res.write(`data: ${JSON.stringify({ text: 'Sign in to access school data like attendance, timetables, and reports. I can answer general questions without login.\n\nTry asking: "What is SAMS?" or "What is photosynthesis?"' })}\n\n`);
       res.write(`data: ${JSON.stringify({ done: true })}\n\n`);
@@ -335,14 +334,20 @@ aiRouter.post('/stream', asyncHandler(async (req: Request, res: Response): Promi
     const { streamFromProvider } = await import('../services/ai/streamEngine');
 
     // Stream the response
+    let streamedAnswer = '';
     const result = await streamFromProvider(
       user,
       question.trim(),
       formattedHistory.slice(-20),
       (chunk: { text: string }) => {
+        streamedAnswer += chunk.text;
         res.write(`data: ${JSON.stringify({ text: chunk.text })}\n\n`);
       },
     );
+
+    if (!streamedAnswer.trim() && result.answer?.trim()) {
+      res.write(`data: ${JSON.stringify({ text: result.answer })}\n\n`);
+    }
 
     // Persist to conversation memory for authenticated users
     if (user.sub !== 'guest') {
@@ -455,7 +460,7 @@ aiRouter.post('/query', asyncHandler(async (req: Request, res: Response): Promis
           engine: 'local',
         });
       }
-      return;
+        return;
     }
 
     // For all other guest messages, go to Groq WITH conversation history
