@@ -48,6 +48,17 @@ interface SupportMessage extends Notification {
   isMine?: boolean;
 }
 
+interface NotificationThread {
+  key: string;
+  title: string;
+  subtitle: string;
+  avatar: string;
+  latest: Notification;
+  messages: Notification[];
+  unreadCount: number;
+  attachments: NotificationAttachment[];
+}
+
 type Folder = 'alerts' | 'inbox' | 'sent';
 
 interface Department {
@@ -95,6 +106,23 @@ function formatDateTime(dateStr: string): string {
   if (d.toDateString() === now.toDateString()) return `Today at ${time}`;
   if (d.toDateString() === yesterday.toDateString()) return `Yesterday at ${time}`;
   return `${d.toLocaleDateString([], { day: 'numeric', month: 'short', year: 'numeric' })} at ${time}`;
+}
+
+function formatThreadTime(dateStr: string): string {
+  const d = new Date(dateStr);
+  const now = new Date();
+  const yesterday = new Date(now);
+  yesterday.setDate(yesterday.getDate() - 1);
+  if (d.toDateString() === now.toDateString()) {
+    return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  }
+  if (d.toDateString() === yesterday.toDateString()) return 'Yesterday';
+  return d.toLocaleDateString([], { day: '2-digit', month: 'short' });
+}
+
+function threadPreview(notif: Notification): string {
+  const prefix = notif.attachments?.length ? `${notif.attachments.length} attachment${notif.attachments.length !== 1 ? 's' : ''} - ` : '';
+  return `${prefix}${notif.message || notif.title || 'Message'}`;
 }
 
 const MAX_ATTACHMENT_FILES = 5;
@@ -177,6 +205,8 @@ const NotificationsPage: React.FC = () => {
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [sentMessages, setSentMessages] = useState<SentNotification[]>([]);
   const [folder, setFolder] = useState<Folder>('inbox');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [activeThreadKey, setActiveThreadKey] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [sentLoading, setSentLoading] = useState(false);
   const [isClassRep, setIsClassRep] = useState(false);
@@ -787,6 +817,87 @@ const NotificationsPage: React.FC = () => {
     folder === 'inbox' ? inboxMessages :
     sentMessages;
   const listLoading = folder === 'sent' ? sentLoading : loading;
+  const messageThreads = useMemo<NotificationThread[]>(() => {
+    const threadMap = new Map<string, NotificationThread>();
+
+    for (const notif of displayList) {
+      const isSentFolder = folder === 'sent';
+      const scopeLabel = notif.targetScopeLabel ?? (isSentFolder ? 'Recipients' : 'You');
+      const senderDisplay = notif.type === 'SUPER_ADMIN'
+        ? 'SAMS Super Admin'
+        : truncateName(notif.senderName || (notif.senderId === null ? 'System' : 'Deleted User'));
+      const key = isSentFolder
+        ? `sent:${notif.batchId ?? notif.id}`
+        : notif.batchId
+          ? `batch:${notif.batchId}`
+          : `from:${notif.senderId ?? 'system'}:${notif.type}:${notif.title || 'message'}`;
+      const titleText = isSentFolder
+        ? scopeLabel
+        : notif.title || senderDisplay || 'Message';
+      const subtitleText = isSentFolder
+        ? `You -> ${scopeLabel}`
+        : `${senderDisplay}${formatRole(notif.senderRole) ? ` - ${formatRole(notif.senderRole)}` : ''}`;
+
+      const existing = threadMap.get(key);
+      if (!existing) {
+        threadMap.set(key, {
+          key,
+          title: titleText,
+          subtitle: subtitleText,
+          avatar: isSentFolder ? 'ME' : initials(senderDisplay || titleText),
+          latest: notif,
+          messages: [notif],
+          unreadCount: !isSentFolder && !notif.read ? 1 : 0,
+          attachments: collectAttachments([notif]),
+        });
+        continue;
+      }
+
+      existing.messages.push(notif);
+      if (new Date(notif.createdAt).getTime() > new Date(existing.latest.createdAt).getTime()) {
+        existing.latest = notif;
+        existing.title = titleText;
+        existing.subtitle = subtitleText;
+      }
+      if (!isSentFolder && !notif.read) existing.unreadCount += 1;
+      existing.attachments = collectAttachments(existing.messages);
+    }
+
+    return [...threadMap.values()]
+      .map((thread) => ({
+        ...thread,
+        messages: [...thread.messages].sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()),
+      }))
+      .sort((a, b) => new Date(b.latest.createdAt).getTime() - new Date(a.latest.createdAt).getTime());
+  }, [displayList, folder]);
+
+  const filteredThreads = useMemo(() => {
+    const query = searchQuery.trim().toLowerCase();
+    if (!query) return messageThreads;
+    return messageThreads.filter((thread) => {
+      const haystack = [
+        thread.title,
+        thread.subtitle,
+        thread.latest.title,
+        thread.latest.message,
+        thread.latest.senderName,
+        thread.latest.targetScopeLabel,
+      ].filter(Boolean).join(' ').toLowerCase();
+      return haystack.includes(query);
+    });
+  }, [messageThreads, searchQuery]);
+
+  const activeThread = filteredThreads.find((thread) => thread.key === activeThreadKey) ?? filteredThreads[0] ?? null;
+
+  useEffect(() => {
+    if (!filteredThreads.length) {
+      if (activeThreadKey !== null) setActiveThreadKey(null);
+      return;
+    }
+    if (!activeThreadKey || !filteredThreads.some((thread) => thread.key === activeThreadKey)) {
+      setActiveThreadKey(filteredThreads[0].key);
+    }
+  }, [activeThreadKey, filteredThreads]);
 
   const renderAttachments = (attachments: NotificationAttachment[] | undefined, isSentFolder: boolean) => {
     if (!attachments || attachments.length === 0) return null;
@@ -1516,17 +1627,115 @@ const NotificationsPage: React.FC = () => {
               <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
             </svg>
           </div>
-        ) : displayList.length === 0 ? (
+        ) : messageThreads.length === 0 ? (
           <div className="text-center py-12">
             <svg className="w-16 h-16 text-ink-muted mx-auto mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
             </svg>
-            <p className="text-ink-muted">{folder === 'inbox' ? 'No messages in your inbox' : 'No sent messages yet'}</p>
+            <p className="text-ink-muted">{folder === 'inbox' ? 'No messages in your inbox' : folder === 'alerts' ? 'No alerts yet' : 'No sent messages yet'}</p>
           </div>
         ) : (
-          <div className="rounded-3xl border border-line bg-surface/70 p-3 sm:p-4 shadow-card-soft space-y-3">
-            {displayList.map((notif) => renderMessageCard(notif, folder === 'sent'))}
-          </div>
+          <section className="overflow-hidden rounded-2xl border border-line bg-[#17212b] shadow-card-soft">
+            <div className="grid min-h-[34rem] lg:grid-cols-[minmax(20rem,26rem)_1fr]">
+              <div className="border-b border-line/80 bg-[#17212b] lg:border-b-0 lg:border-r">
+                <div className="sticky top-0 z-10 border-b border-white/5 bg-[#17212b]/95 p-3 backdrop-blur">
+                  <div className="relative">
+                    <svg className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#7f91a4]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-4.35-4.35m1.1-5.4a6.5 6.5 0 11-13 0 6.5 6.5 0 0113 0z" />
+                    </svg>
+                    <input
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      className="h-11 w-full rounded-xl border border-white/5 bg-[#223140] pl-10 pr-3 text-sm text-[#e9edef] outline-none placeholder:text-[#7f91a4] focus:border-indigo-400/40"
+                      placeholder="Search messages"
+                    />
+                  </div>
+                </div>
+
+                {filteredThreads.length === 0 ? (
+                  <div className="px-5 py-10 text-center text-sm text-[#8da0b3]">
+                    No message matches your search.
+                  </div>
+                ) : (
+                  <div className="max-h-[34rem] overflow-y-auto">
+                    {filteredThreads.map((thread) => {
+                      const selected = activeThread?.key === thread.key;
+                      const latest = thread.latest;
+                      const isSentFolder = folder === 'sent';
+                      return (
+                        <button
+                          key={thread.key}
+                          type="button"
+                          onClick={() => {
+                            setActiveThreadKey(thread.key);
+                            if (!isSentFolder && latest && !latest.read) void markAsRead(latest.id);
+                          }}
+                          className={`flex w-full items-center gap-3 border-b border-white/5 px-3 py-3 text-left transition-colors ${
+                            selected ? 'bg-[#223140]' : 'bg-transparent hover:bg-[#1d2a36]'
+                          }`}
+                        >
+                          <span className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-full text-xs font-bold ${
+                            isSentFolder
+                              ? 'bg-indigo-600 text-white'
+                              : latest.type === 'SUPER_ADMIN'
+                                ? 'bg-amber-500/20 text-amber-100 ring-1 ring-amber-400/30'
+                                : 'bg-[#2f4154] text-[#dce7f1]'
+                          }`}>
+                            {thread.avatar}
+                          </span>
+                          <span className="min-w-0 flex-1">
+                            <span className="flex items-center gap-2">
+                              <span className="min-w-0 flex-1 truncate text-sm font-semibold text-[#f3f6f8]">
+                                {thread.title}
+                              </span>
+                              <span className="shrink-0 text-[11px] text-[#7f91a4]">{formatThreadTime(latest.createdAt)}</span>
+                            </span>
+                            <span className="mt-1 flex items-center gap-2">
+                              <span className="min-w-0 flex-1 truncate text-sm text-[#9fb0c0]">
+                                {threadPreview(latest)}
+                              </span>
+                              {thread.unreadCount > 0 && (
+                                <span className="flex h-5 min-w-5 shrink-0 items-center justify-center rounded-full bg-[#3ea6ff] px-1.5 text-[11px] font-bold text-white">
+                                  {thread.unreadCount > 99 ? '99+' : thread.unreadCount}
+                                </span>
+                              )}
+                            </span>
+                            <span className="mt-0.5 block truncate text-xs text-[#6f8294]">{thread.subtitle}</span>
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+
+              <div className="min-w-0 bg-[#0f1720]">
+                {activeThread ? (
+                  <>
+                    <div className="sticky top-0 z-10 flex items-center gap-3 border-b border-white/5 bg-[#17212b]/95 px-4 py-3 backdrop-blur">
+                      <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#2f4154] text-xs font-bold text-[#dce7f1]">
+                        {activeThread.avatar}
+                      </span>
+                      <div className="min-w-0 flex-1">
+                        <h2 className="truncate text-sm font-semibold text-[#f3f6f8]">{activeThread.title}</h2>
+                        <p className="truncate text-xs text-[#8da0b3]">
+                          {activeThread.messages.length} message{activeThread.messages.length !== 1 ? 's' : ''}
+                          {activeThread.attachments.length > 0 ? ` - ${activeThread.attachments.length} attachment${activeThread.attachments.length !== 1 ? 's' : ''}` : ''}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="space-y-3 p-3 sm:p-4">
+                      {activeThread.messages.map((notif) => renderMessageCard(notif, folder === 'sent'))}
+                    </div>
+                  </>
+                ) : (
+                  <div className="flex h-full min-h-[24rem] items-center justify-center p-8 text-center text-sm text-[#8da0b3]">
+                    Select a message to open it.
+                  </div>
+                )}
+              </div>
+            </div>
+          </section>
         )}
       </div>
 

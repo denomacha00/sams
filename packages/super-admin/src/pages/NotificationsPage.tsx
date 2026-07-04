@@ -135,6 +135,32 @@ function formatDateTime(value: string): string {
   });
 }
 
+function formatThreadTime(value: string): string {
+  const d = new Date(value);
+  const now = new Date();
+  const yesterday = new Date(now);
+  yesterday.setDate(yesterday.getDate() - 1);
+  if (d.toDateString() === now.toDateString()) {
+    return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  }
+  if (d.toDateString() === yesterday.toDateString()) return 'Yesterday';
+  return d.toLocaleDateString([], { day: '2-digit', month: 'short' });
+}
+
+function initials(name: string): string {
+  return name
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((part) => part[0]?.toUpperCase() ?? '')
+    .join('') || 'SA';
+}
+
+function previewText(message: string, attachments = 0): string {
+  const prefix = attachments > 0 ? `${attachments} attachment${attachments === 1 ? '' : 's'} - ` : '';
+  return `${prefix}${message || 'Message'}`;
+}
+
 const roleOptions: Array<{ value: TargetRole; label: string }> = [
   { value: 'ALL', label: 'All users' },
   { value: 'SCHOOL_ADMIN', label: 'School admins only' },
@@ -148,6 +174,8 @@ const NotificationsPage: React.FC = () => {
   const [sent, setSent] = useState<SentNotification[]>([]);
   const [supportThreads, setSupportThreads] = useState<SupportThread[]>([]);
   const [selectedSupportThread, setSelectedSupportThread] = useState<SupportThreadDetail | null>(null);
+  const [supportSearch, setSupportSearch] = useState('');
+  const [sentSearch, setSentSearch] = useState('');
   const [loading, setLoading] = useState(true);
   const [sentLoading, setSentLoading] = useState(true);
   const [supportLoading, setSupportLoading] = useState(true);
@@ -181,6 +209,28 @@ const NotificationsPage: React.FC = () => {
     () => schools.find((school) => school.id === schoolId),
     [schoolId, schools],
   );
+  const filteredSupportThreads = useMemo(() => {
+    const query = supportSearch.trim().toLowerCase();
+    if (!query) return supportThreads;
+    return supportThreads.filter((thread) => [
+      thread.adminName,
+      thread.schoolName,
+      thread.schoolCode,
+      thread.lastMessage,
+      thread.lastSenderName,
+    ].join(' ').toLowerCase().includes(query));
+  }, [supportSearch, supportThreads]);
+  const filteredSent = useMemo(() => {
+    const query = sentSearch.trim().toLowerCase();
+    if (!query) return sent;
+    return sent.filter((item) => [
+      item.title,
+      item.message,
+      item.targetScopeLabel,
+      String(item.recipientCount),
+      String(item.schoolCount),
+    ].join(' ').toLowerCase().includes(query));
+  }, [sent, sentSearch]);
 
   const fetchSchools = async () => {
     const { data } = await apiClient.get('/super/schools');
@@ -786,9 +836,27 @@ const NotificationsPage: React.FC = () => {
             No school admin support messages yet.
           </p>
         ) : (
-          <div className="grid grid-cols-1 gap-4 xl:grid-cols-[22rem_minmax(0,1fr)]">
-            <div className="space-y-2">
-              {supportThreads.map((thread) => {
+          <div className="overflow-hidden rounded-2xl border border-gray-700 bg-[#17212b]">
+            <div className="grid min-h-[28rem] grid-cols-1 xl:grid-cols-[24rem_minmax(0,1fr)]">
+              <div className="border-b border-white/5 xl:border-b-0 xl:border-r">
+                <div className="border-b border-white/5 bg-[#17212b] p-3">
+                  <div className="relative">
+                    <svg className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#7f91a4]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-4.35-4.35m1.1-5.4a6.5 6.5 0 11-13 0 6.5 6.5 0 0113 0z" />
+                    </svg>
+                    <input
+                      value={supportSearch}
+                      onChange={(event) => setSupportSearch(event.target.value)}
+                      placeholder="Search support messages"
+                      className="h-11 w-full rounded-xl border border-white/5 bg-[#223140] pl-10 pr-3 text-sm text-[#e9edef] outline-none placeholder:text-[#7f91a4] focus:border-amber-400/40"
+                    />
+                  </div>
+                </div>
+                {filteredSupportThreads.length === 0 ? (
+                  <p className="px-5 py-10 text-center text-sm text-[#8da0b3]">No support message matches your search.</p>
+                ) : (
+                  <div className="max-h-[32rem] overflow-y-auto">
+                    {filteredSupportThreads.map((thread) => {
                 const selected =
                   selectedSupportThread?.schoolId === thread.schoolId &&
                   selectedSupportThread?.adminUserId === thread.adminUserId;
@@ -797,26 +865,31 @@ const NotificationsPage: React.FC = () => {
                     key={`${thread.schoolId}-${thread.adminUserId}`}
                     type="button"
                     onClick={() => void openSupportThread(thread)}
-                    className={`w-full rounded-2xl border p-4 text-left transition-colors ${
+                    className={`flex w-full items-center gap-3 border-b border-white/5 px-3 py-3 text-left transition-colors ${
                       selected
-                        ? 'border-amber-400/45 bg-amber-500/10'
-                        : 'border-gray-700 bg-gray-900/45 hover:border-gray-600 hover:bg-gray-900'
+                        ? 'bg-[#223140]'
+                        : 'bg-transparent hover:bg-[#1d2a36]'
                     }`}
                   >
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="min-w-0">
-                        <p className="truncate text-sm font-semibold text-white">{thread.adminName}</p>
-                        <p className="truncate text-xs text-amber-200">{thread.schoolName} ({thread.schoolCode})</p>
-                      </div>
-                      <span className="shrink-0 text-xs text-gray-500">{formatDateTime(thread.lastAt)}</span>
-                    </div>
-                    <p className="mt-2 line-clamp-2 text-sm text-gray-400">{thread.lastMessage}</p>
+                    <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-amber-500/20 text-xs font-bold text-amber-100 ring-1 ring-amber-400/25">
+                      {initials(thread.adminName)}
+                    </span>
+                    <span className="min-w-0 flex-1">
+                      <span className="flex items-center gap-2">
+                        <span className="min-w-0 flex-1 truncate text-sm font-semibold text-[#f3f6f8]">{thread.adminName}</span>
+                        <span className="shrink-0 text-[11px] text-[#7f91a4]">{formatThreadTime(thread.lastAt)}</span>
+                      </span>
+                      <span className="mt-1 block truncate text-sm text-[#9fb0c0]">{thread.lastMessage}</span>
+                      <span className="mt-0.5 block truncate text-xs text-[#6f8294]">{thread.schoolName} ({thread.schoolCode})</span>
+                    </span>
                   </button>
                 );
-              })}
-            </div>
+                    })}
+                  </div>
+                )}
+              </div>
 
-            <div className="min-h-[22rem] rounded-2xl border border-gray-700 bg-gray-900/45 p-4">
+              <div className="min-h-[22rem] bg-[#0f1720] p-4">
               {!selectedSupportThread ? (
                 <div className="flex h-full items-center justify-center text-center text-sm text-gray-500">
                   Select a school admin conversation.
@@ -921,15 +994,29 @@ const NotificationsPage: React.FC = () => {
                   </div>
                 </div>
               )}
+              </div>
             </div>
           </div>
         )}
       </section>
 
       <section className="rounded-2xl border border-gray-700/80 bg-gray-800/80 p-6 shadow-lg shadow-black/10">
-        <div className="mb-5 flex flex-col gap-1 border-b border-gray-700/80 pb-4">
-          <h2 className="text-lg font-semibold tracking-tight text-white">Sent updates</h2>
-          <p className="text-sm text-gray-400">Edit message/title or remove a platform update from recipients.</p>
+        <div className="mb-5 flex flex-col gap-4 border-b border-gray-700/80 pb-4 lg:flex-row lg:items-end lg:justify-between">
+          <div>
+            <h2 className="text-lg font-semibold tracking-tight text-white">Sent updates</h2>
+            <p className="text-sm text-gray-400">Edit message/title or remove a platform update from recipients.</p>
+          </div>
+          <div className="relative w-full lg:w-80">
+            <svg className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-4.35-4.35m1.1-5.4a6.5 6.5 0 11-13 0 6.5 6.5 0 0113 0z" />
+            </svg>
+            <input
+              value={sentSearch}
+              onChange={(event) => setSentSearch(event.target.value)}
+              placeholder="Search sent updates"
+              className="h-10 w-full rounded-xl border border-gray-700 bg-gray-950 pl-10 pr-3 text-sm text-white outline-none placeholder:text-gray-500 focus:border-amber-400/40"
+            />
+          </div>
         </div>
 
         {sentLoading ? (
@@ -938,29 +1025,37 @@ const NotificationsPage: React.FC = () => {
           <p className="rounded-xl border border-dashed border-gray-700 py-8 text-center text-sm text-gray-500">
             No platform updates sent yet.
           </p>
+        ) : filteredSent.length === 0 ? (
+          <p className="rounded-xl border border-dashed border-gray-700 py-8 text-center text-sm text-gray-500">
+            No sent update matches your search.
+          </p>
         ) : (
-          <div className="space-y-3">
-            {sent.map((item) => {
+          <div className="overflow-hidden rounded-2xl border border-gray-700 bg-[#17212b]">
+            {filteredSent.map((item) => {
               const batchId = item.batchId ?? item.id;
               return (
-                <div key={batchId} className="rounded-2xl border border-gray-700 bg-gray-900/45 p-4">
-                  <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
-                    <div className="min-w-0">
+                <div key={batchId} className="flex gap-3 border-b border-white/5 p-4 last:border-b-0">
+                  <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-amber-500/20 text-xs font-bold text-amber-100 ring-1 ring-amber-400/25">
+                    SA
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+                      <div className="min-w-0">
                       <div className="flex flex-wrap items-center gap-2">
                         <h3 className="truncate text-sm font-semibold text-white">{item.title}</h3>
                         <span className="rounded-full border border-amber-500/25 bg-amber-500/10 px-2 py-0.5 text-xs text-amber-200">
-                          SAMS update
+                          Official
                         </span>
                         {item.updatedAt && (
                           <span className="text-xs italic text-amber-300/80">edited</span>
                         )}
                       </div>
-                      <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-gray-400">{item.message}</p>
+                      <p className="mt-2 line-clamp-2 text-sm leading-6 text-gray-400">{previewText(item.message, item.attachments?.length ?? 0)}</p>
                       <div className="mt-3 flex flex-wrap gap-2 text-xs text-gray-500">
                         <span>{item.targetScopeLabel || 'Recipients'}</span>
                         <span>{item.recipientCount} user{item.recipientCount === 1 ? '' : 's'}</span>
                         <span>{item.schoolCount} school{item.schoolCount === 1 ? '' : 's'}</span>
-                        <span>{formatDateTime(item.createdAt)}</span>
+                        <span>{formatThreadTime(item.createdAt)}</span>
                       </div>
                       {!!item.attachments?.length && (
                         <div className="mt-3 flex flex-wrap gap-2">
@@ -971,23 +1066,24 @@ const NotificationsPage: React.FC = () => {
                           ))}
                         </div>
                       )}
-                    </div>
-                    <div className="flex shrink-0 gap-2">
-                      <button
-                        type="button"
-                        onClick={() => openEdit(item)}
-                        className="rounded-lg border border-gray-700 px-3 py-2 text-xs font-semibold text-gray-300 transition-colors hover:bg-gray-800 hover:text-white"
-                      >
-                        Edit
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => void handleDelete(item)}
-                        disabled={deletingBatchId === batchId}
-                        className="rounded-lg border border-red-500/40 px-3 py-2 text-xs font-semibold text-red-300 transition-colors hover:bg-red-950/40 disabled:opacity-50"
-                      >
-                        {deletingBatchId === batchId ? 'Deleting...' : 'Delete'}
-                      </button>
+                      </div>
+                      <div className="flex shrink-0 gap-2">
+                        <button
+                          type="button"
+                          onClick={() => openEdit(item)}
+                          className="rounded-lg border border-gray-700 px-3 py-2 text-xs font-semibold text-gray-300 transition-colors hover:bg-gray-800 hover:text-white"
+                        >
+                          Edit
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => void handleDelete(item)}
+                          disabled={deletingBatchId === batchId}
+                          className="rounded-lg border border-red-500/40 px-3 py-2 text-xs font-semibold text-red-300 transition-colors hover:bg-red-950/40 disabled:opacity-50"
+                        >
+                          {deletingBatchId === batchId ? 'Deleting...' : 'Delete'}
+                        </button>
+                      </div>
                     </div>
                   </div>
                 </div>
