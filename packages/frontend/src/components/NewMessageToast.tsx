@@ -5,6 +5,7 @@ interface ToastMessage {
   id: string;
   title: string;
   message: string;
+  type?: string | null;
   senderName?: string | null;
   senderRole?: string | null;
   batchId?: string | null;
@@ -17,9 +18,24 @@ type ToastListener = (msg: ToastMessage) => void;
 
 let toastQueue: ToastMessage[] = [];
 let toastListener: ToastListener | null = null;
+let lastToastKey: string | null = null;
+let lastToastAt = 0;
+
+const QUIET_NOTIFICATION_TYPES = new Set(['DAILY_SCHEDULE']);
+
+function shouldShowToast(msg: ToastMessage): boolean {
+  if (msg.type && QUIET_NOTIFICATION_TYPES.has(msg.type)) return false;
+  const key = msg.id || `${msg.batchId ?? ''}:${msg.type ?? ''}:${msg.title}:${msg.message}`;
+  const now = Date.now();
+  if (key === lastToastKey && now - lastToastAt < 2500) return false;
+  lastToastKey = key;
+  lastToastAt = now;
+  return true;
+}
 
 /** Called from the socket hook when a new notification arrives. */
 export function enqueueNewMessageToast(msg: ToastMessage): void {
+  if (!shouldShowToast(msg)) return;
   toastQueue = [...toastQueue, msg].slice(-1); // keep only the most recent
   toastListener?.(msg);
   // Auto-dismiss after 5 seconds

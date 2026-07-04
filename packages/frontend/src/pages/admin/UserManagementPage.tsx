@@ -40,6 +40,7 @@ interface UserFormData {
   password: string;
   departmentId: string;
   classId: string;
+  subjects: string;
   attendanceGpsExempt: boolean;
 }
 
@@ -53,6 +54,7 @@ const emptyForm: UserFormData = {
   password: '',
   departmentId: '',
   classId: '',
+  subjects: '',
   attendanceGpsExempt: false,
 };
 
@@ -86,6 +88,15 @@ const UserManagementPage: React.FC = () => {
     }
   };
   const { needsDept, needsClass } = getRoleRequirements(formData.role);
+  const canAssignSubjects = formData.role === 'TEACHER' || formData.role === 'HOD';
+
+  const parseSubjects = (value: string) =>
+    Array.from(new Set(
+      value
+        .split(',')
+        .map((subject) => subject.trim())
+        .filter(Boolean),
+    ));
 
   useEffect(() => {
     fetchUsers();
@@ -174,11 +185,22 @@ const UserManagementPage: React.FC = () => {
       password: '',
       departmentId: user.departmentId || '',
       classId: user.classId || '',
+      subjects: '',
       attendanceGpsExempt: user.attendanceGpsExempt ?? false,
     });
     setError('');
     setHodWarning(null);
     setShowModal(true);
+    if (user.role === 'TEACHER' || user.role === 'HOD') {
+      void apiClient.get(`/teacher-subjects/${user.id}`)
+        .then(({ data }) => {
+          setFormData((current) => ({
+            ...current,
+            subjects: Array.isArray(data.subjects) ? data.subjects.join(', ') : '',
+          }));
+        })
+        .catch(() => {});
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -216,8 +238,16 @@ const UserManagementPage: React.FC = () => {
           payload.attendanceGpsExempt = formData.attendanceGpsExempt;
         }
         await apiClient.put(`/users/${editingUser.id}`, payload);
+        if (editingUser.role === 'TEACHER' || editingUser.role === 'HOD') {
+          await apiClient.put(`/teacher-subjects/${editingUser.id}`, {
+            subjects: parseSubjects(formData.subjects),
+          });
+        }
       } else {
         payload.password = formData.password;
+        if (formData.role === 'TEACHER' || formData.role === 'HOD') {
+          payload.subjects = formData.subjects;
+        }
         await apiClient.post('/users', payload);
       }
 
@@ -522,7 +552,7 @@ const UserManagementPage: React.FC = () => {
                   <select
                     value={formData.role}
                     onChange={(e) => {
-                      setFormData({ ...formData, role: e.target.value, departmentId: '', classId: '' });
+                      setFormData({ ...formData, role: e.target.value, departmentId: '', classId: '', subjects: '' });
                       setHodWarning(null);
                     }}
                     className="w-full px-4 py-2.5 rounded-xl bg-surface-muted border border-line text-white focus:outline-none focus:border-indigo-500/50 transition-colors"
@@ -601,6 +631,22 @@ const UserManagementPage: React.FC = () => {
                   )}
                 </div>
               </div>
+
+              {canAssignSubjects && (
+                <div>
+                  <label className="block text-sm text-ink-muted mb-1">Skilled units / subjects</label>
+                  <textarea
+                    value={formData.subjects}
+                    onChange={(e) => setFormData({ ...formData, subjects: e.target.value })}
+                    rows={3}
+                    className="w-full px-4 py-2.5 rounded-xl bg-surface-muted border border-line text-ink placeholder-ink-subtle focus:outline-none focus:border-indigo-500/50 transition-colors"
+                    placeholder="Mathematics, Physics, Chemistry"
+                  />
+                  <p className="text-xs text-ink-subtle mt-1">
+                    Separate units with commas. The timetable generator uses these assignments before giving a teacher a lesson.
+                  </p>
+                </div>
+              )}
 
               <div>
                 <label className="block text-sm text-ink-muted mb-1">

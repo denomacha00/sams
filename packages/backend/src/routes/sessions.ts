@@ -12,6 +12,7 @@ import {
 } from '../lib/sessionResponse';
 import { getLocalTimetableClock, minutesFromTime } from '../lib/sessionWindow';
 import { resolveTeacherManagedClassIds } from '../lib/teacherScope';
+import { getSchoolClosureForDate } from '../lib/schoolCalendar';
 
 // ─── Validation Schemas ───────────────────────────────────────────────────────
 
@@ -170,6 +171,20 @@ sessionsRouter.get('/available', async (req: Request, res: Response): Promise<vo
     await sessionService.expireStaleActiveSessions(req.schoolId);
 
     const clock = getLocalTimetableClock();
+    const closure = await getSchoolClosureForDate(req.schoolId);
+    if (closure) {
+      res.status(200).json({
+        today: {
+          dayOfWeek: clock.dayOfWeek,
+          dayLabel: DAY_LABELS[clock.dayOfWeek] ?? 'Today',
+          currentMinutes: clock.minutes,
+          closure,
+        },
+        entries: [],
+      });
+      return;
+    }
+
     const where: Record<string, unknown> = {
       schoolId: req.schoolId,
       dayOfWeek: clock.dayOfWeek,

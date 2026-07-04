@@ -226,8 +226,16 @@ const viewTodayScheduleHandler: ActionHandler = async (_params, scope) => {
   }
 
   const classCtx = await getStudentClassContext(scope.classId);
-  const { dayName, entries } = await fetchTodayTimetableForClass(scope.classId);
+  const { dayName, entries, closure } = await fetchTodayTimetableForClass(scope.classId, { schoolId: scope.schoolId });
   const classLabel = classCtx?.className ? ` (${classCtx.className})` : '';
+
+  if (closure) {
+    return {
+      answer:
+        `📅 **Today (${dayName})**${classLabel}\n\nSchool is closed for **${closure.title}**.${closure.reason ? ` ${closure.reason}` : ''}\n\nYour normal weekly timetable is still saved; it resumes on the next open school day.`,
+      data: { dayOfWeek: jsDateToSchemaDayOfWeek(), entryCount: 0, closure },
+    };
+  }
 
   if (entries.length === 0) {
     return {
@@ -261,7 +269,11 @@ const explainRemindersHandler: ActionHandler = async (_params, scope) => {
   let answer = REMINDERS_EXPLANATION;
 
   if (scope.classId) {
-    const { dayName, entries } = await fetchTodayTimetableForClass(scope.classId);
+    const { dayName, entries, closure } = await fetchTodayTimetableForClass(scope.classId, { schoolId: scope.schoolId });
+    if (closure) {
+      answer += `\n\n**Quick look — ${dayName}:**\nSchool is closed for **${closure.title}**.${closure.reason ? ` ${closure.reason}` : ''}`;
+      return { answer, data: { remindersSupported: false, closure } };
+    }
     if (entries.length > 0) {
       answer += `\n\n**Quick look — ${dayName}:**\n${formatTimetableSlotLines(entries)}`;
     }

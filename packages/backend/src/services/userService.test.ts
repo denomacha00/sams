@@ -12,11 +12,22 @@ vi.mock('../lib/prisma', () => ({
       update: vi.fn(),
       delete: vi.fn(),
     },
+    department: {
+      findUnique: vi.fn(),
+    },
+    class: {
+      findUnique: vi.fn(),
+    },
+    teacherSubject: {
+      createMany: vi.fn(),
+    },
   },
 }));
 
 vi.mock('./licenseService', () => ({
-  licenseService: {},
+  licenseService: {
+    checkStudentLimit: vi.fn(),
+  },
 }));
 
 describe('userService.listUsers', () => {
@@ -67,5 +78,73 @@ describe('userService.listUsers', () => {
         role: UserRole.TEACHER,
       },
     });
+  });
+});
+
+describe('userService assignment validation', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('auto-aligns department when moving a student to another class in the same school', async () => {
+    vi.mocked(prisma.user.findUnique).mockResolvedValue({
+      id: 'student-1',
+      schoolId: 'school-1',
+      role: UserRole.STUDENT,
+      fullName: 'Student One',
+      phone: null,
+      classId: 'class-old',
+      departmentId: 'dept-old',
+      passwordHash: 'hash',
+    } as never);
+    vi.mocked(prisma.class.findUnique).mockResolvedValue({
+      schoolId: 'school-1',
+      departmentId: 'dept-new',
+    } as never);
+    vi.mocked(prisma.user.update).mockResolvedValue({
+      id: 'student-1',
+      schoolId: 'school-1',
+      role: UserRole.STUDENT,
+      fullName: 'Student One',
+      classId: 'class-new',
+      departmentId: 'dept-new',
+      passwordHash: 'hash',
+    } as never);
+
+    await userService.updateUser('school-1', 'student-1', { classId: 'class-new' });
+
+    expect(prisma.user.update).toHaveBeenCalledWith(expect.objectContaining({
+      where: { id: 'student-1' },
+      data: expect.objectContaining({
+        classId: 'class-new',
+        departmentId: 'dept-new',
+      }),
+    }));
+  });
+
+  it('rejects mismatched class and department assignments', async () => {
+    vi.mocked(prisma.user.findUnique).mockResolvedValue({
+      id: 'student-1',
+      schoolId: 'school-1',
+      role: UserRole.STUDENT,
+      fullName: 'Student One',
+      phone: null,
+      classId: 'class-old',
+      departmentId: 'dept-old',
+      passwordHash: 'hash',
+    } as never);
+    vi.mocked(prisma.class.findUnique).mockResolvedValue({
+      schoolId: 'school-1',
+      departmentId: 'dept-real',
+    } as never);
+
+    await expect(
+      userService.updateUser('school-1', 'student-1', {
+        classId: 'class-new',
+        departmentId: 'dept-wrong',
+      }),
+    ).rejects.toMatchObject({ code: 'CLASS_DEPARTMENT_MISMATCH' });
+
+    expect(prisma.user.update).not.toHaveBeenCalled();
   });
 });

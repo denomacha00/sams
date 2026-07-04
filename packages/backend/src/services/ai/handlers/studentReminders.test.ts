@@ -13,6 +13,9 @@ vi.mock('../../../lib/prisma', () => ({
     timetableEntry: {
       findMany: vi.fn(),
     },
+    schoolClosure: {
+      findUnique: vi.fn(),
+    },
   },
 }));
 
@@ -48,6 +51,7 @@ const studentScope = {
 describe('student reminder actions', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.mocked(prisma.schoolClosure.findUnique).mockResolvedValue(null);
     vi.useFakeTimers();
     vi.setSystemTime(FIXED_NOW);
   });
@@ -127,5 +131,21 @@ describe('student reminder actions', () => {
         where: expect.objectContaining({ classId: 'class-1', dayOfWeek: day }),
       }),
     );
+  });
+
+  it('view_today_schedule explains school closures without listing timetable slots', async () => {
+    vi.mocked(prisma.schoolClosure.findUnique).mockResolvedValue({
+      id: 'closure-1',
+      date: '2026-06-03',
+      title: 'Midterm break',
+      reason: 'School calendar pause',
+    });
+
+    const def = findAction(UserRole.STUDENT, 'view_today_schedule');
+    const result = await def!.handler({}, studentScope);
+
+    expect(result.answer).toMatch(/School is closed/i);
+    expect(result.answer).toMatch(/Midterm break/);
+    expect(prisma.timetableEntry.findMany).not.toHaveBeenCalled();
   });
 });

@@ -3,6 +3,8 @@ import { prisma } from './prisma';
 export interface StudentClassTeacherInfo {
   id: string;
   fullName: string;
+  email: string | null;
+  phone: string | null;
   subjects: string[];
   isClassTeacher: boolean;
 }
@@ -77,7 +79,7 @@ export async function getStudentClassContext(classId: string): Promise<StudentCl
 
   const users = await prisma.user.findMany({
     where: { id: { in: [...teacherIds] } },
-    select: { id: true, fullName: true },
+    select: { id: true, fullName: true, email: true, phone: true },
   });
   const subjectByTeacher = new Map<string, Set<string>>();
   for (const e of entries) {
@@ -90,6 +92,8 @@ export async function getStudentClassContext(classId: string): Promise<StudentCl
     .map((u) => ({
       id: u.id,
       fullName: u.fullName,
+      email: u.email,
+      phone: u.phone,
       subjects: [...(subjectByTeacher.get(u.id) ?? [])].sort(),
       isClassTeacher: u.id === cls.classTeacherId,
     }))
@@ -124,7 +128,11 @@ export function formatStudentTeachersAnswer(ctx: StudentClassContext): string {
   const lines = ctx.teachers.map((t) => {
     const role = t.isClassTeacher ? ' (class teacher)' : '';
     const subjects = t.subjects.length > 0 ? ` — teaches ${t.subjects.join(', ')}` : '';
-    return `• **${t.fullName}**${role}${subjects}`;
+    const contact: string[] = [];
+    if (t.email) contact.push(`email: ${t.email}`);
+    if (t.phone) contact.push(`phone: ${t.phone}`);
+    const contactLine = contact.length > 0 ? `\n  Contact: ${contact.join(' · ')}` : '';
+    return `• **${t.fullName}**${role}${subjects}${contactLine}`;
   });
 
   return `👩‍🏫 **Your teachers** (${ctx.className})\n\n${lines.join('\n')}\n\nSay **"show my timetable"** to see when each subject is scheduled.`;

@@ -5,6 +5,7 @@ vi.mock('../lib/prisma', () => ({
     user: { findMany: vi.fn() },
     timetableEntry: { findMany: vi.fn() },
     notification: { findMany: vi.fn(), createMany: vi.fn() },
+    schoolClosure: { findUnique: vi.fn() },
   },
 }));
 
@@ -21,6 +22,7 @@ describe('studentScheduleReminders', () => {
     vi.clearAllMocks();
     delete process.env.STUDENT_DAILY_SCHEDULE_REMINDERS;
     process.env.APP_TIMEZONE = 'Africa/Nairobi';
+    vi.mocked(prisma.schoolClosure.findUnique).mockResolvedValue(null as never);
   });
 
   it('is enabled by default and can be disabled via env', () => {
@@ -103,6 +105,28 @@ describe('studentScheduleReminders', () => {
 
     expect(result.sent).toBe(0);
     expect(result.skipped).toBe(1);
+    expect(prisma.notification.createMany).not.toHaveBeenCalled();
+  });
+
+  it('skips daily schedule notices on school closure days', async () => {
+    const now = new Date('2026-06-02T03:30:00Z');
+
+    vi.mocked(prisma.user.findMany).mockResolvedValue([
+      { id: 'stu-1', schoolId: 'school-1', classId: 'class-1' },
+      { id: 'stu-2', schoolId: 'school-1', classId: 'class-1' },
+    ] as Awaited<ReturnType<typeof prisma.user.findMany>>);
+    vi.mocked(prisma.schoolClosure.findUnique).mockResolvedValue({
+      id: 'close-1',
+      date: '2026-06-02',
+      title: 'Midterm break',
+      reason: null,
+    } as never);
+
+    const result = await runStudentDailyScheduleReminders(now);
+
+    expect(result.sent).toBe(0);
+    expect(result.skipped).toBe(2);
+    expect(prisma.timetableEntry.findMany).not.toHaveBeenCalled();
     expect(prisma.notification.createMany).not.toHaveBeenCalled();
   });
 

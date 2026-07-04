@@ -43,6 +43,48 @@ export interface ListUsersFilters {
   classId?: string;
 }
 
+async function verifyDepartmentInSchool(schoolId: string, departmentId: string): Promise<void> {
+  const department = await prisma.department.findUnique({
+    where: { id: departmentId },
+    select: { schoolId: true },
+  });
+  if (!department || department.schoolId !== schoolId) {
+    throw new AppError(404, 'DEPARTMENT_NOT_FOUND', 'Department not found in this school');
+  }
+}
+
+async function resolveClassAssignment(
+  schoolId: string,
+  classId: string | undefined,
+  departmentId: string | undefined,
+): Promise<{ classId?: string; departmentId?: string }> {
+  const normalizedClassId = classId?.trim() || undefined;
+  const normalizedDepartmentId = departmentId?.trim() || undefined;
+
+  if (!normalizedClassId) {
+    if (normalizedDepartmentId) await verifyDepartmentInSchool(schoolId, normalizedDepartmentId);
+    return { classId: normalizedClassId, departmentId: normalizedDepartmentId };
+  }
+
+  const cls = await prisma.class.findUnique({
+    where: { id: normalizedClassId },
+    select: { schoolId: true, departmentId: true },
+  });
+  if (!cls || cls.schoolId !== schoolId) {
+    throw new AppError(404, 'CLASS_NOT_FOUND', 'Class not found in this school');
+  }
+
+  if (normalizedDepartmentId && normalizedDepartmentId !== cls.departmentId) {
+    throw new AppError(
+      400,
+      'CLASS_DEPARTMENT_MISMATCH',
+      'Selected class does not belong to the selected department',
+    );
+  }
+
+  return { classId: normalizedClassId, departmentId: normalizedDepartmentId ?? cls.departmentId };
+}
+
 // ─── Helper ───────────────────────────────────────────────────────────────────
 
 /**
@@ -78,6 +120,8 @@ export class UserService {
       throw new AppError(400, 'DEPARTMENT_REQUIRED', 'Teachers and HODs must be assigned to a department');
     }
 
+    const assignment = await resolveClassAssignment(schoolId, data.classId, data.departmentId);
+
     const username = data.username.trim();
     const existingUsername = await prisma.user.findFirst({
       where: { username: { equals: username, mode: 'insensitive' } },
@@ -101,8 +145,8 @@ export class UserService {
         phone,
         admissionNumber: data.admissionNumber ?? null,
         passwordHash,
-        departmentId: data.departmentId || null,
-        classId: data.classId || null,
+        departmentId: assignment.departmentId || null,
+        classId: assignment.classId || null,
       },
     });
 
@@ -159,6 +203,17 @@ export class UserService {
       await assertPhoneAvailableInSchool(schoolId, phone, userId);
     }
 
+    const classChanged = data.classId !== undefined;
+    const departmentChanged = data.departmentId !== undefined;
+    const assignment =
+      classChanged || departmentChanged
+        ? await resolveClassAssignment(
+            schoolId,
+            classChanged ? data.classId : user.classId ?? undefined,
+            departmentChanged ? data.departmentId : classChanged ? undefined : user.departmentId ?? undefined,
+          )
+        : undefined;
+
     const updated = await prisma.user.update({
       where: { id: userId },
       data: {
@@ -166,8 +221,8 @@ export class UserService {
         ...(data.username !== undefined && { username: data.username.trim() }),
         ...(data.email !== undefined && { email: data.email }),
         ...(phone !== undefined && { phone }),
-        ...(data.departmentId !== undefined && { departmentId: data.departmentId }),
-        ...(data.classId !== undefined && { classId: data.classId }),
+        ...(assignment && { departmentId: assignment.departmentId ?? null }),
+        ...(assignment && { classId: assignment.classId ?? null }),
         ...(data.isLocked !== undefined && { isLocked: data.isLocked }),
         ...(data.attendanceGpsExempt !== undefined && {
           attendanceGpsExempt: data.attendanceGpsExempt,

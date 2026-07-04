@@ -33,6 +33,7 @@ import { examsRouter } from './routes/exams';
 import { teacherSubjectsRouter } from './routes/teacherSubjects';
 import { parentChatRouter } from './routes/parentChat';
 import { schemeOfWorkRouter } from './routes/schemeOfWork';
+import { schoolCalendarRouter } from './routes/schoolCalendar';
 import { registerSocketServer } from './lib/socket';
 import { setupAttendanceSocket } from './sockets/attendanceSocket';
 import { setupTypingSocket } from './sockets/typingSocket';
@@ -186,6 +187,7 @@ export function registerApplication(app: express.Express, httpServer: HttpServer
   app.use('/api/v1/teacher-subjects', teacherSubjectsRouter);
   app.use('/api/v1/parent-chat', parentChatRouter);
   app.use('/api/v1/schemes', schemeOfWorkRouter);
+  app.use('/api/v1/school-calendar', schoolCalendarRouter);
 
   io = new SocketIOServer(httpServer, {
     cors: {

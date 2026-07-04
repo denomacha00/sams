@@ -972,6 +972,15 @@ usersRouter.put('/:id', requirePermission('manage:users'), async (req: Request, 
       if (parsed.data.departmentId && parsed.data.departmentId !== req.user.departmentId) {
         throw new AppError(403, 'FORBIDDEN', 'HODs cannot move users to a different department');
       }
+      if (parsed.data.classId) {
+        const cls = await prisma.class.findUnique({
+          where: { id: parsed.data.classId },
+          select: { departmentId: true, schoolId: true },
+        });
+        if (!cls || cls.schoolId !== req.schoolId || cls.departmentId !== req.user.departmentId) {
+          throw new AppError(403, 'FORBIDDEN', 'HODs can only move users to classes in their own department');
+        }
+      }
     }
 
     if (parsed.data.attendanceGpsExempt !== undefined) {

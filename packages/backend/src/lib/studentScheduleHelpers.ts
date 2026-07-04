@@ -1,5 +1,6 @@
 import { prisma } from './prisma';
 import { getAppTimezone, schemaDayOfWeekInTimezone } from './appTimezone';
+import { getSchoolClosureForDate, type SchoolClosureInfo } from './schoolCalendar';
 
 const DAY_NAMES = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
 
@@ -43,16 +44,30 @@ export async function fetchTimetableSlotsForClassDay(classId: string, dayOfWeek:
 
 export async function fetchTodayTimetableForClass(
   classId: string,
-  options?: { date?: Date; timeZone?: string },
+  options?: { date?: Date; timeZone?: string; schoolId?: string },
 ) {
   const timeZone = options?.timeZone ?? getAppTimezone();
   const date = options?.date ?? new Date();
   const dayOfWeek = schemaDayOfWeekInTimezone(date, timeZone);
+  const closure: SchoolClosureInfo | null = options?.schoolId
+    ? await getSchoolClosureForDate(options.schoolId, date, timeZone)
+    : null;
+
+  if (closure) {
+    return {
+      dayOfWeek,
+      dayName: schemaDayName(dayOfWeek),
+      entries: [],
+      closure,
+    };
+  }
+
   const entries = await fetchTimetableSlotsForClassDay(classId, dayOfWeek);
 
   return {
     dayOfWeek,
     dayName: schemaDayName(dayOfWeek),
     entries,
+    closure,
   };
 }

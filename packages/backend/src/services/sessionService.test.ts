@@ -26,6 +26,9 @@ vi.mock('../lib/prisma', () => ({
       findMany: vi.fn(),
       createMany: vi.fn(),
     },
+    schoolClosure: {
+      findUnique: vi.fn(),
+    },
   },
 }));
 
@@ -66,6 +69,7 @@ describe('SessionService.startSession', () => {
     vi.mocked(prisma.attendanceRecord.createMany).mockResolvedValue({ count: 0 } as never);
     vi.mocked(prisma.attendanceSession.findMany).mockResolvedValue([] as never);
     vi.mocked(prisma.attendanceSession.updateMany).mockResolvedValue({ count: 0 } as never);
+    vi.mocked(prisma.schoolClosure.findUnique).mockResolvedValue(null as never);
   });
 
   afterEach(() => {

@@ -10,6 +10,7 @@ import {
   schemaDayName,
   type TimetableSlotRow,
 } from '../lib/studentScheduleHelpers';
+import { getSchoolClosureForDate } from '../lib/schoolCalendar';
 
 export const DAILY_SCHEDULE_NOTIFICATION_TYPE = 'DAILY_SCHEDULE';
 
@@ -65,8 +66,22 @@ export async function runStudentDailyScheduleReminders(
 
   let sent = 0;
   let skipped = 0;
+  const closedSchools = new Set<string>();
 
   for (const [classId, classStudents] of byClass) {
+    const schoolId = classStudents[0]?.schoolId;
+    if (!schoolId) continue;
+    if (closedSchools.has(schoolId)) {
+      skipped += classStudents.length;
+      continue;
+    }
+    const closure = await getSchoolClosureForDate(schoolId, now, timeZone);
+    if (closure) {
+      skipped += classStudents.length;
+      closedSchools.add(schoolId);
+      continue;
+    }
+
     const entries = await prisma.timetableEntry.findMany({
       where: { classId, dayOfWeek },
       orderBy: { startTime: 'asc' },

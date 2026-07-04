@@ -112,11 +112,25 @@ model School {
   teacherSubjects     TeacherSubject[]
   schoolFeatureFlags  SchoolFeatureFlag[]
   schemes             SchemeOfWork[]
+  closures            SchoolClosure[]
 
 
   @@index([isSuspended])
   @@index([licenseExpiresAt])
   @@index([createdAt])
+}
+
+model SchoolClosure {
+  id        String   @id @default(cuid())
+  schoolId  String
+  school    School   @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  date      String   @db.VarChar(10)
+  title     String   @db.VarChar(120)
+  reason    String?  @db.VarChar(500)
+  createdAt DateTime @default(now())
+
+  @@unique([schoolId, date])
+  @@index([schoolId, date])
 }
 
 model User {

@@ -89,6 +89,19 @@ const updateSubjectsSchema = z.object({
   subjects: z.array(z.string().min(1).max(200)).max(50),
 });
 
+function normalizeSubjects(subjects: string[]): string[] {
+  const seen = new Set<string>();
+  const normalized: string[] = [];
+  for (const subject of subjects) {
+    const value = subject.trim();
+    const key = value.toLowerCase();
+    if (!value || seen.has(key)) continue;
+    seen.add(key);
+    normalized.push(value);
+  }
+  return normalized;
+}
+
 teacherSubjectsRouter.put('/:teacherId', requirePermission('manage:timetable'), async (req: Request, res: Response): Promise<void> => {
   const parsed = updateSubjectsSchema.safeParse(req.body);
   if (!parsed.success) {
@@ -117,13 +130,15 @@ teacherSubjectsRouter.put('/:teacherId', requirePermission('manage:timetable'), 
       }
     }
 
+    const subjects = normalizeSubjects(parsed.data.subjects);
+
     // Full replace: delete all existing, insert new
     await prisma.$transaction(async (tx) => {
       await tx.teacherSubject.deleteMany({ where: { teacherId } });
 
-      if (parsed.data.subjects.length > 0) {
+      if (subjects.length > 0) {
         await tx.teacherSubject.createMany({
-          data: parsed.data.subjects.map((subject) => ({
+          data: subjects.map((subject) => ({
             schoolId: req.schoolId,
             teacherId,
             subject,

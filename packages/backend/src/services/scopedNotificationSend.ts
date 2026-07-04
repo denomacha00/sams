@@ -219,7 +219,6 @@ export async function sendScopedNotification(
         for (const u of targetUsers) {
           io.to(`user:${u.id}`).emit('notification:new', payload);
         }
-        io.to(`school:${effectiveSender.schoolId}`).emit('notification:new', payload);
       }
       if (channels.includes('sms')) {
         void import('./notificationService').then(({ notificationService }) => {

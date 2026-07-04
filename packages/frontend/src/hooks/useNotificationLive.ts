@@ -80,6 +80,7 @@ function connectSocket(userId: string): Socket | null {
         id: data.id || `toast-${Date.now()}`,
         title: data.title || 'New Message',
         message: data.message || '',
+        type: data.type || null,
         senderName: data.senderName || null,
         senderRole: data.senderRole || null,
         batchId: data.batchId || null,

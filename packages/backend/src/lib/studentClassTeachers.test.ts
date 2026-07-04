@@ -12,10 +12,10 @@ describe('studentClassTeachers formatting', () => {
     className: 'Form 2B',
     departmentId: 'dept-science',
     departmentName: 'Sciences',
-    hod: { id: 'hod-1', fullName: 'Dr. Kamau' },
+    hod: { id: 'hod-1', fullName: 'Dr. Kamau', email: 'hod@sams.test', phone: '+254700000001' },
     teachers: [
-      { id: 't1', fullName: 'Ms. Wanjiku', subjects: ['Mathematics', 'Physics'], isClassTeacher: true },
-      { id: 't2', fullName: 'Mr. Otieno', subjects: ['English'], isClassTeacher: false },
+      { id: 't1', fullName: 'Ms. Wanjiku', email: 'wanjiku@sams.test', phone: '+254700000002', subjects: ['Mathematics', 'Physics'], isClassTeacher: true },
+      { id: 't2', fullName: 'Mr. Otieno', email: null, phone: null, subjects: ['English'], isClassTeacher: false },
     ],
   };
 
@@ -26,6 +26,8 @@ describe('studentClassTeachers formatting', () => {
     expect(answer).toContain('class teacher');
     expect(answer).toContain('Mathematics');
     expect(answer).toContain('Mr. Otieno');
+    expect(answer).toContain('wanjiku@sams.test');
+    expect(answer).toContain('+254700000002');
     expect(answer).toContain('show my timetable');
   });
 

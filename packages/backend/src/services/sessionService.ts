@@ -13,6 +13,7 @@ import {
 } from '../lib/sessionWindow';
 import { resolveTeacherManagedClassIds } from '../lib/teacherScope';
 import { markMissingStudentsAbsentForSessions } from '../lib/attendanceFinalizer';
+import { getSchoolClosureForDate } from '../lib/schoolCalendar';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -119,6 +120,14 @@ export class SessionService {
 
     // Validate the current school-local day matches the scheduled day of week.
     const localClock = getLocalTimetableClock();
+    const closure = await getSchoolClosureForDate(schoolId);
+    if (closure) {
+      throw new AppError(
+        400,
+        'SCHOOL_CLOSED',
+        `School is closed today for ${closure.title}. Attendance sessions cannot be started on closure days.`,
+      );
+    }
 
     if (localClock.dayOfWeek !== timetableEntry.dayOfWeek) {
       const dayNames = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
