@@ -207,6 +207,7 @@ const NotificationsPage: React.FC = () => {
   const [folder, setFolder] = useState<Folder>('inbox');
   const [searchQuery, setSearchQuery] = useState('');
   const [activeThreadKey, setActiveThreadKey] = useState<string | null>(null);
+  const [mobileThreadOpen, setMobileThreadOpen] = useState(false);
   const [loading, setLoading] = useState(true);
   const [sentLoading, setSentLoading] = useState(false);
   const [isClassRep, setIsClassRep] = useState(false);
@@ -898,6 +899,10 @@ const NotificationsPage: React.FC = () => {
       setActiveThreadKey(filteredThreads[0].key);
     }
   }, [activeThreadKey, filteredThreads]);
+
+  useEffect(() => {
+    setMobileThreadOpen(false);
+  }, [folder, searchQuery]);
 
   const renderAttachments = (attachments: NotificationAttachment[] | undefined, isSentFolder: boolean) => {
     if (!attachments || attachments.length === 0) return null;
@@ -1637,7 +1642,7 @@ const NotificationsPage: React.FC = () => {
         ) : (
           <section className="overflow-hidden rounded-2xl border border-line bg-[#17212b] shadow-card-soft">
             <div className="grid min-h-[34rem] lg:grid-cols-[minmax(20rem,26rem)_1fr]">
-              <div className="border-b border-line/80 bg-[#17212b] lg:border-b-0 lg:border-r">
+              <div className={`border-b border-line/80 bg-[#17212b] lg:block lg:border-b-0 lg:border-r ${mobileThreadOpen ? 'hidden' : 'block'}`}>
                 <div className="sticky top-0 z-10 border-b border-white/5 bg-[#17212b]/95 p-3 backdrop-blur">
                   <div className="relative">
                     <svg className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#7f91a4]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -1668,6 +1673,7 @@ const NotificationsPage: React.FC = () => {
                           type="button"
                           onClick={() => {
                             setActiveThreadKey(thread.key);
+                            setMobileThreadOpen(true);
                             if (!isSentFolder && latest && !latest.read) void markAsRead(latest.id);
                           }}
                           className={`flex w-full items-center gap-3 border-b border-white/5 px-3 py-3 text-left transition-colors ${
@@ -1709,10 +1715,20 @@ const NotificationsPage: React.FC = () => {
                 )}
               </div>
 
-              <div className="min-w-0 bg-[#0f1720]">
+              <div className={`min-w-0 bg-[#0f1720] lg:block ${mobileThreadOpen ? 'block' : 'hidden'}`}>
                 {activeThread ? (
                   <>
                     <div className="sticky top-0 z-10 flex items-center gap-3 border-b border-white/5 bg-[#17212b]/95 px-4 py-3 backdrop-blur">
+                      <button
+                        type="button"
+                        onClick={() => setMobileThreadOpen(false)}
+                        className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-[#dce7f1] hover:bg-white/10 lg:hidden"
+                        aria-label="Back to messages"
+                      >
+                        <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                        </svg>
+                      </button>
                       <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#2f4154] text-xs font-bold text-[#dce7f1]">
                         {activeThread.avatar}
                       </span>

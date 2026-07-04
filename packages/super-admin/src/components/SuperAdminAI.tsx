@@ -34,6 +34,7 @@ interface AiThreadRecord {
 
 const AI_UNAVAILABLE_INTENTS = new Set(['ai_error', 'ai_not_configured']);
 const AI_VISION_FAILURE_INTENTS = new Set(['image_analysis_error', 'ai_not_configured', 'upload_error']);
+const SUPER_AI_QUERY_TIMEOUT_MS = 30_000;
 
 const CONFIRM_RE = /^(yes|y|confirm|proceed|ok|do it|go ahead)\.?$/i;
 const DONE_RE = /^(?:i'?m\s+)?done|no|stop|bye|enough|thats?\s+all|finish|end/i;
@@ -573,7 +574,7 @@ const SuperAdminAI: React.FC = () => {
             history: messagesToAiHistory(messages),
             confirmAction: true,
             pendingAction: pending,
-          });
+          }, { timeout: SUPER_AI_QUERY_TIMEOUT_MS });
           if (data.threadId) { setThreadId(data.threadId); saveSuperAiThreadId(data.threadId, user?.id); }
           appendMemoryNotice(data.memoryNotice);
           if (data.pendingAction) {
@@ -590,7 +591,7 @@ const SuperAdminAI: React.FC = () => {
           threadId,
           history: messagesToAiHistory(messages),
           ...(pending ? { pendingAction: pending } : {}),
-        });
+        }, { timeout: SUPER_AI_QUERY_TIMEOUT_MS });
         if (data.threadId) { setThreadId(data.threadId); saveSuperAiThreadId(data.threadId, user?.id); }
         appendMemoryNotice(data.memoryNotice);
         if (data.pendingAction) {

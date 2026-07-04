@@ -917,6 +917,70 @@ export async function openaiQuery(
   }
 }
 
+export async function openaiGeneralKnowledgeQuery(
+  question: string,
+  history: Array<{ role: 'user' | 'assistant'; content: string }> = [],
+): Promise<OpenAIQueryResult> {
+  const trimmedHistory = trimHistoryMessages(history.slice(-6), 1_200);
+  const messages: OpenAI.Chat.Completions.ChatCompletionMessageParam[] = [
+    { role: 'system', content: SAMS_AI_IDENTITY },
+    {
+      role: 'system',
+      content:
+        'Answer general knowledge questions quickly, clearly, and naturally. Do not load or invent SAMS school data. If the user asks for private SAMS/school records, say they must sign in and use the school-data AI path.',
+    },
+    ...trimmedHistory,
+    { role: 'user', content: question },
+  ];
+
+  try {
+    const client = getOpenAIClient({ timeoutMs: 18_000 });
+    const response = await client.chat.completions.create({
+      model: resolveChatModel(),
+      messages,
+      temperature: 0.45,
+      max_tokens: 500,
+    });
+    const rawAnswer = response.choices[0]?.message?.content ?? 'I could not answer that. Please try again.';
+    return { answer: sanitizeLlmOutput(rawAnswer), intent: 'openai_response' };
+  } catch (err) {
+    console.error('[AI/General] Error, trying fallback:', extractProviderErrorText(err));
+    const fallback = getFallbackClient({ timeoutMs: 10_000 });
+    if (fallback) {
+      try {
+        const response = await fallback.chat.completions.create({
+          model: resolveFallbackChatModel(),
+          messages,
+          temperature: 0.45,
+          max_tokens: 500,
+        });
+        const answer = response.choices[0]?.message?.content;
+        if (answer) return { answer: sanitizeLlmOutput(answer), intent: 'openai_response' };
+      } catch (fallbackErr) {
+        console.error('[AI/General/Fallback] Also failed:', extractProviderErrorText(fallbackErr));
+      }
+    }
+
+    const atomesus = getAtomesusClient(10_000);
+    if (atomesus) {
+      try {
+        const response = await atomesus.chat.completions.create({
+          model: resolveAtomesusChatModel(),
+          messages,
+          temperature: 0.45,
+          max_tokens: 500,
+        });
+        const answer = response.choices[0]?.message?.content;
+        if (answer) return { answer: sanitizeLlmOutput(answer), intent: 'openai_response' };
+      } catch (atomesusErr) {
+        console.error('[AI/General/Atomesus] Also failed:', extractProviderErrorText(atomesusErr));
+      }
+    }
+
+    return { answer: formatProviderError(err), intent: 'ai_error' };
+  }
+}
+
 async function handleToolCalls(
   toolCalls: OpenAI.Chat.Completions.ChatCompletionMessageToolCall[],
   user: AccessTokenPayload,

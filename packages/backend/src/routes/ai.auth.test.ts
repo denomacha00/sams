@@ -6,7 +6,7 @@ import { UserRole } from '@sams/shared';
 import { aiRouter, optionalAiAuth, isSamsDataQuestion } from './ai';
 import { aiService } from '../services/aiService';
 import { detectIntent, localQuery } from '../services/ai/localEngine';
-import { openaiQuery } from '../services/ai/openaiEngine';
+import { openaiGeneralKnowledgeQuery, openaiQuery } from '../services/ai/openaiEngine';
 
 vi.mock('../services/aiService', () => ({
   aiService: {
@@ -21,6 +21,11 @@ vi.mock('../services/ai/localEngine', () => ({
 }));
 
 vi.mock('../services/ai/openaiEngine', () => ({
+  openaiGeneralKnowledgeQuery: vi.fn(async (question: string) => ({
+    answer: `${question} is answered by the fast general path.`,
+    intent: 'openai_response',
+    engine: 'openai',
+  })),
   openaiQuery: vi.fn(),
   openaiQueryWithHistory: vi.fn(),
 }));
@@ -128,8 +133,28 @@ describe('AI optional auth', () => {
     const res = await request(app).post('/ai/stream').send({ question: 'what is physics' });
 
     expect(res.status).toBe(200);
-    expect(res.text).toContain('what is physics is answered by the provider.');
+    expect(res.text).toContain('what is physics is answered by the fast general path.');
     expect(res.text).toContain('"done":true');
+    expect(aiService.query).not.toHaveBeenCalled();
+  });
+
+  it('answers signed-in general-knowledge questions through the fast general path', async () => {
+    vi.mocked(detectIntent).mockReturnValue('unknown');
+    const token = jwt.sign(
+      { sub: 'hod-1', schoolId: 'school-1', role: UserRole.HOD },
+      secret,
+      { expiresIn: '1h' },
+    );
+    const app = createAiApp();
+
+    const res = await request(app)
+      .post('/ai/query')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ question: 'what is physics' });
+
+    expect(res.status).toBe(200);
+    expect(res.body.answer).toContain('what is physics is answered by the fast general path.');
+    expect(openaiGeneralKnowledgeQuery).toHaveBeenCalled();
     expect(aiService.query).not.toHaveBeenCalled();
   });
 

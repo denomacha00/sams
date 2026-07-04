@@ -176,6 +176,7 @@ const NotificationsPage: React.FC = () => {
   const [selectedSupportThread, setSelectedSupportThread] = useState<SupportThreadDetail | null>(null);
   const [supportSearch, setSupportSearch] = useState('');
   const [sentSearch, setSentSearch] = useState('');
+  const [supportConversationOpen, setSupportConversationOpen] = useState(false);
   const [loading, setLoading] = useState(true);
   const [sentLoading, setSentLoading] = useState(true);
   const [supportLoading, setSupportLoading] = useState(true);
@@ -266,6 +267,7 @@ const NotificationsPage: React.FC = () => {
     try {
       const { data } = await apiClient.get(`/super/notifications/support/${thread.schoolId}/${thread.adminUserId}`);
       setSelectedSupportThread(data);
+      setSupportConversationOpen(true);
       setSupportReply('');
       setSupportReplyAttachments([]);
     } catch (err) {
@@ -321,6 +323,7 @@ const NotificationsPage: React.FC = () => {
         `/super/notifications/support/${selectedSupportThread.schoolId}/${selectedSupportThread.adminUserId}`,
       );
       setSelectedSupportThread(null);
+      setSupportConversationOpen(false);
       setSupportReply('');
       setSupportReplyAttachments([]);
       await fetchSupportThreads();
@@ -337,6 +340,10 @@ const NotificationsPage: React.FC = () => {
       .catch((err) => setError(getSuperAdminApiError(err, 'Failed to load notifications page.')))
       .finally(() => setLoading(false));
   }, []);
+
+  useEffect(() => {
+    setSupportConversationOpen(false);
+  }, [supportSearch]);
 
   const visibleSupportAttachments = useMemo(
     () => collectAttachmentsFromSupport(selectedSupportThread),
@@ -838,7 +845,7 @@ const NotificationsPage: React.FC = () => {
         ) : (
           <div className="overflow-hidden rounded-2xl border border-gray-700 bg-[#17212b]">
             <div className="grid min-h-[28rem] grid-cols-1 xl:grid-cols-[24rem_minmax(0,1fr)]">
-              <div className="border-b border-white/5 xl:border-b-0 xl:border-r">
+              <div className={`border-b border-white/5 xl:block xl:border-b-0 xl:border-r ${supportConversationOpen ? 'hidden' : 'block'}`}>
                 <div className="border-b border-white/5 bg-[#17212b] p-3">
                   <div className="relative">
                     <svg className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#7f91a4]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -889,7 +896,7 @@ const NotificationsPage: React.FC = () => {
                 )}
               </div>
 
-              <div className="min-h-[22rem] bg-[#0f1720] p-4">
+              <div className={`min-h-[22rem] bg-[#0f1720] p-4 xl:block ${supportConversationOpen ? 'block' : 'hidden'}`}>
               {!selectedSupportThread ? (
                 <div className="flex h-full items-center justify-center text-center text-sm text-gray-500">
                   Select a school admin conversation.
@@ -897,11 +904,23 @@ const NotificationsPage: React.FC = () => {
               ) : (
                 <div className="flex h-full flex-col">
                   <div className="flex flex-col gap-3 border-b border-gray-700 pb-3 sm:flex-row sm:items-start sm:justify-between">
-                    <div>
-                      <h3 className="text-sm font-semibold text-white">{selectedSupportThread.adminName}</h3>
-                      <p className="text-xs text-gray-400">
-                        {selectedSupportThread.schoolName} ({selectedSupportThread.schoolCode})
-                      </p>
+                    <div className="flex min-w-0 items-center gap-3">
+                      <button
+                        type="button"
+                        onClick={() => setSupportConversationOpen(false)}
+                        className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-gray-200 hover:bg-white/10 xl:hidden"
+                        aria-label="Back to support messages"
+                      >
+                        <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                        </svg>
+                      </button>
+                      <div className="min-w-0">
+                        <h3 className="truncate text-sm font-semibold text-white">{selectedSupportThread.adminName}</h3>
+                        <p className="truncate text-xs text-gray-400">
+                          {selectedSupportThread.schoolName} ({selectedSupportThread.schoolCode})
+                        </p>
+                      </div>
                     </div>
                     <button
                       type="button"

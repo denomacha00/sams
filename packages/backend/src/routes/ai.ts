@@ -3,7 +3,7 @@ import jwt from 'jsonwebtoken';
 import multer, { type Multer } from 'multer';
 import { type AccessTokenPayload, UserRole } from '@sams/shared';
 import { aiService } from '../services/aiService';
-import { openaiQuery, openaiQueryWithHistory } from '../services/ai/openaiEngine';
+import { openaiGeneralKnowledgeQuery, openaiQuery, openaiQueryWithHistory } from '../services/ai/openaiEngine';
 import { detectIntent, localQuery } from '../services/ai/localEngine';
 import { isSamsDataQuery } from '../services/ai/dataQueryRouter';
 import { conversationMemoryService } from '../services/conversationMemoryService';
@@ -125,6 +125,9 @@ const SAMS_DATA_KEYWORDS = [
   'school report', 'how many students', 'attendance rate',
 ];
 
+const GENERAL_KNOWLEDGE_START_RE = /^(?:what|who|why|how|where|when|define|explain|describe|tell\s+me\s+about)\b/i;
+const SAMS_CONTEXT_TERMS_RE = /\b(?:sams|school|student|teacher|hod|admin|parent|guardian|class|department|attendance|timetable|report|license|payment|fee|notification|message|exam|grade|marks?|session)\b/i;
+
 /** True when a question needs a logged-in user (attendance, timetables, etc.). */
 export function isSamsDataQuestion(question: string, intent: string): boolean {
   if (PUBLIC_GUEST_INTENTS.includes(intent)) return false;
@@ -133,6 +136,14 @@ export function isSamsDataQuestion(question: string, intent: string): boolean {
     isSamsDataQuery(question) ||
     SAMS_DATA_KEYWORDS.some((kw) => question.trim().toLowerCase().includes(kw))
   );
+}
+
+function isGeneralKnowledgeQuestion(question: string, intent: string): boolean {
+  const trimmed = question.trim();
+  if (intent !== 'unknown') return false;
+  if (!GENERAL_KNOWLEDGE_START_RE.test(trimmed)) return false;
+  if (SAMS_CONTEXT_TERMS_RE.test(trimmed)) return false;
+  return !isSamsDataQuestion(trimmed, intent);
 }
 
 // ─── Conversation Management Endpoints ────────────────────────────────────────
@@ -286,6 +297,18 @@ aiRouter.post('/stream', asyncHandler(async (req: Request, res: Response): Promi
     }
   }
 
+  if (isGeneralKnowledgeQuestion(trimmedQuestion, intent)) {
+    try {
+      const result = await openaiGeneralKnowledgeQuery(trimmedQuestion, Array.isArray(clientHistory) ? clientHistory : []);
+      res.write(`data: ${JSON.stringify({ text: result.answer })}\n\n`);
+      res.write(`data: ${JSON.stringify({ intent: result.intent, engine: 'openai', done: true })}\n\n`);
+    } catch (err) {
+      res.write(`data: ${JSON.stringify({ text: formatProviderError(err), intent: 'ai_error', engine: 'openai', done: true })}\n\n`);
+    }
+    res.end();
+    return;
+  }
+
   // Load history
   const formattedHistory: Array<{ role: 'user' | 'assistant'; content: string }> = [];
   if (Array.isArray(clientHistory)) {
@@ -393,9 +416,25 @@ aiRouter.post('/query', asyncHandler(async (req: Request, res: Response): Promis
     }
 
     // Authenticated user — full access
+    const trimmedQuestion = question.trim();
+    const intent = detectIntent(trimmedQuestion);
+    const history = req.body.history as Array<{ role: string; content: string }> | undefined;
+    const formattedGeneralHistory = Array.isArray(history)
+      ? history.slice(-6).map((m: any) => ({
+          role: m.role as 'user' | 'assistant',
+          content: String(m.content ?? '').slice(0, 1000),
+        }))
+      : [];
+
+    if (!confirmAction && !pendingAction && isGeneralKnowledgeQuestion(trimmedQuestion, intent)) {
+      const result = await openaiGeneralKnowledgeQuery(trimmedQuestion, formattedGeneralHistory);
+      res.status(200).json(result);
+      return;
+    }
+
     if (req.user) {
       try {
-        const result = await aiService.query(req.user, question.trim(), { threadId, confirmAction, pendingAction, history: clientHistory });
+        const result = await aiService.query(req.user, trimmedQuestion, { threadId, confirmAction, pendingAction, history: clientHistory });
         const response: Record<string, unknown> = { ...result };
         res.status(200).json(response);
       } catch (aiErr) {
@@ -421,9 +460,8 @@ aiRouter.post('/query', asyncHandler(async (req: Request, res: Response): Promis
     }
 
     // Unauthenticated user — check if it's a data query
-    const intent = detectIntent(question.trim());
     // Block SAMS data queries for unauthenticated users (intent-based + keyword-based)
-    if (isSamsDataQuestion(question.trim(), intent)) {
+    if (isSamsDataQuestion(trimmedQuestion, intent)) {
       res.status(200).json({
         answer:
           'Sign in to access school data like attendance, timetables, and reports. I can answer general questions without login.\n\nIf you are already signed in, sign out and sign in again, or refresh the page.\n\nTry asking: "What is SAMS?" or "What is photosynthesis?"',
@@ -444,12 +482,11 @@ aiRouter.post('/query', asyncHandler(async (req: Request, res: Response): Promis
 
     // For guest local intents (greeting, about SAMS, help), answer locally.
     // Private SAMS data was already blocked above; general knowledge still uses the provider.
-    const history = req.body.history as Array<{ role: string; content: string }> | undefined;
     const hasHistory = history && history.length > 1;
 
     if (!hasHistory && intent !== 'unknown') {
       try {
-        const result = await localQuery(guestUser, question.trim());
+        const result = await localQuery(guestUser, trimmedQuestion);
         res.status(200).json(result);
       } catch {
         res.status(200).json({
@@ -478,10 +515,10 @@ aiRouter.post('/query', asyncHandler(async (req: Request, res: Response): Promis
           role: m.role as 'user' | 'assistant',
           content: m.content,
         }));
-        const result = await openaiQueryWithHistory(guestUserRestricted, question.trim(), formattedHistory);
+        const result = await openaiQueryWithHistory(guestUserRestricted, trimmedQuestion, formattedHistory);
         res.status(200).json(result);
       } else {
-        const result = await openaiQuery(guestUserRestricted, question.trim());
+        const result = await openaiQuery(guestUserRestricted, trimmedQuestion);
         res.status(200).json(result);
       }
     } catch (guestErr) {

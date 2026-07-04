@@ -466,11 +466,11 @@ export function getOpenAIClient(options?: { timeoutMs?: number }): OpenAI {
   });
 }
 
-export function getFallbackClient(): OpenAI | null {
+export function getFallbackClient(options?: { timeoutMs?: number }): OpenAI | null {
   const apiKey = process.env.OPENAI_FALLBACK_KEY?.trim();
   if (!apiKey) return null;
   const baseURL = process.env.OPENAI_FALLBACK_URL?.trim() || DEFAULT_OPENROUTER_BASE_URL;
-  return new OpenAI({ apiKey, baseURL, timeout: DEFAULT_AI_PROVIDER_TIMEOUT_MS });
+  return new OpenAI({ apiKey, baseURL, timeout: options?.timeoutMs ?? DEFAULT_AI_PROVIDER_TIMEOUT_MS });
 }
 
 export function getAtomesusClient(timeoutMs?: number): OpenAI | null {
