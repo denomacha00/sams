@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import apiClient from '../services/apiClient';
 import { useVoiceQuery } from '../hooks/useVoiceQuery';
-import { loadAiThreadId, messagesToAiHistory, saveAiThreadId } from '../lib/aiChat';
+import { AI_QUERY_TIMEOUT_MS, loadAiThreadId, messagesToAiHistory, saveAiThreadId } from '../lib/aiChat';
 import { AiMessageContent } from '../lib/aiMessageContent';
 import { detectAiNavigationRequest } from '../lib/aiNavigation';
 import { applyAiThemeCommand, detectAiThemeRequest } from '../lib/aiThemeCommand';
@@ -61,7 +61,7 @@ const AISAMSWidget: React.FC = () => {
         history: messagesToAiHistory(messages),
         confirmAction: true,
         pendingAction: pending,
-      });
+      }, { timeout: AI_QUERY_TIMEOUT_MS });
       if (data.threadId) {
         setThreadId(data.threadId);
         saveAiThreadId(data.threadId);
@@ -136,7 +136,7 @@ const AISAMSWidget: React.FC = () => {
           : pending
             ? { pendingAction: pending }
             : {}),
-      });
+      }, { timeout: AI_QUERY_TIMEOUT_MS });
       if (data.threadId) {
         setThreadId(data.threadId);
         saveAiThreadId(data.threadId);

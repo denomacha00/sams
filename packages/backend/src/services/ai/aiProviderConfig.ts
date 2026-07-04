@@ -17,6 +17,7 @@ export const DEFAULT_OPENROUTER_BASE_URL = 'https://openrouter.ai/api/v1';
 export const DEFAULT_OPENROUTER_FALLBACK_MODEL = 'meta-llama/llama-3.1-8b-instruct:free';
 export const DEFAULT_ATOMESUS_BASE_URL = 'https://api.atomesus.com/v1';
 export const DEFAULT_ATOMESUS_MODEL = 'cipher';
+export const DEFAULT_AI_PROVIDER_TIMEOUT_MS = 45_000;
 /** OpenRouter / Groq multimodal model (must differ from text-only chat models). */
 export const DEFAULT_VISION_MODEL = 'meta-llama/llama-4-scout-17b-16e-instruct';
 
@@ -461,7 +462,7 @@ export function getOpenAIClient(options?: { timeoutMs?: number }): OpenAI {
   return new OpenAI({
     apiKey,
     baseURL: getPrimaryBaseURL(),
-    ...(options?.timeoutMs ? { timeout: options.timeoutMs } : {}),
+    timeout: options?.timeoutMs ?? DEFAULT_AI_PROVIDER_TIMEOUT_MS,
   });
 }
 
@@ -469,7 +470,7 @@ export function getFallbackClient(): OpenAI | null {
   const apiKey = process.env.OPENAI_FALLBACK_KEY?.trim();
   if (!apiKey) return null;
   const baseURL = process.env.OPENAI_FALLBACK_URL?.trim() || DEFAULT_OPENROUTER_BASE_URL;
-  return new OpenAI({ apiKey, baseURL });
+  return new OpenAI({ apiKey, baseURL, timeout: DEFAULT_AI_PROVIDER_TIMEOUT_MS });
 }
 
 export function getAtomesusClient(timeoutMs?: number): OpenAI | null {
@@ -479,6 +480,6 @@ export function getAtomesusClient(timeoutMs?: number): OpenAI | null {
   return new OpenAI({
     apiKey: apiKey!,
     baseURL,
-    ...(timeoutMs ? { timeout: timeoutMs } : {}),
+    timeout: timeoutMs ?? DEFAULT_AI_PROVIDER_TIMEOUT_MS,
   });
 }

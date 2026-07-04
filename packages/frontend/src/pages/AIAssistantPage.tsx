@@ -4,6 +4,8 @@ import apiClient from '../services/apiClient';
 import { useVoiceQuery } from '../hooks/useVoiceQuery';
 import { useAuthStore } from '../store/authStore';
 import {
+  AI_IMAGE_TIMEOUT_MS,
+  AI_QUERY_TIMEOUT_MS,
   buildMemoryNoticeMessage,
   getAiAuthHint,
   getAiErrorMessage,
@@ -201,7 +203,7 @@ const AIAssistantPage: React.FC = () => {
         history: messagesToAiHistory(messages),
         confirmAction: true,
         pendingAction: pending,
-      });
+      }, { timeout: AI_QUERY_TIMEOUT_MS });
       if (data.threadId) {
         setThreadId(data.threadId);
         saveAiThreadId(data.threadId, threadOwner);
@@ -271,7 +273,7 @@ const AIAssistantPage: React.FC = () => {
         formData.append('question', text.trim() || 'What is in this image?');
         if (threadId) formData.append('threadId', threadId);
         clearImages();
-        const { data } = await apiClient.post('/ai/query-with-image', formData);
+        const { data } = await apiClient.post('/ai/query-with-image', formData, { timeout: AI_IMAGE_TIMEOUT_MS });
         if (data.threadId) {
           setThreadId(data.threadId);
           saveAiThreadId(data.threadId, threadOwner);
@@ -314,7 +316,7 @@ const AIAssistantPage: React.FC = () => {
           : pending
             ? { pendingAction: pending }
             : {}),
-      });
+      }, { timeout: AI_QUERY_TIMEOUT_MS });
       if (data.threadId) {
         setThreadId(data.threadId);
         saveAiThreadId(data.threadId, threadOwner);

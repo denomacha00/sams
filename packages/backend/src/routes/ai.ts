@@ -3,7 +3,8 @@ import jwt from 'jsonwebtoken';
 import multer, { type Multer } from 'multer';
 import { type AccessTokenPayload, UserRole } from '@sams/shared';
 import { aiService } from '../services/aiService';
-import { openaiQuery } from '../services/ai/openaiEngine';
+import { openaiQuery, openaiQueryWithHistory } from '../services/ai/openaiEngine';
+import { detectIntent, localQuery } from '../services/ai/localEngine';
 import { isSamsDataQuery } from '../services/ai/dataQueryRouter';
 import { conversationMemoryService } from '../services/conversationMemoryService';
 import { AppError } from '../middleware/errors';
@@ -114,6 +115,8 @@ const DATA_INTENTS = [
   'student_count', 'session_status', 'system_stats',
 ];
 
+const PUBLIC_GUEST_INTENTS = ['greeting', 'about_sams', 'super_admin_help'];
+
 // Keywords that indicate a SAMS data query (even if intent detection misses it)
 const SAMS_DATA_KEYWORDS = [
   'my report', 'my attendance', 'class report', 'my class', 'my students',
@@ -124,6 +127,7 @@ const SAMS_DATA_KEYWORDS = [
 
 /** True when a question needs a logged-in user (attendance, timetables, etc.). */
 export function isSamsDataQuestion(question: string, intent: string): boolean {
+  if (PUBLIC_GUEST_INTENTS.includes(intent)) return false;
   return (
     DATA_INTENTS.includes(intent) ||
     isSamsDataQuery(question) ||
@@ -274,7 +278,6 @@ aiRouter.post('/stream', asyncHandler(async (req: Request, res: Response): Promi
 
   // Check for data queries without auth
   if (req.user === undefined && user.sub === 'guest') {
-    const { detectIntent } = require('../services/ai/localEngine');
     const intent = detectIntent(question.trim());
     if (isSamsDataQuestion(question.trim(), intent)) {
       res.write(`data: ${JSON.stringify({ text: 'Sign in to access school data like attendance, timetables, and reports. I can answer general questions without login.\n\nTry asking: "What is SAMS?" or "What is photosynthesis?"' })}\n\n`);
@@ -413,7 +416,6 @@ aiRouter.post('/query', asyncHandler(async (req: Request, res: Response): Promis
     }
 
     // Unauthenticated user — check if it's a data query
-    const { detectIntent } = require('../services/ai/localEngine');
     const intent = detectIntent(question.trim());
     // Block SAMS data queries for unauthenticated users (intent-based + keyword-based)
     if (isSamsDataQuestion(question.trim(), intent)) {
@@ -435,14 +437,24 @@ aiRouter.post('/query', asyncHandler(async (req: Request, res: Response): Promis
       exp: 0,
     };
 
-    // For about_sams, use local engine ONLY if no history (first message)
+    // For guest local intents (greeting, about SAMS, help), answer locally.
+    // Private SAMS data was already blocked above; general knowledge still uses the provider.
     const history = req.body.history as Array<{ role: string; content: string }> | undefined;
     const hasHistory = history && history.length > 1;
 
-    if (!hasHistory && (intent === 'about_sams' || intent === 'super_admin_help')) {
-      const { localQuery } = require('../services/ai/localEngine');
-      const result = await localQuery(guestUser, question.trim());
-      res.status(200).json(result);
+    if (!hasHistory && intent !== 'unknown') {
+      try {
+        const result = await localQuery(guestUser, question.trim());
+        res.status(200).json(result);
+      } catch {
+        res.status(200).json({
+          answer: intent === 'greeting'
+            ? "Hi! I'm SAMS. Ask me anything general, or sign in if you want me to check private school data."
+            : 'I can answer that, but I could not load the local SAMS helper just now. Try again in a moment.',
+          intent,
+          engine: 'local',
+        });
+      }
       return;
     }
 
@@ -457,7 +469,6 @@ aiRouter.post('/query', asyncHandler(async (req: Request, res: Response): Promis
       };
 
       if (history && history.length > 0) {
-        const { openaiQueryWithHistory } = require('../services/ai/openaiEngine');
         const formattedHistory = history.slice(-10).map((m: any) => ({
           role: m.role as 'user' | 'assistant',
           content: m.content,

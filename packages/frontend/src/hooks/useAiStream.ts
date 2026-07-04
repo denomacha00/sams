@@ -3,6 +3,8 @@ import apiClient from '../services/apiClient';
 import { readAccessToken } from '../lib/authTokens';
 import { AiApiHistoryMessage } from '../lib/aiChat';
 
+const AI_STREAM_TIMEOUT_MS = 45_000;
+
 export interface StreamCallbacks {
   onStart?: () => void;
   onToken?: (text: string) => void;
@@ -30,6 +32,14 @@ export function useAiStream() {
     abortRef.current?.abort();
     const controller = new AbortController();
     abortRef.current = controller;
+    let completed = false;
+    let timedOut = false;
+    const timeoutId = window.setTimeout(() => {
+      if (!completed) {
+        timedOut = true;
+        controller.abort();
+      }
+    }, AI_STREAM_TIMEOUT_MS);
 
     const token = readAccessToken();
     const baseUrl = import.meta.env.VITE_API_BASE_URL || '/api/v1';
@@ -65,8 +75,9 @@ export function useAiStream() {
       let fullText = '';
       let intent: string | undefined;
       let engine: string | undefined;
+      let sawDone = false;
 
-      while (true) {
+      while (!sawDone) {
         const { done, value } = await reader.read();
         if (done) break;
 
@@ -91,6 +102,7 @@ export function useAiStream() {
             if (data.done) {
               intent = data.intent;
               engine = data.engine;
+              sawDone = true;
               break;
             }
             if (data.error) {
@@ -103,16 +115,24 @@ export function useAiStream() {
         }
       }
 
+      if (!sawDone) {
+        throw new Error('AI stream closed before finishing');
+      }
+      completed = true;
       callbacks.onDone?.(fullText, intent, engine);
       return fullText;
     } catch (err: unknown) {
       if (err instanceof DOMException && err.name === 'AbortError') {
-        return '';
+        if (!timedOut) return '';
+        const errorMsg = 'AI response timed out';
+        callbacks.onError?.(errorMsg);
+        return errorMsg;
       }
       const errorMsg = err instanceof Error ? err.message : 'Streaming failed';
       callbacks.onError?.(errorMsg);
       return errorMsg;
     } finally {
+      window.clearTimeout(timeoutId);
       if (abortRef.current === controller) {
         abortRef.current = null;
       }

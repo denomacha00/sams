@@ -5,6 +5,8 @@ import jwt from 'jsonwebtoken';
 import { UserRole } from '@sams/shared';
 import { aiRouter, optionalAiAuth, isSamsDataQuestion } from './ai';
 import { aiService } from '../services/aiService';
+import { detectIntent, localQuery } from '../services/ai/localEngine';
+import { openaiQuery } from '../services/ai/openaiEngine';
 
 vi.mock('../services/aiService', () => ({
   aiService: {
@@ -96,6 +98,19 @@ describe('AI optional auth', () => {
   it('detects school data questions for guest blocking', () => {
     expect(isSamsDataQuestion('What is my attendance rate?', 'attendance_percentage')).toBe(true);
     expect(isSamsDataQuestion('What is photosynthesis?', 'unknown')).toBe(false);
+  });
+
+  it('answers guest greetings locally without sign-in warning', async () => {
+    vi.mocked(detectIntent).mockReturnValue('greeting');
+    vi.mocked(localQuery).mockResolvedValue({ answer: 'Hi there', intent: 'greeting', engine: 'local' });
+    const app = createAiApp();
+
+    const res = await request(app).post('/ai/query').send({ question: 'hi' });
+
+    expect(res.status).toBe(200);
+    expect(res.body).toMatchObject({ answer: 'Hi there', intent: 'greeting', engine: 'local' });
+    expect(localQuery).toHaveBeenCalled();
+    expect(openaiQuery).not.toHaveBeenCalled();
   });
 
   it('passes voice confirmation context through to aiService', async () => {

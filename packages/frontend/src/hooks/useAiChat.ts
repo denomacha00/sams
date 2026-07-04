@@ -4,6 +4,8 @@ import { useAuthStore } from '../store/authStore';
 import { useAiSpeech } from './useAiSpeech';
 import { useVoiceQuery } from './useVoiceQuery';
 import {
+  AI_IMAGE_TIMEOUT_MS,
+  AI_QUERY_TIMEOUT_MS,
   loadAiThreadId,
   saveAiThreadId,
   threadRecordsToMessages,
@@ -189,7 +191,7 @@ export function useAiChat(options?: AiChatOptions) {
       threadId,
       history,
       ...extra,
-    });
+    }, { timeout: AI_QUERY_TIMEOUT_MS });
     if (data.threadId) {
       setThreadId(data.threadId);
       saveAiThreadId(data.threadId, threadOwner);
@@ -220,7 +222,7 @@ export function useAiChat(options?: AiChatOptions) {
         if (threadId) formData.append('threadId', threadId);
         clearImages();
 
-        const { data } = await apiClient.post('/ai/query-with-image', formData);
+        const { data } = await apiClient.post('/ai/query-with-image', formData, { timeout: AI_IMAGE_TIMEOUT_MS });
         if (data.threadId) {
           setThreadId(data.threadId);
           saveAiThreadId(data.threadId, threadOwner);
@@ -231,7 +233,7 @@ export function useAiChat(options?: AiChatOptions) {
 
       // Image generation
       if (/^generate\s+(?:an?\s+)?image/i.test(text.trim())) {
-        const { data } = await apiClient.post('/ai/generate-image', { prompt: text.trim() });
+        const { data } = await apiClient.post('/ai/generate-image', { prompt: text.trim() }, { timeout: AI_IMAGE_TIMEOUT_MS });
         const imgMsg: Message = {
           id: crypto.randomUUID(), role: 'assistant',
           content: `Here's the generated image:`, imageUrl: data.imageUrl, timestamp: new Date(),
