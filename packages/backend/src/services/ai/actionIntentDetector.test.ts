@@ -262,7 +262,7 @@ describe('actionIntentDetector role scoping (regex path)', () => {
     const read = await actionIntentDetector.detect('mark all alerts as read', UserRole.SUPER_ADMIN);
     expect(read.isAction).toBe(true);
     expect(read.action).toBe('mark_notifications_read');
-    expect(read.requiresConfirmation).toBe(false);
+    expect(read.requiresConfirmation).toBe(true);
   });
 
   it('detects @school as a safe school database overview before terminal fallback', async () => {

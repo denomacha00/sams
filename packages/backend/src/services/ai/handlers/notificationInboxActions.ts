@@ -30,7 +30,7 @@ export const clearInboxNotificationsHandler: ActionHandler = async (_params, sco
 export const markNotificationsReadActionDef: ActionDefinition = {
   action: 'mark_notifications_read',
   description: 'Mark all inbox notifications as read for the logged-in user',
-  destructive: false,
+  destructive: true,
   patterns: [
     /mark\s+(?:all\s+)?(?:my\s+)?(?:alerts?|notifications?|messages?|inbox)\s+(?:as\s+)?read/i,
     /read\s+(?:all\s+)?(?:my\s+)?(?:alerts?|notifications?|messages?|inbox)/i,

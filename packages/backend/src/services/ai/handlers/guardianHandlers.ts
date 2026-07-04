@@ -211,7 +211,7 @@ export const guardianActions: ActionDefinition[] = [
   {
     action: 'export_child_attendance_report',
     description: 'Export attendance report for a linked child',
-    destructive: false,
+    destructive: true,
     patterns: [
       /(?:export|download|generate|prepare).*(?:child|children|student).*(?:report|attendance)/i,
       /(?:export|download|generate|prepare).*(?:report|attendance).*(?:for|of)\s+(.+)/i,

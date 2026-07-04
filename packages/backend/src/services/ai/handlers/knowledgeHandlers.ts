@@ -116,7 +116,7 @@ export const knowledgeActions: ActionDefinition[] = [
   {
     action: 'create_knowledge',
     description: 'Create a knowledge base entry (title, content, category) — available to school admins, HODs, and teachers',
-    destructive: false,
+    destructive: true,
     patterns: [
       /(?:add|create)\s+(?:a\s+)?knowledge\s+(?:entry|article)\s*(?:for|about)?\s*(.+)/i,
       /save\s+(?:a\s+)?(?:note|knowledge)\s+(?:entry)\s*(?:for|about)?\s*(.+)/i,

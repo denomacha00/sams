@@ -98,7 +98,7 @@ export const profileActions: ActionDefinition[] = [
   {
     action: 'update_phone',
     description: 'Update your own phone number',
-    destructive: false,
+    destructive: true,
     patterns: [
       /(?:update|change|set)\s+(?:my\s+)?phone\s+(?:number\s+)?(?:to\s+)?(.+)/i,
       /change\s+(?:my\s+)?(?:mobile|phone)\s+(?:number\s+)?(?:to\s+)?(.+)/i,
