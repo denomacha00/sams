@@ -203,7 +203,7 @@ export const superAdminExtraActions: ActionDefinition[] = [
   {
     action: 'trigger_scheduled_job',
     description: 'Trigger a scheduled job to run now',
-    destructive: false,
+    destructive: true,
     patterns: [/trigger\s+(?:job\s+)?(.+)/i, /run\s+(?:job\s+)?(.+)/i],
     extractParams: (_msg, match) => ({ jobName: (match?.[1] || '').trim() }),
     descriptionTemplate: (p) => `Trigger job "${String(p.jobName)}".`,
@@ -212,7 +212,7 @@ export const superAdminExtraActions: ActionDefinition[] = [
   {
     action: 'trigger_data_export',
     description: 'Trigger a data export',
-    destructive: false,
+    destructive: true,
     patterns: [
       /(?:export|download)\s+(.+?)\s+(?:as\s+)?(csv|json|xlsx|excel)?/i,
       /trigger\s+(?:data\s+)?export/i,

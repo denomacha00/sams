@@ -100,6 +100,19 @@ function excludePasswordHash<T extends { passwordHash: string }>(
 
 // ─── User Service ─────────────────────────────────────────────────────────────
 
+function normalizeSubjects(subjects: string[] | undefined): string[] {
+  const seen = new Set<string>();
+  const normalized: string[] = [];
+  for (const subject of subjects ?? []) {
+    const value = subject.trim();
+    const key = value.toLowerCase();
+    if (!value || seen.has(key)) continue;
+    seen.add(key);
+    normalized.push(value);
+  }
+  return normalized;
+}
+
 export class UserService {
   /**
    * Create a new user within a school.
@@ -151,9 +164,10 @@ export class UserService {
     });
 
     // Save teacher subjects if provided
-    if (data.subjects?.length && (data.role === UserRole.TEACHER || data.role === UserRole.HOD)) {
+    const subjects = normalizeSubjects(data.subjects);
+    if (subjects.length && (data.role === UserRole.TEACHER || data.role === UserRole.HOD)) {
       await prisma.teacherSubject.createMany({
-        data: data.subjects.map((subject) => ({
+        data: subjects.map((subject) => ({
           schoolId,
           teacherId: user.id,
           subject,

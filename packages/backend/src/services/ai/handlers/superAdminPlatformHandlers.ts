@@ -206,7 +206,7 @@ export const superAdminPlatformActions: ActionDefinition[] = [
   {
     action: 'trigger_backup',
     description: 'Trigger a new database backup immediately',
-    destructive: false,
+    destructive: true,
     patterns: [
       /(?:trigger|create|make|start|run)\s+(?:a\s+)?(?:database\s+)?backup/i,
       /back\s+up\s+(?:the\s+)?(?:database|system|platform)/i,

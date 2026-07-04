@@ -39,6 +39,19 @@ export interface AddStudentManuallyData {
   phone?: string;
 }
 
+function normalizeSubjects(subjects: string[] | undefined): string[] {
+  const seen = new Set<string>();
+  const normalized: string[] = [];
+  for (const subject of subjects ?? []) {
+    const value = subject.trim();
+    const key = value.toLowerCase();
+    if (!value || seen.has(key)) continue;
+    seen.add(key);
+    normalized.push(value);
+  }
+  return normalized;
+}
+
 export class RegistrationLinkService {
   async generateLink(
     creatorId: string,
@@ -282,9 +295,10 @@ export class RegistrationLinkService {
     }
 
     // Save teacher subjects if provided (TEACHER or HOD registering via link)
-    if (data.subjects?.length && (link.targetRole === UserRole.TEACHER || link.targetRole === UserRole.HOD)) {
+    const subjects = normalizeSubjects(data.subjects);
+    if (subjects.length && (link.targetRole === UserRole.TEACHER || link.targetRole === UserRole.HOD)) {
       await prisma.teacherSubject.createMany({
-        data: data.subjects.map((subject) => ({
+        data: subjects.map((subject) => ({
           schoolId: link.schoolId,
           teacherId: user.id,
           subject,

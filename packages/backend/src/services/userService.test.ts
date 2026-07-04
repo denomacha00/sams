@@ -8,6 +8,7 @@ vi.mock('../lib/prisma', () => ({
     user: {
       findMany: vi.fn(),
       findUnique: vi.fn(),
+      findFirst: vi.fn(),
       create: vi.fn(),
       update: vi.fn(),
       delete: vi.fn(),
@@ -146,5 +147,37 @@ describe('userService assignment validation', () => {
     ).rejects.toMatchObject({ code: 'CLASS_DEPARTMENT_MISMATCH' });
 
     expect(prisma.user.update).not.toHaveBeenCalled();
+  });
+
+  it('normalizes teacher subjects when creating staff manually', async () => {
+    vi.mocked(prisma.department.findUnique).mockResolvedValue({ schoolId: 'school-1' } as never);
+    vi.mocked(prisma.user.findFirst).mockResolvedValue(null);
+    vi.mocked(prisma.user.create).mockResolvedValue({
+      id: 'teacher-1',
+      schoolId: 'school-1',
+      role: UserRole.TEACHER,
+      fullName: 'Teacher One',
+      username: 'teacher1',
+      phone: null,
+      departmentId: 'dept-1',
+      classId: null,
+      passwordHash: 'hash',
+    } as never);
+
+    await userService.createUser('school-1', {
+      role: UserRole.TEACHER,
+      fullName: 'Teacher One',
+      username: 'teacher1',
+      password: 'password123',
+      departmentId: 'dept-1',
+      subjects: [' Math ', 'math', '', 'Physics'],
+    });
+
+    expect(prisma.teacherSubject.createMany).toHaveBeenCalledWith({
+      data: [
+        { schoolId: 'school-1', teacherId: 'teacher-1', subject: 'Math' },
+        { schoolId: 'school-1', teacherId: 'teacher-1', subject: 'Physics' },
+      ],
+    });
   });
 });

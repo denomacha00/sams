@@ -835,7 +835,7 @@ export const superAdminActions: ActionDefinition[] = [
   {
     action: 'unsuspend_school',
     description: 'Unsuspend a school, restoring user access',
-    destructive: false,
+    destructive: true,
     patterns: [
       /\bunsuspend\s+(.+)/i,
       /\bunblock\s+(.+)/i,
@@ -860,7 +860,7 @@ export const superAdminActions: ActionDefinition[] = [
   {
     action: 'generate_license',
     description: 'Generate a new license key for a school',
-    destructive: false,
+    destructive: true,
     patterns: [
       /generate\s+(?:a\s+)?(?:(?:trial|basic|professional|enterprise)\s+)?(?:licen[cs]e|key)\s+(?:for\s+)?(.+)/i,
       /create\s+(?:a\s+)?(?:(?:trial|basic|professional|enterprise)\s+)?(?:licen[cs]e|key)\s+(?:for\s+)?(.+)/i,
@@ -880,7 +880,7 @@ export const superAdminActions: ActionDefinition[] = [
   {
     action: 'extend_license',
     description: 'Extend a school license by a number of days',
-    destructive: false,
+    destructive: true,
     patterns: [
       /extend\s+(.+?)\s+by\s+(\d+)\s*days?/i,
       /add\s+(\d+)\s*days?\s+to\s+(.+)/i,
@@ -972,7 +972,7 @@ export const superAdminActions: ActionDefinition[] = [
   {
     action: 'send_platform_summary',
     description: 'Send a platform summary email to the super admin email',
-    destructive: false,
+    destructive: true,
     patterns: [
       /send\s+(?:platform|system|daily)\s+(?:summary|report|email)/i,
       /email\s+(?:platform|system|daily)\s+(?:summary|report)/i,

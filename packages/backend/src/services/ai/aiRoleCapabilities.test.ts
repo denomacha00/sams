@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { UserRole } from '@sams/shared';
-import { isActionPermitted } from './roleActionRegistry';
+import { findAction, isActionPermitted } from './roleActionRegistry';
 import { actionIntentDetector } from './actionIntentDetector';
 
 describe('AI role capabilities matrix', () => {
@@ -98,6 +98,20 @@ describe('AI role capabilities matrix', () => {
       expect(r.action).toBe('reset_user_password');
       expect(r.requiresConfirmation).toBe(true);
       expect(r.params).toMatchObject({ identifier: 'john', mode: 'temp_password' });
+    });
+  });
+
+  describe('super admin confirmation safety', () => {
+    it.each([
+      'unsuspend_school',
+      'generate_license',
+      'extend_license',
+      'send_platform_summary',
+      'trigger_backup',
+      'trigger_scheduled_job',
+      'trigger_data_export',
+    ])('requires confirmation for %s', (actionName) => {
+      expect(findAction(UserRole.SUPER_ADMIN, actionName)?.destructive).toBe(true);
     });
   });
 });
