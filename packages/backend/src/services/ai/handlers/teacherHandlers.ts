@@ -346,7 +346,7 @@ export const teacherActions: ActionDefinition[] = [
   {
     action: 'start_session',
     description: 'Start an attendance session for your class',
-    destructive: false,
+    destructive: true,
     patterns: [
       /start\s+(?:a\s+)?(?:session|class|attendance)/i,
       /begin\s+(?:a\s+)?(?:session|class|attendance)/i,
@@ -378,7 +378,7 @@ export const teacherActions: ActionDefinition[] = [
   {
     action: 'mark_attendance',
     description: 'Mark a student as present, absent, or late',
-    destructive: false,
+    destructive: true,
     patterns: [
       /mark\s+(.+?)\s+(?:as\s+)?(?:present|absent|late)/i,
       /record\s+(.+?)\s+(?:as\s+)?(?:present|absent|late)/i,

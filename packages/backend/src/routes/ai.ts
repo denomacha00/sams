@@ -486,7 +486,7 @@ aiRouter.post('/query', asyncHandler(async (req: Request, res: Response): Promis
  * Process a voice transcription query.
  */
 aiRouter.post('/voice', asyncHandler(async (req: Request, res: Response): Promise<void> => {
-  const { transcription, question } = req.body;
+  const { transcription, question, threadId, confirmAction, pendingAction, history } = req.body;
   const text = transcription || question;
 
   if (!text || typeof text !== 'string' || !text.trim()) {
@@ -502,7 +502,12 @@ aiRouter.post('/voice', asyncHandler(async (req: Request, res: Response): Promis
   };
 
   try {
-    const result = await aiService.voiceQuery(user, text.trim());
+    const result = await aiService.voiceQuery(user, text.trim(), {
+      threadId: typeof threadId === 'string' ? threadId : undefined,
+      confirmAction: confirmAction === true,
+      pendingAction,
+      history: Array.isArray(history) ? history : undefined,
+    });
     res.status(200).json(result);
   } catch (voiceErr) {
     console.error('[AI] Voice query error:', (voiceErr as Error).message);

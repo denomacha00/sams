@@ -178,7 +178,7 @@ export const guardianLinkActions: ActionDefinition[] = [
   {
     action: 'link_guardian',
     description: 'Link a guardian to a student (school admin)',
-    destructive: false,
+    destructive: true,
     patterns: [
       /link\s+(?:guardian|parent)\s+(.+?)\s+(?:to|with)\s+(.+)/i,
     ],

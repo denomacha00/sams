@@ -203,7 +203,7 @@ export const timetableEditActions: ActionDefinition[] = [
   {
     action: 'create_timetable_entry',
     description: 'Add a single timetable entry (lesson slot) for a class in your department (HOD only)',
-    destructive: false,
+    destructive: true,
     patterns: [
       /add\s+(?:timetable|schedule)\s+(?:entry|slot|lesson)\s+(?:for\s+)?(.+)/i,
       /create\s+(?:a\s+)?(?:timetable|schedule)\s+(?:entry|slot)\s+(?:for\s+)?(.+)/i,

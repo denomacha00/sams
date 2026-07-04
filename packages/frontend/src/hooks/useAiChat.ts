@@ -19,6 +19,7 @@ import {
   type AiActionData,
   type AiThreadOwner,
 } from '../lib/aiChat';
+import { detectAiNavigationRequest } from '../lib/aiNavigation';
 
 // ─── Types ────────────────────────────────────────────────────────────────
 
@@ -250,7 +251,17 @@ export function useAiChat(options?: AiChatOptions) {
 
       // Navigation request
       if (onNavigateRef.current && !selectedImages.length) {
-        // Try navigation (handled by parent)
+        const navigationTarget = detectAiNavigationRequest(text);
+        if (navigationTarget) {
+          onNavigateRef.current(navigationTarget.path);
+          appendMessage({
+            id: crypto.randomUUID(),
+            role: 'assistant',
+            content: `Opened **${navigationTarget.label}**.`,
+            timestamp: new Date(),
+          });
+          return;
+        }
       }
 
       // Normal query

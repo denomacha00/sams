@@ -46,6 +46,11 @@ describe('AI role capabilities matrix', () => {
     it('HOD cannot send school-wide notifications', () => {
       expect(isActionPermitted(UserRole.HOD, 'send_school_notification')).toBe(false);
     });
+
+    it('parent and teacher chat messages require confirmation', () => {
+      expect(findAction(UserRole.GUARDIAN, 'send_message_to_teacher')?.destructive).toBe(true);
+      expect(findAction(UserRole.TEACHER, 'reply_to_parent')?.destructive).toBe(true);
+    });
   });
 
   describe('intent detection', () => {
@@ -112,6 +117,28 @@ describe('AI role capabilities matrix', () => {
       'trigger_data_export',
     ])('requires confirmation for %s', (actionName) => {
       expect(findAction(UserRole.SUPER_ADMIN, actionName)?.destructive).toBe(true);
+    });
+  });
+
+  describe('role side-effect confirmation safety', () => {
+    it.each([
+      [UserRole.SCHOOL_ADMIN, 'add_user'],
+      [UserRole.SCHOOL_ADMIN, 'create_class'],
+      [UserRole.SCHOOL_ADMIN, 'create_department'],
+      [UserRole.SCHOOL_ADMIN, 'link_guardian'],
+      [UserRole.SCHOOL_ADMIN, 'set_class_rep'],
+      [UserRole.HOD, 'start_session'],
+      [UserRole.HOD, 'mark_attendance'],
+      [UserRole.HOD, 'add_teacher'],
+      [UserRole.HOD, 'create_class'],
+      [UserRole.HOD, 'create_timetable_entry'],
+      [UserRole.TEACHER, 'start_session'],
+      [UserRole.TEACHER, 'mark_attendance'],
+      [UserRole.TEACHER, 'create_registration_link'],
+      [UserRole.TEACHER, 'export_attendance_report'],
+      [UserRole.TEACHER, 'enter_exam_result'],
+    ] as const)('%s %s requires confirmation', (role, actionName) => {
+      expect(findAction(role, actionName)?.destructive).toBe(true);
     });
   });
 });

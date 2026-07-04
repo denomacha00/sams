@@ -173,7 +173,7 @@ export const parentChatTeacherActions: ActionDefinition[] = [
   {
     action: 'reply_to_parent',
     description: 'Reply to a parent who messaged you',
-    destructive: false,
+    destructive: true,
     patterns: [
       /reply\s+(?:to\s+)?(?:parent\s+)?(.+?)\s*[:,-]\s*(.+)/i,
       /respond\s+(?:to\s+)?(?:parent\s+)?(.+?)\s*[:,-]\s*(.+)/i,
@@ -210,7 +210,7 @@ export const parentChatGuardianActions: ActionDefinition[] = [
   {
     action: 'send_message_to_teacher',
     description: 'Send a message to your child\'s teacher',
-    destructive: false,
+    destructive: true,
     patterns: [
       /(?:send|message)\s+(?:a\s+)?message\s+to\s+(?:teacher\s+)?(.+?)\s*[:,-]\s*(.+)/i,
       /message\s+(?:teacher\s+)?(.+?)\s*[:,-]\s*(.+)/i,

@@ -4,6 +4,7 @@ import request from 'supertest';
 import jwt from 'jsonwebtoken';
 import { UserRole } from '@sams/shared';
 import { aiRouter, optionalAiAuth, isSamsDataQuestion } from './ai';
+import { aiService } from '../services/aiService';
 
 vi.mock('../services/aiService', () => ({
   aiService: {
@@ -95,5 +96,37 @@ describe('AI optional auth', () => {
   it('detects school data questions for guest blocking', () => {
     expect(isSamsDataQuestion('What is my attendance rate?', 'attendance_percentage')).toBe(true);
     expect(isSamsDataQuestion('What is photosynthesis?', 'unknown')).toBe(false);
+  });
+
+  it('passes voice confirmation context through to aiService', async () => {
+    vi.mocked(aiService.voiceQuery).mockResolvedValue({ answer: 'done', intent: 'action_executed', engine: 'local' });
+    const app = createAiApp();
+    const pendingAction = {
+      action: 'send_class_message',
+      params: { message: 'Bring books' },
+      description: 'Send class message.',
+    };
+
+    const res = await request(app)
+      .post('/ai/voice')
+      .send({
+        transcription: 'yes',
+        threadId: 'thread-1',
+        confirmAction: true,
+        pendingAction,
+        history: [{ role: 'assistant', content: 'Confirm?' }],
+      });
+
+    expect(res.status).toBe(200);
+    expect(aiService.voiceQuery).toHaveBeenCalledWith(
+      expect.objectContaining({ sub: 'guest' }),
+      'yes',
+      expect.objectContaining({
+        threadId: 'thread-1',
+        confirmAction: true,
+        pendingAction,
+        history: [{ role: 'assistant', content: 'Confirm?' }],
+      }),
+    );
   });
 });

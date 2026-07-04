@@ -8,7 +8,7 @@ describe('actionIntentDetector role scoping (regex path)', () => {
     const result = await actionIntentDetector.detect('start attendance session for Math', UserRole.TEACHER);
     expect(result.isAction).toBe(true);
     expect(result.action).toBe('start_session');
-    expect(result.requiresConfirmation).toBe(false);
+    expect(result.requiresConfirmation).toBe(true);
   });
 
   it('does not treat add_user as teacher action', async () => {
@@ -31,7 +31,7 @@ describe('actionIntentDetector role scoping (regex path)', () => {
     expect(teacher.isAction).toBe(true);
     expect(teacher.action).toBe('create_registration_link');
     expect(teacher.params?.studentName).toBe('Jane Doe');
-    expect(teacher.requiresConfirmation).toBe(false);
+    expect(teacher.requiresConfirmation).toBe(true);
   });
 
   it('detects teacher invite student phrasing', async () => {

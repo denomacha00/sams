@@ -88,7 +88,7 @@ export const classRepActions: ActionDefinition[] = [
   {
     action: 'set_class_rep',
     description: 'Assign a student as class representative',
-    destructive: false,
+    destructive: true,
     patterns: [
       /(?:set|make|assign)\s+(.+?)\s+(?:as|the)\s+(?:class\s+)?rep(?:resentative)?/i,
       /(?:set|make|assign)\s+(?:the\s+)?(?:class\s+)?rep(?:resentative)?\s+(.+)/i,
@@ -108,7 +108,7 @@ export const classRepActions: ActionDefinition[] = [
   {
     action: 'unset_class_rep',
     description: 'Remove a student as class representative',
-    destructive: false,
+    destructive: true,
     patterns: [
       /(?:remove|unset|unassign)\s+(?:the\s+)?(?:class\s+)?rep(?:resentative)?\s+(.+)/i,
       /(?:remove|unset|unassign)\s+(.+?)\s+(?:as|from)\s+(?:the\s+)?(?:class\s+)?rep(?:resentative)?/i,

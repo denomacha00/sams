@@ -734,6 +734,7 @@ export class AIService {
       threadId?: string;
       confirmAction?: boolean;
       pendingAction?: PendingAction;
+      history?: Array<{ role: 'user' | 'assistant'; content: string }>;
     },
   ): Promise<AIServiceResponse> {
     return this.query(user, transcription, options);

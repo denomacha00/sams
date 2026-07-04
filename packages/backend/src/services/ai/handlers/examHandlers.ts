@@ -345,7 +345,7 @@ export const examActions: ActionDefinition[] = [
   {
     action: 'enter_exam_result',
     description: 'Enter or update a student\'s exam score for a subject. Use "John scored 30/50 in Math" format.',
-    destructive: false,
+    destructive: true,
     patterns: [
       /(?:scored|got|received|marks?)\s+(\d+(?:\.\d+)?)\s*\/\s*(\d+(?:\.\d+)?)\s+(?:in|for|on)\s+(.+)/i,
       /(?:enter|record|add|save|submit)\s+(?:marks?|results?|scores?|grade)\s+(?:for|of)\s+(.+?)(?:\s+(?:in|for|on)\s+(.+))?/i,

@@ -49,12 +49,15 @@ export function useAiSpeech(options?: { onEnd?: () => void; onStart?: () => void
     if (typeof window === 'undefined' || !window.speechSynthesis) return null;
     const voices = window.speechSynthesis.getVoices();
     if (voices.length === 0) return null;
+    const englishVoices = voices.filter((v) => v.lang.toLowerCase().startsWith('en'));
+    const naturalVoice = englishVoices.find((v) => /natural|neural|online|premium|enhanced/i.test(v.name));
     return (
-      voices.find((v) => v.lang.startsWith('en') && v.name.includes('Kenya')) ||
-      voices.find((v) => v.lang.startsWith('en') && v.name.includes('Africa')) ||
-      voices.find((v) => v.lang.startsWith('en') && v.name.includes('UK')) ||
-      voices.find((v) => v.lang.startsWith('en') && v.name.includes('India')) ||
-      voices.find((v) => v.lang.startsWith('en')) ||
+      naturalVoice ||
+      englishVoices.find((v) => /Kenya|Africa/i.test(v.name)) ||
+      englishVoices.find((v) => /UK|Great Britain|United Kingdom/i.test(v.name)) ||
+      englishVoices.find((v) => /India/i.test(v.name)) ||
+      englishVoices.find((v) => /Google|Microsoft|Samantha|Daniel|Arthur|Libby/i.test(v.name)) ||
+      englishVoices[0] ||
       null
     );
   }, []);
@@ -103,8 +106,8 @@ export function useAiSpeech(options?: { onEnd?: () => void; onStart?: () => void
     const utterance = new SpeechSynthesisUtterance(cleanText);
     const preferredVoice = resolveVoice();
     if (preferredVoice) utterance.voice = preferredVoice;
-    utterance.rate = 1.0;
-    utterance.pitch = 1.0;
+    utterance.rate = 0.94;
+    utterance.pitch = 0.98;
     utterance.volume = 1.0;
     utterance.lang = 'en';
 

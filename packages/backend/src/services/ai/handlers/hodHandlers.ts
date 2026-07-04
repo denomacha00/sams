@@ -516,7 +516,7 @@ export const hodActions: ActionDefinition[] = [
   {
     action: 'start_session',
     description: 'Start an attendance session for a class in your department',
-    destructive: false,
+    destructive: true,
     patterns: [
       /start\s+(?:a\s+)?(?:session|class|attendance)/i,
       /begin\s+(?:a\s+)?(?:session|class|attendance)/i,
@@ -550,7 +550,7 @@ export const hodActions: ActionDefinition[] = [
   {
     action: 'mark_attendance',
     description: 'Mark a student as present, absent, or late in an active department session',
-    destructive: false,
+    destructive: true,
     patterns: [
       /mark\s+(.+?)\s+(?:as\s+)?(?:present|absent|late)/i,
       /record\s+(.+?)\s+(?:as\s+)?(?:present|absent|late)/i,
@@ -573,7 +573,7 @@ export const hodActions: ActionDefinition[] = [
   {
     action: 'add_teacher',
     description: 'Assign a teacher to your department',
-    destructive: false,
+    destructive: true,
     patterns: [
       /add\s+teacher\s+(.+)/i,
       /assign\s+(.+)\s+to\s+(?:my\s+)?department/i,
@@ -590,7 +590,7 @@ export const hodActions: ActionDefinition[] = [
   {
     action: 'create_class',
     description: 'Create a class in your department',
-    destructive: false,
+    destructive: true,
     patterns: [
       /create\s+(?:a\s+)?class\s+(.+)/i,
       /add\s+(?:a\s+)?(?:new\s+)?class\s+(.+)/i,

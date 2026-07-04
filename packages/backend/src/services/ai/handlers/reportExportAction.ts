@@ -163,7 +163,7 @@ export const exportReportHandler: ActionHandler = async (params, scope) => {
 export const exportReportActionDef: ActionDefinition = {
   action: 'export_attendance_report',
   description: 'Export an attendance report as PDF, Excel, or CSV within the user role scope',
-  destructive: false,
+  destructive: true,
   patterns: REPORT_EXPORT_PATTERNS,
   extractParams: (message, match) => ({
     format: detectFormat(message, match),

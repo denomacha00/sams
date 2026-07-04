@@ -406,7 +406,7 @@ export const schoolAdminActions: ActionDefinition[] = [
   {
     action: 'add_user',
     description: 'Add a new user (student, teacher, or staff) to the school',
-    destructive: false,
+    destructive: true,
     patterns: [
       /^(?:add|create|register)\s+(?:a\s+)?user\s*$/i,
       /add\s+(?:a\s+)?(?:user|student|teacher|staff)\s+(.+)/i,
@@ -449,7 +449,7 @@ export const schoolAdminActions: ActionDefinition[] = [
   {
     action: 'create_class',
     description: 'Create a new class in the school',
-    destructive: false,
+    destructive: true,
     patterns: [
       /create\s+(?:a\s+)?class\s+(.+)/i,
       /add\s+(?:a\s+)?(?:new\s+)?class\s+(.+)/i,
@@ -466,7 +466,7 @@ export const schoolAdminActions: ActionDefinition[] = [
   {
     action: 'create_department',
     description: 'Create a new department in the school',
-    destructive: false,
+    destructive: true,
     patterns: [
       /create\s+(?:a\s+)?department\s+(.+)/i,
       /add\s+(?:a\s+)?(?:new\s+)?department\s+(.+)/i,

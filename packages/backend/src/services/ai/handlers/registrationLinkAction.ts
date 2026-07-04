@@ -157,7 +157,7 @@ export const createRegistrationLinkActionDef = {
   action: 'create_registration_link' as const,
   description:
     'Generate a student self-registration link (same as Registration Links on the dashboard — not direct user creation)',
-  destructive: false,
+  destructive: true,
   patterns: INVITE_STUDENT_PATTERNS,
   extractParams: extractInviteStudentParams,
   descriptionTemplate: (params: Record<string, unknown>) => {

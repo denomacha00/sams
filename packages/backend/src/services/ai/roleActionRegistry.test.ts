@@ -130,7 +130,7 @@ describe('roleActionRegistry permissions', () => {
 
   it('HOD can create classes in their department', () => {
     expect(isActionPermitted(UserRole.HOD, 'create_class')).toBe(true);
-    expect(findAction(UserRole.HOD, 'create_class')?.destructive).toBe(false);
+    expect(findAction(UserRole.HOD, 'create_class')?.destructive).toBe(true);
   });
 
   it('HOD can send department notifications but not school-wide', () => {
