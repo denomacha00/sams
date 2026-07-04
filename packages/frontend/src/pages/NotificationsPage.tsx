@@ -828,16 +828,20 @@ const NotificationsPage: React.FC = () => {
         ? 'SAMS Super Admin'
         : truncateName(notif.senderName || (notif.senderId === null ? 'System' : 'Deleted User'));
       const key = isSentFolder
-        ? `sent:${notif.batchId ?? notif.id}`
-        : notif.batchId
-          ? `batch:${notif.batchId}`
-          : `from:${notif.senderId ?? 'system'}:${notif.type}:${notif.title || 'message'}`;
+        ? `sent:${notif.type}:${notif.scope ?? 'scope'}:${notif.targetId ?? notif.targetScopeLabel ?? 'all'}:${notif.targetRole ?? 'ALL'}`
+        : notif.senderId
+          ? `from:${notif.type}:${notif.senderId}`
+          : `system:${notif.type}:${notif.title || 'message'}`;
       const titleText = isSentFolder
         ? scopeLabel
-        : notif.title || senderDisplay || 'Message';
+        : notif.senderId
+          ? senderDisplay
+          : notif.title || senderDisplay || 'Message';
       const subtitleText = isSentFolder
         ? `You -> ${scopeLabel}`
-        : `${senderDisplay}${formatRole(notif.senderRole) ? ` - ${formatRole(notif.senderRole)}` : ''}`;
+        : notif.senderId
+          ? `${formatRole(notif.senderRole) || 'Sender'} - ${notif.title || 'Message'}`
+          : `${senderDisplay}${formatRole(notif.senderRole) ? ` - ${formatRole(notif.senderRole)}` : ''}`;
 
       const existing = threadMap.get(key);
       if (!existing) {
@@ -859,6 +863,8 @@ const NotificationsPage: React.FC = () => {
         existing.latest = notif;
         existing.title = titleText;
         existing.subtitle = subtitleText;
+      } else if (!isSentFolder && existing.latest.senderId && !existing.subtitle.includes(notif.title || 'Message')) {
+        existing.subtitle = `${formatRole(existing.latest.senderRole) || 'Sender'} - ${existing.latest.title || 'Message'}`;
       }
       if (!isSentFolder && !notif.read) existing.unreadCount += 1;
       existing.attachments = collectAttachments(existing.messages);
