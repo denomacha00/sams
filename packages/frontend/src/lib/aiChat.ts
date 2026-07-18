@@ -1,6 +1,6 @@
 const AI_THREAD_STORAGE_KEY = 'sams-ai-thread-id';
 
-export const AI_QUERY_TIMEOUT_MS = 30_000;
+export const AI_QUERY_TIMEOUT_MS = 45_000;
 export const AI_IMAGE_TIMEOUT_MS = 90_000;
 
 export interface AiThreadOwner {

@@ -12,7 +12,7 @@ export interface ClassificationResult {
 // ─── Constants ────────────────────────────────────────────────────────────────
 
 const CONFIDENCE_THRESHOLD = 0.6;
-const TIMEOUT_MS = 15000;
+const TIMEOUT_MS = 4_000;
 
 const CLASSIFICATION_SYSTEM_PROMPT = `You are an intent classifier for a school management system called SAMS.
 Given a user message and a list of available actions, determine if the message is requesting one of the actions.
@@ -65,7 +65,7 @@ export async function classifyIntent(
 ): Promise<ClassificationResult | null> {
   let client: OpenAI;
   try {
-    client = getOpenAIClient();
+    client = getOpenAIClient({ timeoutMs: TIMEOUT_MS });
   } catch {
     return null; // No API key — graceful degradation
   }

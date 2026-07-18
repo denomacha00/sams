@@ -925,13 +925,6 @@ export class AIService {
         },
       });
 
-      return {
-        answer: result.answer,
-        intent: 'action_executed',
-        engine: 'local',
-        data: result.data,
-      };
-
       // Format the response with HumanResponseFormatter + optional LLM reframe
       try {
         const { getOpenAIClient, resolveChatModel } = await import('./ai/aiProviderConfig');

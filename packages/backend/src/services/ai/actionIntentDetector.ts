@@ -43,9 +43,36 @@ class ActionIntentDetector {
       return { isAction: false, requiresConfirmation: false };
     }
 
+    if (!this.mightBeActionRequest(trimmed)) {
+      return { isAction: false, requiresConfirmation: false };
+    }
+
     // Step 2: LLM fallback with role-scoped action candidates
     const llmResult = await this.detectByLLM(trimmed, userRole);
     return llmResult;
+  }
+
+  private mightBeActionRequest(message: string): boolean {
+    const q = message.toLowerCase();
+    if (/^@\w+/.test(q)) return true;
+    if (
+      /\b(?:send|message|notify|email|sms|export|download|generate|create|add|delete|remove|clear|update|change|set|reset|suspend|unsuspend|start|stop|end|open|close|trigger|run|mark|register|remind)\b/.test(q)
+    ) {
+      return true;
+    }
+    if (
+      /\b(?:show|view|list|pull\s+up|bring\s+up|check|read|get|find)\b/.test(q) &&
+      /\b(?:attendance|timetable|schedule|report|risk|students?|teachers?|classes?|department|school|session|notifications?|messages?|parents?|guardians?|license|licence|payments?)\b/.test(q)
+    ) {
+      return true;
+    }
+    if (
+      /\bhow\s+many\b/.test(q) &&
+      /\b(?:students?|teachers?|classes?|users?|schools?|sessions?|departments?)\b/.test(q)
+    ) {
+      return true;
+    }
+    return false;
   }
 
   private isClearlyForbiddenActionPhrase(message: string, role: string): boolean {
