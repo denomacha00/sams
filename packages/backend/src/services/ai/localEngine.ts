@@ -1823,8 +1823,14 @@ export async function localQuery(
         return await handleSystemStats();
       case 'custom_knowledge': {
         const result = await handleCustomKnowledge(user, question);
-        // If no knowledge matched, let it fall through to LLM
-        if (result.intent === 'unknown' && !result.answer) break;
+        // If no knowledge matched, return unknown so the AIService
+        // passes the question to the LLM provider chain.
+        if (result.intent === 'unknown' && !result.answer) {
+          return {
+            answer: `I can help you with:\n• About SAMS ("what is SAMS", "what can you do")\n• Attendance rates and percentages\n• Absent students today\n• Risk scores and at-risk students\n• Top students by attendance\n• Class attendance comparison\n• Generate timetable ("generate timetable" for whole school, or "generate timetable for Form 1A")\n• Remake timetable ("remake timetable", "regenerate timetable")\n• View timetable ("show my timetable")\n• Student count ("how many students")\n• Active sessions ("who is teaching now")\n• System stats ("how many schools", "total revenue")\n• Admin guides ("how to generate a license", "how to suspend a school")\n\nTry asking: "What is SAMS?" or "Generate timetable for the whole school"`,
+            intent: 'unknown',
+          };
+        }
         return result;
       }
       case 'attendance_percentage':
