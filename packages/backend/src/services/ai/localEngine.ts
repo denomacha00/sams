@@ -1821,8 +1821,12 @@ export async function localQuery(
           };
         }
         return await handleSystemStats();
-      case 'custom_knowledge':
-        return await handleCustomKnowledge(user, question);
+      case 'custom_knowledge': {
+        const result = await handleCustomKnowledge(user, question);
+        // If no knowledge matched, let it fall through to LLM
+        if (result.intent === 'unknown' && !result.answer) break;
+        return result;
+      }
       case 'attendance_percentage':
         return await handleAttendancePercentage(scope);
       case 'absent_students':

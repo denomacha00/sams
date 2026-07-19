@@ -17,7 +17,7 @@ export const DEFAULT_OPENROUTER_BASE_URL = 'https://openrouter.ai/api/v1';
 export const DEFAULT_OPENROUTER_FALLBACK_MODEL = 'meta-llama/llama-3.1-8b-instruct:free';
 export const DEFAULT_ATOMESUS_BASE_URL = 'https://api.atomesus.com/v1';
 export const DEFAULT_ATOMESUS_MODEL = 'cipher';
-export const DEFAULT_AI_PROVIDER_TIMEOUT_MS = 25_000;
+export const DEFAULT_AI_PROVIDER_TIMEOUT_MS = 15_000;
 /** OpenRouter / Groq multimodal model (must differ from text-only chat models). */
 export const DEFAULT_VISION_MODEL = 'meta-llama/llama-4-scout-17b-16e-instruct';
 
