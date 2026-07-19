@@ -503,6 +503,7 @@ const FloatingAI: React.FC = () => {
                     <span className={`w-1 h-1 rounded-full animate-typewriter-pulse ${typingStage === 'writing' ? 'bg-emerald-400' : 'bg-indigo-400'}`} style={{ animationDelay: '0.2s' }} />
                     <span className={`w-1 h-1 rounded-full animate-typewriter-pulse ${typingStage === 'writing' ? 'bg-emerald-400' : 'bg-indigo-400'}`} style={{ animationDelay: '0.4s' }} />
                   </span>
+                  <span>{typingStage === 'writing' ? 'Writing...' : 'Thinking...'}</span>
                 </div>
               </div>
             </div>
@@ -515,8 +516,7 @@ const FloatingAI: React.FC = () => {
             <div className="text-[10px] text-ink-muted mb-1.5 text-center font-medium tracking-wide">
               <span className="inline-flex items-center gap-1">
                 <span className={`w-1 h-1 rounded-full animate-typewriter-pulse ${typingStage === 'writing' ? 'bg-emerald-400' : 'bg-indigo-400'}`} />
-                <span className="w-1 h-1 rounded-full animate-typewriter-pulse" style={{ animationDelay: '0.2s' }} />
-                <span className="w-1 h-1 rounded-full animate-typewriter-pulse" style={{ animationDelay: '0.4s' }} />
+                SAMS AI is {typingStage === 'writing' ? 'writing' : 'thinking'}...
               </span>
             </div>
           )}

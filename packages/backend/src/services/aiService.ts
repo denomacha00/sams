@@ -691,7 +691,7 @@ export class AIService {
       }
 
       return {
-        answer: openaiResult.answer,
+        answer: formatAnswer(openaiResult.answer, user.role, userName),
         intent: openaiResult.intent,
         engine: 'openai',
         data: openaiResult.data,
