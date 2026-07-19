@@ -175,7 +175,9 @@ async function tryBackupChatProviders(
   primaryErr: unknown,
 ): Promise<OpenAIQueryResult> {
   let fallbackErr: unknown;
-  const fallback = getFallbackClient();
+
+  // Try fallback (Atomesus with cipher) — 5s max, this isn't worth waiting on
+  const fallback = getFallbackClient({ timeoutMs: 5_000 });
   if (fallback) {
     try {
       const fallbackResponse = await fallback.chat.completions.create({
@@ -194,25 +196,29 @@ async function tryBackupChatProviders(
     }
   }
 
-  const atomesus = getAtomesusClient();
-  if (atomesus) {
-    try {
-      const atomesusResponse = await atomesus.chat.completions.create({
-        model: resolveAtomesusChatModel(),
-        messages,
-        temperature: 0.85,
-        max_tokens: CHAT_MAX_TOKENS,
-      });
-      const atomesusAnswer = atomesusResponse.choices[0]?.message?.content;
-      if (atomesusAnswer) {
-        return { answer: sanitizeLlmOutput(atomesusAnswer), intent: 'openai_response' };
+  // Do NOT try getAtomesusClient separately — the fallback client already uses
+  // the Atomesus URL/key when OPENAI_FALLBACK_URL is set to a provider like
+  // Atomesus with the same API key. A separate getAtomesusClient() call would
+  // hit the same provider again and double the wait.
+
+  // If fallback was not configured at all and Atomesus is a separate key, try it
+  if (!fallback) {
+    const atomesus = getAtomesusClient(5_000);
+    if (atomesus) {
+      try {
+        const atomesusResponse = await atomesus.chat.completions.create({
+          model: resolveAtomesusChatModel(),
+          messages,
+          temperature: 0.85,
+          max_tokens: CHAT_MAX_TOKENS,
+        });
+        const atomesusAnswer = atomesusResponse.choices[0]?.message?.content;
+        if (atomesusAnswer) {
+          return { answer: sanitizeLlmOutput(atomesusAnswer), intent: 'openai_response' };
+        }
+      } catch (err) {
+        console.error('[AI/Atomesus] Also failed:', extractProviderErrorText(err));
       }
-    } catch (err) {
-      console.error('[AI/Atomesus] Also failed:', extractProviderErrorText(err));
-      return {
-        answer: formatProviderError(primaryErr, fallbackErr, err),
-        intent: 'ai_error',
-      };
     }
   }
 
