@@ -160,6 +160,12 @@ const MAX_CHAT_INPUT_TOKENS = readBoundedIntEnv('AI_MAX_INPUT_TOKENS', 8_000, 1_
 const MIN_HISTORY_TOKENS = readBoundedIntEnv('AI_MIN_HISTORY_TOKENS', 1_200, 0, 4_000);
 const CHAT_MAX_TOKENS = readBoundedIntEnv('AI_MAX_TOKENS', 800, 50, 2_000);
 
+// Per-call ceilings so the full provider chain returns before the frontend's
+// 45s abort (see aiChat.ts). Worst case: classifier 4s + primary 22s + tool
+// round 15s = 41s. Env-overridable for slower/faster deployments.
+const PRIMARY_CHAT_TIMEOUT_MS = readBoundedIntEnv('AI_PRIMARY_TIMEOUT_MS', 22_000, 5_000, 40_000);
+const TOOL_ROUND_TIMEOUT_MS = readBoundedIntEnv('AI_TOOL_TIMEOUT_MS', 15_000, 5_000, 30_000);
+
 async function tryBackupChatProviders(
   messages: OpenAI.Chat.Completions.ChatCompletionMessageParam[],
   primaryErr: unknown,
@@ -888,7 +894,7 @@ export async function openaiQuery(
   const tools = getRoleScopedTools(user.role);
 
   try {
-    const client = getOpenAIClient();
+    const client = getOpenAIClient({ timeoutMs: PRIMARY_CHAT_TIMEOUT_MS });
     const useTools = shouldUseTools(user);
     const response = await client.chat.completions.create({
       model: resolveChatModel(),
@@ -1005,7 +1011,7 @@ async function handleToolCalls(
   });
 
   const updatedMessages = [...messages, ...toolResults];
-  const client = getOpenAIClient();
+  const client = getOpenAIClient({ timeoutMs: TOOL_ROUND_TIMEOUT_MS });
   const response = await client.chat.completions.create({
     model: resolveChatModel(),
     messages: updatedMessages,
@@ -1029,7 +1035,10 @@ export async function openaiQueryWithHistory(
   const tools = getRoleScopedTools(user.role);
 
   try {
-    const client = getOpenAIClient();
+    // Bounded so the whole chain (classifier 4s + primary 22s + optional tool
+    // round 15s = 41s) stays under the frontend's 45s abort. A slow primary now
+    // fails over to the fast fallback instead of hanging past the browser limit.
+    const client = getOpenAIClient({ timeoutMs: PRIMARY_CHAT_TIMEOUT_MS });
     const useTools = shouldUseTools(user);
     const response = await client.chat.completions.create({
       model: resolveChatModel(),

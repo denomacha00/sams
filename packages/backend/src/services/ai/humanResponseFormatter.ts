@@ -59,7 +59,9 @@ function getGreeting(userName?: string): string {
     'Hang on... ',
   ];
   const prefix = greetings[Math.floor(Math.random() * greetings.length)];
-  if (!userName) return prefix;
+  // Ensure a trailing space so "Alright," + "You've got..." doesn't collapse
+  // into "Alright,You've got...".
+  if (!userName) return prefix.replace(/\s*$/, ' ');
   return `${prefix} ${userName} — `;
 }
 
@@ -244,7 +246,11 @@ export function formatHumanResponse(
   }
 
   // ─── Case 7: Stats counts ───────────────────────────────────────────
-  const statsMatch = text.match(STATS_COUNT_RE);
+  // Skip pre-formatted status messages (action confirmations, errors). A
+  // confirmation like "✅ In-app message sent to 12 user(s)..." must NOT be
+  // rewritten into the "You've got 12 users in your school" stats template.
+  const isStatusMessage = /^(?:✅|❌|⚠️|📩|📤)/.test(text) || /\bsent to\b/i.test(text);
+  const statsMatch = isStatusMessage ? null : text.match(STATS_COUNT_RE);
   if (statsMatch) {
     const count = parseInt(statsMatch[1], 10);
     const entity = statsMatch[2].toLowerCase();
@@ -252,8 +258,8 @@ export function formatHumanResponse(
     const greeting = getGreeting(userName);
 
     const plural = entity + (count !== 1 ? 's' : '');
-    const verb = count === 1 ? 'is' : 'are';
-    text = `${greeting}You've got **${count}** ${plural} ${verb} in ${context?.role === 'SUPER_ADMIN' ? 'the platform' : 'your school'}.`;
+    const location = context?.role === 'SUPER_ADMIN' ? 'the platform' : 'your school';
+    text = `${greeting}You've got **${count}** ${plural} in ${location}.`;
 
     suggestions.push(
       entity === 'student'
