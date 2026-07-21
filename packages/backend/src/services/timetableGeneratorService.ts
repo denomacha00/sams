@@ -93,7 +93,8 @@ function uniqueSubjects(ss: string[]): string[] {
 }
 function getSubjects(cls: ClassInfo, cat: SubjectCatalog): string[] {
   const s = cat.byDepartment.get(cls.departmentId) ?? cat.schoolWide;
-  return s.length > 0 ? s : DEFAULT_SUBJECTS;
+  // NEVER fall back to hardcoded subjects — only use what teachers registered.
+  return s;
 }
 /** Canonical key for subject matching — trim + lowercase so "Mathematics",
  *  "mathematics", and " Math " map to the same teacher pool. Without this the
@@ -419,10 +420,9 @@ async function loadSubjectCatalog(schoolId: string, departmentId?: string): Prom
     }
   }
 
-  // Last resort: generic defaults (should never happen once teachers register)
-  if (schoolWideSet.size === 0) {
-    for (const s of DEFAULT_SUBJECTS) schoolWideSet.add(s);
-  }
+  // NEVER fall back to hardcoded DEFAULT_SUBJECTS. If no TeacherSubject
+  // registrations exist and no timetable history, the catalog stays empty
+  // and the generator will fail with a clear error telling the user what to do.
 
   const cat: SubjectCatalog = {
     schoolWide: [...schoolWideSet].sort(),

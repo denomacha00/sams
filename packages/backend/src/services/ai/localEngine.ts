@@ -357,21 +357,9 @@ function timetableManageDeniedMessage(role: UserRole): string {
 
 // ─── School-Wide Timetable Generator ──────────────────────────────────────────
 
-/**
- * Default Kenyan secondary school subjects.
- */
-const DEFAULT_SUBJECTS = [
-  'Mathematics',
-  'English',
-  'Kiswahili',
-  'Biology',
-  'Chemistry',
-  'Physics',
-  'History',
-  'Geography',
-  'CRE',
-  'Business Studies',
-];
+// DEFAULT_SUBJECTS removed — the generator must only use subjects that teachers
+// registered via TeacherSubject. Guessing hardcoded subjects like Biology or
+// English when no teacher declared them produces a timetable no one can teach.
 
 /**
  * Professional school schedule: 8 periods per day, 40 minutes each.
@@ -414,6 +402,7 @@ interface TimetableSlot {
   dayOfWeek: number;
   startTime: string;
   endTime: string;
+  room?: string;
 }
 
 interface ExistingTimetableBooking {
@@ -544,20 +533,51 @@ function uniqueSubjects(subjects: string[]): string[] {
 function getSubjectsForClass(cls: ClassInfo, catalog: SubjectCatalog): string[] {
   const departmentSubjects = catalog.byDepartment.get(cls.departmentId) ?? [];
   const subjects = departmentSubjects.length > 0 ? departmentSubjects : catalog.schoolWide;
-  return subjects.length > 0 ? subjects : DEFAULT_SUBJECTS;
+  // NEVER fall back to hardcoded subjects — only use what teachers registered.
+  // An empty catalog means teachers haven't registered subjects yet.
+  return subjects;
 }
 
 
 /**
  * Core timetable generation algorithm.
- * Generates a conflict-free timetable for the given classes using available teachers.
+ * Uses ONLY declared teacher-subject registrations (TeacherSubject table).
+ * Every teacher is assigned ONLY to subjects they registered for.
+ * Rooms are checked across ALL classes (whole school) to prevent double-booking.
  *
  * Algorithm:
- * 1. For each class, determine subjects (round-robin from DEFAULT_SUBJECTS)
- * 2. For each day and period, pick the next subject (avoid repeats same day)
- * 3. Find an available teacher for that subject (same department preferred)
- * 4. If no teacher available, skip the slot
- * 5. Track all bookings to prevent conflicts
+ * 1. Build subject→teachers index from the teacherSubjectMap (teacherId → Set<subject>)
+ * 2. For each day/period, pick a subject for the class (avoid repeats same day)
+ * 3. Find a teacher who registered that subject AND is free (least-loaded first)
+ * 4. If rooms are provided, assign a room that isn't used by ANY other class at that time
+ * 5. If no teacher/room available, skip the slot
+ */
+/**
+ * Fisher-Yates shuffle for randomness — ensures each "Generate Again"
+ * produces a different schedule.
+ */
+function shuffleRng<T>(arr: T[]): T[] {
+  const a = [...arr];
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
+
+/**
+ * Core timetable generation algorithm.
+ * Uses ONLY declared teacher-subject registrations (TeacherSubject table).
+ * Every teacher is assigned ONLY to subjects they registered for.
+ * Rooms are checked across ALL classes (whole school) to prevent double-booking.
+ * Randomised so each "Generate Again" produces a different schedule (fair distribution).
+ *
+ * Algorithm:
+ * 1. Build subject→teachers index from the teacherSubjectMap (teacherId → Set<subject>)
+ * 2. For each day/period, pick a subject for the class (avoid repeats same day)
+ * 3. Find a teacher who registered that subject AND is free (random among least-loaded)
+ * 4. If rooms are provided, assign a room that isn't used by ANY other class at that time
+ * 5. If no teacher/room available, skip the slot
  */
 function generateTimetableSlots(
   schoolId: string,
@@ -565,6 +585,13 @@ function generateTimetableSlots(
   teachers: TeacherInfo[],
   existingBookings: ExistingTimetableBooking[],
   subjectCatalog: SubjectCatalog,
+  /** teacherId → Set of subjects they registered for (from TeacherSubject).
+   *  Teachers are ONLY assigned to subjects in their set. If a teacherId is
+   *  missing, they have no registered subjects and cannot teach anything. */
+  teacherSubjectMap: Map<string, Set<string>>,
+  /** List of available room names (e.g. ['Lab A', 'Room 3', 'Hall']). 
+   *  Empty means no room tracking. */
+  rooms: string[],
 ): { slots: TimetableSlot[]; skipped: number; stats: Record<string, number> } {
   const tracker = new ScheduleTracker();
   tracker.seed(existingBookings);
@@ -572,104 +599,124 @@ function generateTimetableSlots(
   let skipped = 0;
   const stats: Record<string, number> = {};
 
-  // Group teachers by department for efficient lookup
-  const teachersByDept = new Map<string, TeacherInfo[]>();
-  const teachersNoDept: TeacherInfo[] = [];
-
-  for (const teacher of teachers) {
-    if (teacher.departmentId) {
-      const list = teachersByDept.get(teacher.departmentId) ?? [];
-      list.push(teacher);
-      teachersByDept.set(teacher.departmentId, list);
-    } else {
-      teachersNoDept.push(teacher);
+  // Build reverse index: subject → teacherIds who registered for it
+  // A teacher registered for multiple subjects → appears under each one.
+  const subjectTeachers = new Map<string, Set<string>>();
+  for (const [tid, subjects] of teacherSubjectMap) {
+    for (const subj of subjects) {
+      const set = subjectTeachers.get(subj) ?? new Set();
+      set.add(tid);
+      subjectTeachers.set(subj, set);
     }
   }
 
-  // Process each class
-  for (const cls of classes) {
-    // Get teachers for this class's department, fallback to all teachers
-    const deptTeachers = teachersByDept.get(cls.departmentId) ?? [];
-    const availableTeachers = deptTeachers.length > 0
-      ? [...deptTeachers, ...teachersNoDept]
-      : teachers; // If no dept teachers, use all
+  // Track room usage across ALL classes: "room:day:startTime" → classId
+  const roomBookings = new Map<string, string>();
+  // Seed existing room bookings (from other classes not being regenerated)
+  for (const eb of existingBookings as any[]) {
+    if (eb.room) {
+      roomBookings.set(`${eb.room}:${eb.dayOfWeek}:${eb.startTime}`, eb.classId);
+    }
+  }
 
-    if (availableTeachers.length === 0) {
+  let ri = 0;
+  const nextRoom = rooms.length > 0
+    ? (day: number, startTime: string): string | undefined => {
+        // Try rooms in random-start order to distribute fairly
+        const startIdx = Math.floor(Math.random() * rooms.length);
+        for (let i = 0; i < rooms.length; i++) {
+          const candidate = rooms[(startIdx + i) % rooms.length];
+          const key = `${candidate}:${day}:${startTime}`;
+          if (!roomBookings.has(key)) {
+            roomBookings.set(key, 'booked');
+            return candidate;
+          }
+        }
+        return undefined; // all rooms booked at this time
+      }
+    : () => undefined as string | undefined;
+
+  // Shuffle class processing order for randomness
+  const shuffledClasses = shuffleRng(classes);
+
+  // Process each class
+  for (const cls of shuffledClasses) {
+    const subjects = getSubjectsForClass(cls, subjectCatalog);
+    if (subjects.length === 0) {
       skipped += DAYS.length * PERIODS.length;
       continue;
     }
-
-    // Create a subject rotation for this class from existing school/department data when available.
-    const subjects = getSubjectsForClass(cls, subjectCatalog);
-    let subjectPointer = 0;
+    // Shuffle subject rotation so each regen picks different subjects first
+    const shuffledSubjects = shuffleRng(subjects);
 
     for (const day of DAYS) {
       let periodsFilledToday = 0;
 
       for (const period of PERIODS) {
-        // Check class availability (should always be true for fresh generation)
         if (!tracker.isClassAvailable(cls.id, day, period.startTime)) {
           skipped++;
           continue;
         }
 
-        // Pick next subject, trying to avoid repeats on the same day
+        // Pick subject, try to avoid same-subject repeats in a day
         let subject: string | null = null;
-        let attempts = 0;
-        while (attempts < subjects.length) {
-          const candidate = subjects[subjectPointer % subjects.length];
-          subjectPointer++;
-          attempts++;
+        const fresh = shuffledSubjects.filter((s) => !tracker.hasSubjectToday(cls.id, day, s));
+        const pool = fresh.length > 0 ? fresh : shuffledSubjects;
+        subject = pool[Math.floor(Math.random() * pool.length)];
 
-          // Prefer subjects not yet used today for this class
-          if (!tracker.hasSubjectToday(cls.id, day, candidate)) {
-            subject = candidate;
-            break;
-          }
-
-          // If all subjects used today, allow repeats
-          if (attempts === subjects.length) {
-            subject = candidate;
-          }
-        }
-
-        if (!subject) {
-          subject = subjects[subjectPointer % subjects.length];
-          subjectPointer++;
-        }
-
-        // Find an available teacher (round-robin through available teachers)
-        let assignedTeacher: TeacherInfo | null = null;
-        for (let i = 0; i < availableTeachers.length; i++) {
-          const teacher = availableTeachers[i];
-          if (
-            tracker.isTeacherAvailable(teacher.id, day, period.startTime) &&
-            tracker.isTeacherUnderDailyLimit(teacher.id, day)
-          ) {
-            assignedTeacher = teacher;
-            // Rotate the array so next time we start from a different teacher
-            availableTeachers.push(availableTeachers.splice(i, 1)[0]);
-            break;
-          }
-        }
-
-        if (!assignedTeacher) {
-          // No teacher available for this slot
+        // ─── Find a teacher who registered THIS subject ────────────────
+        // CRITICAL: Only teachers who declared this subject via TeacherSubject
+        // are eligible. Teachers with no registrations cannot be assigned.
+        const candidateTids = subjectTeachers.get(subject);
+        if (!candidateTids || candidateTids.size === 0) {
           skipped++;
           continue;
         }
 
-        // Book the slot
-        tracker.book(assignedTeacher.id, cls.id, day, period.startTime, subject);
+        // Among qualified teachers who are free, pick one at random
+        // but weighted toward the least-loaded (fair distribution).
+        // Build a list of eligible teachers with their current load.
+        const eligible: Array<{ teacher: TeacherInfo; load: number }> = [];
+        for (const tid of candidateTids) {
+          const tch = teachers.find((t) => t.id === tid);
+          if (!tch) continue;
+          if (
+            tracker.isTeacherAvailable(tch.id, day, period.startTime) &&
+            tracker.isTeacherUnderDailyLimit(tch.id, day)
+          ) {
+            eligible.push({
+              teacher: tch,
+              load: tracker.teacherDailyLoad.get(tch.id)?.get(day) ?? 0,
+            });
+          }
+        }
+
+        if (eligible.length === 0) {
+          skipped++;
+          continue;
+        }
+
+        // Sort by load (ascending) then pick randomly among the lowest 50%
+        // This ensures fairness (least-loaded get picked first) while adding
+        // randomness so each regeneration is different.
+        eligible.sort((a, b) => a.load - b.load);
+        const cutoff = Math.max(1, Math.ceil(eligible.length / 2));
+        const pick = eligible[Math.floor(Math.random() * cutoff)];
+
+        // ─── Assign room (checked against ALL classes school-wide) ─────
+        const room = nextRoom(day, period.startTime);
+
+        tracker.book(pick.teacher.id, cls.id, day, period.startTime, subject);
 
         slots.push({
           schoolId,
           classId: cls.id,
-          teacherId: assignedTeacher.id,
+          teacherId: pick.teacher.id,
           subject,
           dayOfWeek: day,
           startTime: period.startTime,
           endTime: period.endTime,
+          room,
         });
 
         periodsFilledToday++;
@@ -782,17 +829,25 @@ async function handleGenerateTimetable(
 
   const targetClassIds = targetClasses.map((c) => c.id);
 
-  // Build subject catalog ONLY from TeacherSubject registrations — never from
-  // timetable history or DEFAULT_SUBJECTS, otherwise the generator schedules
-  // subjects that no teacher registered for and resorts to wildcard assignments.
-  // This matches the fix applied to timetableGeneratorService.ts (commit 4181c9eb).
-  const teacherSubjectRows = await prisma.teacherSubject.findMany({
-    where: { schoolId },
-    select: { subject: true, teacher: { select: { departmentId: true } } },
-  });
+  // ── Build subject catalog ONLY from TeacherSubject registrations ──────────
+  // Never from timetable history or DEFAULT_SUBJECTS — otherwise the generator
+  // schedules subjects no teacher registered for.
+  // Also builds the teacherSubjectMap: teacherId → Set of their declared subjects.
+  const [teacherSubjectRows, teacherSubjectForMap] = await Promise.all([
+    prisma.teacherSubject.findMany({
+      where: { schoolId },
+      select: { subject: true, teacher: { select: { departmentId: true } } },
+    }),
+    // Also fetch teacherId + subject for building the map (need the teacherId)
+    prisma.teacherSubject.findMany({
+      where: { schoolId },
+      select: { teacherId: true, subject: true },
+    }),
+  ]);
 
   const schoolWideSubjects = new Set<string>();
   const byDeptMap = new Map<string, Set<string>>();
+  const teacherSubjectMap = new Map<string, Set<string>>();
 
   for (const row of teacherSubjectRows) {
     if (!row.subject?.trim()) continue;
@@ -804,6 +859,14 @@ async function handleGenerateTimetable(
     }
   }
 
+  for (const row of teacherSubjectForMap) {
+    if (!row.subject?.trim()) continue;
+    if (!teacherSubjectMap.has(row.teacherId)) {
+      teacherSubjectMap.set(row.teacherId, new Set());
+    }
+    teacherSubjectMap.get(row.teacherId)!.add(row.subject.trim());
+  }
+
   const subjectCatalog: SubjectCatalog = {
     byDepartment: new Map(),
     schoolWide: [...schoolWideSubjects].sort(),
@@ -812,6 +875,7 @@ async function handleGenerateTimetable(
     subjectCatalog.byDepartment.set(deptId, [...subs].sort());
   }
 
+  // Load existing bookings (classes NOT being regenerated stay in DB)
   const existingBookings = await prisma.timetableEntry.findMany({
     where: {
       schoolId,
@@ -878,6 +942,8 @@ async function handleGenerateTimetable(
     teachers,
     existingBookings,
     subjectCatalog,
+    teacherSubjectMap,
+    [], // rooms — pass an empty array for now, rooms can be provided by the route
   );
 
   if (slots.length === 0) {
