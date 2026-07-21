@@ -162,7 +162,6 @@ function generate(
   catalog: SubjectCatalog, periods: PeriodBlock[], days: number[], maxDay: number,
   rooms: string[], tSubj: Map<string, Set<string>>,
   subjectMap: Map<string, TeacherInfo[]>,
-  unconstrained: TeacherInfo[],
 ): { slots: TimetableSlot[]; skipped: number; stats: Record<string, number>; assignments: Record<string, number>; doubles: number } {
   const tr = new Tracker();
   tr.seed(existing);
@@ -179,32 +178,26 @@ function generate(
   //   (a) every class gets as many lessons as periods allow
   //   (b) teachers get a fair share of lessons across their subjects
   //   (c) teacher-subject constraints are strictly respected
+  //
+  // CRITICAL: Teachers are ONLY assigned to subjects they explicitly registered
+  // for via TeacherSubject. NO wildcard fallback — if no registered teacher is
+  // free, the slot is skipped rather than assigning an unqualified teacher.
 
   for (const day of days) {
-    // Build ordered period list (not shuffled — we want consistent order)
     const orderedPeriods = [...periods];
 
     for (const p of orderedPeriods) {
-      // Round-robin through classes — each gets one chance at this period
       for (const cls of shuffle(classes)) {
         if (!tr.classFree(cls.id, day, p.startTime)) continue;
 
-        // Available subjects for this class (deduplicate what's already booked today)
         const allSubs = shuffle(getSubjects(cls, catalog));
         const available = allSubs.filter((s) => !tr.hasSubject(cls.id, day, s));
         const subs = available.length > 0 ? available : allSubs;
 
-        // For each subject, find a teacher who:
-        // 1. Can teach it (registered for it, or — only as a fallback — has no
-        //    registered subjects at all)
-        // 2. Is free at this time on this day
-        // 3. Hasn't exceeded maxLessonsPerTeacherPerDay
-        //
-        // We STRICTLY prefer teachers who registered this subject. An
-        // unconstrained (no-subject) teacher is only used when no registered
-        // teacher is available, so we never "guess" a teacher onto a subject
-        // they didn't say they can teach while a qualified one is free.
-        let best: { teacher: TeacherInfo; subject: string; qualified: boolean } | null = null;
+        // ─── Find the best teacher for this subject slot ─────────────────
+        // Only teachers who explicitly registered this subject via TeacherSubject
+        // are eligible. If no registered teacher is free, the slot is skipped.
+        let best: { teacher: TeacherInfo; subject: string } | null = null;
 
         const pickLeastLoaded = (pool: TeacherInfo[]): TeacherInfo | null => {
           const free = pool
@@ -214,26 +207,16 @@ function generate(
         };
 
         for (const subj of subs) {
-          // 1. Teachers who registered this subject (their declared skill).
-          //    Look up by NORMALIZED key so "Mathematics" matches a teacher who
-          //    registered "mathematics" / " Math " (subjectMap is keyed normalized).
+          // Teachers who registered this subject via TeacherSubject
+          // Look up by NORMALIZED key for case-insensitive matching
           const registered = subjectMap.get(normSubject(subj)) ?? [];
-          const registeredPick = pickLeastLoaded(registered);
-          // 2. Fallback: teachers with no registered subjects at all.
-          const fallbackPick = registeredPick ? null : pickLeastLoaded(unconstrained);
-          const tch = registeredPick ?? fallbackPick;
+          const tch = pickLeastLoaded(registered);
           if (!tch) continue;
-          const isQualified = registeredPick !== null;
 
-          // Prefer any qualified match over any fallback match; within the same
-          // tier, prefer the least-loaded teacher so lessons stay balanced.
-          const better =
-            !best ||
-            (isQualified && !best.qualified) ||
-            (isQualified === best.qualified &&
-              tr.teacherLoad(tch.id, day) < tr.teacherLoad(best.teacher.id, day));
+          // Prefer the least-loaded teacher for balance
+          const better = !best || tr.teacherLoad(tch.id, day) < tr.teacherLoad(best.teacher.id, day);
           if (better) {
-            best = { teacher: tch, subject: subj, qualified: isQualified };
+            best = { teacher: tch, subject: subj };
           }
         }
 
@@ -255,7 +238,6 @@ function generate(
     }
   }
 
-  // Calculate stats
   for (const cls of classes) {
     let total = 0;
     for (const day of days) {
@@ -284,10 +266,6 @@ function buildTeacherSubjectMap(
   explicitRows: { teacherId: string; subject: string }[],
   historyRows: { teacherId: string; subject: string }[],
 ): Map<string, Set<string>> {
-  // Subjects are stored NORMALIZED (trim + lowercase) so matching against the
-  // catalog is case/whitespace-insensitive. A teacher who registered "mathematics"
-  // or " Math " must still match a class needing "Mathematics" — otherwise no
-  // qualified teacher is found and the generator falls back to a wildcard ("guessing").
   const m = new Map<string, Set<string>>();
   const explicitTeacherIds = new Set<string>();
   for (const row of explicitRows) {
@@ -313,39 +291,27 @@ function buildTeacherSubjectMap(
   return m;
 }
 
-/** Build a reverse map: subject → list of teachers who can teach it
- *  Also returns a separate pool of unconstrained teachers (no subject restrictions).
- *  Teachers with explicit subject assignments ONLY appear under those subjects.
- *  Unconstrained teachers appear under EVERY subject (wildcards). */
+/** Build reverse map: subject → list of teachers who registered for it.
+ *  Teachers are ONLY added under subjects they explicitly registered via
+ *  TeacherSubject. Teachers with NO registrations get nothing — they are
+ *  never used as wildcards. */
 function buildSubjectToTeachersMap(
   teachers: TeacherInfo[],
   tSubj: Map<string, Set<string>>,
-): { subjectMap: Map<string, TeacherInfo[]>; unconstrained: TeacherInfo[] } {
+): Map<string, TeacherInfo[]> {
   const subjectMap = new Map<string, TeacherInfo[]>();
-  const unconstrained: TeacherInfo[] = [];
 
   for (const teacher of teachers) {
     const subjects = tSubj.get(teacher.id);
-    if (subjects && subjects.size > 0) {
-      // Teacher has explicit subject assignments — only add under those subjects
-      for (const subj of subjects) {
-        const list = subjectMap.get(subj) ?? [];
-        list.push(teacher);
-        subjectMap.set(subj, list);
-      }
-    } else {
-      // Teacher has NO subject constraints — can teach anything
-      unconstrained.push(teacher);
+    if (!subjects || subjects.size === 0) continue; // skip teachers with no registrations
+    for (const subj of subjects) {
+      const list = subjectMap.get(subj) ?? [];
+      list.push(teacher);
+      subjectMap.set(subj, list);
     }
   }
 
-  // Also put unconstrained teachers under every known subject for convenience
-  for (const teacher of unconstrained) {
-    // They're also kept in the separate unconstrained array for the generation loop
-    // so we don't need to duplicate them into every subject
-  }
-
-  return { subjectMap, unconstrained };
+  return subjectMap;
 }
 
 async function loadClasses(schoolId: string, departmentId?: string, classIds?: string[]): Promise<ClassInfo[]> {
@@ -363,27 +329,12 @@ async function loadTeachers(schoolId: string, departmentId?: string): Promise<Te
 }
 
 /**
- * Build the subject catalog from THREE sources:
- * 1. Existing timetable entries (historical subjects)
- * 2. TeacherSubject table (assigned skills — even if never scheduled)
- * 3. DEFAULT_SUBJECTS fallback
+ * Build the subject catalog ONLY from TeacherSubject registrations.
+ * NEVER uses DEFAULT_SUBJECTS. NEVER uses timetable history (which could
+ * contain subjects from previous broken generations).
+ * An empty catalog means teachers haven't registered subjects yet.
  */
 async function loadSubjectCatalog(schoolId: string, departmentId?: string): Promise<SubjectCatalog> {
-  // ── Build the catalog ONLY from TeacherSubject registrations ──────────────
-  // Teachers and HODs declare which subjects they can teach during registration
-  // (via TeacherSubject table). The timetable generator must ONLY schedule subjects
-  // that have at least one registered teacher — anything else is "guessing".
-  //
-  // Timetable history is NOT used to build the catalog; including it causes the
-  // generator to try scheduling subjects nobody registered for, then falling back
-  // to wildcard (unconstrained) teachers who never declared that skill.
-  // DEFAULT_SUBJECTS are also excluded for the same reason — they're generic and
-  // don't reflect what the school actually teaches.
-  //
-  // When called with departmentId, only TeacherSubject rows belonging to teachers
-  // in that department are considered, so HODs only schedule subjects their own
-  // teachers declared.
-
   const teacherSubjectRows = await prisma.teacherSubject.findMany({
     where: { schoolId },
     select: { subject: true, teacher: { select: { departmentId: true, id: true } } },
@@ -393,7 +344,6 @@ async function loadSubjectCatalog(schoolId: string, departmentId?: string): Prom
   const byDeptMap = new Map<string, Set<string>>();
 
   // TeacherSubject is the SINGLE source of truth for what subjects exist.
-  // A subject only appears in the catalog if at least one teacher registered for it.
   for (const r of teacherSubjectRows) {
     if (!r.subject?.trim()) continue;
     schoolWideSet.add(r.subject.trim());
@@ -404,8 +354,8 @@ async function loadSubjectCatalog(schoolId: string, departmentId?: string): Prom
     }
   }
 
-  // If the school/department has NO TeacherSubject registrations at all, fall back
-  // to subjects extracted from existing timetable history (better than nothing).
+  // If the school has NO TeacherSubject registrations, fall back to subjects
+  // from existing timetable entries (better than nothing).
   if (schoolWideSet.size === 0) {
     const timetableRows = await prisma.timetableEntry.findMany({
       where: { schoolId },
@@ -420,9 +370,7 @@ async function loadSubjectCatalog(schoolId: string, departmentId?: string): Prom
     }
   }
 
-  // NEVER fall back to hardcoded DEFAULT_SUBJECTS. If no TeacherSubject
-  // registrations exist and no timetable history, the catalog stays empty
-  // and the generator will fail with a clear error telling the user what to do.
+  // NEVER fall back to hardcoded DEFAULT_SUBJECTS.
 
   const cat: SubjectCatalog = {
     schoolWide: [...schoolWideSet].sort(),
@@ -463,23 +411,19 @@ export const timetableGeneratorService = {
       select: { classId: true, teacherId: true, subject: true, dayOfWeek: true, startTime: true },
     });
 
-    // Build teacher-subject knowledge from TeacherSubject table + existing entries
-    const [dbSubjectRows, existingSubjRows] = await Promise.all([
-      prisma.teacherSubject.findMany({
-        where: { schoolId },
-        select: { teacherId: true, subject: true },
-      }),
-      prisma.timetableEntry.findMany({
-        where: { schoolId, classId: { in: targetIds }, ...(departmentId ? { class: { departmentId } } : {}) },
-        select: { teacherId: true, subject: true }, distinct: ['teacherId', 'subject'],
-      }),
-    ]);
-    const tSubj = buildTeacherSubjectMap(teachers, teacherSubjectMapping, dbSubjectRows, existingSubjRows);
+    // Build teacher-subject knowledge from TeacherSubject table ONLY
+    // Timetable history is NOT used — it can contain subjects from previous
+    // broken generations that no teacher actually registered for, causing
+    // the generator to "guess" unqualified teachers.
+    const dbSubjectRows = await prisma.teacherSubject.findMany({
+      where: { schoolId },
+      select: { teacherId: true, subject: true },
+    });
+    const tSubj = buildTeacherSubjectMap(teachers, teacherSubjectMapping, dbSubjectRows, []);
 
-    // Build reverse map: subject → teachers who can teach it
-    // subjectMap: teachers with explicit subject assignments (ONLY under those subjects)
-    // unconstrained: teachers with no subject restrictions (can teach anything)
-    const { subjectMap, unconstrained } = buildSubjectToTeachersMap(teachers, tSubj);
+    // Build reverse map: subject → teachers who registered for it
+    // Teachers with no registrations are silently dropped — no wildcards.
+    const subjectMap = buildSubjectToTeachersMap(teachers, tSubj);
 
     // Delete existing if remake
     if (remake) {
@@ -492,7 +436,7 @@ export const timetableGeneratorService = {
     const periods = buildPeriods(startHour, periodDuration, breakStart, breakEnd, lunchStart, lunchEnd);
     const result = generate(
       schoolId, classes, teachers, existingBookings, catalog, periods,
-      workingDays, maxLessonsPerTeacherPerDay, rooms, tSubj, subjectMap, unconstrained,
+      workingDays, maxLessonsPerTeacherPerDay, rooms, tSubj, subjectMap,
     );
     if (!result.slots.length) throw new Error('Could not generate any timetable entries. Not enough teachers available.');
 
@@ -533,38 +477,30 @@ export const timetableGeneratorService = {
 
     const catalog = await loadSubjectCatalog(schoolId, departmentId);
 
-    // Only load existing bookings for classes NOT being regenerated (same as generate with remake=false)
     const existing = await prisma.timetableEntry.findMany({
       where: { schoolId, classId: { notIn: targetIds }, ...(departmentId ? { class: { departmentId } } : {}) },
       select: { classId: true, teacherId: true, subject: true, dayOfWeek: true, startTime: true },
     });
 
-    // Build teacher-subject knowledge from BOTH TeacherSubject table AND existing timetable entries
-    const [dbSubjectRows, existingSubjRows] = await Promise.all([
-      prisma.teacherSubject.findMany({
-        where: { schoolId },
-        select: { teacherId: true, subject: true },
-      }),
-      prisma.timetableEntry.findMany({
-        where: { schoolId, classId: { in: targetIds }, ...(departmentId ? { class: { departmentId } } : {}) },
-        select: { teacherId: true, subject: true }, distinct: ['teacherId', 'subject'],
-      }),
-    ]);
-    const tSubj = buildTeacherSubjectMap(teachers, teacherSubjectMapping, dbSubjectRows, existingSubjRows);
+    // Build teacher-subject knowledge from TeacherSubject table ONLY
+    const dbSubjectRows = await prisma.teacherSubject.findMany({
+      where: { schoolId },
+      select: { teacherId: true, subject: true },
+    });
+    const tSubj = buildTeacherSubjectMap(teachers, teacherSubjectMapping, dbSubjectRows, []);
 
-    // Build reverse map: subject → teachers who can teach it
-    const { subjectMap, unconstrained } = buildSubjectToTeachersMap(teachers, tSubj);
+    // Build reverse map: subject → teachers who can teach it (no wildcards)
+    const subjectMap = buildSubjectToTeachersMap(teachers, tSubj);
 
     const periods = buildPeriods(startHour, periodDuration, breakStart, breakEnd, lunchStart, lunchEnd);
     const result = generate(
       schoolId, classes, teachers, existing, catalog, periods,
-      workingDays, maxLessonsPerTeacherPerDay, rooms, tSubj, subjectMap, unconstrained,
+      workingDays, maxLessonsPerTeacherPerDay, rooms, tSubj, subjectMap,
     );
 
     const tMap = new Map(teachers.map((t) => [t.id, t.fullName]));
     const cMap = new Map(classes.map((c) => [c.id, c.name]));
 
-    // Build preview slots with resolved names
     const slots: PreviewSlot[] = result.slots.map((s) => ({
       classId: s.classId,
       className: cMap.get(s.classId) ?? 'Unknown',
