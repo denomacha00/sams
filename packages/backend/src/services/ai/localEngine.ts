@@ -782,26 +782,33 @@ async function handleGenerateTimetable(
 
   const targetClassIds = targetClasses.map((c) => c.id);
 
-  const subjectRows = await prisma.timetableEntry.findMany({
-    where: {
-      schoolId,
-      ...(hodDepartmentId ? { class: { departmentId: hodDepartmentId } } : {}),
-    },
-    select: {
-      subject: true,
-      class: { select: { departmentId: true } },
-    },
+  // Build subject catalog ONLY from TeacherSubject registrations — never from
+  // timetable history or DEFAULT_SUBJECTS, otherwise the generator schedules
+  // subjects that no teacher registered for and resorts to wildcard assignments.
+  const teacherSubjectRows = await prisma.teacherSubject.findMany({
+    where: { schoolId },
+    select: { subject: true, teacher: { select: { departmentId: true } } },
   });
+
+  const schoolWideSubjects = new Set<string>();
+  const byDeptMap = new Map<string, Set<string>>();
+
+  for (const row of teacherSubjectRows) {
+    if (!row.subject?.trim()) continue;
+    schoolWideSubjects.add(row.subject.trim());
+    const d = row.teacher.departmentId;
+    if (d) {
+      if (!byDeptMap.has(d)) byDeptMap.set(d, new Set());
+      byDeptMap.get(d)!.add(row.subject.trim());
+    }
+  }
 
   const subjectCatalog: SubjectCatalog = {
     byDepartment: new Map(),
-    schoolWide: uniqueSubjects(subjectRows.map((row) => row.subject)),
+    schoolWide: [...schoolWideSubjects].sort(),
   };
-  for (const row of subjectRows) {
-    const departmentId = row.class.departmentId;
-    const existing = subjectCatalog.byDepartment.get(departmentId) ?? [];
-    existing.push(row.subject);
-    subjectCatalog.byDepartment.set(departmentId, uniqueSubjects(existing));
+  for (const [deptId, subs] of byDeptMap) {
+    subjectCatalog.byDepartment.set(deptId, [...subs].sort());
   }
 
   const existingBookings = await prisma.timetableEntry.findMany({
