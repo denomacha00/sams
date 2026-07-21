@@ -909,10 +909,14 @@ export async function openaiQuery(
       return await handleToolCalls(choice.message.tool_calls, user, messages, tools);
     }
 
-    const rawAnswer = choice?.message?.content ?? 'I was unable to generate a response. Please try rephrasing your question.';
-    const answer = sanitizeLlmOutput(rawAnswer);
+    const rawAnswer = choice?.message?.content?.trim();
+    // Empty primary response → try the backup providers instead of dead-ending
+    // on a canned message. A blank completion is a provider failure too.
+    if (!rawAnswer) {
+      return tryBackupChatProviders(messages, new Error('Primary returned empty response'));
+    }
 
-    return { answer, intent: 'openai_response' };
+    return { answer: sanitizeLlmOutput(rawAnswer), intent: 'openai_response' };
   } catch (err) {
     console.error('[AI/Primary] Error, trying fallback:', (err as Error).message);
     return tryBackupChatProviders(messages, err);
@@ -943,7 +947,11 @@ export async function openaiGeneralKnowledgeQuery(
       temperature: 0.45,
       max_tokens: 500,
     });
-    const rawAnswer = response.choices[0]?.message?.content ?? 'I could not answer that. Please try again.';
+    const rawAnswer = response.choices[0]?.message?.content?.trim();
+    // An empty primary response must fall through to the backups (throw so the
+    // catch runs), not dead-end on a canned "I could not answer" — that was a
+    // real "AI won't answer some questions" cause when the primary returned blank.
+    if (!rawAnswer) throw new Error('Primary returned an empty response');
     return { answer: sanitizeLlmOutput(rawAnswer), intent: 'openai_response' };
   } catch (err) {
     console.error('[AI/General] Error, trying fallback:', extractProviderErrorText(err));
@@ -1053,10 +1061,16 @@ export async function openaiQueryWithHistory(
       return await handleToolCalls(choice.message.tool_calls, user, messages, tools);
     }
 
-    const rawAnswer = choice?.message?.content ?? 'I was unable to generate a response. Please try rephrasing your question.';
-    const answer = sanitizeLlmOutput(rawAnswer);
+    const rawAnswer = choice?.message?.content?.trim();
+    // Empty primary response (no throw) must still fail over to the backups
+    // instead of dead-ending on a canned "unable to respond" — otherwise a flaky
+    // primary silently swallows the question.
+    if (!rawAnswer) {
+      console.error('[AI/Primary] Empty response with history, trying fallback');
+      return tryBackupChatProviders(messages, new Error('primary: empty response'));
+    }
 
-    return { answer, intent: 'openai_response' };
+    return { answer: sanitizeLlmOutput(rawAnswer), intent: 'openai_response' };
   } catch (err) {
     console.error('[AI/Primary] Error with history, trying fallback:', (err as Error).message);
     return tryBackupChatProviders(messages, err);

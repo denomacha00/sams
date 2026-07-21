@@ -1056,6 +1056,9 @@ notificationsRouter.post('/send', uploadNotificationAttachments, async (req: Req
       );
     }
 
+    // Persist uploaded files inside the send flow, after notification rows are
+    // inserted but before the realtime emit, so recipients get media in the same
+    // socket event instead of racing the DB commit on refetch.
     const result = await sendScopedNotification(req.user, {
       scope,
       targetId,
@@ -1063,6 +1066,13 @@ notificationsRouter.post('/send', uploadNotificationAttachments, async (req: Req
       title,
       message,
       channels,
+      onBeforeEmit: (batchId) =>
+        saveNotificationAttachments(
+          uploadedNotificationFiles(req),
+          req.schoolId,
+          req.user.sub,
+          batchId,
+        ),
     });
 
     if (!result.success) {
@@ -1075,18 +1085,11 @@ notificationsRouter.post('/send', uploadNotificationAttachments, async (req: Req
       return;
     }
 
-    const attachments = await saveNotificationAttachments(
-      uploadedNotificationFiles(req),
-      req.schoolId,
-      req.user.sub,
-      result.batchId,
-    );
-
     res.status(200).json({
       success: true,
       recipientCount: result.recipientCount,
       batchId: result.batchId,
-      attachments,
+      attachments: result.attachments ?? [],
     });
   } catch (err) {
     if (err instanceof ScopedNotificationError) {

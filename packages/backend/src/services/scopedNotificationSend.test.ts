@@ -72,6 +72,41 @@ describe('scopedNotificationSend RBAC', () => {
     );
   });
 
+  it('runs onBeforeEmit and returns its attachments (media persisted before emit)', async () => {
+    const onBeforeEmit = vi.fn(async (batchId: string) => [
+      { id: 'a1', fileName: 'photo.jpg', mimeType: 'image/jpeg', batchId },
+    ]);
+
+    const result = await sendScopedNotification(
+      { sub: 't1', role: UserRole.TEACHER, schoolId: 'school-1', classId: 'class-1' },
+      { scope: 'class', targetId: 'class-1', message: 'See photo', channels: ['inapp'], onBeforeEmit },
+    );
+
+    expect(result.success).toBe(true);
+    expect(onBeforeEmit).toHaveBeenCalledWith(result.batchId);
+    // attachments saved during send flow, returned to caller
+    expect(result.attachments).toEqual([
+      expect.objectContaining({ id: 'a1', fileName: 'photo.jpg' }),
+    ]);
+    // onBeforeEmit runs only AFTER notification rows are inserted
+    expect(prismaMock.notification.createMany).toHaveBeenCalled();
+  });
+
+  it('never drops the message when onBeforeEmit throws', async () => {
+    const onBeforeEmit = vi.fn(async () => {
+      throw new Error('disk full');
+    });
+
+    const result = await sendScopedNotification(
+      { sub: 't1', role: UserRole.TEACHER, schoolId: 'school-1', classId: 'class-1' },
+      { scope: 'class', targetId: 'class-1', message: 'text still sends', channels: ['inapp'], onBeforeEmit },
+    );
+
+    expect(result.success).toBe(true);
+    expect(result.recipientCount).toBe(1);
+    expect(result.attachments).toEqual([]);
+  });
+
   it('denies TEACHER school scope', async () => {
     await expect(
       sendScopedNotification(

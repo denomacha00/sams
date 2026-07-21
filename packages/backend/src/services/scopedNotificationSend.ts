@@ -22,6 +22,13 @@ export interface SendScopedNotificationInput {
   title?: string;
   message: string;
   channels: NotificationChannel[];
+  /**
+   * Optional hook run after in-app notification rows are inserted but BEFORE the
+   * realtime socket emit. Returns attachment summaries to include in the payload
+   * so recipients receive media in the same event (no refresh race). The HTTP
+   * route uses this to persist uploaded files; the AI path omits it.
+   */
+  onBeforeEmit?: (batchId: string) => Promise<Record<string, unknown>[]>;
 }
 
 export interface SendScopedNotificationResult {
@@ -29,6 +36,7 @@ export interface SendScopedNotificationResult {
   recipientCount: number;
   batchId: string;
   warning?: string;
+  attachments?: Record<string, unknown>[];
 }
 
 export class ScopedNotificationError extends Error {
@@ -60,6 +68,7 @@ export async function sendScopedNotification(
       : sender;
 
   let { scope, targetId, targetRole, message, channels } = input;
+  const { onBeforeEmit } = input;
   const title = input.title?.trim() || 'New Message';
   const batchId = createId();
 
@@ -203,6 +212,18 @@ export async function sendScopedNotification(
     }
   }
 
+  // Persist attachments (if any) BEFORE emitting so the realtime payload carries
+  // media and recipients don't race the DB commit on refetch. Runs only when the
+  // caller (HTTP route) supplies the hook; failure here must not drop the message.
+  let attachments: Record<string, unknown>[] = [];
+  if (onBeforeEmit) {
+    try {
+      attachments = await onBeforeEmit(batchId);
+    } catch (attachErr) {
+      console.error('[scopedNotificationSend] Attachment persistence failed:', attachErr);
+    }
+  }
+
   const payload = {
     title,
     message: message.trim(),
@@ -210,6 +231,7 @@ export async function sendScopedNotification(
     senderId: effectiveSender.sub,
     batchId,
     timestamp: new Date().toISOString(),
+    attachments,
   };
 
   setImmediate(() => {
@@ -233,7 +255,7 @@ export async function sendScopedNotification(
     }
   });
 
-  return { success: true, recipientCount: targetUsers.length, batchId };
+  return { success: true, recipientCount: targetUsers.length, batchId, attachments };
 }
 
 /** AI actions may only use in-app delivery; SMS is reserved for OTP/password-reset flows for now. */

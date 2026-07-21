@@ -187,33 +187,44 @@ function generate(
         const subs = available.length > 0 ? available : allSubs;
 
         // For each subject, find a teacher who:
-        // 1. Can teach it (per tSubj mapping or has no mapping = teaches anything)
+        // 1. Can teach it (registered for it, or — only as a fallback — has no
+        //    registered subjects at all)
         // 2. Is free at this time on this day
         // 3. Hasn't exceeded maxLessonsPerTeacherPerDay
-        // Try subjects in order, pick the most underloaded teacher per subject
-        let best: { teacher: TeacherInfo; subject: string } | null = null;
+        //
+        // We STRICTLY prefer teachers who registered this subject. An
+        // unconstrained (no-subject) teacher is only used when no registered
+        // teacher is available, so we never "guess" a teacher onto a subject
+        // they didn't say they can teach while a qualified one is free.
+        let best: { teacher: TeacherInfo; subject: string; qualified: boolean } | null = null;
+
+        const pickLeastLoaded = (pool: TeacherInfo[]): TeacherInfo | null => {
+          const free = pool
+            .filter((t) => tr.teacherFree(t.id, day, p.startTime) && tr.teacherUnderLimit(t.id, day, maxDay))
+            .sort((a, b) => tr.teacherLoad(a.id, day) - tr.teacherLoad(b.id, day));
+          return free[0] ?? null;
+        };
 
         for (const subj of subs) {
-          // Get teachers who can teach this subject:
-          // 1. Qualified teachers from subject→teachers map (constrained teachers)
-          // 2. Plus any unconstrained teachers (can teach everything)
-          const qualified = subjectMap.get(subj) ?? [];
-          const cands = [...qualified, ...unconstrained]
-            .filter((t) =>
-              tr.teacherFree(t.id, day, p.startTime) &&
-              tr.teacherUnderLimit(t.id, day, maxDay)
-            )
-            .sort((a, b) => tr.teacherLoad(a.id, day) - tr.teacherLoad(b.id, day));
+          // 1. Teachers who registered this subject (their declared skill).
+          const registered = subjectMap.get(subj) ?? [];
+          const registeredPick = pickLeastLoaded(registered);
+          // 2. Fallback: teachers with no registered subjects at all.
+          const fallbackPick = registeredPick ? null : pickLeastLoaded(unconstrained);
+          const tch = registeredPick ?? fallbackPick;
+          if (!tch) continue;
+          const isQualified = registeredPick !== null;
 
-          if (cands.length === 0) continue;
-
-          // Pick the least-loaded teacher for this subject
-          const tch = cands[0];
-          if (!best || tr.teacherLoad(tch.id, day) < tr.teacherLoad(best.teacher.id, day)) {
-            best = { teacher: tch, subject: subj };
+          // Prefer any qualified match over any fallback match; within the same
+          // tier, prefer the least-loaded teacher so lessons stay balanced.
+          const better =
+            !best ||
+            (isQualified && !best.qualified) ||
+            (isQualified === best.qualified &&
+              tr.teacherLoad(tch.id, day) < tr.teacherLoad(best.teacher.id, day));
+          if (better) {
+            best = { teacher: tch, subject: subj, qualified: isQualified };
           }
-          // If equally loaded, prefer the teacher who already had this subject today
-          // (so they keep teaching their specialty)
         }
 
         if (!best) {
@@ -380,8 +391,14 @@ async function loadSubjectCatalog(schoolId: string, departmentId?: string): Prom
     }
   }
 
-  // Ensure DEFAULT_SUBJECTS are present
-  for (const s of DEFAULT_SUBJECTS) schoolWideSet.add(s);
+  // DEFAULT_SUBJECTS are a LAST-RESORT fallback only — used when the school has
+  // no real subject data at all (no teacher registrations, no timetable history).
+  // We must NOT mix them into a school that has real registrations, or the
+  // generator will try to schedule subjects nobody registered for and "guess" a
+  // wildcard teacher onto them. Real declared skills always win.
+  if (schoolWideSet.size === 0) {
+    for (const s of DEFAULT_SUBJECTS) schoolWideSet.add(s);
+  }
 
   const cat: SubjectCatalog = {
     schoolWide: [...schoolWideSet].sort(),
