@@ -380,7 +380,13 @@ async function loadSubjectCatalog(schoolId: string, departmentId?: string): Prom
     }
   }
 
-  // NEVER fall back to hardcoded DEFAULT_SUBJECTS.
+  // Last resort: if NO data at all, seed with DEFAULT_SUBJECTS so the
+  // generator can still produce a timetable from unconstrained teachers.
+  if (schoolWideSet.size === 0) {
+    for (const subj of DEFAULT_SUBJECTS) {
+      schoolWideSet.add(subj);
+    }
+  }
 
   const cat: SubjectCatalog = {
     schoolWide: [...schoolWideSet].sort(),
@@ -440,7 +446,22 @@ export const timetableGeneratorService = {
 
     // Build reverse map: subject → teachers who registered for it
     // Teachers with no registrations are silently dropped — no wildcards.
-    const subjectMap = buildSubjectToTeachersMap(teachers, tSubj);
+    let subjectMap = buildSubjectToTeachersMap(teachers, tSubj);
+
+    // LAST RESORT: If NO teacher has ANY subject registrations (neither TeacherSubject
+    // nor history), treat all teachers as wildcards so the generator can still produce
+    // a timetable using DEFAULT_SUBJECTS.
+    if (subjectMap.size === 0 && dbSubjectRows.length === 0 && historyFallback.length === 0) {
+      const schoolWide = catalog.schoolWide;
+      for (const teacher of teachers) {
+        for (const subj of schoolWide) {
+          const key = normSubject(subj);
+          const list = subjectMap.get(key) ?? [];
+          list.push(teacher);
+          subjectMap.set(key, list);
+        }
+      }
+    }
 
     // Delete existing if remake
     if (remake) {
@@ -516,7 +537,21 @@ export const timetableGeneratorService = {
     const tSubj = buildTeacherSubjectMap(teachers, teacherSubjectMapping, dbSubjectRows, historyFallback);
 
     // Build reverse map: subject → teachers who can teach it (no wildcards)
-    const subjectMap = buildSubjectToTeachersMap(teachers, tSubj);
+    let subjectMap = buildSubjectToTeachersMap(teachers, tSubj);
+
+    // LAST RESORT: If NO teacher has ANY subject registrations, treat all teachers
+    // as wildcards so the generator can still produce a timetable from DEFAULT_SUBJECTS.
+    if (subjectMap.size === 0 && dbSubjectRows.length === 0 && historyFallback.length === 0) {
+      const schoolWide = catalog.schoolWide;
+      for (const teacher of teachers) {
+        for (const subj of schoolWide) {
+          const key = normSubject(subj);
+          const list = subjectMap.get(key) ?? [];
+          list.push(teacher);
+          subjectMap.set(key, list);
+        }
+      }
+    }
 
     const periods = buildPeriods(startHour, periodDuration, breakStart, breakEnd, lunchStart, lunchEnd);
     const result = generate(
