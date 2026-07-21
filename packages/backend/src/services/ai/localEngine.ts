@@ -463,6 +463,10 @@ class ScheduleTracker {
     return subjects.has(subject);
   }
 
+  getTeacherLoad(teacherId: string, day: number): number {
+    return this.teacherDailyLoad.get(teacherId)?.get(day) ?? 0;
+  }
+
   book(teacherId: string, classId: string, day: number, startTime: string, subject: string): void {
     // Teacher booking
     if (!this.teacherBookings.has(teacherId)) {
@@ -686,7 +690,7 @@ function generateTimetableSlots(
           ) {
             eligible.push({
               teacher: tch,
-              load: tracker.teacherDailyLoad.get(tch.id)?.get(day) ?? 0,
+              load: tracker.getTeacherLoad(tch.id, day),
             });
           }
         }
