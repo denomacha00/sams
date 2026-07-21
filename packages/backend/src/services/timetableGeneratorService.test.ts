@@ -120,6 +120,33 @@ describe('timetableGeneratorService.generatePreview — teacher subject assignme
     expect(result.slots.some((s) => s.teacherId === 'tAny')).toBe(false);
   });
 
+  it('matches registered subjects case- and whitespace-insensitively', async () => {
+    // The class catalog subject "Mathematics" must match a teacher who registered
+    // " mathematics " (different case + surrounding spaces). Before normalization
+    // the exact-string match failed, no qualified teacher was found, and the slot
+    // fell to a wildcard teacher — that was a source of "guessing".
+    wireMocks({
+      classes: [{ id: 'c1', name: 'Form 1', departmentId: DEPT }],
+      teachers: [
+        { id: 'tMath', fullName: 'Math Teacher', departmentId: DEPT },
+        { id: 'tAny', fullName: 'Relief Teacher', departmentId: DEPT },
+      ],
+      // Registered with messy casing/spacing; catalog historical entry is clean.
+      teacherSubjects: [{ teacherId: 'tMath', subject: '  mathematics ' }],
+      historicalSubjects: ['Mathematics'],
+    });
+
+    const result = await timetableGeneratorService.generatePreview({
+      schoolId: SCHOOL, departmentId: DEPT, maxLessonsPerTeacherPerDay: HIGH_CAP,
+    });
+
+    const mathSlots = result.slots.filter((s) => s.subject === 'Mathematics');
+    expect(mathSlots.length).toBeGreaterThan(0);
+    // The registered teacher (despite messy casing) must own Mathematics — the
+    // wildcard must never be guessed onto it.
+    expect(mathSlots.every((s) => s.teacherId === 'tMath')).toBe(true);
+  });
+
   it('does NOT inject hardcoded default subjects when teachers registered real ones', async () => {
     // Only Mathematics is registered. The generator must never schedule any of
     // the hardcoded DEFAULT_SUBJECTS (English, Chemistry, Physics, ...) that no

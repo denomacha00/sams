@@ -95,6 +95,13 @@ function getSubjects(cls: ClassInfo, cat: SubjectCatalog): string[] {
   const s = cat.byDepartment.get(cls.departmentId) ?? cat.schoolWide;
   return s.length > 0 ? s : DEFAULT_SUBJECTS;
 }
+/** Canonical key for subject matching — trim + lowercase so "Mathematics",
+ *  "mathematics", and " Math " map to the same teacher pool. Without this the
+ *  reverse map lookup misses and the generator falls back to a wildcard teacher
+ *  ("guessing"). Display names are preserved separately from the match key. */
+function normSubject(s: string): string {
+  return s.trim().toLowerCase();
+}
 
 // ─── Schedule Tracker ─────────────────────────────────────────────────────────
 
@@ -207,7 +214,9 @@ function generate(
 
         for (const subj of subs) {
           // 1. Teachers who registered this subject (their declared skill).
-          const registered = subjectMap.get(subj) ?? [];
+          //    Look up by NORMALIZED key so "Mathematics" matches a teacher who
+          //    registered "mathematics" / " Math " (subjectMap is keyed normalized).
+          const registered = subjectMap.get(normSubject(subj)) ?? [];
           const registeredPick = pickLeastLoaded(registered);
           // 2. Fallback: teachers with no registered subjects at all.
           const fallbackPick = registeredPick ? null : pickLeastLoaded(unconstrained);
@@ -274,12 +283,16 @@ function buildTeacherSubjectMap(
   explicitRows: { teacherId: string; subject: string }[],
   historyRows: { teacherId: string; subject: string }[],
 ): Map<string, Set<string>> {
+  // Subjects are stored NORMALIZED (trim + lowercase) so matching against the
+  // catalog is case/whitespace-insensitive. A teacher who registered "mathematics"
+  // or " Math " must still match a class needing "Mathematics" — otherwise no
+  // qualified teacher is found and the generator falls back to a wildcard ("guessing").
   const m = new Map<string, Set<string>>();
   const explicitTeacherIds = new Set<string>();
   for (const row of explicitRows) {
     explicitTeacherIds.add(row.teacherId);
     if (!m.has(row.teacherId)) m.set(row.teacherId, new Set());
-    m.get(row.teacherId)!.add(row.subject);
+    m.get(row.teacherId)!.add(normSubject(row.subject));
   }
   if (mapping) {
     for (const [key, subs] of Object.entries(mapping)) {
@@ -287,14 +300,14 @@ function buildTeacherSubjectMap(
       if (t) {
         explicitTeacherIds.add(t.id);
         if (!m.has(t.id)) m.set(t.id, new Set());
-        for (const s of subs) m.get(t.id)!.add(s);
+        for (const s of subs) m.get(t.id)!.add(normSubject(s));
       }
     }
   }
   for (const e of historyRows) {
     if (explicitTeacherIds.has(e.teacherId)) continue;
     if (!m.has(e.teacherId)) m.set(e.teacherId, new Set());
-    m.get(e.teacherId)!.add(e.subject);
+    m.get(e.teacherId)!.add(normSubject(e.subject));
   }
   return m;
 }
