@@ -35,7 +35,7 @@ export type Permission =
 
 export const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
   SUPER_ADMIN: ['super:admin', 'view:reports'],
-  SCHOOL_ADMIN: ['manage:users', 'view:timetable', 'view:reports', 'view:risk', 'manage:payments', 'manage:knowledge', 'view:schemes'],
+  SCHOOL_ADMIN: ['manage:users', 'view:timetable', 'manage:timetable', 'view:reports', 'view:risk', 'manage:payments', 'manage:knowledge', 'view:schemes'],
   HOD: [
     'manage:users',
     'manage:timetable',

@@ -208,12 +208,21 @@ timetableRouter.get('/generator-info', requirePermission('manage:timetable'), as
       orderBy: { fullName: 'asc' },
     });
 
-    const subjectRows = await prisma.timetableEntry.findMany({
-      where: { schoolId, ...(departmentId ? { class: { departmentId } } : {}) },
+    // Primary source: TeacherSubject registrations. Fallback to timetable history.
+    const teacherSubjectRows = await prisma.teacherSubject.findMany({
+      where: { schoolId },
       select: { subject: true },
       distinct: ['subject'],
     });
-    const subjects = subjectRows.map((r) => r.subject).filter(Boolean);
+    let subjects = teacherSubjectRows.map((r) => r.subject).filter(Boolean);
+    if (subjects.length === 0) {
+      const timetableRows = await prisma.timetableEntry.findMany({
+        where: { schoolId, ...(departmentId ? { class: { departmentId } } : {}) },
+        select: { subject: true },
+        distinct: ['subject'],
+      });
+      subjects = timetableRows.map((r) => r.subject).filter(Boolean);
+    }
 
     const existingEntryCount = await prisma.timetableEntry.count({
       where: { schoolId, ...(departmentId ? { class: { departmentId } } : {}) },
