@@ -108,8 +108,6 @@ const INTENT_PATTERNS: { intent: DetectedIntent; patterns: RegExp[] }[] = [
       /about\s*the\s*(developer|creator|founder)/i,
       /custom\s*knowledge/i,
       /knowledge\s*base/i,
-      /what\s*do\s*you\s*know\s*about/i,
-      /tell\s+me\s+about\s+(?!sams\b)/i,
     ],
   },
   // ⚠️ ORDER MATTERS: "remake_timetable" MUST come before "generate_timetable"
@@ -233,6 +231,18 @@ const INTENT_PATTERNS: { intent: DetectedIntent; patterns: RegExp[] }[] = [
       /best\s*class/i,
       /worst\s*class/i,
       /class\s*(ranking|performance)/i,
+    ],
+  },
+  // ⚠️ MUST STAY LAST: these are greedy "tell me about X" / "what do you know
+  // about X" catch-alls for the knowledge base. Kept below every data intent so
+  // real questions like "tell me about absent students today" resolve to their
+  // DB handler first, not the knowledge base. Only genuinely open-ended
+  // "tell me about <free text>" reaches here.
+  {
+    intent: 'custom_knowledge',
+    patterns: [
+      /what\s*do\s*you\s*know\s*about/i,
+      /tell\s+me\s+about\s+(?!sams\b)/i,
     ],
   },
 ];
