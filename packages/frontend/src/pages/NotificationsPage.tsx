@@ -147,7 +147,7 @@ const ATTACHMENT_ACCEPT = [
 
 function attachmentDownloadPath(att: NotificationAttachment, download = false): string {
   const suffix = download ? '?download=1' : '';
-  return `/api/v1/notifications/attachments/${encodeURIComponent(att.id)}${suffix}`;
+  return `/notifications/attachments/${encodeURIComponent(att.id)}${suffix}`;
 }
 
 function collectAttachments(messages: Notification[]): NotificationAttachment[] {
