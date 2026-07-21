@@ -4,6 +4,7 @@ import {
   listTerminalCommandHelp,
   resolveTerminalCommand,
   runSafeTerminalCommand,
+  runFreeformShellCommand,
 } from '../../superAdminTerminalOps';
 import { notificationInboxActions } from './notificationInboxActions';
 import { describeBatchParams, resolveBatchSchools, detectBatchOperation, type BatchResolveResult } from '../../superAdminBatchResolver';
@@ -609,6 +610,17 @@ const databaseOverviewHandler: ActionHandler = async () => {
 
 const runTerminalCommandHandler: ActionHandler = async (params) => {
   const requestedCommand = String(params.command ?? '').trim();
+
+  // Free-form path: aiService already gated by role + enable flag + deny-list
+  // and (for risky commands) confirmation. Run it as a raw shell command.
+  if (params.freeform === true) {
+    const result = await runFreeformShellCommand(requestedCommand);
+    return {
+      answer: `${result.label}:\n\`\`\`text\n${result.output}\n\`\`\``,
+      data: { key: result.key, label: result.label, commandPreview: result.commandPreview },
+    };
+  }
+
   const resolved = resolveTerminalCommand(requestedCommand);
   if (!resolved) {
     return {

@@ -41,6 +41,8 @@ import {
 import {
   listTerminalCommandHelp,
   resolveTerminalCommand,
+  isFreeformShellEnabled,
+  assessFreeformCommand,
 } from './superAdminTerminalOps';
 import { formatHumanResponse, humanize, type FormattedSuggestion } from './ai/humanResponseFormatter';
 
@@ -780,12 +782,42 @@ export class AIService {
 
     if (action === 'run_terminal_command') {
       const requestedCommand = String(params.command ?? '').trim();
-      if (!requestedCommand.startsWith('@') || !resolveTerminalCommand(requestedCommand)) {
+      if (!requestedCommand.startsWith('@')) {
         return {
           answer: `That terminal command is not allowed.\n\n${listTerminalCommandHelp()}`,
           intent: 'action_denied',
           engine: 'local',
         };
+      }
+      // A known safe command resolves directly. Otherwise, Super Admins may run
+      // it as a free-form shell command when SAMS_AI_SHELL=1 is set on the server.
+      if (!resolveTerminalCommand(requestedCommand)) {
+        const freeform = requestedCommand.replace(/^@\s*/, '').trim();
+        const canFreeform =
+          scopedUser.role === UserRole.SUPER_ADMIN && isFreeformShellEnabled();
+        if (!canFreeform) {
+          const hint = scopedUser.role === UserRole.SUPER_ADMIN
+            ? 'Free-form shell is off. Set SAMS_AI_SHELL=1 on the server to enable it.'
+            : listTerminalCommandHelp();
+          return {
+            answer: `That terminal command is not allowed.\n\n${hint}`,
+            intent: 'action_denied',
+            engine: 'local',
+          };
+        }
+        const assessment = assessFreeformCommand(freeform);
+        if (assessment.blocked) {
+          return {
+            answer: `⛔ Blocked: ${assessment.blockReason}. That one has to be run from a real SSH session — I won't run it from here.`,
+            intent: 'action_denied',
+            engine: 'local',
+          };
+        }
+        // Mark as free-form so the handler runs it as a raw shell command, and
+        // surface the risk level in the confirmation prompt below.
+        params.freeform = true;
+        params.command = freeform;
+        params.readOnly = assessment.readOnly;
       }
     }
 
@@ -807,12 +839,22 @@ export class AIService {
       };
     }
 
+    // Read-only free-form shell commands (ls, cat, git status, pm2 status, …)
+    // just run — no need to confirm something that only reads state.
+    const isReadOnlyFreeform =
+      action === 'run_terminal_command' && params.freeform === true && params.readOnly === true;
+
     const needsConfirm =
-      scopedUser.role === UserRole.SUPER_ADMIN ||
-      actionRequiresConfirmation(scopedUser.role, action);
+      !isReadOnlyFreeform &&
+      (scopedUser.role === UserRole.SUPER_ADMIN ||
+        actionRequiresConfirmation(scopedUser.role, action));
     if (needsConfirm) {
       const description = mergePendingDescription(scopedUser.role, action, params);
-      const confirmAnswer = `⚠️ **Confirm Action**: ${description}\n\nReply **yes** to proceed.`;
+      // For risky free-form commands, show the exact command being confirmed.
+      const detail = action === 'run_terminal_command' && params.freeform === true
+        ? `${description}\n\n\`\`\`bash\n${String(params.command)}\n\`\`\``
+        : description;
+      const confirmAnswer = `⚠️ **Confirm Action**: ${detail}\n\nReply **yes** to proceed.`;
       return {
         answer: confirmAnswer,
         intent: 'action_confirmation',
