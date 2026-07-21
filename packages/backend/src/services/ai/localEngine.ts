@@ -785,6 +785,7 @@ async function handleGenerateTimetable(
   // Build subject catalog ONLY from TeacherSubject registrations — never from
   // timetable history or DEFAULT_SUBJECTS, otherwise the generator schedules
   // subjects that no teacher registered for and resorts to wildcard assignments.
+  // This matches the fix applied to timetableGeneratorService.ts (commit 4181c9eb).
   const teacherSubjectRows = await prisma.teacherSubject.findMany({
     where: { schoolId },
     select: { subject: true, teacher: { select: { departmentId: true } } },

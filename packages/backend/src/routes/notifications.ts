@@ -452,6 +452,7 @@ notificationsRouter.post('/test-email', async (req: Request, res: Response): Pro
 /**
  * GET /api/v1/notifications/attachments/:id
  * Stream an attachment to a sender or recipient without relying on public /uploads.
+ * Super Admins bypass schoolId checks (their JWT has schoolId='none').
  */
 notificationsRouter.get('/attachments/:id', async (req: Request, res: Response, next: NextFunction): Promise<void> => {
   try {
@@ -459,24 +460,34 @@ notificationsRouter.get('/attachments/:id', async (req: Request, res: Response, 
       where: { id: String(req.params.id) },
     });
 
-    if (!attachment || attachment.schoolId !== req.schoolId) {
+    if (!attachment) {
       throw new AppError(404, 'NOT_FOUND', 'Attachment not found');
     }
 
-    const visibleNotification = await prisma.notification.findFirst({
-      where: {
-        schoolId: req.schoolId,
-        batchId: attachment.batchId,
-        OR: [
-          { userId: req.user.sub },
-          { senderId: req.user.sub },
-        ],
-      },
-      select: { id: true },
-    });
-
-    if (!visibleNotification) {
+    // Super admin can access any attachment (schoolId is 'none' in their JWT).
+    // For all other roles, verify school scope.
+    if (req.user.role !== 'SUPER_ADMIN' && attachment.schoolId !== req.schoolId) {
       throw new AppError(404, 'NOT_FOUND', 'Attachment not found');
+    }
+
+    // Verify the user is a sender or recipient of the notification batch,
+    // OR is a super admin (who has cross-school access).
+    if (req.user.role !== 'SUPER_ADMIN') {
+      const visibleNotification = await prisma.notification.findFirst({
+        where: {
+          schoolId: req.schoolId,
+          batchId: attachment.batchId,
+          OR: [
+            { userId: req.user.sub },
+            { senderId: req.user.sub },
+          ],
+        },
+        select: { id: true },
+      });
+
+      if (!visibleNotification) {
+        throw new AppError(404, 'NOT_FOUND', 'Attachment not found');
+      }
     }
 
     const filePath = notificationAttachmentFilePath(
@@ -496,6 +507,14 @@ notificationsRouter.get('/attachments/:id', async (req: Request, res: Response, 
       if (err) next(new AppError(404, 'NOT_FOUND', 'Attachment file not found'));
     });
   } catch (err) {
+    // Log the actual error for debugging
+    console.error('[Notifications] Attachment fetch failed:', {
+      id: req.params.id,
+      role: req.user?.role,
+      schoolId: req.user?.schoolId,
+      userId: req.user?.sub,
+      error: err instanceof Error ? err.message : String(err),
+    });
     next(err instanceof AppError ? err : new AppError(500, 'INTERNAL_ERROR', 'Failed to load attachment'));
   }
 });
