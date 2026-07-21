@@ -368,35 +368,34 @@ async function loadTeachers(schoolId: string, departmentId?: string): Promise<Te
  * 3. DEFAULT_SUBJECTS fallback
  */
 async function loadSubjectCatalog(schoolId: string, departmentId?: string): Promise<SubjectCatalog> {
-  const where: Record<string, unknown> = { schoolId };
-  if (departmentId) where.class = { departmentId };
+  // ── Build the catalog ONLY from TeacherSubject registrations ──────────────
+  // Teachers and HODs declare which subjects they can teach during registration
+  // (via TeacherSubject table). The timetable generator must ONLY schedule subjects
+  // that have at least one registered teacher — anything else is "guessing".
+  //
+  // Timetable history is NOT used to build the catalog; including it causes the
+  // generator to try scheduling subjects nobody registered for, then falling back
+  // to wildcard (unconstrained) teachers who never declared that skill.
+  // DEFAULT_SUBJECTS are also excluded for the same reason — they're generic and
+  // don't reflect what the school actually teaches.
+  //
+  // When called with departmentId, only TeacherSubject rows belonging to teachers
+  // in that department are considered, so HODs only schedule subjects their own
+  // teachers declared.
 
-  // Source 1: existing timetable entries
-  const timetableRows = await prisma.timetableEntry.findMany({
-    where: { schoolId },
-    select: { subject: true, class: { select: { departmentId: true } } },
-  });
-
-  // Source 2: TeacherSubject assignments (includes subjects teachers are skilled in
-  // that may not yet have timetable entries)
   const teacherSubjectRows = await prisma.teacherSubject.findMany({
     where: { schoolId },
-    select: { subject: true, teacher: { select: { departmentId: true } } },
+    select: { subject: true, teacher: { select: { departmentId: true, id: true } } },
   });
 
-  // Merge all subjects
   const schoolWideSet = new Set<string>();
   const byDeptMap = new Map<string, Set<string>>();
 
-  for (const r of timetableRows) {
-    if (r.subject) schoolWideSet.add(r.subject.trim());
-    const d = r.class.departmentId;
-    if (!byDeptMap.has(d)) byDeptMap.set(d, new Set());
-    byDeptMap.get(d)!.add(r.subject.trim());
-  }
-
+  // TeacherSubject is the SINGLE source of truth for what subjects exist.
+  // A subject only appears in the catalog if at least one teacher registered for it.
   for (const r of teacherSubjectRows) {
-    if (r.subject) schoolWideSet.add(r.subject.trim());
+    if (!r.subject?.trim()) continue;
+    schoolWideSet.add(r.subject.trim());
     const d = r.teacher.departmentId;
     if (d) {
       if (!byDeptMap.has(d)) byDeptMap.set(d, new Set());
@@ -404,11 +403,23 @@ async function loadSubjectCatalog(schoolId: string, departmentId?: string): Prom
     }
   }
 
-  // DEFAULT_SUBJECTS are a LAST-RESORT fallback only — used when the school has
-  // no real subject data at all (no teacher registrations, no timetable history).
-  // We must NOT mix them into a school that has real registrations, or the
-  // generator will try to schedule subjects nobody registered for and "guess" a
-  // wildcard teacher onto them. Real declared skills always win.
+  // If the school/department has NO TeacherSubject registrations at all, fall back
+  // to subjects extracted from existing timetable history (better than nothing).
+  if (schoolWideSet.size === 0) {
+    const timetableRows = await prisma.timetableEntry.findMany({
+      where: { schoolId },
+      select: { subject: true, class: { select: { departmentId: true } } },
+    });
+    for (const r of timetableRows) {
+      if (!r.subject?.trim()) continue;
+      schoolWideSet.add(r.subject.trim());
+      const d = r.class.departmentId;
+      if (!byDeptMap.has(d)) byDeptMap.set(d, new Set());
+      byDeptMap.get(d)!.add(r.subject.trim());
+    }
+  }
+
+  // Last resort: generic defaults (should never happen once teachers register)
   if (schoolWideSet.size === 0) {
     for (const s of DEFAULT_SUBJECTS) schoolWideSet.add(s);
   }
