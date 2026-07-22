@@ -459,20 +459,23 @@ const RegisterPage: React.FC = () => {
                     placeholder="e.g. Mathematics, Physics, Database Systems"
                   />
                   <button
-                    type="button"
-                    onClick={() => {
-                      const trimmed = newSubject.trim();
-                      if (trimmed && !subjects.includes(trimmed)) {
-                        setSubjects([...subjects, trimmed]);
-                        setNewSubject('');
-                      }
-                    }}
-                    className="px-4 py-2.5 rounded-xl bg-surface-muted border border-line text-ink-muted hover:bg-surface-elevated text-sm transition-colors shrink-0"
-                  >
-                    Add
-                  </button>
-                </div>
-                {subjects.length > 0 && (
+              type="button"
+              onClick={() => {
+                const trimmed = newSubject.trim();
+                if (trimmed && !subjects.includes(trimmed)) {
+                  setSubjects([...subjects, trimmed]);
+                  setNewSubject('');
+                }
+              }}
+              className="px-4 py-2.5 rounded-xl bg-surface-muted border border-line text-ink-muted hover:bg-surface-elevated text-sm transition-colors shrink-0"
+            >
+              Add
+            </button>
+          </div>
+          {isTeacherOrHod && subjects.length === 0 && (
+            <p className="text-xs text-red-400 mb-2">You must add at least one subject/unit you can teach.</p>
+          )}
+          {subjects.length > 0 && (
                   <div className="flex flex-wrap gap-1.5">
                     {subjects.map((s) => (
                       <span

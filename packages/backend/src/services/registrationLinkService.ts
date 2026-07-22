@@ -43,11 +43,14 @@ function normalizeSubjects(subjects: string[] | undefined): string[] {
   const seen = new Set<string>();
   const normalized: string[] = [];
   for (const subject of subjects ?? []) {
-    const value = subject.trim();
-    const key = value.toLowerCase();
-    if (!value || seen.has(key)) continue;
-    seen.add(key);
-    normalized.push(value);
+    // Split on comma in case user typed "math, english" into one field
+    for (const part of subject.split(',')) {
+      const value = part.trim();
+      const key = value.toLowerCase();
+      if (!value || seen.has(key)) continue;
+      seen.add(key);
+      normalized.push(value);
+    }
   }
   return normalized;
 }
@@ -294,9 +297,12 @@ export class RegistrationLinkService {
       });
     }
 
-    // Save teacher subjects if provided (TEACHER or HOD registering via link)
-    const subjects = normalizeSubjects(data.subjects);
-    if (subjects.length && (link.targetRole === UserRole.TEACHER || link.targetRole === UserRole.HOD)) {
+    // TEACHER/HOD must provide at least 1 subject (required for timetable generation)
+    if (link.targetRole === UserRole.TEACHER || link.targetRole === UserRole.HOD) {
+      const subjects = normalizeSubjects(data.subjects);
+      if (subjects.length === 0) {
+        throw new AppError(400, 'SUBJECTS_REQUIRED', 'You must register at least one subject you can teach for timetable generation');
+      }
       await prisma.teacherSubject.createMany({
         data: subjects.map((subject) => ({
           schoolId: link.schoolId,
