@@ -354,40 +354,6 @@ async function loadSubjectCatalog(schoolId: string, departmentId?: string): Prom
     }
   }
 
-  // If the school has NO TeacherSubject registrations, also check timetable history
-  // for subject names. This is a fallback so existing timetables aren't orphaned.
-  if (schoolWideSet.size === 0) {
-    const timetableRows = await prisma.timetableEntry.findMany({
-      where: { schoolId },
-      select: { subject: true },
-      distinct: ['subject'],
-    });
-    for (const r of timetableRows) {
-      if (!r.subject?.trim()) continue;
-      schoolWideSet.add(r.subject.trim());
-    }
-    // Also try to add by department from existing timetable + class links
-    const timetableRowsWithDept = await prisma.timetableEntry.findMany({
-      where: { schoolId },
-      select: { subject: true, class: { select: { departmentId: true } } },
-      distinct: ['subject', 'classId'],
-    });
-    for (const r of timetableRowsWithDept) {
-      if (!r.subject?.trim()) continue;
-      const d = r.class.departmentId;
-      if (!byDeptMap.has(d)) byDeptMap.set(d, new Set());
-      byDeptMap.get(d)!.add(r.subject.trim());
-    }
-  }
-
-  // Last resort: if NO data at all, seed with DEFAULT_SUBJECTS so the
-  // generator can still produce a timetable from unconstrained teachers.
-  if (schoolWideSet.size === 0) {
-    for (const subj of DEFAULT_SUBJECTS) {
-      schoolWideSet.add(subj);
-    }
-  }
-
   const cat: SubjectCatalog = {
     schoolWide: [...schoolWideSet].sort(),
     byDepartment: new Map(),
@@ -421,47 +387,25 @@ export const timetableGeneratorService = {
     if (!teachers.length) throw new Error('No teachers found in the school. Add teachers first.');
 
     const catalog = await loadSubjectCatalog(schoolId, departmentId);
+    if (catalog.schoolWide.length === 0) {
+      throw new Error('No subjects found. Register subjects for your teachers in Teacher Subjects first.');
+    }
 
     const existingBookings = !remake ? [] : await prisma.timetableEntry.findMany({
       where: { schoolId, classId: { notIn: targetIds }, ...(departmentId ? { class: { departmentId } } : {}) },
       select: { classId: true, teacherId: true, subject: true, dayOfWeek: true, startTime: true },
     });
 
-    // Build teacher-subject knowledge from TeacherSubject table.
-    // If no TeacherSubject registrations exist, fall back to timetable history
-    // to determine what subjects each teacher has been teaching.
+    // TeacherSubject is the ONLY source for teacher-subject assignments.
     const dbSubjectRows = await prisma.teacherSubject.findMany({
       where: { schoolId },
       select: { teacherId: true, subject: true },
     });
-    let historyFallback: { teacherId: string; subject: string }[] = [];
-    if (dbSubjectRows.length === 0) {
-      historyFallback = await prisma.timetableEntry.findMany({
-        where: { schoolId },
-        select: { teacherId: true, subject: true },
-        distinct: ['teacherId', 'subject'],
-      });
-    }
-    const tSubj = buildTeacherSubjectMap(teachers, teacherSubjectMapping, dbSubjectRows, historyFallback);
+    const tSubj = buildTeacherSubjectMap(teachers, teacherSubjectMapping, dbSubjectRows, []);
 
     // Build reverse map: subject → teachers who registered for it
     // Teachers with no registrations are silently dropped — no wildcards.
     let subjectMap = buildSubjectToTeachersMap(teachers, tSubj);
-
-    // LAST RESORT: If NO teacher has ANY subject registrations (neither TeacherSubject
-    // nor history), treat all teachers as wildcards so the generator can still produce
-    // a timetable using DEFAULT_SUBJECTS.
-    if (subjectMap.size === 0 && dbSubjectRows.length === 0 && historyFallback.length === 0) {
-      const schoolWide = catalog.schoolWide;
-      for (const teacher of teachers) {
-        for (const subj of schoolWide) {
-          const key = normSubject(subj);
-          const list = subjectMap.get(key) ?? [];
-          list.push(teacher);
-          subjectMap.set(key, list);
-        }
-      }
-    }
 
     // Delete existing if remake
     if (remake) {
@@ -520,38 +464,15 @@ export const timetableGeneratorService = {
       select: { classId: true, teacherId: true, subject: true, dayOfWeek: true, startTime: true },
     });
 
-    // Build teacher-subject knowledge from TeacherSubject table.
-    // If no TeacherSubject registrations exist, fall back to timetable history.
+    // TeacherSubject is the ONLY source for teacher-subject assignments.
     const dbSubjectRows = await prisma.teacherSubject.findMany({
       where: { schoolId },
       select: { teacherId: true, subject: true },
     });
-    let historyFallback: { teacherId: string; subject: string }[] = [];
-    if (dbSubjectRows.length === 0) {
-      historyFallback = await prisma.timetableEntry.findMany({
-        where: { schoolId },
-        select: { teacherId: true, subject: true },
-        distinct: ['teacherId', 'subject'],
-      });
-    }
-    const tSubj = buildTeacherSubjectMap(teachers, teacherSubjectMapping, dbSubjectRows, historyFallback);
+    const tSubj = buildTeacherSubjectMap(teachers, teacherSubjectMapping, dbSubjectRows, []);
 
     // Build reverse map: subject → teachers who can teach it (no wildcards)
     let subjectMap = buildSubjectToTeachersMap(teachers, tSubj);
-
-    // LAST RESORT: If NO teacher has ANY subject registrations, treat all teachers
-    // as wildcards so the generator can still produce a timetable from DEFAULT_SUBJECTS.
-    if (subjectMap.size === 0 && dbSubjectRows.length === 0 && historyFallback.length === 0) {
-      const schoolWide = catalog.schoolWide;
-      for (const teacher of teachers) {
-        for (const subj of schoolWide) {
-          const key = normSubject(subj);
-          const list = subjectMap.get(key) ?? [];
-          list.push(teacher);
-          subjectMap.set(key, list);
-        }
-      }
-    }
 
     const periods = buildPeriods(startHour, periodDuration, breakStart, breakEnd, lunchStart, lunchEnd);
     const result = generate(
