@@ -458,6 +458,9 @@ export const timetableGeneratorService = {
     if (!teachers.length) throw new Error('No teachers found in the school. Add teachers first.');
 
     const catalog = await loadSubjectCatalog(schoolId, departmentId);
+    if (catalog.schoolWide.length === 0) {
+      throw new Error('No subjects found. Register subjects for your teachers in Teacher Subjects first.');
+    }
 
     const existing = await prisma.timetableEntry.findMany({
       where: { schoolId, classId: { notIn: targetIds }, ...(departmentId ? { class: { departmentId } } : {}) },
