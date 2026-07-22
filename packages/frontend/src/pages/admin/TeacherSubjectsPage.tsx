@@ -44,9 +44,26 @@ const TeacherSubjectsPage: React.FC = () => {
   };
 
   const addSubject = () => {
-    const trimmed = newSubjectInput.trim();
-    if (!trimmed || editSubjects.includes(trimmed)) return;
-    setEditSubjects([...editSubjects, trimmed]);
+    // Split on commas / newlines so "Math, English, Physics" becomes three
+    // separate subjects instead of one literal string. Dedupe case-insensitively
+    // against what's already added.
+    const parts = newSubjectInput
+      .split(/[,\n]/)
+      .map((s) => s.trim())
+      .filter(Boolean);
+    if (parts.length === 0) return;
+
+    setEditSubjects((prev) => {
+      const seen = new Set(prev.map((s) => s.toLowerCase()));
+      const next = [...prev];
+      for (const part of parts) {
+        const key = part.toLowerCase();
+        if (seen.has(key)) continue;
+        seen.add(key);
+        next.push(part);
+      }
+      return next;
+    });
     setNewSubjectInput('');
   };
 
@@ -192,7 +209,7 @@ const TeacherSubjectsPage: React.FC = () => {
                     }
                   }}
                   className="flex-1 px-4 py-2 rounded-xl input-field placeholder-ink-subtle text-sm"
-                  placeholder="Type a subject and press Enter or Add"
+                  placeholder="Type subjects, comma-separated (e.g. Math, English), then Enter or Add"
                 />
                 <button
                   type="button"

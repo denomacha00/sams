@@ -92,12 +92,17 @@ const updateSubjectsSchema = z.object({
 function normalizeSubjects(subjects: string[]): string[] {
   const seen = new Set<string>();
   const normalized: string[] = [];
-  for (const subject of subjects) {
-    const value = subject.trim();
-    const key = value.toLowerCase();
-    if (!value || seen.has(key)) continue;
-    seen.add(key);
-    normalized.push(value);
+  for (const raw of subjects) {
+    // Defensive split: a single entry may still arrive as "Math, English" from
+    // some callers — split on commas/newlines so each subject is stored on its
+    // own row rather than as one literal string.
+    for (const subject of raw.split(/[,\n]/)) {
+      const value = subject.trim();
+      const key = value.toLowerCase();
+      if (!value || seen.has(key)) continue;
+      seen.add(key);
+      normalized.push(value);
+    }
   }
   return normalized;
 }

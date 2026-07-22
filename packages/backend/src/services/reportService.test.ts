@@ -155,9 +155,9 @@ describe('ReportService.exportReport', () => {
       expect(result).toBeInstanceOf(Buffer);
       const csv = result.toString('utf-8');
       const lines = csv.split('\n');
-      expect(lines[0]).toBe('Student,Expected,Present,Late,Excused,Absent,Attendance %');
-      expect(lines[1]).toBe('"John Doe",20,15,3,1,1,90');
-      expect(lines[2]).toBe('"Jane Smith",20,18,1,0,1,95');
+      expect(lines[0]).toBe('Adm No,Student,Expected,Present,Late,Excused,Absent,Attendance %');
+      expect(lines[1]).toBe('"","John Doe",20,15,3,1,1,90');
+      expect(lines[2]).toBe('"","Jane Smith",20,18,1,0,1,95');
     });
 
     it('should return a Buffer with correct CSV content for department report', async () => {

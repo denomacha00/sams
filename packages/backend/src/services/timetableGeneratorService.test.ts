@@ -14,8 +14,9 @@ vi.mock('../lib/prisma', () => ({
 const SCHOOL = 'school-1';
 const DEPT = 'dept-1';
 // Give teachers a high daily cap so a registered teacher never hits the limit
-// and overflows to the wildcard pool — that keeps the preference assertions
-// deterministic (the fallback behaviour is exercised explicitly in its own test).
+// and slots get skipped for capacity reasons — that keeps the assignment
+// assertions deterministic (there is NO wildcard fallback; unregistered
+// subjects/teachers are simply never scheduled).
 const HIGH_CAP = 1000;
 
 interface MockSetup {
@@ -121,30 +122,31 @@ describe('timetableGeneratorService.generatePreview — teacher subject assignme
   });
 
   it('matches registered subjects case- and whitespace-insensitively', async () => {
-    // The class catalog subject "Mathematics" must match a teacher who registered
-    // " mathematics " (different case + surrounding spaces). Before normalization
-    // the exact-string match failed, no qualified teacher was found, and the slot
-    // fell to a wildcard teacher — that was a source of "guessing".
+    // A teacher who registered "  mathematics " (messy case + spaces) must still
+    // own the Mathematics slots. Before normalization the exact-string match
+    // failed and no qualified teacher was found. The subject catalog is built
+    // ONLY from TeacherSubject rows, so the display subject reflects the
+    // registered value (trimmed) — matching is what we assert here.
     wireMocks({
       classes: [{ id: 'c1', name: 'Form 1', departmentId: DEPT }],
       teachers: [
         { id: 'tMath', fullName: 'Math Teacher', departmentId: DEPT },
         { id: 'tAny', fullName: 'Relief Teacher', departmentId: DEPT },
       ],
-      // Registered with messy casing/spacing; catalog historical entry is clean.
+      // Registered with messy casing/spacing.
       teacherSubjects: [{ teacherId: 'tMath', subject: '  mathematics ' }],
-      historicalSubjects: ['Mathematics'],
     });
 
     const result = await timetableGeneratorService.generatePreview({
       schoolId: SCHOOL, departmentId: DEPT, maxLessonsPerTeacherPerDay: HIGH_CAP,
     });
 
-    const mathSlots = result.slots.filter((s) => s.subject === 'Mathematics');
-    expect(mathSlots.length).toBeGreaterThan(0);
-    // The registered teacher (despite messy casing) must own Mathematics — the
-    // wildcard must never be guessed onto it.
-    expect(mathSlots.every((s) => s.teacherId === 'tMath')).toBe(true);
+    expect(result.slots.length).toBeGreaterThan(0);
+    // Every slot is Mathematics (case-insensitive) and owned by the registered
+    // teacher — the unregistered teacher must never be guessed onto it.
+    expect(result.slots.every((s) => s.subject.trim().toLowerCase() === 'mathematics')).toBe(true);
+    expect(result.slots.every((s) => s.teacherId === 'tMath')).toBe(true);
+    expect(result.slots.some((s) => s.teacherId === 'tAny')).toBe(false);
   });
 
   it('does NOT inject hardcoded default subjects when teachers registered real ones', async () => {
@@ -165,9 +167,11 @@ describe('timetableGeneratorService.generatePreview — teacher subject assignme
     expect(result.slots.every((s) => s.subject === 'Mathematics')).toBe(true);
   });
 
-  it('falls back to an unconstrained teacher only when no registered teacher exists', async () => {
-    // "History" exists in the department (historical entry) but nobody registered
-    // it — only the wildcard teacher can cover it.
+  it('never schedules a subject that no teacher registered (no wildcard fallback)', async () => {
+    // "History" existed only as a historical timetable entry — nobody registered
+    // it via TeacherSubject. The generator must NOT resurrect it, and must NOT
+    // assign an unregistered "relief" teacher to cover it. Guessing was removed
+    // deliberately (commit: "remove all guessing - only use TeacherSubject").
     wireMocks({
       classes: [{ id: 'c1', name: 'Form 1', departmentId: DEPT }],
       teachers: [
@@ -182,12 +186,11 @@ describe('timetableGeneratorService.generatePreview — teacher subject assignme
       schoolId: SCHOOL, departmentId: DEPT, maxLessonsPerTeacherPerDay: HIGH_CAP,
     });
 
-    // tMath (registered only for Mathematics) must never teach anything else.
-    const mathTeacherSlots = result.slots.filter((s) => s.teacherId === 'tMath');
-    expect(mathTeacherSlots.every((s) => s.subject === 'Mathematics')).toBe(true);
-    // History has no registered teacher, so the wildcard covers it.
-    const historySlots = result.slots.filter((s) => s.subject === 'History');
-    expect(historySlots.length).toBeGreaterThan(0);
-    expect(historySlots.every((s) => s.teacherId === 'tAny')).toBe(true);
+    // History was never registered → it must not appear at all.
+    expect(result.slots.some((s) => s.subject === 'History')).toBe(false);
+    // tMath only ever teaches its registered subject.
+    expect(result.slots.every((s) => s.teacherId === 'tMath' && s.subject === 'Mathematics')).toBe(true);
+    // The unregistered teacher is never used as a wildcard.
+    expect(result.slots.some((s) => s.teacherId === 'tAny')).toBe(false);
   });
 });

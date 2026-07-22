@@ -955,7 +955,7 @@ const ReportsPage: React.FC = () => {
 
         {/* Footer */}
         <p className="text-center text-xs text-ink-subtle mt-8">
-          © 2025 SAMS · Developed by Denis Macharia
+          © 2026 SAMS · Developed by Denis Macharia
         </p>
       </div>
     </div>

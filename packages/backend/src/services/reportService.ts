@@ -28,8 +28,12 @@ export interface AttendanceEvidenceRow {
 }
 
 export interface StudentReportData {
+  schoolName?: string;
   studentId: string;
   studentName: string;
+  admissionNumber?: string | null;
+  className?: string | null;
+  departmentName?: string | null;
   totalSessions: number;
   totalExpected: number;
   totalPresent: number;
@@ -41,14 +45,18 @@ export interface StudentReportData {
 }
 
 export interface ClassReportData {
+  schoolName?: string;
   classId: string;
   className: string;
+  classTeacherName?: string | null;
+  departmentName?: string | null;
   totalSessions: number;
   students: StudentReportData[];
   averageAttendancePercentage: number;
 }
 
 export interface DepartmentReportData {
+  schoolName?: string;
   departmentId: string;
   departmentName: string;
   totalSessions: number;
@@ -68,7 +76,7 @@ export interface SchoolReportData {
 
 type AttendanceStatusKey = 'PRESENT' | 'LATE' | 'EXCUSED' | 'ABSENT';
 type StatusCounts = Partial<Record<AttendanceStatusKey, number>>;
-type StudentSeed = { id: string; fullName: string; classId?: string | null };
+type StudentSeed = { id: string; fullName: string; classId?: string | null; admissionNumber?: string | null };
 type ClassSeed = { id: string; name: string; departmentId?: string | null };
 type ClassReportBuildOptions = { includeEvidence?: boolean };
 type EvidenceSessionSeed = {
@@ -108,6 +116,46 @@ function sumStatusCounts(counts: StatusCounts): number {
   return (counts.PRESENT ?? 0) + (counts.LATE ?? 0) + (counts.EXCUSED ?? 0) + (counts.ABSENT ?? 0);
 }
 
+/** Human-friendly label for the raw attendance method stored on a record.
+ *  Raw values: QR, LINK, MANUAL, BIOMETRIC, FINGERPRINT, AUTO_ABSENT,
+ *  OFFLINE_QR, OFFLINE_MANUAL. Anything unmapped is title-cased as a fallback. */
+function formatMethod(method: string | null | undefined): string {
+  if (!method) return '--';
+  const map: Record<string, string> = {
+    QR: 'QR',
+    LINK: 'Link',
+    MANUAL: 'Manual',
+    BIOMETRIC: 'Biometric',
+    FINGERPRINT: 'Fingerprint',
+    AUTO_ABSENT: 'Auto',
+    OFFLINE_QR: 'Offline QR',
+    OFFLINE_MANUAL: 'Offline Manual',
+  };
+  return map[method] ?? method.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
+}
+
+/** Format an ISO timestamp as local HH:mm (24-hour, with minutes). */
+function formatTime(iso: string | null | undefined): string {
+  if (!iso) return '--';
+  return new Date(iso).toLocaleString('en-GB', { hour: '2-digit', minute: '2-digit', hour12: false });
+}
+
+const DAY_NAMES_SHORT = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+/** Short weekday name (Mon, Tue, …) for a YYYY-MM-DD date string. */
+function dayName(dateStr: string | null | undefined): string {
+  if (!dateStr) return '--';
+  const d = new Date(dateStr + 'T00:00:00');
+  return Number.isNaN(d.getTime()) ? '--' : (DAY_NAMES_SHORT[d.getDay()] ?? '--');
+}
+
+/** Weekday name (Mon, Tue, ...) for a YYYY-MM-DD date string. */
+function formatDay(dateStr: string | null | undefined): string {
+  if (!dateStr) return '--';
+  const d = new Date(dateStr + 'T00:00:00');
+  if (Number.isNaN(d.getTime())) return '--';
+  return d.toLocaleDateString('en-GB', { weekday: 'short' });
+}
+
 export function calculateAttendancePercentage(
   totalPresent: number,
   totalLate: number,
@@ -128,6 +176,7 @@ function buildStudentReport(student: StudentSeed, counts: StatusCounts, totalSes
   return {
     studentId: student.id,
     studentName: student.fullName,
+    admissionNumber: student.admissionNumber ?? null,
     totalSessions: totalExpected,
     totalExpected,
     totalPresent,
@@ -164,7 +213,16 @@ export class ReportService {
     const [student, statusRows] = await Promise.all([
       prisma.user.findUnique({
         where: { id: studentId },
-        select: { id: true, fullName: true, schoolId: true, classId: true },
+        select: {
+          id: true,
+          fullName: true,
+          schoolId: true,
+          classId: true,
+          admissionNumber: true,
+          class: { select: { name: true } },
+          department: { select: { name: true } },
+          school: { select: { name: true } },
+        },
       }),
       prisma.attendanceRecord.groupBy({
         by: ['status'],
@@ -250,8 +308,12 @@ export class ReportService {
     const attendancePercentage = calculateAttendancePercentage(totalPresent, totalLate, totalExpected);
 
     return {
+      schoolName: student.school?.name,
       studentId,
       studentName: student.fullName,
+      admissionNumber: student.admissionNumber ?? null,
+      className: student.class?.name ?? null,
+      departmentName: student.department?.name ?? null,
       totalSessions: totalExpected,
       totalExpected,
       totalPresent,
@@ -271,7 +333,13 @@ export class ReportService {
   async getClassReport(schoolId: string, classId: string, dateRange?: DateRange): Promise<ClassReportData> {
     const classData = await prisma.class.findUnique({
       where: { id: classId },
-      select: { id: true, name: true, schoolId: true },
+      select: {
+        id: true,
+        name: true,
+        schoolId: true,
+        department: { select: { name: true } },
+        school: { select: { name: true } },
+      },
     });
 
     if (!classData) {
@@ -289,12 +357,18 @@ export class ReportService {
       { includeEvidence: true },
     );
 
-    return reports[0] ?? {
+    const report = reports[0] ?? {
       classId,
       className: classData.name,
       totalSessions: 0,
       students: [],
       averageAttendancePercentage: 0,
+    };
+
+    return {
+      ...report,
+      schoolName: classData.school?.name,
+      departmentName: classData.department?.name ?? null,
     };
   }
 
@@ -306,7 +380,7 @@ export class ReportService {
   async getDepartmentReport(schoolId: string, departmentId: string, dateRange?: DateRange): Promise<DepartmentReportData> {
     const department = await prisma.department.findUnique({
       where: { id: departmentId },
-      select: { id: true, name: true, schoolId: true },
+      select: { id: true, name: true, schoolId: true, school: { select: { name: true } } },
     });
 
     if (!department) {
@@ -323,9 +397,10 @@ export class ReportService {
       orderBy: { name: 'asc' },
     });
 
-    const classReports = await this._buildClassReports(schoolId, classes, dateRange);
+    const classReports = await this._buildClassReports(schoolId, classes, dateRange, { includeEvidence: true });
 
     return {
+      schoolName: department.school?.name,
       departmentId,
       departmentName: department.name,
       totalSessions: classReports.reduce((sum, report) => sum + report.totalSessions, 0),
@@ -362,7 +437,7 @@ export class ReportService {
       }),
     ]);
 
-    const allClassReports = await this._buildClassReports(schoolId, classes, dateRange);
+    const allClassReports = await this._buildClassReports(schoolId, classes, dateRange, { includeEvidence: true });
     const classReportById = new Map(allClassReports.map((report) => [report.classId, report]));
     const reportsByDepartment = new Map<string, ClassReportData[]>();
     for (const cls of classes) {
@@ -415,7 +490,7 @@ export class ReportService {
       }),
       prisma.user.findMany({
         where: { schoolId, classId: { in: classIds }, role: 'STUDENT' },
-        select: { id: true, fullName: true, classId: true },
+        select: { id: true, fullName: true, classId: true, admissionNumber: true },
         orderBy: [{ classId: 'asc' }, { fullName: 'asc' }],
       }),
       options.includeEvidence
@@ -627,9 +702,13 @@ export class ReportService {
       };
 
       // -- Header banner --
+      // School name is the primary identity on the report. SAMS appears only as
+      // the small generator signature in the footer.
+      const schoolName =
+        ('schoolName' in data && data.schoolName) ? data.schoolName : 'Attendance Report';
       doc.rect(50, 40, 495, 65).fill(NAVY);
-      doc.fill('#ffffff').fontSize(22).font('Helvetica-Bold').text('SAMS Attendance Report', 70, 55);
-      doc.fontSize(9).font('Helvetica').text('Smart Attendance Management System', 70, 80);
+      doc.fill('#ffffff').fontSize(20).font('Helvetica-Bold').text(schoolName, 70, 52, { width: 455 });
+      doc.fontSize(9).font('Helvetica').text('Attendance Report', 70, 82);
 
       let y = 125;
 
@@ -638,7 +717,15 @@ export class ReportService {
         checkPage(30);
         doc.font('Helvetica-Bold').fontSize(15).fill(NAVY).text('Student Attendance Report', 50, y); y += 25;
         doc.moveTo(50, y).lineTo(545, y).strokeColor('#d1d5db').stroke(); y += 12;
-        doc.font('Helvetica-Bold').fontSize(13).fill(DARK).text(data.studentName, 50, y); y += 22;
+        doc.font('Helvetica-Bold').fontSize(13).fill(DARK).text(data.studentName, 50, y); y += 18;
+        // Student identity line: admission no · class · department
+        const meta = [
+          data.admissionNumber ? 'Adm No: ' + data.admissionNumber : null,
+          data.className ? 'Class: ' + data.className : null,
+          data.departmentName ? 'Department: ' + data.departmentName : null,
+        ].filter(Boolean).join('     |     ');
+        if (meta) { doc.font('Helvetica').fontSize(9).fill(GRAY).text(meta, 50, y); y += 16; }
+        y += 4;
 
         // Summary card
         doc.roundedRect(50, y, 240, 75, 5).fill('#f0f7ff');
@@ -655,12 +742,12 @@ export class ReportService {
         if (data.records?.length) {
           checkPage(30);
           doc.font('Helvetica-Bold').fontSize(12).fill(NAVY).text('Daily Evidence', 50, y); y += 20;
-          const cw = [60, 185, 55, 50, 90];
-          drawHeader(['Date', 'Subject', 'Status', 'Method', 'Time'], 50, y, cw); y += 20;
+          const cw = [40, 58, 110, 100, 45, 62, 40];
+          drawHeader(['Day', 'Date', 'Subject', 'Teacher', 'Status', 'Method', 'Time'], 50, y, cw); y += 20;
           for (const row of data.records.slice(0, 50)) {
             checkPage(13);
-            const t = row.scannedAt ? new Date(row.scannedAt).toLocaleString('en-GB', { hour: '2-digit', minute: '2-digit' }) : '--';
-            drawRow([row.date, row.subject, row.status, row.method || '--', t], 50, y, cw); y += 13;
+            const tn = (row.teacherName || '--').length > 20 ? row.teacherName!.slice(0, 17) + '...' : (row.teacherName || '--');
+            drawRow([dayName(row.date), row.date, row.subject, tn, row.status, formatMethod(row.method), formatTime(row.scannedAt)], 50, y, cw); y += 13;
           }
           if (data.records.length > 50) {
             doc.fill(GRAY).font('Helvetica-Oblique').fontSize(8).text('...and ' + (data.records.length - 50) + ' more. Export Excel for full detail.', 50, y); y += 14;
@@ -671,30 +758,34 @@ export class ReportService {
         checkPage(30);
         doc.font('Helvetica-Bold').fontSize(15).fill(NAVY).text('Class Attendance Report', 50, y); y += 25;
         doc.moveTo(50, y).lineTo(545, y).strokeColor('#d1d5db').stroke(); y += 12;
-        doc.font('Helvetica-Bold').fontSize(14).fill(DARK).text(data.className, 50, y); y += 10;
+        // Department first, then Class directly below it — same font size.
+        if (data.departmentName) {
+          doc.font('Helvetica-Bold').fontSize(13).fill(DARK).text('Department: ' + data.departmentName, 50, y); y += 18;
+        }
+        doc.font('Helvetica-Bold').fontSize(13).fill(DARK).text('Class: ' + data.className, 50, y); y += 18;
         doc.font('Helvetica').fontSize(10).fill(GRAY).text('Sessions: ' + data.totalSessions + '  |  Avg Attendance: ' + data.averageAttendancePercentage + '%', 50, y); y += 24;
 
         checkPage(30);
         doc.font('Helvetica-Bold').fontSize(12).fill(NAVY).text('Student Summary', 50, y); y += 20;
-        const sw = [170, 48, 44, 38, 44, 38, 50];
-        drawHeader(['Student', 'Expected', 'Present', 'Late', 'Excused', 'Absent', '%'], 50, y, sw); y += 20;
+        const sw = [92, 118, 42, 40, 32, 42, 36, 43];
+        drawHeader(['Adm No', 'Student', 'Expected', 'Present', 'Late', 'Excused', 'Absent', '%'], 50, y, sw); y += 20;
         for (const s of data.students) {
           checkPage(13);
-          const sn = s.studentName.length > 26 ? s.studentName.slice(0, 23) + '...' : s.studentName;
-          drawRow([sn, s.totalExpected, s.totalPresent, s.totalLate, s.totalExcused, s.totalAbsent, s.attendancePercentage + '%'], 50, y, sw); y += 13;
+          const sn = s.studentName.length > 20 ? s.studentName.slice(0, 17) + '...' : s.studentName;
+          drawRow([s.admissionNumber || '--', sn, s.totalExpected, s.totalPresent, s.totalLate, s.totalExcused, s.totalAbsent, s.attendancePercentage + '%'], 50, y, sw); y += 13;
         }
 
         const ev = data.students.flatMap(s => (s.records || []).map(r => ({ n: s.studentName, r })));
         if (ev.length) {
           checkPage(30);
           doc.font('Helvetica-Bold').fontSize(12).fill(NAVY).text('Daily Evidence', 50, y); y += 20;
-          const ew = [110, 65, 100, 50, 45, 60];
-          drawHeader(['Student', 'Date', 'Subject', 'Status', 'Method', 'Time'], 50, y, ew); y += 20;
+          const ew = [78, 34, 52, 82, 82, 42, 55, 40];
+          drawHeader(['Student', 'Day', 'Date', 'Subject', 'Teacher', 'Status', 'Method', 'Time'], 50, y, ew); y += 20;
           for (const { n, r } of ev.slice(0, 40)) {
             checkPage(13);
-            const sn = n.length > 18 ? n.slice(0, 16) + '...' : n;
-            const t = r.scannedAt ? new Date(r.scannedAt).toLocaleString('en-GB', { hour: '2-digit', minute: '2-digit' }) : '--';
-            drawRow([sn, r.date, r.subject, r.status, r.method || '--', t], 50, y, ew); y += 13;
+            const sn = n.length > 14 ? n.slice(0, 12) + '...' : n;
+            const tn = (r.teacherName || '--').length > 16 ? r.teacherName!.slice(0, 13) + '...' : (r.teacherName || '--');
+            drawRow([sn, dayName(r.date), r.date, r.subject, tn, r.status, formatMethod(r.method), formatTime(r.scannedAt)], 50, y, ew); y += 13;
           }
         }
       } else if ('departmentName' in data) {
@@ -719,6 +810,23 @@ export class ReportService {
               checkPage(12);
               const sn = s.studentName.length > 26 ? s.studentName.slice(0, 23) + '...' : s.studentName;
               drawRow([sn, s.totalExpected, s.totalPresent, s.totalLate, s.totalExcused, s.totalAbsent, s.attendancePercentage + '%'], 50, y, cw); y += 12;
+            }
+          }
+          // Daily evidence for this class (who marked, day, method, exact time)
+          const cev = (c.students || []).flatMap(s => (s.records || []).map(r => ({ n: s.studentName, r })));
+          if (cev.length) {
+            checkPage(24);
+            doc.fill(GRAY).font('Helvetica-Bold').fontSize(8).text('Daily Evidence', 55, y); y += 14;
+            const ew = [78, 34, 52, 82, 82, 42, 55, 40];
+            drawHeader(['Student', 'Day', 'Date', 'Subject', 'Teacher', 'Status', 'Method', 'Time'], 50, y, ew); y += 18;
+            for (const { n, r } of cev.slice(0, 30)) {
+              checkPage(12);
+              const sn = n.length > 14 ? n.slice(0, 12) + '...' : n;
+              const tn = (r.teacherName || '--').length > 16 ? r.teacherName!.slice(0, 13) + '...' : (r.teacherName || '--');
+              drawRow([sn, dayName(r.date), r.date, r.subject, tn, r.status, formatMethod(r.method), formatTime(r.scannedAt)], 50, y, ew); y += 12;
+            }
+            if (cev.length > 30) {
+              doc.fill(GRAY).font('Helvetica-Oblique').fontSize(7).text('...and ' + (cev.length - 30) + ' more. Export Excel for full detail.', 55, y); y += 12;
             }
           }
           y += 4;
@@ -776,6 +884,9 @@ export class ReportService {
         { header: 'Value', key: 'value', width: 15 },
       ];
       sheet.addRow({ metric: 'Student', value: data.studentName });
+      if (data.admissionNumber) sheet.addRow({ metric: 'Admission Number', value: data.admissionNumber });
+      if (data.className) sheet.addRow({ metric: 'Class', value: data.className });
+      if (data.departmentName) sheet.addRow({ metric: 'Department', value: data.departmentName });
       sheet.addRow({ metric: 'Total Expected', value: data.totalExpected });
       sheet.addRow({ metric: 'Present', value: data.totalPresent });
       sheet.addRow({ metric: 'Late', value: data.totalLate });
@@ -785,23 +896,27 @@ export class ReportService {
       if (data.records?.length) {
         const detailSheet = workbook.addWorksheet('Daily Evidence');
         detailSheet.columns = [
+          { header: 'Day', key: 'day', width: 8 },
           { header: 'Date', key: 'date', width: 14 },
           { header: 'Subject', key: 'subject', width: 28 },
           { header: 'Class', key: 'className', width: 20 },
           { header: 'Teacher', key: 'teacherName', width: 24 },
           { header: 'Status', key: 'status', width: 14 },
           { header: 'Method', key: 'method', width: 14 },
+          { header: 'Time', key: 'time', width: 10 },
           { header: 'Marked At', key: 'scannedAt', width: 24 },
           { header: 'Note', key: 'note', width: 32 },
         ];
         for (const row of data.records) {
           detailSheet.addRow({
+            day: dayName(row.date),
             date: row.date,
             subject: row.subject,
             className: row.className ?? '',
             teacherName: row.teacherName ?? '',
             status: row.status,
-            method: row.method ?? '',
+            method: formatMethod(row.method),
+            time: formatTime(row.scannedAt),
             scannedAt: row.scannedAt ?? '',
             note: row.note ?? '',
           });
@@ -810,6 +925,7 @@ export class ReportService {
     } else if ('className' in data) {
       // Class report
       sheet.columns = [
+        { header: 'Adm No', key: 'admissionNumber', width: 14 },
         { header: 'Student', key: 'student', width: 30 },
         { header: 'Expected', key: 'expected', width: 12 },
         { header: 'Present', key: 'present', width: 12 },
@@ -820,6 +936,7 @@ export class ReportService {
       ];
       for (const student of data.students) {
         sheet.addRow({
+          admissionNumber: student.admissionNumber ?? '',
           student: student.studentName,
           expected: student.totalExpected,
           present: student.totalPresent,
@@ -836,22 +953,26 @@ export class ReportService {
         const detailSheet = workbook.addWorksheet('Daily Evidence');
         detailSheet.columns = [
           { header: 'Student', key: 'student', width: 30 },
+          { header: 'Day', key: 'day', width: 8 },
           { header: 'Date', key: 'date', width: 14 },
           { header: 'Subject', key: 'subject', width: 28 },
           { header: 'Teacher', key: 'teacherName', width: 24 },
           { header: 'Status', key: 'status', width: 14 },
           { header: 'Method', key: 'method', width: 14 },
+          { header: 'Time', key: 'time', width: 10 },
           { header: 'Marked At', key: 'scannedAt', width: 24 },
           { header: 'Note', key: 'note', width: 32 },
         ];
         for (const { studentName, row } of evidenceRows) {
           detailSheet.addRow({
             student: studentName,
+            day: dayName(row.date),
             date: row.date,
             subject: row.subject,
             teacherName: row.teacherName ?? '',
             status: row.status,
-            method: row.method ?? '',
+            method: formatMethod(row.method),
+            time: formatTime(row.scannedAt),
             scannedAt: row.scannedAt ?? '',
             note: row.note ?? '',
           });
@@ -926,6 +1047,43 @@ export class ReportService {
             excused: student.totalExcused,
             absent: student.totalAbsent,
             percentage: student.attendancePercentage,
+          });
+        }
+      }
+
+      const deptEvidence = data.classes.flatMap((cls) =>
+        (cls.students ?? []).flatMap((student) =>
+          (student.records ?? []).map((row) => ({ className: cls.className, studentName: student.studentName, row })),
+        ),
+      );
+      if (deptEvidence.length) {
+        const evidenceSheet = workbook.addWorksheet('Daily Evidence');
+        evidenceSheet.columns = [
+          { header: 'Class', key: 'className', width: 20 },
+          { header: 'Student', key: 'student', width: 28 },
+          { header: 'Day', key: 'day', width: 8 },
+          { header: 'Date', key: 'date', width: 14 },
+          { header: 'Subject', key: 'subject', width: 24 },
+          { header: 'Teacher', key: 'teacherName', width: 24 },
+          { header: 'Status', key: 'status', width: 12 },
+          { header: 'Method', key: 'method', width: 14 },
+          { header: 'Time', key: 'time', width: 10 },
+          { header: 'Marked At', key: 'scannedAt', width: 24 },
+          { header: 'Note', key: 'note', width: 28 },
+        ];
+        for (const { className, studentName, row } of deptEvidence) {
+          evidenceSheet.addRow({
+            className,
+            student: studentName,
+            day: dayName(row.date),
+            date: row.date,
+            subject: row.subject,
+            teacherName: row.teacherName ?? '',
+            status: row.status,
+            method: formatMethod(row.method),
+            time: formatTime(row.scannedAt),
+            scannedAt: row.scannedAt ?? '',
+            note: row.note ?? '',
           });
         }
       }
@@ -1033,6 +1191,47 @@ export class ReportService {
           });
         }
       }
+
+      const schoolEvidence = data.departments.flatMap((dept) =>
+        (dept.classes ?? []).flatMap((cls) =>
+          (cls.students ?? []).flatMap((student) =>
+            (student.records ?? []).map((row) => ({ department: dept.departmentName, className: cls.className, studentName: student.studentName, row })),
+          ),
+        ),
+      );
+      if (schoolEvidence.length) {
+        const evidenceSheet = workbook.addWorksheet('Daily Evidence');
+        evidenceSheet.columns = [
+          { header: 'Department', key: 'department', width: 20 },
+          { header: 'Class', key: 'className', width: 18 },
+          { header: 'Student', key: 'student', width: 26 },
+          { header: 'Day', key: 'day', width: 8 },
+          { header: 'Date', key: 'date', width: 14 },
+          { header: 'Subject', key: 'subject', width: 22 },
+          { header: 'Teacher', key: 'teacherName', width: 22 },
+          { header: 'Status', key: 'status', width: 12 },
+          { header: 'Method', key: 'method', width: 14 },
+          { header: 'Time', key: 'time', width: 10 },
+          { header: 'Marked At', key: 'scannedAt', width: 24 },
+          { header: 'Note', key: 'note', width: 26 },
+        ];
+        for (const { department, className, studentName, row } of schoolEvidence) {
+          evidenceSheet.addRow({
+            department,
+            className,
+            student: studentName,
+            day: dayName(row.date),
+            date: row.date,
+            subject: row.subject,
+            teacherName: row.teacherName ?? '',
+            status: row.status,
+            method: formatMethod(row.method),
+            time: formatTime(row.scannedAt),
+            scannedAt: row.scannedAt ?? '',
+            note: row.note ?? '',
+          });
+        }
+      }
     }
 
     // Style header rows for all sheets
@@ -1062,6 +1261,9 @@ export class ReportService {
       // Student report
       lines.push('Metric,Value');
       lines.push(`Student,"${this._escapeCSV(data.studentName)}"`);
+      if (data.admissionNumber) lines.push(`Admission Number,"${this._escapeCSV(data.admissionNumber)}"`);
+      if (data.className) lines.push(`Class,"${this._escapeCSV(data.className)}"`);
+      if (data.departmentName) lines.push(`Department,"${this._escapeCSV(data.departmentName)}"`);
       lines.push(`Total Expected,${data.totalExpected}`);
       lines.push(`Present,${data.totalPresent}`);
       lines.push(`Late,${data.totalLate}`);
@@ -1070,15 +1272,17 @@ export class ReportService {
       lines.push(`Attendance %,${data.attendancePercentage}`);
       if (data.records?.length) {
         lines.push('');
-        lines.push('Date,Subject,Class,Teacher,Status,Method,Marked At,Note');
+        lines.push('Day,Date,Subject,Class,Teacher,Status,Method,Time,Marked At,Note');
         for (const row of data.records) {
           lines.push([
+            dayName(row.date),
             row.date,
             this._escapeCSV(row.subject),
             this._escapeCSV(row.className ?? ''),
             this._escapeCSV(row.teacherName ?? ''),
             row.status,
-            row.method ?? '',
+            formatMethod(row.method),
+            formatTime(row.scannedAt),
             row.scannedAt ?? '',
             this._escapeCSV(row.note ?? ''),
           ].map((value) => `"${value}"`).join(','));
@@ -1086,10 +1290,10 @@ export class ReportService {
       }
     } else if ('className' in data) {
       // Class report
-      lines.push('Student,Expected,Present,Late,Excused,Absent,Attendance %');
+      lines.push('Adm No,Student,Expected,Present,Late,Excused,Absent,Attendance %');
       for (const student of data.students) {
         lines.push(
-          `"${this._escapeCSV(student.studentName)}",${student.totalExpected},${student.totalPresent},${student.totalLate},${student.totalExcused},${student.totalAbsent},${student.attendancePercentage}`,
+          `"${this._escapeCSV(student.admissionNumber ?? '')}","${this._escapeCSV(student.studentName)}",${student.totalExpected},${student.totalPresent},${student.totalLate},${student.totalExcused},${student.totalAbsent},${student.attendancePercentage}`,
         );
       }
       const evidenceRows = data.students.flatMap((student) =>
@@ -1097,15 +1301,17 @@ export class ReportService {
       );
       if (evidenceRows.length) {
         lines.push('');
-        lines.push('Student,Date,Subject,Teacher,Status,Method,Marked At,Note');
+        lines.push('Student,Day,Date,Subject,Teacher,Status,Method,Time,Marked At,Note');
         for (const { studentName, row } of evidenceRows) {
           lines.push([
             this._escapeCSV(studentName),
+            dayName(row.date),
             row.date,
             this._escapeCSV(row.subject),
             this._escapeCSV(row.teacherName ?? ''),
             row.status,
-            row.method ?? '',
+            formatMethod(row.method),
+            formatTime(row.scannedAt),
             row.scannedAt ?? '',
             this._escapeCSV(row.note ?? ''),
           ].map((value) => `"${value}"`).join(','));
@@ -1146,6 +1352,31 @@ export class ReportService {
             student.totalExcused,
             student.totalAbsent,
             student.attendancePercentage,
+          ].map((value) => `"${value}"`).join(','));
+        }
+      }
+
+      const deptEvidence = data.classes.flatMap((cls) =>
+        (cls.students ?? []).flatMap((student) =>
+          (student.records ?? []).map((row) => ({ className: cls.className, studentName: student.studentName, row })),
+        ),
+      );
+      if (deptEvidence.length) {
+        lines.push('');
+        lines.push('Class,Student,Day,Date,Subject,Teacher,Status,Method,Time,Marked At,Note');
+        for (const { className, studentName, row } of deptEvidence) {
+          lines.push([
+            this._escapeCSV(className),
+            this._escapeCSV(studentName),
+            dayName(row.date),
+            row.date,
+            this._escapeCSV(row.subject),
+            this._escapeCSV(row.teacherName ?? ''),
+            row.status,
+            formatMethod(row.method),
+            formatTime(row.scannedAt),
+            row.scannedAt ?? '',
+            this._escapeCSV(row.note ?? ''),
           ].map((value) => `"${value}"`).join(','));
         }
       }
@@ -1215,6 +1446,34 @@ export class ReportService {
               student.attendancePercentage,
             ].map((value) => `"${value}"`).join(','));
           }
+        }
+      }
+
+      const schoolEvidence = data.departments.flatMap((dept) =>
+        (dept.classes ?? []).flatMap((cls) =>
+          (cls.students ?? []).flatMap((student) =>
+            (student.records ?? []).map((row) => ({ department: dept.departmentName, className: cls.className, studentName: student.studentName, row })),
+          ),
+        ),
+      );
+      if (schoolEvidence.length) {
+        lines.push('');
+        lines.push('Department,Class,Student,Day,Date,Subject,Teacher,Status,Method,Time,Marked At,Note');
+        for (const { department, className, studentName, row } of schoolEvidence) {
+          lines.push([
+            this._escapeCSV(department),
+            this._escapeCSV(className),
+            this._escapeCSV(studentName),
+            dayName(row.date),
+            row.date,
+            this._escapeCSV(row.subject),
+            this._escapeCSV(row.teacherName ?? ''),
+            row.status,
+            formatMethod(row.method),
+            formatTime(row.scannedAt),
+            row.scannedAt ?? '',
+            this._escapeCSV(row.note ?? ''),
+          ].map((value) => `"${value}"`).join(','));
         }
       }
     }

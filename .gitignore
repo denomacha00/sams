@@ -73,3 +73,6 @@ Thumbs.db
 packages/mobile/.expo/
 packages/mobile/android/
 packages/mobile/ios/
+
+# Local scratch/sample outputs
+tmp/
