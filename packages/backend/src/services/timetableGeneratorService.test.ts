@@ -253,6 +253,43 @@ describe('timetableGeneratorService.generatePreview — teacher subject assignme
     expect(someClassVaries).toBe(true);
   });
 
+  it('rotates rooms for a single class even when room count divides the period step', async () => {
+    // Regression: the old offset keyed room choice on the period START TIME. Period
+    // times step by the period duration (40 min), so `startMinutes % roomCount`
+    // was constant whenever roomCount divided 40 (here 4 rooms) — every period
+    // picked the same starting room and a lone class sat in ONE room all day.
+    // With ONE class + one multi-subject teacher, that class fills the whole day,
+    // so its rooms MUST still cycle through several distinct rooms.
+    wireMocks({
+      classes: [{ id: 'c1', name: 'Form 1', departmentId: DEPT }],
+      teachers: [{ id: 't1', fullName: 'Teacher A', departmentId: DEPT }],
+      teacherSubjects: [
+        { teacherId: 't1', subject: 'Mathematics' },
+        { teacherId: 't1', subject: 'English' },
+        { teacherId: 't1', subject: 'Biology' },
+      ],
+    });
+
+    const result = await timetableGeneratorService.generatePreview({
+      schoolId: SCHOOL, departmentId: DEPT, maxLessonsPerTeacherPerDay: HIGH_CAP,
+      periodDuration: 40, // step that the old bug divided evenly by roomCount
+      rooms: ['Room 1', 'Room 2', 'Room 3', 'Room 4'], // 4 divides 40
+    });
+
+    // The bug was WITHIN a single day: every period that day picked the same
+    // starting room, so the class sat in one room all day. Assert that on at
+    // least one day the class occupies more than one distinct room.
+    const roomsByDay = new Map<number, Set<string>>();
+    for (const s of result.slots) {
+      if (!s.room) continue;
+      const set = roomsByDay.get(s.dayOfWeek) ?? new Set<string>();
+      set.add(s.room);
+      roomsByDay.set(s.dayOfWeek, set);
+    }
+    const anyDayVaries = [...roomsByDay.values()].some((set) => set.size > 1);
+    expect(anyDayVaries).toBe(true);
+  });
+
   it('never reuses a room already booked by another department in the same slot', async () => {
     // Only one room exists, and it is already taken school-wide on Monday 08:00
     // by another department's class (not being regenerated). The generator must

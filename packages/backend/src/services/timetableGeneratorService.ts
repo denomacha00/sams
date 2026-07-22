@@ -206,15 +206,24 @@ function generate(
   // still blocks "Lab 1" here.
   const roomUsage = new Map<string, Set<string>>();
   for (const [key, set] of occupiedRooms) roomUsage.set(key, new Set(set));
-  const pickRoom = (day: number, startTime: string): string | undefined => {
+  // Rotate rooms by each class's LESSON SEQUENCE, not the clock. A class's n-th
+  // lesson starts at room (classIndex + n), so every consecutive lesson lands on
+  // a different room and the class cycles through all rooms. This avoids the trap
+  // of keying the offset on the period start-time: period times form an arithmetic
+  // sequence (step = period duration, usually 40 min), so `startMinutes % roomCount`
+  // collapses to a constant whenever roomCount divides 40 (2,4,5,8,10,20 rooms) —
+  // which made every period start on the same room and "rooms never changed".
+  const classIndex = new Map(classes.map((c, i) => [c.id, i]));
+  const classLessonCount = new Map<string, number>();
+  const pickRoom = (classId: string, day: number, startTime: string): string | undefined => {
     if (roomList.length === 0) return undefined;
     const key = `${day}|${startTime}`;
     let used = roomUsage.get(key);
     if (!used) { used = new Set<string>(); roomUsage.set(key, used); }
-    // Deterministic per-slot offset so different periods don't all start at Room 1.
-    const offset = (day * 31 + t2m(startTime)) % roomList.length;
+    const base = (classIndex.get(classId) ?? 0) + (classLessonCount.get(classId) ?? 0);
+    classLessonCount.set(classId, (classLessonCount.get(classId) ?? 0) + 1);
     for (let k = 0; k < roomList.length; k++) {
-      const room = roomList[(offset + k) % roomList.length];
+      const room = roomList[(base + k) % roomList.length];
       const rk = normRoom(room);
       if (!used.has(rk)) { used.add(rk); return room; }
     }
@@ -282,7 +291,7 @@ function generate(
         slots.push({
           schoolId, classId: cls.id, teacherId: tch.id, subject: subj,
           dayOfWeek: day, startTime: p.startTime, endTime: p.endTime,
-          room: pickRoom(day, p.startTime),
+          room: pickRoom(cls.id, day, p.startTime),
         });
         (assignments[tch.id] ??= 0);
         assignments[tch.id] += 1;
