@@ -2,7 +2,7 @@ import { Router, type Request, type Response, type NextFunction, type RequestHan
 import jwt from 'jsonwebtoken';
 import multer, { type Multer } from 'multer';
 import { type AccessTokenPayload, UserRole } from '@sams/shared';
-import { aiService } from '../services/aiService';
+import { aiService, isCasualChat, casualChatReply } from '../services/aiService';
 import { openaiGeneralKnowledgeQuery, openaiQuery, openaiQueryWithHistory } from '../services/ai/openaiEngine';
 import { detectIntent, localQuery } from '../services/ai/localEngine';
 import { isSamsDataQuery } from '../services/ai/dataQueryRouter';
@@ -425,6 +425,14 @@ aiRouter.post('/query', asyncHandler(async (req: Request, res: Response): Promis
           content: String(m.content ?? '').slice(0, 1000),
         }))
       : [];
+
+    if (!confirmAction && !pendingAction && isCasualChat(trimmedQuestion)) {
+      // Social chatter ("how are you", "what's up") must answer instantly and
+      // NEVER reach the LLM — otherwise question-word phrasings like "how are
+      // you" match the general-knowledge branch below and hang to a timeout.
+      res.status(200).json({ answer: casualChatReply(), intent: 'casual_chat', engine: 'local' });
+      return;
+    }
 
     if (!confirmAction && !pendingAction && isGeneralKnowledgeQuestion(trimmedQuestion, intent)) {
       const result = await openaiGeneralKnowledgeQuery(trimmedQuestion, formattedGeneralHistory);

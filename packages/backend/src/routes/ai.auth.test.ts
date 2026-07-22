@@ -8,12 +8,16 @@ import { aiService } from '../services/aiService';
 import { detectIntent, localQuery } from '../services/ai/localEngine';
 import { openaiGeneralKnowledgeQuery, openaiQuery } from '../services/ai/openaiEngine';
 
-vi.mock('../services/aiService', () => ({
-  aiService: {
-    query: vi.fn().mockResolvedValue({ answer: 'authenticated answer', intent: 'unknown', engine: 'openai' }),
-    voiceQuery: vi.fn(),
-  },
-}));
+vi.mock('../services/aiService', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../services/aiService')>();
+  return {
+    ...actual,
+    aiService: {
+      query: vi.fn().mockResolvedValue({ answer: 'authenticated answer', intent: 'unknown', engine: 'openai' }),
+      voiceQuery: vi.fn(),
+    },
+  };
+});
 
 vi.mock('../services/ai/localEngine', () => ({
   detectIntent: vi.fn().mockReturnValue('attendance_percentage'),

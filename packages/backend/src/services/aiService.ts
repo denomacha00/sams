@@ -54,8 +54,25 @@ const CONFIRM_ANSWER_RE = /^(yes|y|confirm|proceed|ok|do it|go ahead)\.?$/i;
 // Matches single-word reactions ("nice", "cool", "sawa", "pole", "lol")
 // AND multi-word conversational phrases ("you good", "how are you",
 // "I'm fine", "what's up", "you there", "nyanze", "acha", "ata", etc.)
-const CASUAL_CHAT_RE = /^(?:\s*)(?:nice|cool|ok|okay|k|sawa|good|great|awesome|wow|oh|hmm|aha|heh|hehe|lol|lmao|lmfao|rofl|pole|sure|yeah|yep|no|nope|fine|alright|aight|bet|word|true|facts|acha|ata|nyanze)(?:\s*|[!.]*)$/i;
-const MULTI_WORD_CHAT_RE = /^(?:\s*)(?:(?:you\s+(?:good|there|around|alright|okay|right|fine|ok|great|here|back))|(?:(?:i'?m?|i\s+am)\s+(?:good|fine|ok|okay|great|alright|here|back))|(?:how\s+(?:are\s+you|ya\s+doing|are\s+you\s+doing|goes\s+it|is\s+it\s+going|is\s+life|u\s+doing|you\s+doing|was\s+your\s+day))|(?:what(?:'s|\s+is)\s+up)|(?:howdy)|(?:just\s+(?:checking|saying|saw|passing|wondering|chilling|relaxing))|(?:not\s+(?:bad|much|really)))(?:\s*|[!.]*)$/i;
+const CASUAL_CHAT_RE = /^(?:\s*)(?:nice|cool|ok|okay|k|sawa|good|great|awesome|wow|oh|hmm|aha|heh|hehe|lol|lmao|lmfao|rofl|pole|sure|yeah|yep|no|nope|fine|alright|aight|bet|word|true|facts|acha|ata|nyanze)(?:\s*[!.?]*)$/i;
+const CHAT_STATE_WORDS = 'good|fine|ok|okay|great|alright|well|cool|there|around|right|here|back|chilling|relaxing|straight|safe';
+const MULTI_WORD_CHAT_RE = new RegExp(
+  '^(?:\\s*)(?:' +
+    // "are you fine", "r u good", "you okay", "u there", "are you doing well"
+    `(?:(?:(?:are|r)\\s+)?(?:you|u|ya|yu)\\s+(?:doing\\s+)?(?:${CHAT_STATE_WORDS}))` +
+    // "i'm good", "i am fine", "am good", "im ok"
+    `|(?:(?:i'?m?|i\\s+am|am)\\s+(?:doing\\s+)?(?:${CHAT_STATE_WORDS}))` +
+    // "how are you", "how you doing", "how's it going", "how far" (KE), "hows life"
+    '|(?:how(?:\'?s)?\\s+(?:are\\s+you|ya\\s+doing|are\\s+you\\s+doing|you\\s+doing|u\\s+doing|is\\s+it\\s+going|it\\s+going|is\\s+life|life|far|things|everything|your\\s+day|was\\s+your\\s+day))' +
+    // "what's up", "wassup", "sup", "whatsup"
+    '|(?:(?:what(?:\'s|\\s+is)\\s+up|wass?up|whatsup|sup))' +
+    '|(?:howdy)|(?:you\\s+good)' +
+    // "just checking", "just saying", "nothing much"
+    '|(?:just\\s+(?:checking|saying|saw|passing|wondering|chilling|relaxing))' +
+    '|(?:not(?:hing)?\\s+(?:bad|much|really))' +
+  ')(?:\\s*[!.?]*)$',
+  'i',
+);
 const CASUAL_CHAT_RESPONSES = [
   "Sawa!",
   "Yeah? Anything else?",
@@ -66,6 +83,22 @@ const CASUAL_CHAT_RESPONSES = [
   "Alright. What's up?",
   "I hear you. What else can I do for you?",
 ];
+
+/**
+ * True when a message is pure social chatter ("hi", "how are you", "what's up")
+ * that needs no LLM, DB, or action. The route uses this to short-circuit BEFORE
+ * the general-knowledge LLM branch — otherwise "how are you" (starts with "how")
+ * is misrouted to the slow provider and hangs to a timeout.
+ */
+export function isCasualChat(question: string): boolean {
+  const q = question.trim();
+  return CASUAL_CHAT_RE.test(q) || MULTI_WORD_CHAT_RE.test(q);
+}
+
+/** A random instant casual-chat reply (no network). */
+export function casualChatReply(): string {
+  return CASUAL_CHAT_RESPONSES[Math.floor(Math.random() * CASUAL_CHAT_RESPONSES.length)];
+}
 const LICENSE_KEY_LIKE_RE = /\b[A-Z0-9]{4}(?:-[A-Z0-9]{4}){2,}\b/;
 const FAKE_LICENSE_PLACEHOLDER_RE = /\b(?:LK|LICEN[CS]E)[-_]?(?:X{3,}|[A-Z0-9]{8,})\b/i;
 const TEMP_PASSWORD_LEAK_RE = /\b(?:temporary|temp)\s+pass\s*word\s*[:：]\s*`?[^\s`]{6,}`?/i;
