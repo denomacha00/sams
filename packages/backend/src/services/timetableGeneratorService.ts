@@ -104,6 +104,19 @@ function normSubject(s: string): string {
   return s.trim().toLowerCase();
 }
 
+/** Canonical key for room matching. Different people type the same physical room
+ *  differently — "Lab 1", "Lab1", "Lab   1", "LAB1", "LAB 1" are ALL one room.
+ *  We lowercase, collapse every run of whitespace, and also drop the spaces
+ *  between a word and its trailing number so "lab 1" and "lab1" collide. Used
+ *  ONLY as the clash-detection key; the original display string is preserved. */
+function normRoom(s: string): string {
+  return s
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, ' ')          // collapse runs of whitespace → single space
+    .replace(/(\D)\s+(\d)/g, '$1$2'); // "lab 1" → "lab1", "room  12" → "room12"
+}
+
 // ─── Schedule Tracker ─────────────────────────────────────────────────────────
 
 class Tracker {
@@ -162,6 +175,7 @@ function generate(
   catalog: SubjectCatalog, periods: PeriodBlock[], days: number[], maxDay: number,
   rooms: string[], tSubj: Map<string, Set<string>>,
   subjectMap: Map<string, TeacherInfo[]>,
+  occupiedRooms: Map<string, Set<string>> = new Map(),
 ): { slots: TimetableSlot[]; skipped: number; stats: Record<string, number>; assignments: Record<string, number>; doubles: number } {
   const tr = new Tracker();
   tr.seed(existing);
@@ -169,8 +183,46 @@ function generate(
   let skipped = 0, doubles = 0;
   const stats: Record<string, number> = {}, assignments: Record<string, number> = {};
 
-  let ri = 0;
-  const nextRoom = rooms.length > 0 ? () => rooms[ri++ % rooms.length] : () => undefined as string | undefined;
+  // Room assignment: pick a room that is NOT already used by another class in the
+  // same (day, period). Rooms are a SCHOOL-WIDE resource — a room busy with any
+  // class in any department at this time is unavailable, so we seed usage with
+  // `occupiedRooms` (existing timetable entries not being regenerated). A rotating
+  // offset per time-slot means consecutive periods start from a different room, so
+  // rooms genuinely vary instead of a single global round-robin (which repeats when
+  // class count is a multiple of room count).
+  //
+  // Room identity is matched by normRoom(): "Lab 1", "Lab1", "LAB 1" are one room.
+  // We dedupe the supplied room list by that key first so a mis-typed duplicate
+  // doesn't inflate the apparent room count.
+  const roomList: string[] = [];
+  const seenRoomKeys = new Set<string>();
+  for (const r of rooms) {
+    const k = normRoom(r);
+    if (!k || seenRoomKeys.has(k)) continue;
+    seenRoomKeys.add(k);
+    roomList.push(r);
+  }
+  // `used` sets hold NORMALIZED room keys, so a room booked elsewhere as "LAB1"
+  // still blocks "Lab 1" here.
+  const roomUsage = new Map<string, Set<string>>();
+  for (const [key, set] of occupiedRooms) roomUsage.set(key, new Set(set));
+  const pickRoom = (day: number, startTime: string): string | undefined => {
+    if (roomList.length === 0) return undefined;
+    const key = `${day}|${startTime}`;
+    let used = roomUsage.get(key);
+    if (!used) { used = new Set<string>(); roomUsage.set(key, used); }
+    // Deterministic per-slot offset so different periods don't all start at Room 1.
+    const offset = (day * 31 + t2m(startTime)) % roomList.length;
+    for (let k = 0; k < roomList.length; k++) {
+      const room = roomList[(offset + k) % roomList.length];
+      const rk = normRoom(room);
+      if (!used.has(rk)) { used.add(rk); return room; }
+    }
+    // Every room is already taken this period (school-wide). Do NOT force a room —
+    // double-booking a physical room is impossible. Leave it unassigned ("—") so
+    // an admin can resolve it; this means there are genuinely too few rooms.
+    return undefined;
+  };
 
   // ─── Strategy: fill every class in every period if possible ──────────────
   // For each day, for each period in order, iterate classes round-robin to
@@ -230,7 +282,7 @@ function generate(
         slots.push({
           schoolId, classId: cls.id, teacherId: tch.id, subject: subj,
           dayOfWeek: day, startTime: p.startTime, endTime: p.endTime,
-          room: nextRoom(),
+          room: pickRoom(day, p.startTime),
         });
         (assignments[tch.id] ??= 0);
         assignments[tch.id] += 1;
@@ -319,6 +371,27 @@ async function loadClasses(schoolId: string, departmentId?: string, classIds?: s
   if (departmentId) where.departmentId = departmentId;
   if (classIds?.length) where.id = { in: classIds };
   return prisma.class.findMany({ where, select: { id: true, name: true, departmentId: true }, orderBy: { name: 'asc' } });
+}
+
+/**
+ * Rooms are a school-wide physical resource. Load rooms already occupied by
+ * timetable entries that are NOT being regenerated (other departments/classes),
+ * keyed by "day|startTime", so the generator never puts two classes in the same
+ * room at the same time — even across departments.
+ */
+async function loadOccupiedRooms(schoolId: string, excludeClassIds: string[]): Promise<Map<string, Set<string>>> {
+  const rows = await prisma.timetableEntry.findMany({
+    where: { schoolId, classId: { notIn: excludeClassIds }, room: { not: null } },
+    select: { room: true, dayOfWeek: true, startTime: true },
+  });
+  const map = new Map<string, Set<string>>();
+  for (const r of rows) {
+    if (!r.room) continue;
+    const key = `${r.dayOfWeek}|${r.startTime}`;
+    if (!map.has(key)) map.set(key, new Set());
+    map.get(key)!.add(normRoom(r.room)); // normalized so "LAB1" blocks "Lab 1"
+  }
+  return map;
 }
 
 async function loadTeachers(schoolId: string, departmentId?: string): Promise<TeacherInfo[]> {
@@ -415,10 +488,15 @@ export const timetableGeneratorService = {
       if (cnt > 0) throw new Error(`Timetable already exists with ${cnt} entries. Use "Remake" to regenerate.`);
     }
 
+    // Rooms occupied school-wide by classes we are NOT regenerating (other
+    // departments). Loaded AFTER the remake delete so freed rooms aren't counted.
+    const occupiedRooms = await loadOccupiedRooms(schoolId, targetIds);
+
     const periods = buildPeriods(startHour, periodDuration, breakStart, breakEnd, lunchStart, lunchEnd);
     const result = generate(
       schoolId, classes, teachers, existingBookings, catalog, periods,
       workingDays, maxLessonsPerTeacherPerDay, rooms, tSubj, subjectMap,
+      occupiedRooms,
     );
     if (!result.slots.length) throw new Error('Could not generate any timetable entries. Not enough teachers available.');
 
@@ -477,10 +555,14 @@ export const timetableGeneratorService = {
     // Build reverse map: subject → teachers who can teach it (no wildcards)
     let subjectMap = buildSubjectToTeachersMap(teachers, tSubj);
 
+    // Rooms occupied school-wide by classes we are NOT previewing (other depts).
+    const occupiedRooms = await loadOccupiedRooms(schoolId, targetIds);
+
     const periods = buildPeriods(startHour, periodDuration, breakStart, breakEnd, lunchStart, lunchEnd);
     const result = generate(
       schoolId, classes, teachers, existing, catalog, periods,
       workingDays, maxLessonsPerTeacherPerDay, rooms, tSubj, subjectMap,
+      occupiedRooms,
     );
 
     const tMap = new Map(teachers.map((t) => [t.id, t.fullName]));

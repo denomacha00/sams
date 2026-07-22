@@ -83,7 +83,7 @@ const ADMIN_ITEMS: SidebarItem[] = [
   { label: 'Guardian Mgmt', path: '/admin/guardians', icon: 'guardians' },
   { label: 'Departments', path: '/admin/departments', icon: 'departments' },
   { label: 'Student Workbench', path: '/class/students', icon: 'users' },
-  { label: 'View Timetable', path: '/timetable', icon: 'timetable' },
+  { label: 'School Timetables', path: '/timetable', icon: 'timetable' },
   { label: 'Teacher Subjects', path: '/admin/teacher-subjects', icon: 'exams' },
   { label: 'Exams & Grades', path: '/admin/exams', icon: 'exams' },
   { label: 'Risk Scores', path: '/risk-scores', icon: 'risk' },

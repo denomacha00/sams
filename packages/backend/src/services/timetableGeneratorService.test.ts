@@ -26,6 +26,8 @@ interface MockSetup {
   // Subjects present in the department only via historical timetable entries
   // (i.e. no teacher registered them).
   historicalSubjects?: string[];
+  // Rooms already occupied school-wide by other classes not being regenerated.
+  occupiedRooms?: { room: string; dayOfWeek: number; startTime: string }[];
 }
 
 /**
@@ -36,7 +38,7 @@ interface MockSetup {
  *  - existing bookings: timetableEntry.findMany  (empty — our class is a target)
  *  - knowledge: teacherSubject.findMany (teacherId+subject) + timetableEntry.findMany distinct
  */
-function wireMocks({ classes, teachers, teacherSubjects, historicalSubjects = [] }: MockSetup): void {
+function wireMocks({ classes, teachers, teacherSubjects, historicalSubjects = [], occupiedRooms = [] }: MockSetup): void {
   (prisma.class.findMany as any).mockResolvedValue(classes);
   (prisma.user.findMany as any).mockResolvedValue(teachers);
 
@@ -58,6 +60,10 @@ function wireMocks({ classes, teachers, teacherSubjects, historicalSubjects = []
       return Promise.resolve(
         historicalSubjects.map((subject) => ({ subject, class: { departmentId: DEPT } })),
       );
+    }
+    // loadOccupiedRooms query selects room + slot for school-wide clash avoidance.
+    if (args?.select?.room) {
+      return Promise.resolve(occupiedRooms);
     }
     // Existing bookings + distinct known-subjects: none.
     return Promise.resolve([]);
@@ -192,5 +198,138 @@ describe('timetableGeneratorService.generatePreview — teacher subject assignme
     expect(result.slots.every((s) => s.teacherId === 'tMath' && s.subject === 'Mathematics')).toBe(true);
     // The unregistered teacher is never used as a wildcard.
     expect(result.slots.some((s) => s.teacherId === 'tAny')).toBe(false);
+  });
+
+  it('varies rooms across periods and never double-books a room in the same slot', async () => {
+    // Several classes + several teachers so each period fills multiple classes.
+    // With per-slot room assignment, no two classes in the same (day, startTime)
+    // may share a room, and a single class must NOT sit in the same room every
+    // period (the old global round-robin bug).
+    wireMocks({
+      classes: [
+        { id: 'c1', name: 'Form 1', departmentId: DEPT },
+        { id: 'c2', name: 'Form 2', departmentId: DEPT },
+        { id: 'c3', name: 'Form 3', departmentId: DEPT },
+      ],
+      teachers: [
+        { id: 't1', fullName: 'Teacher A', departmentId: DEPT },
+        { id: 't2', fullName: 'Teacher B', departmentId: DEPT },
+        { id: 't3', fullName: 'Teacher C', departmentId: DEPT },
+      ],
+      teacherSubjects: [
+        { teacherId: 't1', subject: 'Mathematics' },
+        { teacherId: 't2', subject: 'English' },
+        { teacherId: 't3', subject: 'Biology' },
+      ],
+    });
+
+    const result = await timetableGeneratorService.generatePreview({
+      schoolId: SCHOOL, departmentId: DEPT, maxLessonsPerTeacherPerDay: HIGH_CAP,
+      rooms: ['Room 1', 'Room 2', 'Room 3', 'Room 4'],
+    });
+
+    const withRoom = result.slots.filter((s) => s.room);
+    expect(withRoom.length).toBeGreaterThan(0);
+
+    // 1) No two classes share a room within the same day + startTime.
+    const slotRooms = new Map<string, Set<string>>();
+    for (const s of withRoom) {
+      const key = `${s.dayOfWeek}|${s.startTime}`;
+      const used = slotRooms.get(key) ?? new Set<string>();
+      expect(used.has(s.room!)).toBe(false); // no double-book
+      used.add(s.room!);
+      slotRooms.set(key, used);
+    }
+
+    // 2) At least one class uses more than one distinct room across its lessons
+    //    (rooms actually change, not pinned to one).
+    const roomsByClass = new Map<string, Set<string>>();
+    for (const s of withRoom) {
+      const set = roomsByClass.get(s.classId) ?? new Set<string>();
+      set.add(s.room!);
+      roomsByClass.set(s.classId, set);
+    }
+    const someClassVaries = [...roomsByClass.values()].some((set) => set.size > 1);
+    expect(someClassVaries).toBe(true);
+  });
+
+  it('never reuses a room already booked by another department in the same slot', async () => {
+    // Only one room exists, and it is already taken school-wide on Monday 08:00
+    // by another department's class (not being regenerated). The generator must
+    // NOT place any lesson in that room at Mon 08:00.
+    wireMocks({
+      classes: [{ id: 'c1', name: 'Form 1', departmentId: DEPT }],
+      teachers: [{ id: 't1', fullName: 'Teacher A', departmentId: DEPT }],
+      teacherSubjects: [{ teacherId: 't1', subject: 'Mathematics' }],
+      occupiedRooms: [{ room: 'Lab A', dayOfWeek: 0, startTime: '08:00' }],
+    });
+
+    const result = await timetableGeneratorService.generatePreview({
+      schoolId: SCHOOL, departmentId: DEPT, maxLessonsPerTeacherPerDay: HIGH_CAP,
+      rooms: ['Lab A'],
+    });
+
+    // No lesson may occupy Lab A at Mon 08:00 — it's booked elsewhere in school.
+    const clash = result.slots.some(
+      (s) => s.room === 'Lab A' && s.dayOfWeek === 0 && s.startTime === '08:00',
+    );
+    expect(clash).toBe(false);
+  });
+
+  it('treats differently-typed room names as the same physical room', async () => {
+    // Another department booked the room as "LAB1" on Mon 08:00. An admin here
+    // lists the same room as "Lab 1". These must be recognised as ONE room, so
+    // "Lab 1" cannot be scheduled at Mon 08:00 despite the different spelling.
+    wireMocks({
+      classes: [{ id: 'c1', name: 'Form 1', departmentId: DEPT }],
+      teachers: [{ id: 't1', fullName: 'Teacher A', departmentId: DEPT }],
+      teacherSubjects: [{ teacherId: 't1', subject: 'Mathematics' }],
+      occupiedRooms: [{ room: 'LAB1', dayOfWeek: 0, startTime: '08:00' }],
+    });
+
+    const result = await timetableGeneratorService.generatePreview({
+      schoolId: SCHOOL, departmentId: DEPT, maxLessonsPerTeacherPerDay: HIGH_CAP,
+      rooms: ['Lab 1'],
+    });
+
+    // "Lab 1" == "LAB1" — must not be reused at the occupied slot.
+    const clash = result.slots.some(
+      (s) => s.room === 'Lab 1' && s.dayOfWeek === 0 && s.startTime === '08:00',
+    );
+    expect(clash).toBe(false);
+  });
+
+  it('collapses duplicate room spellings so they are not counted as extra rooms', async () => {
+    // The admin accidentally lists the same room five ways. The generator must
+    // treat them as ONE room — so within any single (day, period) at most one
+    // class can be placed in it, never several "different" rooms.
+    wireMocks({
+      classes: [
+        { id: 'c1', name: 'Form 1', departmentId: DEPT },
+        { id: 'c2', name: 'Form 2', departmentId: DEPT },
+      ],
+      teachers: [
+        { id: 't1', fullName: 'Teacher A', departmentId: DEPT },
+        { id: 't2', fullName: 'Teacher B', departmentId: DEPT },
+      ],
+      teacherSubjects: [
+        { teacherId: 't1', subject: 'Mathematics' },
+        { teacherId: 't2', subject: 'English' },
+      ],
+    });
+
+    const result = await timetableGeneratorService.generatePreview({
+      schoolId: SCHOOL, departmentId: DEPT, maxLessonsPerTeacherPerDay: HIGH_CAP,
+      rooms: ['Lab 1', 'Lab1', 'Lab   1', 'LAB1', 'LAB 1'],
+    });
+
+    // All five spellings are one room → at most one roomed lesson per slot.
+    const perSlot = new Map<string, number>();
+    for (const s of result.slots) {
+      if (!s.room) continue;
+      const key = `${s.dayOfWeek}|${s.startTime}`;
+      perSlot.set(key, (perSlot.get(key) ?? 0) + 1);
+    }
+    expect([...perSlot.values()].every((n) => n <= 1)).toBe(true);
   });
 });
