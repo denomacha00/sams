@@ -56,6 +56,7 @@ const TimetableViewPage: React.FC = () => {
   const [filterClassId, setFilterClassId] = useState('');
   const [filterTeacherId, setFilterTeacherId] = useState('');
   const [hodTimetableScope, setHodTimetableScope] = useState<'mine' | 'department'>('mine');
+  const [hodDeptClasses, setHodDeptClasses] = useState<{ id: string; name: string }[]>([]);
   const [loading, setLoading] = useState(true);
   const [viewMode, setViewMode] = useState<'table' | 'grid'>('table');
   const [selectedEntryId, setSelectedEntryId] = useState<string | null>(null);
@@ -94,6 +95,13 @@ const TimetableViewPage: React.FC = () => {
     };
     void fetchEntries();
   }, [filterClassId, filterTeacherId, hodTimetableScope, isHOD, user?.id]);
+
+  useEffect(() => {
+    if (!isHOD || !user?.departmentId) return;
+    apiClient.get(`/departments/${user.departmentId}/classes`)
+      .then(({ data }) => setHodDeptClasses(Array.isArray(data) ? data : []))
+      .catch(() => setHodDeptClasses([]));
+  }, [isHOD, user?.departmentId]);
 
   useEffect(() => {
     if (!isSchoolAdmin) return;
@@ -234,6 +242,20 @@ const TimetableViewPage: React.FC = () => {
               </button>
             </div>
           </div>
+          {hodTimetableScope === 'department' && hodDeptClasses.length > 0 && (
+            <div className="mt-3 px-1">
+              <select
+                value={filterClassId}
+                onChange={(e) => { setFilterClassId(e.target.value); setLoading(true); }}
+                className="px-4 py-2 rounded-xl input-field text-sm min-w-[14rem]"
+              >
+                <option value="">All classes</option>
+                {hodDeptClasses.map((c) => (
+                  <option key={c.id} value={c.id}>{c.name}</option>
+                ))}
+              </select>
+            </div>
+          )}
         )}
 
         {isSchoolAdmin && (
