@@ -214,6 +214,7 @@ const TimetableViewPage: React.FC = () => {
 
       <main className="max-w-7xl mx-auto px-6 py-8">
         {isHOD && (
+          <>
           <div className="mb-6 surface-panel rounded-2xl p-3">
             <div className="grid gap-2 sm:grid-cols-2">
               <button
@@ -256,6 +257,7 @@ const TimetableViewPage: React.FC = () => {
               </select>
             </div>
           )}
+          </>
         )}
 
         {isSchoolAdmin && (
