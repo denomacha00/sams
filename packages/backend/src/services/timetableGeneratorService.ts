@@ -251,25 +251,34 @@ function generate(
 
   // ─── Free-period planning ────────────────────────────────────────────────
   // A packed timetable (every class, every period, every day) feels unnatural.
-  // Real timetables breathe: a class may have a full day, or a day with one or
-  // two free periods, varied at random. For each (class, day) we pre-pick a
-  // random number of periods in [minFree, maxFree] to leave intentionally empty.
-  // These are SKIPPED during assignment (not counted as "skipped" failures — a
-  // free period is by design, not a capacity shortfall).
-  //
-  // We never blank the FIRST period of a day (avoids a late start every day for
-  // the same class) — gaps are chosen from the remaining periods only. If a day
-  // has too few periods to spare, we leave fewer/no gaps.
+  // Real timetables breathe: most days are full-ish, some days are light (one or
+  // two lessons), and occasionally a whole day is free — exactly like a real
+  // college week. For each (class, day) we pre-pick which periods to leave empty
+  // using a weighted random draw:
+  //   • ~15% of days are "light/free" days → anywhere from `minFree` up to ALL
+  //     periods free (a fully free day with no class is possible).
+  //   • the rest are "normal" days → `minFree`..`maxFree` free periods (default 0–2).
+  // ANY period is eligible, including the first (8am) — nothing is pinned to a
+  // fixed slot. Free periods are SKIPPED during assignment (not counted as
+  // "skipped" capacity failures — a gap here is by design).
   const lo = Math.max(0, Math.min(minFree, maxFree));
   const hi = Math.max(lo, Math.max(minFree, maxFree));
+  const LIGHT_DAY_CHANCE = 0.15;
   const freeSlots = new Map<string, Set<string>>(); // key `${classId}|${day}` → startTimes
   for (const cls of classes) {
     for (const day of days) {
-      // keep at least 1 lesson-worth of periods; only blank from index 1+
-      const candidates = periods.slice(1).map((p) => p.startTime);
-      if (candidates.length === 0) continue;
-      const want = lo + Math.floor(Math.random() * (hi - lo + 1));
-      const n = Math.min(want, Math.max(0, candidates.length - 1));
+      const candidates = periods.map((p) => p.startTime); // every period eligible
+      const total = candidates.length;
+      if (total === 0) continue;
+      let n: number;
+      if (Math.random() < LIGHT_DAY_CHANCE) {
+        // Light/free day: from lo free up to the WHOLE day free (no class).
+        n = lo + Math.floor(Math.random() * (total - lo + 1));
+      } else {
+        // Normal day: lo..hi free periods (mostly full).
+        n = lo + Math.floor(Math.random() * (hi - lo + 1));
+      }
+      n = Math.min(n, total); // allow a fully free day
       if (n <= 0) continue;
       const picked = new Set(shuffle(candidates).slice(0, n));
       freeSlots.set(`${cls.id}|${day}`, picked);
