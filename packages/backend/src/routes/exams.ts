@@ -219,6 +219,10 @@ examsRouter.post('/terms', requireRole('SCHOOL_ADMIN'), async (req: Request, res
   try {
     const { isActive, startDate, endDate, name } = parsed.data;
 
+    if (new Date(endDate) <= new Date(startDate)) {
+      throw new AppError(400, 'INVALID_DATE_RANGE', 'End date must be after the start date');
+    }
+
     if (isActive) {
       await prisma.academicTerm.updateMany({
         where: { schoolId: req.user.schoolId, isActive: true },
@@ -238,6 +242,10 @@ examsRouter.post('/terms', requireRole('SCHOOL_ADMIN'), async (req: Request, res
 
     res.status(201).json(term);
   } catch (err) {
+    if ((err as { code?: string }).code === 'P2002') {
+      next(new AppError(409, 'TERM_NAME_TAKEN', 'A term with this name already exists'));
+      return;
+    }
     next(err instanceof AppError ? err : new AppError(500, 'INTERNAL_ERROR', 'Failed to create term'));
   }
 });
@@ -267,6 +275,12 @@ examsRouter.patch('/terms/:id', requireRole('SCHOOL_ADMIN'), async (req: Request
 
     const { isActive, startDate, endDate, name } = parsed.data;
 
+    const effectiveStart = startDate !== undefined ? new Date(startDate) : existing.startDate;
+    const effectiveEnd = endDate !== undefined ? new Date(endDate) : existing.endDate;
+    if (effectiveEnd <= effectiveStart) {
+      throw new AppError(400, 'INVALID_DATE_RANGE', 'End date must be after the start date');
+    }
+
     if (isActive) {
       await prisma.academicTerm.updateMany({
         where: { schoolId: req.user.schoolId, id: { not: id }, isActive: true },
@@ -286,6 +300,10 @@ examsRouter.patch('/terms/:id', requireRole('SCHOOL_ADMIN'), async (req: Request
 
     res.status(200).json(term);
   } catch (err) {
+    if ((err as { code?: string }).code === 'P2002') {
+      next(new AppError(409, 'TERM_NAME_TAKEN', 'A term with this name already exists'));
+      return;
+    }
     next(err instanceof AppError ? err : new AppError(500, 'INTERNAL_ERROR', 'Failed to update term'));
   }
 });

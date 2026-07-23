@@ -408,7 +408,7 @@ const AtAGlancePanel: React.FC<{ role?: UserRole; userId?: string; departmentId?
             setNextClass(describeNextClass(findNextTimetableEntry(Array.isArray(timetableRes.value.data) ? timetableRes.value.data : [])));
           }
           if (!cancelled && attendanceRes.status === 'fulfilled') {
-            const todayRecords = (Array.isArray(attendanceRes.value.data) ? attendanceRes.value.data : []).filter((r: any) => isToday(r.createdAt));
+            const todayRecords = (Array.isArray(attendanceRes.value.data) ? attendanceRes.value.data : []).filter((r: any) => isToday(r.scannedAt ?? r.createdAt));
             const p = todayRecords.filter((r: any) => r.status === 'PRESENT' || r.status === 'LATE').length;
             const a = todayRecords.filter((r: any) => r.status === 'ABSENT').length;
             setStudentStatus(p > 0 ? `${p} present` : a > 0 ? `${a} absent` : 'Not marked yet');
@@ -444,7 +444,7 @@ const AtAGlancePanel: React.FC<{ role?: UserRole; userId?: string; departmentId?
             setSchoolSessions(sessions.filter((s: any) => isToday(s.startedAt)).length);
             setActiveSessionCount(sessions.filter((s: any) => s.isActive).length);
           }
-          if (!cancelled && attendanceRes.status === 'fulfilled') setSchoolAbsent((Array.isArray(attendanceRes.value.data) ? attendanceRes.value.data : []).filter((r: any) => isToday(r.createdAt)).length);
+          if (!cancelled && attendanceRes.status === 'fulfilled') setSchoolAbsent((Array.isArray(attendanceRes.value.data) ? attendanceRes.value.data : []).filter((r: any) => isToday(r.scannedAt ?? r.createdAt)).length);
           if (!cancelled && reportsRes.status === 'fulfilled') setAttendanceLabel(`${Math.round(reportsRes.value.data.averageAttendancePercentage ?? 0)}%`);
           if (!cancelled) setPendingCount((await unreadReq).data.count ?? 0);
         }
@@ -473,7 +473,7 @@ const AtAGlancePanel: React.FC<{ role?: UserRole; userId?: string; departmentId?
             <>
               <InsightRow label="Next class" value={nextClass?.title ?? '—'} hint={nextClass?.detail} valueClass="text-ink font-medium text-right max-w-[55%] truncate" />
               <InsightRow label="Active sessions" value={activeSessionCount} valueClass={activeSessionCount > 0 ? 'text-accent-orange font-semibold' : 'text-brand font-semibold'} />
-              <InsightRow label="Class attendance" value={attendanceLabel} valueClass="text-accent-orange font-semibold" />
+              <InsightRow label="Class attendance" value={attendanceLabel} hint="All recorded sessions" valueClass="text-accent-orange font-semibold" />
               <InsightRow label="Pending actions" value={pendingCount} valueClass="text-brand font-semibold" />
               <Link to="/sessions" className="block text-center text-sm text-brand hover:text-brand-hover pt-2">Open sessions & QR →</Link>
             </>
@@ -481,14 +481,14 @@ const AtAGlancePanel: React.FC<{ role?: UserRole; userId?: string; departmentId?
             <>
               <InsightRow label="Next class" value={nextClass?.title ?? '—'} hint={nextClass?.detail} valueClass="text-ink font-medium text-right max-w-[55%] truncate" />
               <InsightRow label="Live sessions" value={activeSessionCount} valueClass={activeSessionCount > 0 ? 'text-accent-orange font-semibold' : 'text-brand font-semibold'} />
-              <InsightRow label="Dept. attendance" value={attendanceLabel} valueClass="text-accent-orange font-semibold" />
+              <InsightRow label="Dept. attendance" value={attendanceLabel} hint="All recorded sessions" valueClass="text-accent-orange font-semibold" />
               <InsightRow label="Pending" value={pendingCount} valueClass="text-brand font-semibold" />
             </>
           ) : (
             <>
               <InsightRow label="Sessions today" value={schoolSessions} />
               <InsightRow label="Absent today" value={schoolAbsent} valueClass="text-accent-orange font-semibold" />
-              <InsightRow label="School attendance" value={attendanceLabel} valueClass="text-accent-orange font-semibold" />
+              <InsightRow label="School attendance" value={attendanceLabel} hint="All recorded sessions" valueClass="text-accent-orange font-semibold" />
               <InsightRow label="Active sessions" value={activeSessionCount} valueClass={activeSessionCount > 0 ? 'text-accent-orange font-semibold' : 'text-brand font-semibold'} />
               <InsightRow label="Unread messages" value={pendingCount} valueClass="text-brand font-semibold" />
             </>
@@ -512,7 +512,7 @@ const SchoolAdminInsightsPanel: React.FC = () => {
         if (cancelled) return;
         if (aR.status === 'fulfilled') setActiveSessions(Array.isArray(aR.value.data) ? aR.value.data.length : 0);
         if (sR.status === 'fulfilled') setSessionsToday((Array.isArray(sR.value.data) ? sR.value.data : []).filter((s: any) => isToday(s.startedAt)).length);
-        if (abR.status === 'fulfilled') setAbsentToday((Array.isArray(abR.value.data) ? abR.value.data : []).filter((r: any) => isToday(r.createdAt)).length);
+        if (abR.status === 'fulfilled') setAbsentToday((Array.isArray(abR.value.data) ? abR.value.data : []).filter((r: any) => isToday(r.scannedAt ?? r.createdAt)).length);
         if (rR.status === 'fulfilled') setAttendanceRate(`${Math.round(rR.value.data.averageAttendancePercentage ?? 0)}%`);
       })
       .finally(() => { if (!cancelled) setLoading(false); });
@@ -527,7 +527,7 @@ const SchoolAdminInsightsPanel: React.FC = () => {
           <InsightRow label="Active sessions" value={activeSessions} valueClass={activeSessions > 0 ? 'text-accent-orange font-semibold' : 'text-brand font-semibold'} />
           <InsightRow label="Sessions today" value={sessionsToday} />
           <InsightRow label="Absent today" value={absentToday} valueClass="text-accent-orange font-semibold" />
-          <InsightRow label="Overall attendance" value={attendanceRate} valueClass="text-accent-orange font-semibold" />
+          <InsightRow label="Overall attendance" value={attendanceRate} hint="All recorded sessions" valueClass="text-accent-orange font-semibold" />
           <Link to="/reports" className="block text-center text-sm text-brand hover:text-brand-hover pt-2">School reports →</Link>
         </div>
       )}
