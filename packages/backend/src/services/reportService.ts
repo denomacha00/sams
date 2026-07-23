@@ -1490,7 +1490,12 @@ export class ReportService {
   }
 
   private _escapeCSV(value: string): string {
-    return value.replace(/"/g, '""');
+    // Neutralize CSV/formula injection: a cell that begins with =, +, -, @, or a
+    // tab/CR is interpreted as a formula by Excel/Sheets. User-controlled fields
+    // (names, subjects, free-text notes) reach here, so prefix such values with a
+    // single quote before doubling embedded quotes. See OWASP "CSV Injection".
+    const guarded = /^[=+\-@\t\r]/.test(value) ? `'${value}` : value;
+    return guarded.replace(/"/g, '""');
   }
 }
 
