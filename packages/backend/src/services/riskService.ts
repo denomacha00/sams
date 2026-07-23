@@ -291,19 +291,24 @@ export class RiskService {
       return 0; // No sessions = no risk data
     }
 
-    // Count present records
+    // Count present records. Scope to sessions of the student's CURRENT class so
+    // records earned in a class the student has since left don't inflate the rate
+    // above 100% (which would drive attendance risk negative and hide a genuinely
+    // at-risk student). Mirrors the reportService class-scoping fix.
     const presentCount = await prisma.attendanceRecord.count({
       where: {
         studentId,
         schoolId,
         status: { in: ['PRESENT', 'LATE'] },
         scannedAt: { gte: thirtyDaysAgo },
+        ...(classId ? { session: { classId } } : {}),
       },
     });
 
     const attendanceRate = presentCount / totalExpected;
-    // Invert: high attendance = low risk
-    return Math.round((1 - attendanceRate) * 100);
+    // Invert: high attendance = low risk. Clamp to 0-100 so stray cross-class
+    // records or rounding can never produce an out-of-range risk contribution.
+    return Math.max(0, Math.min(100, Math.round((1 - attendanceRate) * 100)));
   }
 
   /**
