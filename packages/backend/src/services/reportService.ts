@@ -205,31 +205,19 @@ export class ReportService {
    * Requirements: 10.1, 10.5, 10.7
    */
   async getStudentReport(schoolId: string, studentId: string, dateRange?: DateRange): Promise<StudentReportData> {
-    const recordWhere = withDateRange<Prisma.AttendanceRecordWhereInput>({
-      studentId,
-      schoolId,
-    }, 'scannedAt', dateRange);
-
-    const [student, statusRows] = await Promise.all([
-      prisma.user.findUnique({
-        where: { id: studentId },
-        select: {
-          id: true,
-          fullName: true,
-          schoolId: true,
-          classId: true,
-          admissionNumber: true,
-          class: { select: { name: true } },
-          department: { select: { name: true } },
-          school: { select: { name: true } },
-        },
-      }),
-      prisma.attendanceRecord.groupBy({
-        by: ['status'],
-        where: recordWhere,
-        _count: { _all: true },
-      }),
-    ]);
+    const student = await prisma.user.findUnique({
+      where: { id: studentId },
+      select: {
+        id: true,
+        fullName: true,
+        schoolId: true,
+        classId: true,
+        admissionNumber: true,
+        class: { select: { name: true } },
+        department: { select: { name: true } },
+        school: { select: { name: true } },
+      },
+    });
 
     if (!student) {
       throw new AppError(404, 'STUDENT_NOT_FOUND', 'Student not found');
@@ -238,6 +226,21 @@ export class ReportService {
     if (student.schoolId !== schoolId) {
       throw new AppError(403, 'FORBIDDEN', 'Access to this resource is not allowed');
     }
+
+    // Scope attendance counts to the student's CURRENT class sessions so that a
+    // student moved between classes doesn't carry old-class records into the new
+    // class's totals (which would push attendance % over 100% and hide absences).
+    const recordWhere = withDateRange<Prisma.AttendanceRecordWhereInput>({
+      studentId,
+      schoolId,
+      ...(student.classId ? { session: { classId: student.classId } } : {}),
+    }, 'scannedAt', dateRange);
+
+    const statusRows = await prisma.attendanceRecord.groupBy({
+      by: ['status'],
+      where: recordWhere,
+      _count: { _all: true },
+    });
 
     const counts: StatusCounts = {};
     for (const row of statusRows) {
@@ -569,9 +572,13 @@ export class ReportService {
 
     const countsByStudent = new Map<string, StatusCounts>();
     if (studentIds.length > 0) {
+      // Scope counts to sessions of the classes in this report, so records a
+      // student earned in a class they've since left don't inflate their totals
+      // in the class they now belong to (attendance % > 100% / hidden absences).
       const recordWhere = withDateRange<Prisma.AttendanceRecordWhereInput>({
         schoolId,
         studentId: { in: studentIds },
+        session: { classId: { in: classIds } },
       }, 'scannedAt', dateRange);
 
       const recordRows = await prisma.attendanceRecord.groupBy({
