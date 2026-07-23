@@ -15,7 +15,7 @@ import { buildAttendanceDeviceHash } from '../lib/attendanceDevice';
 
 const qrScanSchema = z.object({
   qrToken: z.string().min(1),
-  deviceId: z.string().min(8).max(200).optional(),
+  deviceId: z.string().min(8).max(200), // Required to prevent device-sharing bypass
   gpsCoords: z.object({
     lat: z.number().min(-90).max(90),
     lng: z.number().min(-180).max(180),
@@ -63,7 +63,7 @@ const linkGenerateSchema = z.object({
 
 const linkAttendanceSchema = z.object({
   linkToken: z.string().min(1),
-  deviceId: z.string().min(8).max(200).optional(),
+  deviceId: z.string().min(8).max(200), // Required to prevent device-sharing bypass
   gpsCoords: z.object({
     lat: z.number().min(-90).max(90),
     lng: z.number().min(-180).max(180),

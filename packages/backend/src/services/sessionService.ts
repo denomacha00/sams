@@ -287,30 +287,35 @@ export class SessionService {
   }
 
   /**
-   * Close active sessions whose timetable window has passed.
+   * Close active sessions whose timetable window has passed, and ad-hoc sessions
+   * (no timetable entry) that have been open for more than 24 hours.
    * This prevents old QR/link sessions from staying live if nobody taps End Session.
    */
   async expireStaleActiveSessions(schoolId?: string): Promise<number> {
     const sessions = await prisma.attendanceSession.findMany({
       where: {
         isActive: true,
-        timetableEntryId: { not: null },
         ...(schoolId ? { schoolId } : {}),
       },
       select: {
         id: true,
+        startedAt: true,
+        timetableEntryId: true,
         timetableEntry: {
           select: { dayOfWeek: true, startTime: true, endTime: true },
         },
       },
     });
 
+    const ADHOC_MAX_MS = 24 * 60 * 60 * 1000;
+    const now = Date.now();
+
     const expiredIds = sessions
-      .filter((session) =>
-        session.timetableEntry
-          ? isTimetableWindowExpired(session.timetableEntry)
-          : false,
-      )
+      .filter((session) => {
+        if (session.timetableEntry) return isTimetableWindowExpired(session.timetableEntry);
+        // Ad-hoc session: expire after 24 h
+        return !session.timetableEntryId && (now - session.startedAt.getTime()) > ADHOC_MAX_MS;
+      })
       .map((session) => session.id);
 
     if (expiredIds.length === 0) return 0;

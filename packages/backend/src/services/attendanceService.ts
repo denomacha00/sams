@@ -659,14 +659,24 @@ export class AttendanceService {
     if (existing) {
       // Update (overwrite) existing record and log to audit
       const previousStatus = existing.status;
+      const previousMethod = existing.method;
+      const previousScannedAt = existing.scannedAt;
+
+      // If the existing record captured a genuine student action (QR / link / biometric /
+      // fingerprint / synced offline mark), a manual status correction must NOT erase that
+      // evidence — keep the original method and arrival time so reports stay truthful.
+      // Only system placeholders (AUTO_ABSENT) or prior manual marks become a fresh MANUAL.
+      const liveCaptureMethods = ['QR', 'LINK', 'BIOMETRIC', 'FINGERPRINT', 'OFFLINE_QR', 'OFFLINE_MANUAL', 'OFFLINE_LINK'];
+      const preserveEvidence = liveCaptureMethods.includes(previousMethod);
 
       const updated = await prisma.attendanceRecord.update({
         where: { id: existing.id },
         data: {
           status: status as AttendanceStatus,
-          method: 'MANUAL',
           note: note ?? existing.note,
-          scannedAt: new Date(),
+          ...(preserveEvidence
+            ? {} // keep original method + scannedAt
+            : { method: 'MANUAL', scannedAt: new Date() }),
         },
       });
 
@@ -681,7 +691,9 @@ export class AttendanceService {
           studentId,
           previousStatus,
           newStatus: status,
-          method: 'MANUAL',
+          previousMethod,
+          methodPreserved: preserveEvidence,
+          originalScannedAt: previousScannedAt.toISOString(),
           note,
         },
       });
