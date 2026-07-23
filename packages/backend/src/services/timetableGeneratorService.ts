@@ -537,6 +537,11 @@ export const timetableGeneratorService = {
 
     // Delete existing if remake
     if (remake) {
+      // Close any active sessions before entries are deleted (SetNull would orphan them)
+      await prisma.attendanceSession.updateMany({
+        where: { schoolId, classId: { in: targetIds }, isActive: true },
+        data: { isActive: false, endedAt: new Date() },
+      });
       await prisma.timetableEntry.deleteMany({ where: { schoolId, classId: { in: targetIds } } });
     } else {
       const cnt = await prisma.timetableEntry.count({ where: { schoolId, classId: { in: targetIds } } });
