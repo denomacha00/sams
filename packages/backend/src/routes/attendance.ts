@@ -48,7 +48,11 @@ const syncSchema = z.object({
     status: z.nativeEnum(AttendanceStatus),
     method: z.string().min(1),
     note: z.string().max(500).optional(),
-    scannedAt: z.string().min(1),
+    // Must be a parseable timestamp — an invalid string would write an
+    // "Invalid Date" and always win offline-conflict resolution (NaN compares false).
+    scannedAt: z.string().min(1).refine((v) => !Number.isNaN(Date.parse(v)), {
+      message: 'scannedAt must be a valid date',
+    }),
     synced: z.boolean(),
   })),
 });

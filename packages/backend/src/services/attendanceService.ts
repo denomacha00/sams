@@ -990,10 +990,44 @@ export class AttendanceService {
         },
       });
 
+      const offlineScannedAt = new Date(offlineRecord.scannedAt);
+      if (Number.isNaN(offlineScannedAt.getTime())) {
+        // Guard: an unparseable timestamp would write an Invalid Date and always
+        // beat the server record (NaN comparisons are false). Skip as a conflict.
+        conflicts.push({
+          recordId: existing?.id ?? offlineRecord.id,
+          resolution: 'server_wins',
+          offlineRecord,
+          serverRecord: existing
+            ? {
+                id: existing.id,
+                sessionId: existing.sessionId,
+                studentId: existing.studentId,
+                status: existing.status as AttendanceStatus,
+                method: existing.method,
+                note: existing.note ?? undefined,
+                scannedAt: existing.scannedAt.toISOString(),
+                synced: true,
+              }
+            : undefined,
+        });
+        await auditService.log({
+          eventType: 'CONFLICT_RESOLVED',
+          schoolId,
+          resourceSnapshot: {
+            resolution: 'server_wins',
+            reason: 'invalid_offline_timestamp',
+            offlineRecordId: offlineRecord.id,
+            offlineTimestamp: offlineRecord.scannedAt,
+          },
+        });
+        continue;
+      }
+
       if (existing) {
         // Conflict: compare timestamps
         const serverTimestamp = existing.scannedAt.getTime();
-        const offlineTimestamp = new Date(offlineRecord.scannedAt).getTime();
+        const offlineTimestamp = offlineScannedAt.getTime();
 
         if (serverTimestamp > offlineTimestamp) {
           // Server wins — keep server record
@@ -1036,7 +1070,7 @@ export class AttendanceService {
               status: offlineRecord.status as AttendanceStatus,
               method: offlineRecord.method,
               note: offlineRecord.note,
-              scannedAt: new Date(offlineRecord.scannedAt),
+              scannedAt: offlineScannedAt,
               syncedAt: new Date(),
             },
           });
@@ -1090,7 +1124,7 @@ export class AttendanceService {
             status: offlineRecord.status as AttendanceStatus,
             method: offlineRecord.method,
             note: offlineRecord.note,
-            scannedAt: new Date(offlineRecord.scannedAt),
+            scannedAt: offlineScannedAt,
             syncedAt: new Date(),
           },
           create: {
@@ -1101,7 +1135,7 @@ export class AttendanceService {
             status: offlineRecord.status as AttendanceStatus,
             method: offlineRecord.method,
             note: offlineRecord.note,
-            scannedAt: new Date(offlineRecord.scannedAt),
+            scannedAt: offlineScannedAt,
             syncedAt: new Date(),
           },
         });
