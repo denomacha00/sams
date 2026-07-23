@@ -319,7 +319,7 @@ const LinkAttendancePage: React.FC = () => {
           {/* Session details */}
           <div className="space-y-3 mb-6">
             <div className="flex items-center justify-between p-3 bg-white/5 border border-white/5 rounded-xl">
-              <span className="text-xs font-semibold text-ink-muted uppercase tracking-wider">Subject</span>
+              <span className="text-xs font-semibold text-ink-muted uppercase tracking-wider">Unit</span>
               <span className="text-sm font-medium text-ink">{sessionInfo?.subject || '-'}</span>
             </div>
 

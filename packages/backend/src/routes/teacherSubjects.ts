@@ -5,9 +5,13 @@ import { prisma } from '../lib/prisma';
 import { requirePermission } from '../middleware/rbac';
 import { AppError } from '../middleware/errors';
 
+// Quick-pick SUGGESTIONS only (shown as chips in the UI). These are generic
+// cross-cutting units common to Kenyan TVET colleges / TTIs — NOT a high-school
+// subject list. Teachers still register their own real units; this list just
+// seeds the picker when a school has none yet. Keep it short and generic.
 const DEFAULT_SUBJECTS = [
-  'Mathematics', 'English', 'Kiswahili', 'Biology', 'Chemistry',
-  'Physics', 'History', 'Geography', 'CRE', 'Business Studies',
+  'Communication Skills', 'Life Skills', 'Entrepreneurship',
+  'Digital Literacy', 'Work Ethics', 'Numeracy Skills',
 ];
 
 export const teacherSubjectsRouter = Router();

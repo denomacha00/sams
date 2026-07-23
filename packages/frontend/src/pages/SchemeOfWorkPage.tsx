@@ -362,7 +362,7 @@ const SchemeOfWorkPage: React.FC = () => {
               {generatorInfo && (
                 <>
                   <div>
-                    <label className="block text-sm text-ink-muted mb-1">Subject *</label>
+                    <label className="block text-sm text-ink-muted mb-1">Unit *</label>
                     <select required value={form.subject} onChange={(e) => setForm({ ...form, subject: e.target.value })} className="w-full px-4 py-2.5 rounded-xl input-field text-sm">
                       <option value="">-- Select --</option>
                       {generatorInfo.subjects.map((s) => <option key={s} value={s}>{s}</option>)}

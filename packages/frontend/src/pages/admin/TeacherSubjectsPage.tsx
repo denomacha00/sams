@@ -98,7 +98,7 @@ const TeacherSubjectsPage: React.FC = () => {
       <div className="max-w-6xl mx-auto">
         {/* Header */}
         <div className="mb-6">
-          <h1 className="text-xl font-bold text-ink">Teacher Subjects / Skilled Units</h1>
+          <h1 className="text-xl font-bold text-ink">Teacher Units</h1>
           <p className="text-sm text-ink-muted mt-1">
             View and edit which subjects/units each teacher can teach. This is used by the timetable generator.
             Teachers fill this during registration — admins and HODs can adjust here.
@@ -169,7 +169,7 @@ const TeacherSubjectsPage: React.FC = () => {
         {editTeacher && (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
             <div className="input-field rounded-2xl p-8 w-full max-w-lg mx-4 shadow-2xl">
-              <h3 className="text-lg font-bold text-ink mb-1">Edit Subjects</h3>
+              <h3 className="text-lg font-bold text-ink mb-1">Edit Units</h3>
               <p className="text-sm text-ink-muted mb-4">{editTeacher.fullName}</p>
 
               {/* Current subjects */}

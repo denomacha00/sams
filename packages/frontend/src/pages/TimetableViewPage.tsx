@@ -362,7 +362,7 @@ const TimetableViewPage: React.FC = () => {
                 <thead>
                   <tr className="border-b border-line bg-surface-muted">
                     <th className="text-left px-6 py-4 text-sm font-semibold text-ink">Day</th>
-                    <th className="text-left px-6 py-4 text-sm font-semibold text-ink">Subject</th>
+                    <th className="text-left px-6 py-4 text-sm font-semibold text-ink">Unit</th>
                     <th className="text-left px-6 py-4 text-sm font-semibold text-ink">Class</th>
                     <th className="text-left px-6 py-4 text-sm font-semibold text-ink">Teacher</th>
                     <th className="text-left px-6 py-4 text-sm font-semibold text-ink">Time</th>

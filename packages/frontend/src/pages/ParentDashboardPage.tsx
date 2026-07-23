@@ -157,7 +157,7 @@ const WardCard: React.FC<{
                     <table className="w-full text-xs">
                       <thead>
                         <tr className="border-b border-line">
-                          <th className="text-left py-1.5 pr-2 text-ink-muted font-medium">Subject</th>
+                          <th className="text-left py-1.5 pr-2 text-ink-muted font-medium">Unit</th>
                           <th className="text-right py-1.5 px-2 text-ink-muted font-medium">CAT Avg</th>
                           <th className="text-right py-1.5 px-2 text-ink-muted font-medium">Prac 1</th>
                           <th className="text-right py-1.5 px-2 text-ink-muted font-medium">Prac 2</th>

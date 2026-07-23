@@ -306,7 +306,7 @@ const ExamsTab: React.FC<{
               </select>
             </div>
             <div>
-              <label className="block text-sm text-ink-muted mb-1">Subject</label>
+              <label className="block text-sm text-ink-muted mb-1">Unit</label>
               <input value={subject} onChange={(e) => setSubject(e.target.value)} className="form-input w-full" placeholder="e.g. Mathematics" required />
             </div>
             <div>
@@ -347,7 +347,7 @@ const ExamsTab: React.FC<{
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-line">
-                <th className="text-left py-3 px-3 text-ink-muted font-medium">Subject</th>
+                <th className="text-left py-3 px-3 text-ink-muted font-medium">Unit</th>
                 <th className="text-left py-3 px-3 text-ink-muted font-medium">Type</th>
                 <th className="text-left py-3 px-3 text-ink-muted font-medium">Class</th>
                 <th className="text-left py-3 px-3 text-ink-muted font-medium">Term</th>

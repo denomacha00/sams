@@ -634,7 +634,7 @@ const UserManagementPage: React.FC = () => {
 
               {canAssignSubjects && (
                 <div>
-                  <label className="block text-sm text-ink-muted mb-1">Skilled units / subjects</label>
+                  <label className="block text-sm text-ink-muted mb-1">Skilled units</label>
                   <textarea
                     value={formData.subjects}
                     onChange={(e) => setFormData({ ...formData, subjects: e.target.value })}

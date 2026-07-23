@@ -1,10 +1,8 @@
 import { prisma } from '../lib/prisma';
 import { UserRole } from '@sams/shared';
 
-const DEFAULT_SUBJECTS = [
-  'Mathematics', 'English', 'Kiswahili', 'Biology', 'Chemistry',
-  'Physics', 'History', 'Geography', 'CRE', 'Business Studies',
-];
+// NOTE: there is deliberately NO default/hardcoded unit list here. The generator
+// only ever schedules units that teachers explicitly registered via TeacherSubject.
 const DEFAULT_DAYS = [0, 1, 2, 3, 4];
 
 export interface GenerateOptions {

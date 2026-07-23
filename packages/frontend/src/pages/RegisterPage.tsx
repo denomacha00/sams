@@ -433,7 +433,7 @@ const RegisterPage: React.FC = () => {
             {isTeacherOrHod && (
               <div>
                 <label className="block text-sm font-semibold text-ink-muted mb-1.5">
-                  Your skilled units/subjects
+                  Your skilled units
                 </label>
                 <div className="mb-3 p-3 rounded-xl bg-amber-500/15 border border-amber-400/20">
                   <p className="text-xs text-amber-300">

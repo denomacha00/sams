@@ -743,7 +743,7 @@ export class ReportService {
           checkPage(30);
           doc.font('Helvetica-Bold').fontSize(12).fill(NAVY).text('Daily Evidence', 50, y); y += 20;
           const cw = [40, 58, 110, 100, 45, 62, 40];
-          drawHeader(['Day', 'Date', 'Subject', 'Teacher', 'Status', 'Method', 'Time'], 50, y, cw); y += 20;
+          drawHeader(['Day', 'Date', 'Unit', 'Teacher', 'Status', 'Method', 'Time'], 50, y, cw); y += 20;
           for (const row of data.records.slice(0, 50)) {
             checkPage(13);
             const tn = (row.teacherName || '--').length > 20 ? row.teacherName!.slice(0, 17) + '...' : (row.teacherName || '--');
@@ -780,7 +780,7 @@ export class ReportService {
           checkPage(30);
           doc.font('Helvetica-Bold').fontSize(12).fill(NAVY).text('Daily Evidence', 50, y); y += 20;
           const ew = [78, 34, 52, 82, 82, 42, 55, 40];
-          drawHeader(['Student', 'Day', 'Date', 'Subject', 'Teacher', 'Status', 'Method', 'Time'], 50, y, ew); y += 20;
+          drawHeader(['Student', 'Day', 'Date', 'Unit', 'Teacher', 'Status', 'Method', 'Time'], 50, y, ew); y += 20;
           for (const { n, r } of ev.slice(0, 40)) {
             checkPage(13);
             const sn = n.length > 14 ? n.slice(0, 12) + '...' : n;
@@ -818,7 +818,7 @@ export class ReportService {
             checkPage(24);
             doc.fill(GRAY).font('Helvetica-Bold').fontSize(8).text('Daily Evidence', 55, y); y += 14;
             const ew = [78, 34, 52, 82, 82, 42, 55, 40];
-            drawHeader(['Student', 'Day', 'Date', 'Subject', 'Teacher', 'Status', 'Method', 'Time'], 50, y, ew); y += 18;
+            drawHeader(['Student', 'Day', 'Date', 'Unit', 'Teacher', 'Status', 'Method', 'Time'], 50, y, ew); y += 18;
             for (const { n, r } of cev.slice(0, 30)) {
               checkPage(12);
               const sn = n.length > 14 ? n.slice(0, 12) + '...' : n;
@@ -898,7 +898,7 @@ export class ReportService {
         detailSheet.columns = [
           { header: 'Day', key: 'day', width: 8 },
           { header: 'Date', key: 'date', width: 14 },
-          { header: 'Subject', key: 'subject', width: 28 },
+          { header: 'Unit', key: 'subject', width: 28 },
           { header: 'Class', key: 'className', width: 20 },
           { header: 'Teacher', key: 'teacherName', width: 24 },
           { header: 'Status', key: 'status', width: 14 },
@@ -955,7 +955,7 @@ export class ReportService {
           { header: 'Student', key: 'student', width: 30 },
           { header: 'Day', key: 'day', width: 8 },
           { header: 'Date', key: 'date', width: 14 },
-          { header: 'Subject', key: 'subject', width: 28 },
+          { header: 'Unit', key: 'subject', width: 28 },
           { header: 'Teacher', key: 'teacherName', width: 24 },
           { header: 'Status', key: 'status', width: 14 },
           { header: 'Method', key: 'method', width: 14 },
@@ -1063,7 +1063,7 @@ export class ReportService {
           { header: 'Student', key: 'student', width: 28 },
           { header: 'Day', key: 'day', width: 8 },
           { header: 'Date', key: 'date', width: 14 },
-          { header: 'Subject', key: 'subject', width: 24 },
+          { header: 'Unit', key: 'subject', width: 24 },
           { header: 'Teacher', key: 'teacherName', width: 24 },
           { header: 'Status', key: 'status', width: 12 },
           { header: 'Method', key: 'method', width: 14 },
@@ -1207,7 +1207,7 @@ export class ReportService {
           { header: 'Student', key: 'student', width: 26 },
           { header: 'Day', key: 'day', width: 8 },
           { header: 'Date', key: 'date', width: 14 },
-          { header: 'Subject', key: 'subject', width: 22 },
+          { header: 'Unit', key: 'subject', width: 22 },
           { header: 'Teacher', key: 'teacherName', width: 22 },
           { header: 'Status', key: 'status', width: 12 },
           { header: 'Method', key: 'method', width: 14 },
@@ -1272,7 +1272,7 @@ export class ReportService {
       lines.push(`Attendance %,${data.attendancePercentage}`);
       if (data.records?.length) {
         lines.push('');
-        lines.push('Day,Date,Subject,Class,Teacher,Status,Method,Time,Marked At,Note');
+        lines.push('Day,Date,Unit,Class,Teacher,Status,Method,Time,Marked At,Note');
         for (const row of data.records) {
           lines.push([
             dayName(row.date),
@@ -1301,7 +1301,7 @@ export class ReportService {
       );
       if (evidenceRows.length) {
         lines.push('');
-        lines.push('Student,Day,Date,Subject,Teacher,Status,Method,Time,Marked At,Note');
+        lines.push('Student,Day,Date,Unit,Teacher,Status,Method,Time,Marked At,Note');
         for (const { studentName, row } of evidenceRows) {
           lines.push([
             this._escapeCSV(studentName),
@@ -1363,7 +1363,7 @@ export class ReportService {
       );
       if (deptEvidence.length) {
         lines.push('');
-        lines.push('Class,Student,Day,Date,Subject,Teacher,Status,Method,Time,Marked At,Note');
+        lines.push('Class,Student,Day,Date,Unit,Teacher,Status,Method,Time,Marked At,Note');
         for (const { className, studentName, row } of deptEvidence) {
           lines.push([
             this._escapeCSV(className),
@@ -1458,7 +1458,7 @@ export class ReportService {
       );
       if (schoolEvidence.length) {
         lines.push('');
-        lines.push('Department,Class,Student,Day,Date,Subject,Teacher,Status,Method,Time,Marked At,Note');
+        lines.push('Department,Class,Student,Day,Date,Unit,Teacher,Status,Method,Time,Marked At,Note');
         for (const { department, className, studentName, row } of schoolEvidence) {
           lines.push([
             this._escapeCSV(department),

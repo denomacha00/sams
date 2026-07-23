@@ -530,7 +530,7 @@ const TimetablePage: React.FC = () => {
                 <thead>
                   <tr className="border-b border-white/10">
                     <th className="text-left px-6 py-4 text-sm font-semibold text-ink">Day</th>
-                    <th className="text-left px-6 py-4 text-sm font-semibold text-ink">Subject</th>
+                    <th className="text-left px-6 py-4 text-sm font-semibold text-ink">Unit</th>
                     <th className="text-left px-6 py-4 text-sm font-semibold text-ink">Class</th>
                     <th className="text-left px-6 py-4 text-sm font-semibold text-ink">Teacher</th>
                     <th className="text-left px-6 py-4 text-sm font-semibold text-ink">Time</th>
@@ -664,7 +664,7 @@ const TimetablePage: React.FC = () => {
 
             <form onSubmit={handleSubmit} className="space-y-4">
               <div>
-                <label className="block text-sm text-ink-muted mb-1">Subject *</label>
+                <label className="block text-sm text-ink-muted mb-1">Unit *</label>
                 <input
                   type="text"
                   required
@@ -888,7 +888,7 @@ const TimetablePage: React.FC = () => {
                     <thead>
                       <tr className="bg-surface-muted border-b border-white/10">
                         <th className="text-left px-3 py-2 font-semibold text-ink">Day</th>
-                        <th className="text-left px-3 py-2 font-semibold text-ink">Subject</th>
+                        <th className="text-left px-3 py-2 font-semibold text-ink">Unit</th>
                         <th className="text-left px-3 py-2 font-semibold text-ink">Class</th>
                         <th className="text-left px-3 py-2 font-semibold text-ink">Teacher</th>
                         <th className="text-left px-3 py-2 font-semibold text-ink">Time</th>
