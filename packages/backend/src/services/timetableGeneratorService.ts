@@ -18,6 +18,12 @@ export interface GenerateOptions {
   lunchEnd?: string;
   workingDays?: number[];
   maxLessonsPerTeacherPerDay?: number;
+  /** Min free (empty) periods to leave per class per day. Default 0. */
+  minFreePeriodsPerDay?: number;
+  /** Max free (empty) periods to leave per class per day. Default 2. A random
+   *  value in [min, max] is chosen per class per day so timetables have natural,
+   *  varied gaps instead of every single period being packed. */
+  maxFreePeriodsPerDay?: number;
   rooms?: string[];
   teacherSubjectMapping?: Record<string, string[]>;
 }
@@ -174,6 +180,7 @@ function generate(
   rooms: string[], tSubj: Map<string, Set<string>>,
   subjectMap: Map<string, TeacherInfo[]>,
   occupiedRooms: Map<string, Set<string>> = new Map(),
+  minFree = 0, maxFree = 2,
 ): { slots: TimetableSlot[]; skipped: number; stats: Record<string, number>; assignments: Record<string, number>; doubles: number } {
   const tr = new Tracker();
   tr.seed(existing);
@@ -242,12 +249,43 @@ function generate(
   // for via TeacherSubject. NO wildcard fallback — if no registered teacher is
   // free, the slot is skipped rather than assigning an unqualified teacher.
 
+  // ─── Free-period planning ────────────────────────────────────────────────
+  // A packed timetable (every class, every period, every day) feels unnatural.
+  // Real timetables breathe: a class may have a full day, or a day with one or
+  // two free periods, varied at random. For each (class, day) we pre-pick a
+  // random number of periods in [minFree, maxFree] to leave intentionally empty.
+  // These are SKIPPED during assignment (not counted as "skipped" failures — a
+  // free period is by design, not a capacity shortfall).
+  //
+  // We never blank the FIRST period of a day (avoids a late start every day for
+  // the same class) — gaps are chosen from the remaining periods only. If a day
+  // has too few periods to spare, we leave fewer/no gaps.
+  const lo = Math.max(0, Math.min(minFree, maxFree));
+  const hi = Math.max(lo, Math.max(minFree, maxFree));
+  const freeSlots = new Map<string, Set<string>>(); // key `${classId}|${day}` → startTimes
+  for (const cls of classes) {
+    for (const day of days) {
+      // keep at least 1 lesson-worth of periods; only blank from index 1+
+      const candidates = periods.slice(1).map((p) => p.startTime);
+      if (candidates.length === 0) continue;
+      const want = lo + Math.floor(Math.random() * (hi - lo + 1));
+      const n = Math.min(want, Math.max(0, candidates.length - 1));
+      if (n <= 0) continue;
+      const picked = new Set(shuffle(candidates).slice(0, n));
+      freeSlots.set(`${cls.id}|${day}`, picked);
+    }
+  }
+  const isFreeSlot = (classId: string, day: number, time: string): boolean =>
+    freeSlots.get(`${classId}|${day}`)?.has(time) ?? false;
+
   for (const day of days) {
     const orderedPeriods = [...periods];
 
     for (const p of orderedPeriods) {
       for (const cls of shuffle(classes)) {
         if (!tr.classFree(cls.id, day, p.startTime)) continue;
+        // Intentional free period for this class today — leave it empty.
+        if (isFreeSlot(cls.id, day, p.startTime)) continue;
 
         const allSubs = shuffle(getSubjects(cls, catalog));
         const available = allSubs.filter((s) => !tr.hasSubject(cls.id, day, s));
@@ -456,6 +494,7 @@ export const timetableGeneratorService = {
       breakStart = '10:00', breakEnd = '10:20',
       lunchStart = '12:20', lunchEnd = '13:00',
       workingDays = DEFAULT_DAYS, maxLessonsPerTeacherPerDay = 6,
+      minFreePeriodsPerDay = 0, maxFreePeriodsPerDay = 2,
       rooms = [], teacherSubjectMapping,
     } = opts;
 
@@ -503,7 +542,7 @@ export const timetableGeneratorService = {
     const result = generate(
       schoolId, classes, teachers, existingBookings, catalog, periods,
       workingDays, maxLessonsPerTeacherPerDay, rooms, tSubj, subjectMap,
-      occupiedRooms,
+      occupiedRooms, minFreePeriodsPerDay, maxFreePeriodsPerDay,
     );
     if (!result.slots.length) throw new Error('Could not generate any timetable entries. Not enough teachers available.');
 
@@ -532,6 +571,7 @@ export const timetableGeneratorService = {
       breakStart = '10:00', breakEnd = '10:20',
       lunchStart = '12:20', lunchEnd = '13:00',
       workingDays = DEFAULT_DAYS, maxLessonsPerTeacherPerDay = 6,
+      minFreePeriodsPerDay = 0, maxFreePeriodsPerDay = 2,
       rooms = [], teacherSubjectMapping,
     } = opts;
 
@@ -569,7 +609,7 @@ export const timetableGeneratorService = {
     const result = generate(
       schoolId, classes, teachers, existing, catalog, periods,
       workingDays, maxLessonsPerTeacherPerDay, rooms, tSubj, subjectMap,
-      occupiedRooms,
+      occupiedRooms, minFreePeriodsPerDay, maxFreePeriodsPerDay,
     );
 
     const tMap = new Map(teachers.map((t) => [t.id, t.fullName]));

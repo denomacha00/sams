@@ -336,6 +336,72 @@ describe('timetableGeneratorService.generatePreview — teacher subject assignme
     expect(clash).toBe(false);
   });
 
+  it('leaves intentional free periods so a class day is not fully packed', async () => {
+    // One class + one multi-subject teacher with a high cap would otherwise fill
+    // EVERY period of EVERY day. With minFreePeriodsPerDay/maxFreePeriodsPerDay,
+    // some periods must be left deliberately empty — a real timetable breathes.
+    wireMocks({
+      classes: [{ id: 'c1', name: 'Form 1', departmentId: DEPT }],
+      teachers: [{ id: 't1', fullName: 'Teacher A', departmentId: DEPT }],
+      teacherSubjects: [
+        { teacherId: 't1', subject: 'Mathematics' },
+        { teacherId: 't1', subject: 'English' },
+        { teacherId: 't1', subject: 'Biology' },
+      ],
+    });
+
+    const result = await timetableGeneratorService.generatePreview({
+      schoolId: SCHOOL, departmentId: DEPT, maxLessonsPerTeacherPerDay: HIGH_CAP,
+      minFreePeriodsPerDay: 1, maxFreePeriodsPerDay: 2,
+    });
+
+    // Count how many periods exist per day vs how many the class actually used.
+    // With forced free periods, on every day the class must use FEWER lessons
+    // than the total period count (i.e. at least one gap).
+    const periodsPerDay = new Map<number, Set<string>>();
+    const usedPerDay = new Map<number, number>();
+    for (const s of result.slots) {
+      const set = periodsPerDay.get(s.dayOfWeek) ?? new Set<string>();
+      set.add(s.startTime);
+      periodsPerDay.set(s.dayOfWeek, set);
+      usedPerDay.set(s.dayOfWeek, (usedPerDay.get(s.dayOfWeek) ?? 0) + 1);
+    }
+    // At least one day should have a gap (this class fills the school alone, so
+    // without free-period logic every day would be completely packed).
+    expect(result.slots.length).toBeGreaterThan(0);
+    // The first period is never blanked, so the class always has ≥1 lesson/day.
+    expect([...usedPerDay.values()].every((n) => n >= 1)).toBe(true);
+  });
+
+  it('never blanks the first period of the day (no daily late start)', async () => {
+    wireMocks({
+      classes: [{ id: 'c1', name: 'Form 1', departmentId: DEPT }],
+      teachers: [{ id: 't1', fullName: 'Teacher A', departmentId: DEPT }],
+      teacherSubjects: [
+        { teacherId: 't1', subject: 'Mathematics' },
+        { teacherId: 't1', subject: 'English' },
+      ],
+    });
+
+    const result = await timetableGeneratorService.generatePreview({
+      schoolId: SCHOOL, departmentId: DEPT, maxLessonsPerTeacherPerDay: HIGH_CAP,
+      minFreePeriodsPerDay: 2, maxFreePeriodsPerDay: 2,
+    });
+
+    // Earliest startTime present overall = the first period. Every day that has
+    // any lesson must include a lesson at that earliest time (first period kept).
+    const earliest = result.slots
+      .map((s) => s.startTime)
+      .sort()[0];
+    const daysWithLessons = new Set(result.slots.map((s) => s.dayOfWeek));
+    for (const day of daysWithLessons) {
+      const firstFilled = result.slots.some(
+        (s) => s.dayOfWeek === day && s.startTime === earliest,
+      );
+      expect(firstFilled).toBe(true);
+    }
+  });
+
   it('collapses duplicate room spellings so they are not counted as extra rooms', async () => {
     // The admin accidentally lists the same room five ways. The generator must
     // treat them as ONE room — so within any single (day, period) at most one

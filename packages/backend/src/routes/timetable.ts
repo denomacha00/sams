@@ -89,6 +89,8 @@ const generateTimetableSchema = z.object({
   lunchEnd: z.string().regex(/^\d{2}:\d{2}$/).optional().default('13:00'),
   workingDays: z.array(z.number().int().min(0).max(6)).optional(),
   maxLessonsPerTeacherPerDay: z.number().int().min(3).max(10).optional().default(6),
+  minFreePeriodsPerDay: z.number().int().min(0).max(6).optional().default(0),
+  maxFreePeriodsPerDay: z.number().int().min(0).max(6).optional().default(2),
   rooms: z.array(z.string()).optional().default([]),
 });
 
@@ -282,6 +284,8 @@ timetableRouter.post('/generate-preview', requirePermission('manage:timetable'),
       lunchEnd: parsed.data.lunchEnd,
       workingDays: parsed.data.workingDays,
       maxLessonsPerTeacherPerDay: parsed.data.maxLessonsPerTeacherPerDay,
+      minFreePeriodsPerDay: parsed.data.minFreePeriodsPerDay,
+      maxFreePeriodsPerDay: parsed.data.maxFreePeriodsPerDay,
       rooms: parsed.data.rooms,
     });
 
@@ -341,6 +345,8 @@ timetableRouter.post('/generate', requirePermission('manage:timetable'), require
       lunchEnd: parsed.data.lunchEnd,
       workingDays: parsed.data.workingDays,
       maxLessonsPerTeacherPerDay: parsed.data.maxLessonsPerTeacherPerDay,
+      minFreePeriodsPerDay: parsed.data.minFreePeriodsPerDay,
+      maxFreePeriodsPerDay: parsed.data.maxFreePeriodsPerDay,
       rooms: parsed.data.rooms,
     });
 
