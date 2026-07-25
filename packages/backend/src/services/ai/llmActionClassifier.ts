@@ -21,10 +21,26 @@ Respond with JSON only (no markdown):
 - If the message matches an action: {"action": "<action_name>", "params": {...extracted params...}, "confidence": 0.0-1.0}
 - If no action matches: {"action": "none", "confidence": 1.0}
 
-CRITICAL: The user may express their request in ANY natural language. They are NOT writing commands. They talk like one person talking to another. Examples:
+CRITICAL — TYPOS AND MISSPELLINGS ARE NORMAL: Real users type fast and make mistakes. You MUST understand the intent even when words are misspelled, abbreviated, or grammatically broken. Examples of real user messages you will see:
+- "susspend greenwood" = suspend_school (schoolName: "greenwood")
+- "sesson for math" = start_session (subject: "math")
+- "notifiy the class" = send_class_message
+- "genrate timetabel" = generate_timetable
+- "adim of this school" = list_school_admin
+- "attandance of my studnets" = view_class_attendance
+- "downlod reprot" = export_attendance_report
+- "unsuspned school" = unsuspend_school
+- "pasword reset for john" = reset_user_password (identifier: "john")
+- "licnese for greenwood" = generate_license (schoolName: "greenwood")
+- "shwo my schedul" = view_today_schedule
+- "whos absnt today" = view_class_attendance (type: absent_today)
+- "risky studnets" = view_risk_scores
+- "send mesage to deprtment" = send_department_notification
+
+NATURAL LANGUAGE EXAMPLES (correct spelling):
 - "go back to timetable" = view_timetable
-- "can you please read for me the only late students" = view_class_attendance or query_attendance with type=absent_today
-- "open student portal" = list_my_teachers or describe_my_class or some student action
+- "can you please read for me the only late students" = view_class_attendance
+- "open student portal" = list_my_teachers or describe_my_class
 - "can you show me my schedule" = view_today_schedule
 - "I want to see who's at risk" = view_risk_scores
 - "let me know which students are absent today" = view_class_attendance
@@ -38,8 +54,8 @@ CRITICAL: The user may express their request in ANY natural language. They are N
 
 Rules:
 - Only classify as an action if confidence >= 0.6
-- Understand the USER'S REAL INTENT, not just keywords. "can we go back to the timetable" means view_timetable.
-- Extract relevant parameters from the message (e.g., names, subjects, class names)
+- ALWAYS try to understand the REAL INTENT behind the words, even with typos. A word that is 1-2 characters off from a known keyword should be treated as that keyword.
+- Extract relevant parameters from the message (e.g., names, subjects, class names) — even when the surrounding words are misspelled
 - If ambiguous between multiple actions, pick the highest confidence one
 - Questions asking "how many" teachers, students, or classes in the user's department are action requests (e.g. view_department_stats, get_school_stats), not generic informational chat — classify them when a matching stats action exists
 - "Send message to class", "notify students", "notify department", "notify school" are action requests when a matching send_* action exists for the role

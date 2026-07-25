@@ -166,6 +166,86 @@ const CHAT_MAX_TOKENS = readBoundedIntEnv('AI_MAX_TOKENS', 800, 50, 2_000);
 const PRIMARY_CHAT_TIMEOUT_MS = readBoundedIntEnv('AI_PRIMARY_TIMEOUT_MS', 22_000, 5_000, 40_000);
 const TOOL_ROUND_TIMEOUT_MS = readBoundedIntEnv('AI_TOOL_TIMEOUT_MS', 15_000, 5_000, 30_000);
 
+// How many think→act→observe rounds the agent may run in a single turn. Each
+// round is one LLM call, so this is bounded tight to stay under the frontend's
+// 45s abort. 3 lets the agent chain e.g. lookup_school → query_attendance →
+// answer. Env-overridable for deployments with faster providers.
+const MAX_AGENT_STEPS = readBoundedIntEnv('AI_MAX_AGENT_STEPS', 3, 1, 6);
+
+// Temperature for tool-reasoning rounds. The first (chatty) turn uses 0.85 for a
+// warm, human voice, but once the agent is chaining tools and grounding an answer
+// in real data we want it near-deterministic so it reasons over the tool results
+// instead of improvising numbers. Lower = more faithful to the fetched data.
+const AGENT_REASONING_TEMPERATURE = 0.2;
+
+// Known tool names — used to recognise a tool call the model emitted as raw
+// text instead of via the structured tool_calls field (a Groq/llama quirk).
+const KNOWN_TOOL_NAMES = new Set([
+  'query_database', 'lookup_school', 'lookup_user',
+  'query_attendance', 'query_risk_scores', 'query_reports',
+]);
+
+interface ParsedTextToolCall {
+  name: string;
+  arguments: string;
+}
+
+/**
+ * Some providers (notably Groq's llama models) sometimes ignore the structured
+ * tool_calls channel and instead print the call as raw JSON in message.content —
+ * e.g. {"name":"query_attendance","arguments":{"type":"percentage"}} or wrapped
+ * in <tool_call>…</tool_call> / ```json fences. That raw JSON was leaking to the
+ * user as "the answer" (the "it gives me code instead of a reply" bug). This
+ * pulls a real tool call back out of the text so the agent loop can run it.
+ */
+function extractTextEmbeddedToolCall(content: string): ParsedTextToolCall | null {
+  if (!content || !content.includes('{')) return null;
+  const candidates: string[] = [];
+
+  const tagged = content.match(/<tool_call>\s*([\s\S]*?)\s*<\/tool_call>/i);
+  if (tagged?.[1]) candidates.push(tagged[1]);
+
+  const fenced = content.match(/```(?:json|tool_code)?\s*([\s\S]*?)\s*```/i);
+  if (fenced?.[1]) candidates.push(fenced[1]);
+
+  // Bare JSON object with a "name" field somewhere in the text.
+  const bare = content.match(/\{[\s\S]*?"name"\s*:\s*"[a-z_]+"[\s\S]*?\}/i);
+  if (bare?.[0]) candidates.push(bare[0]);
+
+  for (const raw of candidates) {
+    try {
+      const parsed = JSON.parse(raw.trim());
+      const name = parsed.name ?? parsed.function?.name ?? parsed.tool;
+      if (typeof name !== 'string' || !KNOWN_TOOL_NAMES.has(name)) continue;
+      const argsSource = parsed.arguments ?? parsed.parameters ?? parsed.function?.arguments ?? {};
+      const argsStr = typeof argsSource === 'string' ? argsSource : JSON.stringify(argsSource);
+      return { name, arguments: argsStr };
+    } catch {
+      // not valid JSON — try the next candidate
+    }
+  }
+  return null;
+}
+
+/**
+ * Strip any leaked tool-call scaffolding from a final answer so the user never
+ * sees <tool_call> tags or a bare {"name":"query_…"} blob. Only removes blobs
+ * that reference a KNOWN tool — real code the user asked for is left untouched.
+ */
+export function cleanLeakedToolSyntax(answer: string): string {
+  let out = answer;
+  out = out.replace(/<\/?tool_call>/gi, '');
+  const knownToolPattern = Array.from(KNOWN_TOOL_NAMES).join('|');
+  const leakedBlob = new RegExp(
+    `\\{[^{}]*"(?:name|tool)"\\s*:\\s*"(?:${knownToolPattern})"[\\s\\S]*?\\}`,
+    'gi',
+  );
+  out = out.replace(leakedBlob, '');
+  // Collapse the empty ```json fence left behind after the blob is removed.
+  out = out.replace(/```(?:json|tool_code)?\s*```/gi, '');
+  return out.replace(/\n{3,}/g, '\n\n').trim();
+}
+
 async function tryBackupChatProviders(
   messages: OpenAI.Chat.Completions.ChatCompletionMessageParam[],
   primaryErr: unknown,
@@ -321,12 +401,15 @@ export async function buildSystemPrompt(user: AccessTokenPayload): Promise<strin
 
   // Tool hints — what the LLM can use for different roles
   const toolHintSuperAdmin = `\n\nTOOLS YOU CAN USE (when you need real data from the system — USE THESE, don't guess):
-- query_database: Run SQL queries to look up ANY data. Use this for everything — schools, users, licenses, sessions, attendance, payments.
+- query_database: Run SELECT queries to look up ANY data. Use this for everything — schools, users, licenses, sessions, attendance, payments.
+- execute_database: Run INSERT/UPDATE/DELETE to actually CHANGE data (extend a license, flip a flag, fix a row). UPDATE/DELETE must have a WHERE clause. If it says writes are disabled, tell the boss to set SAMS_AI_SQL_WRITE=1 on the server.
 - lookup_school: Find a school by name.
 - lookup_user: Find a user by name/email.
 - query_attendance: Get attendance stats (percentage, absent today, top students).
 - query_risk_scores: Get student risk scores.
 - query_reports: Get attendance reports.
+
+HOW TO WORK LIKE AN AGENT: You can call tools MORE THAN ONCE and chain them. Look something up, read the result, then call another tool based on what you found, then answer. Example: lookup_school to get an id → query_database to pull that school's stats → give the answer. Don't stop at one call if the question needs more.
 
 IMPORTANT: DO NOT just answer from what you remember. Call these tools to get real, live data. If a tool fails, try another. You have NO pre-existing knowledge of specific schools, users, or numbers.`;
 
@@ -336,7 +419,14 @@ IMPORTANT: DO NOT just answer from what you remember. Call these tools to get re
 - query_attendance: Get attendance stats for your scope (percentage, absent today, records).
 - query_risk_scores: Get risk scores for your students.
 - query_reports: Get attendance reports.
-- You CANNOT run raw SQL queries. If you try query_database and get an error, use query_attendance or lookup_user instead.`;
+- You CANNOT run raw SQL queries. If you try query_database and get an error, use query_attendance or lookup_user instead.
+
+HOW TO WORK LIKE A REAL AGENT:
+1. UNDERSTAND the request first — even if it is misspelled or casual, work out what they actually mean ("attandance" = attendance, "studnets" = students).
+2. If you need real data to answer, CALL A TOOL. Never state a name, count, percentage, or status you did not get from a tool or from the context above.
+3. You can call tools MORE THAN ONCE and chain them — look something up, read the result, then call another tool based on what you found, then answer.
+4. If a tool returns nothing or errors, say so plainly. Do NOT fill the gap with a guess.
+5. Answer in 1-3 clear sentences using the real data. If you truly cannot get it, say what you could not find and what the user can do next.`;
 
   // Handle guest (unauthenticated) users
   if (user.sub === 'guest') {
@@ -561,6 +651,20 @@ const SUPER_ADMIN_ONLY_TOOLS: OpenAI.Chat.Completions.ChatCompletionTool[] = [
         type: 'object',
         properties: {
           sql: { type: 'string', description: 'The SQL query to run. Must be SELECT only. Example: SELECT * FROM "School" LIMIT 5' },
+        },
+        required: ['sql'],
+      },
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'execute_database',
+      description: 'Run a write SQL statement (INSERT, UPDATE, or DELETE) against the database. Super Admin only, and only when server-side writes are enabled. Use to actually change data — e.g. extend a license, flip a flag, fix a bad row. UPDATE/DELETE MUST include a WHERE clause. Returns the number of affected rows.',
+      parameters: {
+        type: 'object',
+        properties: {
+          sql: { type: 'string', description: 'The write statement. INSERT/UPDATE/DELETE only, single statement, WHERE required for UPDATE/DELETE. Example: UPDATE "School" SET "planTier"=\'PRO\' WHERE id=\'abc\'' },
         },
         required: ['sql'],
       },
@@ -839,6 +943,23 @@ export async function dispatchFunctionCall(
         }
         break;
       }
+      case 'execute_database': {
+        // Writes are Super Admin only AND require the server-side opt-in flag.
+        // The catastrophic-op deny-list lives in runWriteQuery itself.
+        if (user.role !== 'SUPER_ADMIN') {
+          result = { error: 'Only Super Admins can run write statements.' };
+          break;
+        }
+        const { runWriteQuery } = await import('../superAdminDbAccess');
+        const sql = parsedArgs.sql as string;
+        try {
+          const writeResult = await runWriteQuery(sql);
+          result = { ok: true, affectedRows: writeResult.affectedRows, executionMs: writeResult.executionMs };
+        } catch (wErr) {
+          result = { error: wErr instanceof Error ? wErr.message : String(wErr) };
+        }
+        break;
+      }
       case 'lookup_school': {
         const { prisma } = await import('../../lib/prisma');
         const name = parsedArgs.name as string;
@@ -905,11 +1026,16 @@ export async function openaiQuery(
     });
 
     const choice = response.choices[0];
-    if (choice?.finish_reason === 'tool_calls' && choice.message?.tool_calls) {
-      return await handleToolCalls(choice.message.tool_calls, user, messages, tools);
+    // Enter the agent loop when the model asked for a tool — either through the
+    // structured channel OR as raw JSON in the text (Groq/llama quirk).
+    const wantsTools =
+      (choice?.finish_reason === 'tool_calls' && !!choice.message?.tool_calls?.length) ||
+      (useTools && !!extractTextEmbeddedToolCall(choice?.message?.content ?? ''));
+    if (choice?.message && wantsTools) {
+      return await runAgentLoop(choice.message, user, messages, tools);
     }
 
-    const rawAnswer = choice?.message?.content?.trim();
+    const rawAnswer = cleanLeakedToolSyntax(choice?.message?.content ?? '');
     // Empty primary response → try the backup providers instead of dead-ending
     // on a canned message. A blank completion is a provider failure too.
     if (!rawAnswer) {
@@ -947,7 +1073,7 @@ export async function openaiGeneralKnowledgeQuery(
       temperature: 0.45,
       max_tokens: 500,
     });
-    const rawAnswer = response.choices[0]?.message?.content?.trim();
+    const rawAnswer = cleanLeakedToolSyntax(response.choices[0]?.message?.content ?? '');
     // An empty primary response must fall through to the backups (throw so the
     // catch runs), not dead-end on a canned "I could not answer" — that was a
     // real "AI won't answer some questions" cause when the primary returned blank.
@@ -991,45 +1117,81 @@ export async function openaiGeneralKnowledgeQuery(
   }
 }
 
-async function handleToolCalls(
-  toolCalls: OpenAI.Chat.Completions.ChatCompletionMessageToolCall[],
+/**
+ * Multi-step agent loop (think → act → observe → repeat).
+ *
+ * Replaces the old single-shot handler that ran only the FIRST tool call and
+ * did exactly one follow-up. Now the agent:
+ *   1. Executes EVERY tool call the model requested this round (parallel calls),
+ *   2. Feeds all results back,
+ *   3. Loops up to MAX_AGENT_STEPS so it can chain lookups
+ *      (e.g. lookup_school → query_attendance → final answer),
+ *   4. Also recovers tool calls the model emitted as raw text (Groq/llama quirk)
+ *      so that JSON never leaks to the user as "the answer".
+ *
+ * `firstRound` is the model's initial response that already asked for tools.
+ */
+async function runAgentLoop(
+  firstRound: OpenAI.Chat.Completions.ChatCompletionMessage,
   user: AccessTokenPayload,
-  messages: OpenAI.Chat.Completions.ChatCompletionMessageParam[],
+  baseMessages: OpenAI.Chat.Completions.ChatCompletionMessageParam[],
   tools: OpenAI.Chat.Completions.ChatCompletionTool[],
 ): Promise<OpenAIQueryResult> {
-  const toolResults: OpenAI.Chat.Completions.ChatCompletionMessageParam[] = [];
-  const msg = toolCalls[0]!;
+  const messages: OpenAI.Chat.Completions.ChatCompletionMessageParam[] = [...baseMessages];
+  const client = getOpenAIClient({ timeoutMs: TOOL_ROUND_TIMEOUT_MS });
+  let assistantMsg = firstRound;
 
-  let result: string;
-  try {
-    result = await dispatchFunctionCall(msg.function.name, msg.function.arguments, user, { restrictSqlToSuperAdmin: true });
-  } catch (err) {
-    result = JSON.stringify({ error: err instanceof Error ? err.message : String(err) });
+  for (let step = 0; step < MAX_AGENT_STEPS; step++) {
+    // Collect this round's tool calls — structured first, else recovered from text.
+    let calls = assistantMsg.tool_calls ?? [];
+    if (calls.length === 0) {
+      const embedded = extractTextEmbeddedToolCall(assistantMsg.content ?? '');
+      if (embedded) {
+        calls = [{
+          id: `text_call_${step}`,
+          type: 'function',
+          function: { name: embedded.name, arguments: embedded.arguments },
+        }];
+      }
+    }
+
+    // No more tools requested → this is the final answer.
+    if (calls.length === 0) {
+      const finalText = cleanLeakedToolSyntax(assistantMsg.content ?? '');
+      if (finalText) return { answer: sanitizeLlmOutput(finalText), intent: 'openai_response' };
+      break; // empty → fall through to a nudged final round below
+    }
+
+    // Record the assistant turn, then run every requested tool.
+    messages.push({ role: 'assistant', content: assistantMsg.content ?? null, tool_calls: calls });
+    for (const call of calls) {
+      let result: string;
+      try {
+        result = await dispatchFunctionCall(call.function.name, call.function.arguments, user, {
+          restrictSqlToSuperAdmin: true,
+        });
+      } catch (err) {
+        result = JSON.stringify({ error: err instanceof Error ? err.message : String(err) });
+      }
+      messages.push({ role: 'tool', tool_call_id: call.id, content: result });
+    }
+
+    // Last allowed step: force a text answer (no more tools) so we never end mid-loop.
+    const isLastStep = step === MAX_AGENT_STEPS - 1;
+    const response = await client.chat.completions.create({
+      model: resolveChatModel(),
+      messages,
+      // Low temperature here: the agent is now reasoning over real tool results,
+      // so it should stay faithful to the data, not improvise.
+      temperature: AGENT_REASONING_TEMPERATURE,
+      max_tokens: CHAT_MAX_TOKENS,
+      ...(isLastStep ? {} : { tools, tool_choice: 'auto' as const }),
+    });
+    assistantMsg = response.choices[0]?.message ?? { role: 'assistant', content: '' };
   }
 
-  toolResults.push({
-    role: 'assistant',
-    content: null,
-    tool_calls: [msg],
-  });
-  toolResults.push({
-    role: 'tool',
-    tool_call_id: msg.id,
-    content: result,
-  });
-
-  const updatedMessages = [...messages, ...toolResults];
-  const client = getOpenAIClient({ timeoutMs: TOOL_ROUND_TIMEOUT_MS });
-  const response = await client.chat.completions.create({
-    model: resolveChatModel(),
-    messages: updatedMessages,
-    temperature: 0.85,
-    max_tokens: CHAT_MAX_TOKENS,
-    tools,
-    tool_choice: 'auto' as const,
-  });
-
-  const rawAnswer = response.choices[0]?.message?.content ?? 'Done.';
+  // Loop exhausted (or empty final content) — summarise what we have.
+  const rawAnswer = cleanLeakedToolSyntax(assistantMsg.content ?? '') || 'Done.';
   return { answer: sanitizeLlmOutput(rawAnswer), intent: 'openai_response' };
 }
 
@@ -1057,11 +1219,14 @@ export async function openaiQueryWithHistory(
     });
 
     const choice = response.choices[0];
-    if (choice?.finish_reason === 'tool_calls' && choice.message?.tool_calls) {
-      return await handleToolCalls(choice.message.tool_calls, user, messages, tools);
+    const wantsTools =
+      (choice?.finish_reason === 'tool_calls' && !!choice.message?.tool_calls?.length) ||
+      (useTools && !!extractTextEmbeddedToolCall(choice?.message?.content ?? ''));
+    if (choice?.message && wantsTools) {
+      return await runAgentLoop(choice.message, user, messages, tools);
     }
 
-    const rawAnswer = choice?.message?.content?.trim();
+    const rawAnswer = cleanLeakedToolSyntax(choice?.message?.content ?? '');
     // Empty primary response (no throw) must still fail over to the backups
     // instead of dead-ending on a canned "unable to respond" — otherwise a flaky
     // primary silently swallows the question.

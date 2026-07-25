@@ -7,6 +7,18 @@ vi.mock('./roleActionRegistry', () => ({
   findAction: vi.fn(),
 }));
 
+vi.mock('../../lib/prisma', () => ({
+  prisma: {
+    user: {
+      findUnique: vi.fn(),
+      findFirst: vi.fn(),
+      findMany: vi.fn(),
+    },
+  },
+}));
+
+import { prisma } from '../../lib/prisma';
+
 const hodUser = {
   sub: 'hod-greenwood',
   schoolId: 'school-greenwood',
@@ -48,8 +60,16 @@ describe('roleContextQuery', () => {
     expect(result?.answer).toMatch(/Greenwood Admin/);
   });
 
-  it('returns null for HOD on student-only actions', async () => {
+  it('answers HOD "my teachers" with their department teachers (no dead-end)', async () => {
+    // HOD path uses fetchDepartmentTeachers → prisma.user.findMany.
+    vi.mocked(prisma.user.findMany).mockResolvedValue([
+      { fullName: 'Mr. Jones' },
+      { fullName: 'Ms. Lee' },
+    ] as never);
+
     const result = await queryRoleContext(hodUser as never, 'my teachers');
-    expect(result).toBeNull();
+    expect(result?.intent).toBe('list_my_teachers');
+    expect(result?.answer).toMatch(/Mr\. Jones/);
+    expect(result?.answer).not.toMatch(/not linked to a class/i);
   });
 });

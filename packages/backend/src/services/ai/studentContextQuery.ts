@@ -40,6 +40,7 @@ export const SCHOOL_ADMIN_LOOKUP_ROLES: UserRole[] = [
   UserRole.STUDENT,
   UserRole.TEACHER,
   UserRole.HOD,
+  UserRole.GUARDIAN,
 ];
 
 export const STUDENT_TEACHERS_QUERY_PATTERNS: RegExp[] = [
@@ -55,6 +56,10 @@ export const STUDENT_TEACHERS_QUERY_PATTERNS: RegExp[] = [
   /(?:my\s+)?teachers?\s+(?:contact|details?|info(?:rmation)?|profile|name|email|phone|mobile|number)/i,
   /(?:contact|details?|info(?:rmation)?|profile|name|email|phone|mobile|number)\s+(?:of\s+)?(?:my|our)?\s*teachers?/i,
   /who\s+(?:teaches?|is\s+teaching)\s+(?:me|us|my\s+class)/i,
+  // Guardian/parent phrasing — about their child
+  /who\s+(?:teaches?|is\s+teaching)\s+(?:my|our)\s+(?:child|kid|son|daughter|ward)/i,
+  /(?:my|our)\s+(?:child|kid|son|daughter|ward)(?:'s|s')?\s+teachers?/i,
+  /teachers?\s+(?:of|for)\s+(?:my|our)\s+(?:child|kid|son|daughter|ward)/i,
 ];
 
 /** Class rep before generic "my class" so rep questions are not misclassified. */

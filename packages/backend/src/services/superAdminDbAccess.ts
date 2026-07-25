@@ -33,6 +33,63 @@ function isReadOnlyQuery(sql: string): boolean {
   return !DANGEROUS_PATTERNS.some((p) => p.test(trimmed));
 }
 
+// ─── Write access (opt-in, Super Admin only) ────────────────────────────────
+// Off by default. Turned on with SAMS_AI_SQL_WRITE=1 on the server — the same
+// deliberate flag pattern as SAMS_AI_SHELL. Even when on, a few catastrophic
+// operations stay blocked so a single hallucinated statement can't wipe the
+// platform. The owner runs those from a real psql session, not from chat.
+const WRITE_SQL_RE = /^\s*(INSERT|UPDATE|DELETE)\s/i;
+const CATASTROPHIC_PATTERNS: Array<{ re: RegExp; reason: string }> = [
+  { re: /\bDROP\b/i, reason: 'DROP is never allowed from AI chat' },
+  { re: /\bTRUNCATE\b/i, reason: 'TRUNCATE wipes whole tables' },
+  { re: /\bALTER\b/i, reason: 'schema changes must be a migration, not AI chat' },
+  { re: /\bGRANT\b|\bREVOKE\b/i, reason: 'permission changes are not allowed from AI chat' },
+  { re: /\bCREATE\b/i, reason: 'CREATE must be a migration, not AI chat' },
+  // UPDATE/DELETE with no WHERE = touches every row. Almost always a mistake.
+  { re: /^\s*(UPDATE|DELETE)\b(?![\s\S]*\bWHERE\b)/i, reason: 'UPDATE/DELETE without a WHERE clause affects every row' },
+  { re: /;\s*\S/, reason: 'multiple statements in one query are not allowed' },
+  { re: /\/\*/, reason: 'block comments can hide malicious SQL' },
+];
+
+export function isSqlWriteEnabled(): boolean {
+  return process.env.SAMS_AI_SQL_WRITE === '1';
+}
+
+/** Screen a write statement. Returns a block reason, or null when it's allowed. */
+export function assessWriteQuery(sql: string): string | null {
+  const trimmed = sql.trim();
+  if (!WRITE_SQL_RE.test(trimmed)) {
+    return 'Only INSERT, UPDATE, and DELETE writes are supported here.';
+  }
+  const hit = CATASTROPHIC_PATTERNS.find((p) => p.re.test(trimmed));
+  return hit ? hit.reason : null;
+}
+
+/**
+ * Run a write statement (INSERT/UPDATE/DELETE) — Super Admin, opt-in only.
+ * Returns the number of affected rows. Callers MUST have already gated on role
+ * and confirmation; this layer only enforces the flag + catastrophic deny-list.
+ */
+export async function runWriteQuery(sql: string): Promise<{ affectedRows: number; executionMs: number }> {
+  if (!isSqlWriteEnabled()) {
+    throw new Error('SQL writes are disabled. Set SAMS_AI_SQL_WRITE=1 on the server to enable them.');
+  }
+  const blockReason = assessWriteQuery(sql);
+  if (blockReason) throw new Error(`Blocked: ${blockReason}.`);
+
+  const trimmed = sql.trim();
+  if (trimmed.length > 2000) throw new Error('Query too long. Maximum 2000 characters.');
+
+  const start = Date.now();
+  try {
+    const affectedRows = await prisma.$executeRawUnsafe(trimmed);
+    return { affectedRows, executionMs: Date.now() - start };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    throw new Error(`Write failed: ${message}`);
+  }
+}
+
 // ─── Services ────────────────────────────────────────────────────────────────
 
 /**

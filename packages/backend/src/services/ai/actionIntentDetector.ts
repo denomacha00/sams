@@ -1,6 +1,74 @@
 import { getActionsForRole, isActionPermitted, normalizeActionPatterns } from './roleActionRegistry';
 import { classifyIntent } from './llmActionClassifier';
 
+// ─── Fuzzy matching (typo tolerance) ────────────────────────────────────────────
+// Real people mistype. "susspend", "notifiy", "sesson", "genrate", "adim" must
+// still reach the classifier instead of dying at the keyword gate. We compare
+// each token against known action verbs/nouns with a bounded edit distance so a
+// slip of one or two characters still counts as a match.
+
+/** Levenshtein edit distance, capped early once it exceeds `max` (perf guard). */
+function editDistance(a: string, b: string, max: number): number {
+  const al = a.length;
+  const bl = b.length;
+  if (Math.abs(al - bl) > max) return max + 1;
+  if (al === 0) return bl;
+  if (bl === 0) return al;
+
+  let prev = new Array<number>(bl + 1);
+  let curr = new Array<number>(bl + 1);
+  for (let j = 0; j <= bl; j++) prev[j] = j;
+
+  for (let i = 1; i <= al; i++) {
+    curr[0] = i;
+    let rowMin = curr[0];
+    for (let j = 1; j <= bl; j++) {
+      const cost = a[i - 1] === b[j - 1] ? 0 : 1;
+      curr[j] = Math.min(prev[j] + 1, curr[j - 1] + 1, prev[j - 1] + cost);
+      if (curr[j] < rowMin) rowMin = curr[j];
+    }
+    if (rowMin > max) return max + 1; // whole row already over budget
+    [prev, curr] = [curr, prev];
+  }
+  return prev[bl];
+}
+
+/** Edit-distance budget that scales with word length (longer words tolerate more). */
+function fuzzyBudget(word: string): number {
+  if (word.length <= 4) return 1;
+  if (word.length <= 8) return 2;
+  return 2;
+}
+
+/**
+ * True when any token in `tokens` matches `keyword` exactly OR within its fuzzy
+ * budget. Short keywords (<=3 chars) require an exact match to avoid noise.
+ */
+function tokenFuzzyMatches(tokens: string[], keyword: string): boolean {
+  if (keyword.length <= 3) return tokens.includes(keyword);
+  const budget = fuzzyBudget(keyword);
+  return tokens.some((t) => {
+    if (t === keyword) return true;
+    if (Math.abs(t.length - keyword.length) > budget) return false;
+    return editDistance(t, keyword, budget) <= budget;
+  });
+}
+
+/** True when the message contains a fuzzy hit for ANY of the supplied keywords. */
+function anyKeywordFuzzy(tokens: string[], keywords: readonly string[]): boolean {
+  return keywords.some((kw) => tokenFuzzyMatches(tokens, kw));
+}
+
+// Domain nouns — the SAMS things an action usually targets.
+const DOMAIN_NOUNS: readonly string[] = [
+  'attendance', 'timetable', 'schedule', 'report', 'risk', 'student', 'students',
+  'teacher', 'teachers', 'class', 'classes', 'department', 'school', 'schools',
+  'session', 'sessions', 'notification', 'notifications', 'message', 'messages',
+  'parent', 'parents', 'guardian', 'guardians', 'license', 'licence', 'payment',
+  'payments', 'roster', 'admin', 'user', 'users', 'password', 'reminder',
+  'reminders', 'hod', 'stats', 'statistics',
+];
+
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 export interface DetectedAction {
@@ -55,23 +123,42 @@ class ActionIntentDetector {
   private mightBeActionRequest(message: string): boolean {
     const q = message.toLowerCase();
     if (/^@\w+/.test(q)) return true;
-    if (
-      /\b(?:send|message|notify|email|sms|export|download|generate|create|add|delete|remove|clear|update|change|set|reset|suspend|unsuspend|start|stop|end|open|close|trigger|run|mark|register|remind)\b/.test(q)
-    ) {
+
+    // Tokenize on non-letters so "notify:" / "sesson." / "students," still split
+    // into clean words for fuzzy comparison.
+    const tokens = q.split(/[^a-z]+/).filter(Boolean);
+    if (tokens.length === 0) return false;
+
+    // Any strong action verb (fuzzy) is enough on its own — mirrors the old
+    // "verb anywhere" rule but now tolerates typos like "susspend"/"notifiy".
+    const STRONG_VERBS = [
+      'send', 'notify', 'email', 'export', 'download', 'generate', 'create',
+      'add', 'delete', 'remove', 'clear', 'update', 'change', 'reset', 'suspend',
+      'unsuspend', 'block', 'unblock', 'start', 'stop', 'trigger', 'run', 'mark',
+      'register', 'remind', 'extend', 'renew', 'reactivate',
+    ] as const;
+    if (anyKeywordFuzzy(tokens, STRONG_VERBS)) return true;
+
+    // Read/lookup verbs count only when a domain noun is also present (fuzzy on
+    // both) — "show attendance", "pul up my timetabel", "chek the roster".
+    const READ_VERBS = [
+      'show', 'view', 'list', 'check', 'read', 'get', 'find', 'pull', 'bring',
+      'display', 'lookup', 'search', 'open',
+    ] as const;
+    if (anyKeywordFuzzy(tokens, READ_VERBS) && anyKeywordFuzzy(tokens, DOMAIN_NOUNS)) {
       return true;
     }
-    if (
-      /\b(?:show|view|list|pull\s+up|bring\s+up|check|read|get|find)\b/.test(q) &&
-      /\b(?:attendance|timetable|schedule|report|risk|students?|teachers?|classes?|department|school|session|notifications?|messages?|parents?|guardians?|license|licence|payments?)\b/.test(q)
-    ) {
-      return true;
-    }
+
+    // "how many <thing>" headcount questions (typo-tolerant on the noun).
     if (
       /\bhow\s+many\b/.test(q) &&
-      /\b(?:students?|teachers?|classes?|users?|schools?|sessions?|departments?)\b/.test(q)
+      anyKeywordFuzzy(tokens, [
+        'students', 'teachers', 'classes', 'users', 'schools', 'sessions', 'departments',
+      ])
     ) {
       return true;
     }
+
     return false;
   }
 

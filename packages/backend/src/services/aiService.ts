@@ -596,7 +596,14 @@ export class AIService {
       return { ...unhandledAction, threadId };
     }
 
-    if (isSamsDataQuery(question)) {
+    // Anti-hallucination dead-end: a SAMS-data-shaped question the local engine
+    // couldn't resolve normally stops here so the LLM can't invent numbers.
+    // EXCEPTION — Super Admins fall through to the agent: they carry the
+    // query_database tool, so the agent fetches REAL data instead of guessing.
+    // That's the "no restrictions in super admin" behaviour, and it's safe
+    // precisely because the answer is grounded in a live query, not the model's
+    // imagination. Other roles keep the guard (they'd get invented figures).
+    if (isSamsDataQuery(question) && user.role !== UserRole.SUPER_ADMIN) {
       const blocked: AIServiceResponse = {
         answer: SAMS_DATA_NOT_FOUND_MESSAGE,
         intent: 'data_not_found',

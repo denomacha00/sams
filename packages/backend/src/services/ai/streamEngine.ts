@@ -16,11 +16,15 @@ import {
   hasAtomesusAIKey,
   getMissingAIKeyMessage,
 } from './aiProviderConfig';
-import { buildSystemPrompt, getRoleScopedTools, dispatchFunctionCall, shouldUseTools, sanitizeLlmOutput } from './openaiEngine';
+import { buildSystemPrompt, getRoleScopedTools, dispatchFunctionCall, shouldUseTools, sanitizeLlmOutput, cleanLeakedToolSyntax } from './openaiEngine';
 
 export interface StreamChunk {
   text: string;
 }
+
+// Max think→act→observe rounds for the streaming agent. Kept tight so the whole
+// streamed turn stays responsive; each round is a fresh completion call.
+const MAX_STREAM_AGENT_STEPS = Number.parseInt(process.env.AI_MAX_AGENT_STEPS ?? '', 10) || 3;
 
 /**
  * Stream a chat completion from the primary AI provider.
@@ -178,52 +182,15 @@ async function doStreamCompletion(
     }
 
     if (hasToolCalls && finishReason === 'tool_calls') {
-      const toolResultsMessages: OpenAI.Chat.Completions.ChatCompletionMessageParam[] = [
-        ...messages,
-        {
-          role: 'assistant',
-          content: null,
-          tool_calls: Array.from(toolCalls.values()).map((tc) => ({
-            id: tc.id,
-            type: 'function' as const,
-            function: { name: tc.name, arguments: tc.arguments },
-          })),
-        },
-      ];
-
-      for (const [, tc] of toolCalls) {
-        try {
-          const result = await dispatchFunctionCall(tc.name, tc.arguments, user, { restrictSqlToSuperAdmin: true });
-          toolResultsMessages.push({
-            role: 'tool',
-            tool_call_id: tc.id,
-            content: result,
-          });
-        } catch (err) {
-          toolResultsMessages.push({
-            role: 'tool',
-            tool_call_id: tc.id,
-            content: JSON.stringify({ error: err instanceof Error ? err.message : String(err) }),
-          });
-        }
-      }
-
-      const followUpStream = await client.chat.completions.create({
-        model,
-        messages: toolResultsMessages,
-        temperature: 0.85,
-        max_tokens: 800,
-        stream: true,
-      });
-
-      for await (const fChunk of followUpStream) {
-        const fDelta = fChunk.choices[0]?.delta;
-        if (fDelta?.content) {
-          accumulatedAnswer += fDelta.content;
-          onDelta({ text: fDelta.content });
-        }
-      }
-
+      // Chain tool rounds: run the requested tools, then let the model either
+      // ask for MORE tools (chaining, e.g. lookup_school → query_attendance) or
+      // stream its final text answer. Bounded by MAX_STREAM_AGENT_STEPS.
+      const followUpText = await streamAgentRounds(
+        client, model, messages, user,
+        Array.from(toolCalls.values()),
+        onDelta,
+      );
+      accumulatedAnswer += followUpText;
       break;
     }
   }
@@ -236,7 +203,7 @@ async function doStreamCompletion(
   // The non-streaming path (openaiQuery/openaiQueryWithHistory) already does this,
   // but the streaming path was returning raw LLM output without sanitization,
   // allowing the model to identify as Atomesus/Cipher/from India.
-  const sanitized = sanitizeLlmOutput(accumulatedAnswer);
+  const sanitized = sanitizeLlmOutput(cleanLeakedToolSyntax(accumulatedAnswer));
 
   return {
     answer: sanitized,
@@ -244,4 +211,108 @@ async function doStreamCompletion(
     engine: 'openai',
     data: undefined,
   };
+}
+
+interface StreamToolCall {
+  id: string;
+  name: string;
+  arguments: string;
+}
+
+/**
+ * Run one-or-more streamed tool rounds (think → act → observe → repeat).
+ *
+ * The old code executed a single tool round and stopped, so the streaming agent
+ * could never chain lookups. This loops: run the requested tools, ask the model
+ * again with the results, and if it wants more tools, keep going — up to
+ * MAX_STREAM_AGENT_STEPS. On the final allowed step tools are withheld so the
+ * model is forced to produce a text answer. Returns the streamed final text.
+ */
+async function streamAgentRounds(
+  client: OpenAI,
+  model: string,
+  baseMessages: OpenAI.Chat.Completions.ChatCompletionMessageParam[],
+  user: AccessTokenPayload,
+  initialCalls: StreamToolCall[],
+  onDelta: (chunk: StreamChunk) => void,
+): Promise<string> {
+  const messages = [...baseMessages];
+  let pendingCalls = initialCalls;
+  let finalText = '';
+
+  for (let step = 0; step < MAX_STREAM_AGENT_STEPS; step++) {
+    // Record the assistant's tool request, then execute every tool it asked for.
+    messages.push({
+      role: 'assistant',
+      content: null,
+      tool_calls: pendingCalls.map((tc) => ({
+        id: tc.id,
+        type: 'function' as const,
+        function: { name: tc.name, arguments: tc.arguments },
+      })),
+    });
+    for (const tc of pendingCalls) {
+      try {
+        const result = await dispatchFunctionCall(tc.name, tc.arguments, user, { restrictSqlToSuperAdmin: true });
+        messages.push({ role: 'tool', tool_call_id: tc.id, content: result });
+      } catch (err) {
+        messages.push({
+          role: 'tool',
+          tool_call_id: tc.id,
+          content: JSON.stringify({ error: err instanceof Error ? err.message : String(err) }),
+        });
+      }
+    }
+
+    // Force a text answer on the last allowed step (withhold tools).
+    const isLastStep = step === MAX_STREAM_AGENT_STEPS - 1;
+    const stream = await client.chat.completions.create({
+      model,
+      messages,
+      // Low temperature once we're reasoning over tool results — stay faithful to
+      // the fetched data instead of improvising (mirrors the non-streaming loop).
+      temperature: 0.2,
+      max_tokens: 800,
+      stream: true,
+      ...(isLastStep ? {} : { tools: getRoleScopedTools(user.role), tool_choice: 'auto' as const }),
+    });
+
+    const nextCalls: Map<number, StreamToolCall> = new Map();
+    let roundHasToolCalls = false;
+    let sentLen = 0;
+    let roundText = '';
+
+    for await (const chunk of stream) {
+      const delta = chunk.choices[0]?.delta;
+      if (delta?.content) {
+        roundText += delta.content;
+        // Stream sanitised text as it arrives, diffing against what's been sent.
+        const clean = sanitizeLlmOutput(roundText);
+        const newChars = clean.slice(sentLen);
+        if (newChars) {
+          onDelta({ text: newChars });
+          sentLen = clean.length;
+        }
+      }
+      if (delta?.tool_calls) {
+        roundHasToolCalls = true;
+        for (const tc of delta.tool_calls) {
+          const idx = tc.index ?? 0;
+          const existing = nextCalls.get(idx) ?? { id: '', name: '', arguments: '' };
+          if (tc.id) existing.id = tc.id;
+          if (tc.function?.name) existing.name = tc.function.name;
+          if (tc.function?.arguments) existing.arguments += tc.function.arguments;
+          nextCalls.set(idx, existing);
+        }
+      }
+    }
+
+    finalText += roundText;
+
+    // No further tools requested → we're done.
+    if (!roundHasToolCalls || nextCalls.size === 0) break;
+    pendingCalls = Array.from(nextCalls.values());
+  }
+
+  return finalText;
 }

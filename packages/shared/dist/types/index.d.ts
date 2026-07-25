@@ -99,7 +99,8 @@ export interface ConflictResult {
     recordId: string;
     resolution: 'server_wins' | 'offline_wins';
     offlineRecord: OfflineAttendanceRecord;
-    serverRecord: OfflineAttendanceRecord;
+    /** Absent when the offline record was rejected before any server record existed (e.g. invalid timestamp). */
+    serverRecord?: OfflineAttendanceRecord;
 }
 export interface BiometricMatch {
     studentId: string;

@@ -10,7 +10,17 @@ vi.mock('./roleActionRegistry', () => ({
   findAction: vi.fn(),
 }));
 
+vi.mock('../../lib/prisma', () => ({
+  prisma: {
+    user: {
+      findUnique: vi.fn(),
+      findFirst: vi.fn(),
+    },
+  },
+}));
+
 import { findAction } from './roleActionRegistry';
+import { prisma } from '../../lib/prisma';
 
 const studentUser = {
   sub: 'stu-betty',
@@ -70,9 +80,22 @@ describe('studentContextQuery', () => {
     expect(detectStudentContextAction('my class rep')).toBe('who_is_class_rep');
   });
 
-  it('returns null for non-students on student-only actions', async () => {
-    const teacher = { ...studentUser, role: UserRole.TEACHER };
-    await expect(queryStudentContext(teacher as never, 'my hod')).resolves.toBeNull();
+  it('answers a teacher asking for their HOD via departmentId (no classId dead-end)', async () => {
+    // Teacher lookup: first their own departmentId, then the HOD in that department.
+    vi.mocked(prisma.user.findUnique).mockResolvedValue({ departmentId: 'dept-1' } as never);
+    vi.mocked(prisma.user.findFirst).mockResolvedValue({
+      fullName: 'Dr. Smith',
+      email: 'smith@school.edu',
+      phone: null,
+      department: { name: 'Science' },
+    } as never);
+
+    const teacher = { ...studentUser, role: UserRole.TEACHER, departmentId: 'dept-1', classId: undefined };
+    const result = await queryStudentContext(teacher as never, 'my hod');
+    expect(result?.intent).toBe('list_my_hod');
+    expect(result?.answer).toMatch(/Dr\. Smith/);
+    // Must NOT hit the classId-dependent student handler dead-end.
+    expect(result?.answer).not.toMatch(/not linked to a class/i);
   });
 
   it('allows HOD to query school admin', async () => {

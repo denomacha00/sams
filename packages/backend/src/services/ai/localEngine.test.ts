@@ -16,6 +16,9 @@ const { prismaMock } = vi.hoisted(() => ({
     user: {
       findMany: vi.fn(),
     },
+    teacherSubject: {
+      findMany: vi.fn(),
+    },
   },
 }));
 
@@ -49,6 +52,15 @@ describe('localQuery timetable generation', () => {
     prismaMock.user.findMany.mockResolvedValue([
       { id: 'teacher-1', fullName: 'Teacher One', departmentId: 'dept-1' },
     ]);
+    prismaMock.teacherSubject.findMany
+      // teacherSubjectRows: subject + teacher.departmentId
+      .mockResolvedValueOnce([
+        { subject: 'Mathematics', teacher: { departmentId: 'dept-1' } },
+      ])
+      // teacherSubjectForMap: teacherId + subject
+      .mockResolvedValueOnce([
+        { teacherId: 'teacher-1', subject: 'Mathematics' },
+      ]);
   });
 
   it('limits HOD whole-school timetable generation to the HOD department', async () => {
