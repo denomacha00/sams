@@ -10,8 +10,8 @@ import { identifierMatchConditions } from '../utils/userIdentifier';
 // ─── Constants ────────────────────────────────────────────────────────────────
 
 const ACCESS_TOKEN_EXPIRY = '15m';
-const REFRESH_TOKEN_EXPIRY = '30d';
-const REFRESH_TOKEN_EXPIRY_MS = 30 * 24 * 60 * 60 * 1000; // 30 days in ms
+const REFRESH_TOKEN_EXPIRY = '1d';
+const REFRESH_TOKEN_EXPIRY_MS = 1 * 24 * 60 * 60 * 1000; // 1 day in ms
 
 const MAX_FAILED_ATTEMPTS = 15;
 const LOGIN_COOLDOWN_MS = 60 * 1000; // 1 minute in ms
@@ -29,7 +29,7 @@ function normalizeLoginSchoolCode(schoolCode: string): string {
 
 export interface TokenPair {
   accessToken: string;  // JWT, 15 min expiry
-  refreshToken: string; // JWT, 30 days expiry
+  refreshToken: string; // JWT, 1 day expiry (session lifetime)
 }
 
 interface AccessTokenPayload {

@@ -1,4 +1,5 @@
 import { Router, type Request, type Response, type NextFunction, type RequestHandler } from 'express';
+import rateLimit from 'express-rate-limit';
 import jwt from 'jsonwebtoken';
 import multer, { type Multer } from 'multer';
 import { type AccessTokenPayload, UserRole } from '@sams/shared';
@@ -19,6 +20,7 @@ import {
   runVisionChatCompletion,
 } from '../services/ai/aiProviderConfig';
 import { isConversationMemoryEnabled } from '../services/ai/roleActionsPrompt';
+import { createRateLimitStore, getClientIp } from '../lib/rateLimitStore';
 
 // Multer config for multi-image uploads (max 4 images, 5MB each)
 const aiUpload = multer({
@@ -107,6 +109,31 @@ export function optionalAiAuth(req: Request, _res: Response, next: NextFunction)
 }
 
 aiRouter.use(optionalAiAuth);
+
+// ─── Guest Rate Limiter ───────────────────────────────────────────────────────
+// Unauthenticated callers hit paid AI providers (Groq/vision/image). Throttle
+// them hard per-IP so a stranger can't burn API credits or DoS the AI. Signed-in
+// users are skipped here and governed by the global limiter instead.
+const GUEST_AI_MAX = Number.parseInt(process.env.AI_GUEST_RATE_LIMIT ?? '15', 10);
+const guestAiLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: Number.isFinite(GUEST_AI_MAX) && GUEST_AI_MAX > 0 ? GUEST_AI_MAX : 15,
+  store: createRateLimitStore('rl:ai-guest:'),
+  passOnStoreError: true,
+  standardHeaders: true,
+  legacyHeaders: false,
+  keyGenerator: getClientIp,
+  skip: (req: Request) => Boolean(req.user), // authenticated users use global limits
+  handler: (_req: Request, res: Response) => {
+    res.status(429).json({
+      answer:
+        "You're sending requests a bit too fast. Please wait a moment and try again — or sign in for higher limits.",
+      intent: 'rate_limited',
+      engine: 'local',
+    });
+  },
+});
+aiRouter.use(guestAiLimiter);
 
 // SAMS data intents that require authentication
 const DATA_INTENTS = [

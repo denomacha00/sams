@@ -189,10 +189,23 @@ export function registerApplication(app: express.Express, httpServer: HttpServer
   app.use('/api/v1/schemes', schemeOfWorkRouter);
   app.use('/api/v1/school-calendar', schoolCalendarRouter);
 
+  // Socket.IO CORS — mirror the HTTP policy. Never fall back to '*' in production.
+  const socketCorsRaw = process.env.CORS_ORIGIN;
+  let socketOrigin: boolean | string | string[];
+  if (socketCorsRaw && socketCorsRaw !== '*') {
+    const allowed = socketCorsRaw.split(',').map((s) => s.trim()).filter(Boolean);
+    socketOrigin = allowed.length === 1 ? allowed[0] : allowed;
+  } else if (process.env.NODE_ENV === 'production') {
+    socketOrigin = false;
+  } else {
+    socketOrigin = true;
+  }
+
   io = new SocketIOServer(httpServer, {
     cors: {
-      origin: process.env.CORS_ORIGIN ?? '*',
+      origin: socketOrigin,
       methods: ['GET', 'POST'],
+      credentials: true,
     },
   });
 
