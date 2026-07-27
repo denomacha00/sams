@@ -16,7 +16,7 @@ import {
   hasAtomesusAIKey,
   getMissingAIKeyMessage,
 } from './aiProviderConfig';
-import { buildSystemPrompt, getRoleScopedTools, dispatchFunctionCall, shouldUseTools, sanitizeLlmOutput, cleanLeakedToolSyntax } from './openaiEngine';
+import { buildSystemPrompt, getRoleScopedTools, dispatchFunctionCall, shouldUseTools, sanitizeLlmOutput, cleanLeakedToolSyntax, extractTextEmbeddedToolCall } from './openaiEngine';
 
 export interface StreamChunk {
   text: string;
@@ -116,10 +116,89 @@ function buildStreamMessages(
   ];
 }
 
-interface AccumulatedToolCall {
+interface StreamToolCall {
   id: string;
   name: string;
   arguments: string;
+}
+
+interface GatedStreamResult {
+  /** Full raw accumulated text content (unsanitised). */
+  rawContent: string;
+  /** True if any sanitised text was actually forwarded to the client via onDelta. */
+  streamed: boolean;
+  /** True if content was withheld because it began as a tool-call blob. */
+  gated: boolean;
+  /** Structured tool calls collected from the tool_calls channel. */
+  toolCalls: StreamToolCall[];
+}
+
+/**
+ * Decide, once, whether the streamed content is a leaked tool-call blob that
+ * must be withheld from the user. Groq/llama models sometimes emit a tool call
+ * as raw JSON in `content` instead of the structured `tool_calls` channel; if we
+ * stream that verbatim the user sees `{"name":"query_database",...}` as "the
+ * answer". Real prose never *starts* with `{` or `<tool_call>`, so keying off the
+ * leading non-whitespace char lets normal answers stream unaffected.
+ */
+function looksLikeLeakedToolBlob(content: string): boolean {
+  const lead = content.trimStart();
+  if (!lead) return false;
+  return lead[0] === '{' || /^<tool_call/i.test(lead) || /^```(?:json|tool_code)\b/i.test(lead);
+}
+
+/**
+ * Consume a streaming completion, forwarding sanitised prose token-by-token but
+ * buffering (never forwarding) content that begins as a leaked tool-call blob.
+ * Structured tool_calls are accumulated regardless. The caller inspects the
+ * result to recover a real tool run or flush cleaned text.
+ */
+async function consumeGatedStream(
+  stream: AsyncIterable<OpenAI.Chat.Completions.ChatCompletionChunk>,
+  onDelta: (chunk: StreamChunk) => void,
+): Promise<GatedStreamResult> {
+  let rawContent = '';
+  let sentLen = 0;
+  let gateDecided = false;
+  let gated = false;
+  let streamed = false;
+  const calls: Map<number, StreamToolCall> = new Map();
+
+  for await (const chunk of stream) {
+    const delta = chunk.choices[0]?.delta;
+
+    if (delta?.content) {
+      rawContent += delta.content;
+      if (!gateDecided && rawContent.trimStart().length > 0) {
+        gated = looksLikeLeakedToolBlob(rawContent);
+        gateDecided = true;
+      }
+      if (!gated) {
+        // Sanitize the full text so far, then diff against what was already sent
+        // so we never forward tokens that sanitisation would later rewrite.
+        const sanitizedSoFar = sanitizeLlmOutput(rawContent);
+        const newChars = sanitizedSoFar.slice(sentLen);
+        if (newChars) {
+          onDelta({ text: newChars });
+          sentLen = sanitizedSoFar.length;
+          streamed = true;
+        }
+      }
+    }
+
+    if (delta?.tool_calls) {
+      for (const tc of delta.tool_calls) {
+        const idx = tc.index ?? 0;
+        const existing = calls.get(idx) ?? { id: '', name: '', arguments: '' };
+        if (tc.id) existing.id = tc.id;
+        if (tc.function?.name) existing.name = tc.function.name;
+        if (tc.function?.arguments) existing.arguments += tc.function.arguments;
+        calls.set(idx, existing);
+      }
+    }
+  }
+
+  return { rawContent, streamed, gated, toolCalls: Array.from(calls.values()) };
 }
 
 /**
@@ -128,7 +207,8 @@ interface AccumulatedToolCall {
  * executes them, then makes a follow-up streaming call to get the final answer.
  *
  * CRITICAL: The final accumulated answer is sanitized through sanitizeLlmOutput()
- * before returning to prevent identity drift.
+ * before returning to prevent identity drift, and leaked tool-call JSON is never
+ * streamed to the user — it is recovered into a real tool run instead.
  */
 async function doStreamCompletion(
   client: OpenAI,
@@ -147,55 +227,44 @@ async function doStreamCompletion(
     ...(useTools ? { tools: getRoleScopedTools(user.role), tool_choice: 'auto' as const } : {}),
   });
 
-  let accumulatedAnswer = '';
-  const toolCalls: Map<number, AccumulatedToolCall> = new Map();
-  let hasToolCalls = false;
+  const { rawContent, streamed, gated, toolCalls } = await consumeGatedStream(stream, onDelta);
 
-  let lastSanitizedLength = 0;
-
-  for await (const chunk of stream) {
-    const delta = chunk.choices[0]?.delta;
-    const finishReason = chunk.choices[0]?.finish_reason;
-
-    if (delta?.content) {
-      accumulatedAnswer += delta.content;
-      // Sanitize in real-time: the full accumulated text gets sanitized,
-      // then we diff against what was already sent to avoid sending bad tokens.
-      const sanitizedSoFar = sanitizeLlmOutput(accumulatedAnswer);
-      const newChars = sanitizedSoFar.slice(lastSanitizedLength);
-      if (newChars) {
-        onDelta({ text: newChars });
-        lastSanitizedLength = sanitizedSoFar.length;
-      }
-    }
-
-    if (delta?.tool_calls) {
-      hasToolCalls = true;
-      for (const tc of delta.tool_calls) {
-        const idx = tc.index ?? 0;
-        const existing = toolCalls.get(idx) ?? { id: '', name: '', arguments: '' };
-        if (tc.id) existing.id = tc.id;
-        if (tc.function?.name) existing.name = tc.function.name;
-        if (tc.function?.arguments) existing.arguments += tc.function.arguments;
-        toolCalls.set(idx, existing);
-      }
-    }
-
-    if (hasToolCalls && finishReason === 'tool_calls') {
-      // Chain tool rounds: run the requested tools, then let the model either
-      // ask for MORE tools (chaining, e.g. lookup_school → query_attendance) or
-      // stream its final text answer. Bounded by MAX_STREAM_AGENT_STEPS.
-      const followUpText = await streamAgentRounds(
-        client, model, messages, user,
-        Array.from(toolCalls.values()),
-        onDelta,
-      );
-      accumulatedAnswer += followUpText;
-      break;
-    }
+  // Structured tool calls → run the agent rounds so the real answer streams.
+  if (toolCalls.length > 0) {
+    const followUpText = await streamAgentRounds(client, model, messages, user, toolCalls, onDelta);
+    const sanitized = sanitizeLlmOutput(cleanLeakedToolSyntax(followUpText));
+    return sanitized.trim()
+      ? { answer: sanitized, intent: 'openai_response', engine: 'openai', data: undefined }
+      : null;
   }
 
-  if (!accumulatedAnswer.trim()) {
+  // Content was withheld because it looked like a leaked tool-call blob. Try to
+  // recover a real tool call from it (the model meant to call a tool but emitted
+  // JSON as text); if recoverable, run it so the user gets a real answer.
+  if (gated) {
+    const embedded = useTools ? extractTextEmbeddedToolCall(rawContent) : null;
+    if (embedded) {
+      const followUpText = await streamAgentRounds(
+        client, model, messages, user,
+        [{ id: 'text_call_0', name: embedded.name, arguments: embedded.arguments }],
+        onDelta,
+      );
+      const sanitized = sanitizeLlmOutput(cleanLeakedToolSyntax(followUpText));
+      if (sanitized.trim()) {
+        return { answer: sanitized, intent: 'openai_response', engine: 'openai', data: undefined };
+      }
+    }
+    // Not a recoverable tool call (or tools unavailable) — flush the cleaned text
+    // now so a withheld-but-benign message still reaches the user.
+    const cleaned = sanitizeLlmOutput(cleanLeakedToolSyntax(rawContent));
+    if (cleaned.trim()) {
+      onDelta({ text: cleaned });
+      return { answer: cleaned, intent: 'openai_response', engine: 'openai', data: undefined };
+    }
+    return null;
+  }
+
+  if (!streamed || !rawContent.trim()) {
     return null;
   }
 
@@ -203,7 +272,7 @@ async function doStreamCompletion(
   // The non-streaming path (openaiQuery/openaiQueryWithHistory) already does this,
   // but the streaming path was returning raw LLM output without sanitization,
   // allowing the model to identify as Atomesus/Cipher/from India.
-  const sanitized = sanitizeLlmOutput(cleanLeakedToolSyntax(accumulatedAnswer));
+  const sanitized = sanitizeLlmOutput(cleanLeakedToolSyntax(rawContent));
 
   return {
     answer: sanitized,
@@ -211,12 +280,6 @@ async function doStreamCompletion(
     engine: 'openai',
     data: undefined,
   };
-}
-
-interface StreamToolCall {
-  id: string;
-  name: string;
-  arguments: string;
 }
 
 /**
@@ -277,41 +340,34 @@ async function streamAgentRounds(
       ...(isLastStep ? {} : { tools: getRoleScopedTools(user.role), tool_choice: 'auto' as const }),
     });
 
-    const nextCalls: Map<number, StreamToolCall> = new Map();
-    let roundHasToolCalls = false;
-    let sentLen = 0;
-    let roundText = '';
+    // Reuse the gated consumer: prose streams live, but a leaked tool-call blob
+    // is withheld and recovered below rather than shown to the user.
+    const { rawContent: roundText, gated, toolCalls: nextCalls } = await consumeGatedStream(stream, onDelta);
 
-    for await (const chunk of stream) {
-      const delta = chunk.choices[0]?.delta;
-      if (delta?.content) {
-        roundText += delta.content;
-        // Stream sanitised text as it arrives, diffing against what's been sent.
-        const clean = sanitizeLlmOutput(roundText);
-        const newChars = clean.slice(sentLen);
-        if (newChars) {
-          onDelta({ text: newChars });
-          sentLen = clean.length;
-        }
+    // Structured tool calls → keep looping (chained lookups).
+    if (nextCalls.length > 0) {
+      pendingCalls = nextCalls;
+      continue;
+    }
+
+    // Content withheld as a suspected tool blob: recover a real call and loop,
+    // unless we're on the last step (tools withheld) — then flush cleaned text.
+    if (gated) {
+      const embedded = isLastStep ? null : extractTextEmbeddedToolCall(roundText);
+      if (embedded) {
+        pendingCalls = [{ id: `text_call_${step}`, name: embedded.name, arguments: embedded.arguments }];
+        continue;
       }
-      if (delta?.tool_calls) {
-        roundHasToolCalls = true;
-        for (const tc of delta.tool_calls) {
-          const idx = tc.index ?? 0;
-          const existing = nextCalls.get(idx) ?? { id: '', name: '', arguments: '' };
-          if (tc.id) existing.id = tc.id;
-          if (tc.function?.name) existing.name = tc.function.name;
-          if (tc.function?.arguments) existing.arguments += tc.function.arguments;
-          nextCalls.set(idx, existing);
-        }
+      const cleaned = sanitizeLlmOutput(cleanLeakedToolSyntax(roundText));
+      if (cleaned.trim()) {
+        onDelta({ text: cleaned });
+        finalText += cleaned;
       }
+      break;
     }
 
     finalText += roundText;
-
-    // No further tools requested → we're done.
-    if (!roundHasToolCalls || nextCalls.size === 0) break;
-    pendingCalls = Array.from(nextCalls.values());
+    break;
   }
 
   return finalText;

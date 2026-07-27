@@ -79,6 +79,8 @@ const FloatingAI: React.FC = () => {
   const [imagePreviews, setImagePreviews] = useState<string[]>([]);
   const [replyTo, setReplyTo] = useState<{ id: string; content: string; role: 'user' | 'assistant' } | null>(null);
   const [swipedMsgId, setSwipedMsgId] = useState<string | null>(null);
+  const [copiedMsgId, setCopiedMsgId] = useState<string | null>(null);
+  const [swipe, setSwipe] = useState<{ id: string; dx: number } | null>(null);
   const [streamingMsgId, setStreamingMsgId] = useState<string | null>(null);
   const [hasStreamedToken, setHasStreamedToken] = useState(false);
   const typingStage = useAiTypingStage(loading, Boolean(streamingMsgId && hasStreamedToken));
@@ -412,6 +414,29 @@ const FloatingAI: React.FC = () => {
 
   const handleSubmit = (e: React.FormEvent) => { e.preventDefault(); voicePendingRef.current = false; if (isListening) stopListening(); submitQuery(input); };
 
+  const copyMessage = useCallback(async (id: string, text: string) => {
+    const value = text.trim();
+    if (!value) return;
+    try {
+      if (navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(value);
+      } else {
+        const ta = document.createElement('textarea');
+        ta.value = value;
+        ta.style.position = 'fixed';
+        ta.style.opacity = '0';
+        document.body.appendChild(ta);
+        ta.select();
+        document.execCommand('copy');
+        ta.remove();
+      }
+      setCopiedMsgId(id);
+      setTimeout(() => setCopiedMsgId((prev) => (prev === id ? null : prev)), 1500);
+    } catch {
+      // Clipboard blocked (insecure context / permissions) — selection still works.
+    }
+  }, []);
+
   useEffect(() => { messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [messages]);
   useEffect(() => { if (isOpen) setTimeout(() => inputRef.current?.focus(), 300); }, [isOpen]);
 
@@ -437,6 +462,12 @@ const FloatingAI: React.FC = () => {
             const isSwiped = swipedMsgId === msg.id;
 
             const handleTouchStart = (e: React.TouchEvent) => { touchStartXRef.current = e.touches[0].clientX; touchStartIdRef.current = msg.id; };
+            const handleTouchMove = (e: React.TouchEvent) => {
+              if (touchStartIdRef.current !== msg.id || msg.id === 'welcome' || !msg.content.trim()) return;
+              const dx = e.touches[0].clientX - touchStartXRef.current;
+              // Only track a rightward pull (WhatsApp reply direction); clamp the travel.
+              if (dx > 0) setSwipe({ id: msg.id, dx: Math.min(dx, 90) });
+            };
             const handleTouchEnd = (e: React.TouchEvent) => {
               if (touchStartIdRef.current !== msg.id) return;
               const dx = e.changedTouches[0].clientX - touchStartXRef.current;
@@ -445,13 +476,21 @@ const FloatingAI: React.FC = () => {
                 setReplyTo({ id: msg.id, content: msg.content, role: msg.role });
                 setTimeout(() => setSwipedMsgId(null), 600);
               }
+              setSwipe(null);
             };
+            const dragX = swipe?.id === msg.id ? swipe.dx : 0;
 
             return (
-              <div key={msg.id} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+              <div key={msg.id} className={`relative flex items-center ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+                {dragX > 0 && (
+                  <div className="absolute left-2 flex items-center justify-center text-brand pointer-events-none" style={{ opacity: Math.min(dragX / 60, 1) }}>
+                    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6" /></svg>
+                  </div>
+                )}
                 {msg.role === 'assistant' && <div className="w-6 h-6 rounded-full bg-brand flex items-center justify-center mr-2 mt-1 flex-shrink-0"><AISparkleIcon className="w-3 h-3 text-white" /></div>}
-                <div onTouchStart={handleTouchStart} onTouchEnd={handleTouchEnd}
-                  className={`max-w-[80%] rounded-xl px-3 py-2 text-sm relative group select-none touch-pan-y ${isSwiped ? 'ring-2 ring-brand/50 scale-[0.97]' : ''} ${msg.role === 'user' ? 'bg-brand text-white' : msg.isError ? 'bg-red-950/50 border border-red-500/40 text-red-200' : msg.isSystemNotice ? 'bg-indigo-950/50 border border-indigo-500/40 text-indigo-300' : 'bg-surface-muted border border-line text-ink'}`}>
+                <div onTouchStart={handleTouchStart} onTouchMove={handleTouchMove} onTouchEnd={handleTouchEnd}
+                  style={dragX > 0 ? { transform: `translateX(${dragX}px)`, transition: 'none' } : { transform: 'translateX(0)', transition: 'transform 0.2s ease-out' }}
+                  className={`max-w-[80%] rounded-xl px-3 py-2 text-sm relative group select-text touch-pan-y ${isSwiped ? 'ring-2 ring-brand/50 scale-[0.97]' : ''} ${msg.role === 'user' ? 'bg-brand text-white' : msg.isError ? 'bg-red-950/50 border border-red-500/40 text-red-200' : msg.isSystemNotice ? 'bg-indigo-950/50 border border-indigo-500/40 text-indigo-300' : 'bg-surface-muted border border-line text-ink'}`}>
                   
                   {isSwiped && (
                     <div className="absolute inset-0 flex items-center justify-center bg-brand/10 backdrop-blur-[1px] rounded-xl z-10">
@@ -476,6 +515,15 @@ const FloatingAI: React.FC = () => {
                   )}
                   <div className="flex items-start gap-1">
                     <div className="flex-1">{msg.role === 'assistant' ? <AiMessageContent content={msg.content} isStreaming={streamingMsgId === msg.id} /> : <p className="whitespace-pre-wrap leading-relaxed break-words overflow-hidden">{msg.content}</p>}</div>
+                    {msg.content.length > 0 && (
+                      <button type="button" onClick={(e) => { e.stopPropagation(); void copyMessage(msg.id, msg.content); }} title={copiedMsgId === msg.id ? 'Copied!' : 'Copy'} className={`p-1 rounded-lg shrink-0 transition-all mt-0.5 ${copiedMsgId === msg.id ? 'text-emerald-400' : msg.role === 'user' ? 'text-white/70 hover:text-white hover:bg-white/10' : 'text-ink-muted hover:text-brand hover:bg-surface-elevated'}`}>
+                        {copiedMsgId === msg.id ? (
+                          <svg className="w-3.5 h-3.5" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M16.704 4.153a.75.75 0 01.143 1.052l-8 10.5a.75.75 0 01-1.127.075l-4.5-4.5a.75.75 0 011.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 011.05-.143z" clipRule="evenodd" /></svg>
+                        ) : (
+                          <svg className="w-3.5 h-3.5" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.5"><rect x="7" y="7" width="9" height="9" rx="1.5" /><path d="M4 13V4.5A1.5 1.5 0 015.5 3H13" strokeLinecap="round" /></svg>
+                        )}
+                      </button>
+                    )}
                     {msg.role === 'assistant' && msg.content.length > 0 && (
                       <button type="button" onClick={(e) => { e.stopPropagation(); toggleSpeech(msg.content); }} className={`p-1 rounded-lg shrink-0 transition-all mt-0.5 ${speaking ? 'text-indigo-300 bg-indigo-500/20 animate-pulse' : 'text-ink-muted hover:text-brand hover:bg-surface-elevated'}`}>
                         <svg className="w-3.5 h-3.5" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M9.383 3.076A1 1 0 0110 4v12a1 1 0 01-1.707.707L4.586 13H2a1 1 0 01-1-1V8a1 1 0 011-1h2.586l3.707-3.707a1 1 0 011.09-.217zM14.657 2.929a1 1 0 011.414 0A9.972 9.972 0 0119 10a9.972 9.972 0 01-2.929 7.071 1 1 0 01-1.414-1.414A7.971 7.971 0 0017 10c0-2.21-.894-4.208-2.343-5.657a1 1 0 010-1.414zm-2.829 2.828a1 1 0 011.415 0A5.983 5.983 0 0115 10a5.984 5.984 0 01-1.757 4.243 1 1 0 01-1.415-1.415A3.984 3.984 0 0013 10a3.983 3.983 0 00-1.172-2.828 1 1 0 010-1.415z" clipRule="evenodd" /></svg>

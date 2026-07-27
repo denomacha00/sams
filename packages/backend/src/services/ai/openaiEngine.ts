@@ -183,11 +183,66 @@ const AGENT_REASONING_TEMPERATURE = 0.2;
 const KNOWN_TOOL_NAMES = new Set([
   'query_database', 'lookup_school', 'lookup_user',
   'query_attendance', 'query_risk_scores', 'query_reports',
+  'execute_database',
 ]);
 
 interface ParsedTextToolCall {
   name: string;
   arguments: string;
+}
+
+/**
+ * Scan `text` for balanced-brace JSON objects (handles nested `{...}`, e.g. the
+ * `"arguments":{...}` a tool call always has). Returns each object's [start,end)
+ * span and raw body, in order. String contents (and escaped quotes) are skipped
+ * so braces inside string values don't throw off the depth count.
+ */
+function findBalancedJsonObjects(text: string): Array<{ start: number; end: number; body: string }> {
+  const found: Array<{ start: number; end: number; body: string }> = [];
+  let i = 0;
+  while (i < text.length) {
+    if (text[i] !== '{') { i++; continue; }
+    let depth = 0;
+    let inStr = false;
+    let esc = false;
+    let closed = false;
+    for (let j = i; j < text.length; j++) {
+      const ch = text[j];
+      if (inStr) {
+        if (esc) esc = false;
+        else if (ch === '\\') esc = true;
+        else if (ch === '"') inStr = false;
+      } else if (ch === '"') {
+        inStr = true;
+      } else if (ch === '{') {
+        depth++;
+      } else if (ch === '}') {
+        depth--;
+        if (depth === 0) {
+          found.push({ start: i, end: j + 1, body: text.slice(i, j + 1) });
+          i = j + 1;
+          closed = true;
+          break;
+        }
+      }
+    }
+    if (!closed) break; // unbalanced tail — stop scanning
+  }
+  return found;
+}
+
+/** Parse a raw JSON blob into a known tool call, or null if it isn't one. */
+function toKnownToolCall(raw: string): ParsedTextToolCall | null {
+  try {
+    const parsed = JSON.parse(raw.trim());
+    const name = parsed.name ?? parsed.function?.name ?? parsed.tool;
+    if (typeof name !== 'string' || !KNOWN_TOOL_NAMES.has(name)) return null;
+    const argsSource = parsed.arguments ?? parsed.parameters ?? parsed.function?.arguments ?? {};
+    const argsStr = typeof argsSource === 'string' ? argsSource : JSON.stringify(argsSource);
+    return { name, arguments: argsStr };
+  } catch {
+    return null;
+  }
 }
 
 /**
@@ -198,31 +253,25 @@ interface ParsedTextToolCall {
  * user as "the answer" (the "it gives me code instead of a reply" bug). This
  * pulls a real tool call back out of the text so the agent loop can run it.
  */
-function extractTextEmbeddedToolCall(content: string): ParsedTextToolCall | null {
+export function extractTextEmbeddedToolCall(content: string): ParsedTextToolCall | null {
   if (!content || !content.includes('{')) return null;
-  const candidates: string[] = [];
 
+  // Prefer explicitly delimited blobs (tags / fences) — their inner body parses cleanly.
   const tagged = content.match(/<tool_call>\s*([\s\S]*?)\s*<\/tool_call>/i);
-  if (tagged?.[1]) candidates.push(tagged[1]);
-
+  if (tagged?.[1]) {
+    const call = toKnownToolCall(tagged[1]);
+    if (call) return call;
+  }
   const fenced = content.match(/```(?:json|tool_code)?\s*([\s\S]*?)\s*```/i);
-  if (fenced?.[1]) candidates.push(fenced[1]);
+  if (fenced?.[1]) {
+    const call = toKnownToolCall(fenced[1]);
+    if (call) return call;
+  }
 
-  // Bare JSON object with a "name" field somewhere in the text.
-  const bare = content.match(/\{[\s\S]*?"name"\s*:\s*"[a-z_]+"[\s\S]*?\}/i);
-  if (bare?.[0]) candidates.push(bare[0]);
-
-  for (const raw of candidates) {
-    try {
-      const parsed = JSON.parse(raw.trim());
-      const name = parsed.name ?? parsed.function?.name ?? parsed.tool;
-      if (typeof name !== 'string' || !KNOWN_TOOL_NAMES.has(name)) continue;
-      const argsSource = parsed.arguments ?? parsed.parameters ?? parsed.function?.arguments ?? {};
-      const argsStr = typeof argsSource === 'string' ? argsSource : JSON.stringify(argsSource);
-      return { name, arguments: argsStr };
-    } catch {
-      // not valid JSON — try the next candidate
-    }
+  // Bare JSON: scan every balanced-brace object (nested "arguments" included).
+  for (const obj of findBalancedJsonObjects(content)) {
+    const call = toKnownToolCall(obj.body);
+    if (call) return call;
   }
   return null;
 }
@@ -233,15 +282,14 @@ function extractTextEmbeddedToolCall(content: string): ParsedTextToolCall | null
  * that reference a KNOWN tool — real code the user asked for is left untouched.
  */
 export function cleanLeakedToolSyntax(answer: string): string {
-  let out = answer;
-  out = out.replace(/<\/?tool_call>/gi, '');
-  const knownToolPattern = Array.from(KNOWN_TOOL_NAMES).join('|');
-  const leakedBlob = new RegExp(
-    `\\{[^{}]*"(?:name|tool)"\\s*:\\s*"(?:${knownToolPattern})"[\\s\\S]*?\\}`,
-    'gi',
-  );
-  out = out.replace(leakedBlob, '');
-  // Collapse the empty ```json fence left behind after the blob is removed.
+  let out = answer.replace(/<\/?tool_call>/gi, '');
+  // Remove balanced-brace JSON objects that are a known tool call. Scan right-to-left
+  // so earlier spans stay valid as we splice out later ones.
+  const blobs = findBalancedJsonObjects(out).filter((obj) => toKnownToolCall(obj.body) !== null);
+  for (let k = blobs.length - 1; k >= 0; k--) {
+    out = out.slice(0, blobs[k].start) + out.slice(blobs[k].end);
+  }
+  // Collapse an empty ```json fence left behind after the blob is removed.
   out = out.replace(/```(?:json|tool_code)?\s*```/gi, '');
   return out.replace(/\n{3,}/g, '\n\n').trim();
 }

@@ -23,6 +23,7 @@ interface ChatMessage {
   pendingAction?: PendingAction;
   isError?: boolean;
   isSystemNotice?: boolean;
+  replyTo?: { id: string; role: 'user' | 'assistant'; snippet: string };
 }
 
 interface AiThreadRecord {
@@ -178,6 +179,36 @@ const SuperAdminAI: React.FC = () => {
   const [historyLoaded, setHistoryLoaded] = useState(false);
   const [selectedImages, setSelectedImages] = useState<File[]>([]);
   const [imagePreviews, setImagePreviews] = useState<string[]>([]);
+  const [copiedMsgId, setCopiedMsgId] = useState<string | null>(null);
+  const [replyTo, setReplyTo] = useState<{ id: string; role: 'user' | 'assistant'; snippet: string } | null>(null);
+  const [swipe, setSwipe] = useState<{ id: string; dx: number } | null>(null);
+  const touchStartXRef = useRef(0);
+  const touchStartIdRef = useRef<string | null>(null);
+
+  const copyMessage = async (id: string, content: string) => {
+    try {
+      if (navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(content);
+      } else {
+        const ta = document.createElement('textarea');
+        ta.value = content;
+        ta.style.position = 'fixed';
+        ta.style.opacity = '0';
+        document.body.appendChild(ta);
+        ta.focus();
+        ta.select();
+        document.execCommand('copy');
+        ta.remove();
+      }
+      setCopiedMsgId(id);
+      setTimeout(() => setCopiedMsgId((cur) => (cur === id ? null : cur)), 1500);
+    } catch { /* silently ignore */ }
+  };
+
+  const startReply = (msg: ChatMessage) => {
+    const text = msg.content.trim();
+    setReplyTo({ id: msg.id, role: msg.role, snippet: text.length > 120 ? `${text.slice(0, 120)}…` : text });
+  };
   const pendingActionRef = useRef<PendingAction | null>(null);
   const voicePendingRef = useRef(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -380,14 +411,17 @@ const SuperAdminAI: React.FC = () => {
     voicePendingRef.current = false;
     if (isListening) stopListening();
 
+    const activeReply = replyTo;
     const userMsg: ChatMessage = {
       id: generateId(),
       role: 'user',
       content: question || 'What is in this image?',
       timestamp: new Date(),
+      replyTo: activeReply ?? undefined,
     };
     setMessages((prev) => [...prev, userMsg]);
     setInput('');
+    setReplyTo(null);
     setLoading(true);
 
     // Helper for voice-spoken responses
@@ -711,20 +745,54 @@ const SuperAdminAI: React.FC = () => {
 
           {/* Messages */}
           <div className="flex-1 overflow-y-auto p-4 space-y-4">
-            {messages.map((msg) => (
+            {messages.map((msg) => {
+              const dragX = swipe?.id === msg.id ? swipe.dx : 0;
+              return (
               <div
                 key={msg.id}
-                className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
+                className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'} relative items-center`}
               >
                 <div
-                  className={`max-w-[85%] rounded-xl px-3 py-2 text-sm ${
+                  className="absolute left-0 flex items-center justify-center w-7 h-7 rounded-full bg-gray-700 border border-gray-600 text-gray-300 transition-opacity"
+                  style={{ opacity: Math.min(dragX / 55, 1) }}
+                  aria-hidden="true"
+                >
+                  <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6" />
+                  </svg>
+                </div>
+                <div
+                  className={`max-w-[85%] rounded-xl px-3 py-2 text-sm select-text ${
                     msg.role === 'user'
                       ? 'bg-indigo-600 text-white'
                       : msg.isError
                         ? 'bg-red-950 text-red-100 border border-red-600'
                         : 'bg-gray-800 text-gray-200 border border-gray-700'
                   }`}
+                  style={{ transform: `translateX(${dragX}px)`, transition: dragX === 0 ? 'transform 0.2s ease' : 'none' }}
+                  onTouchStart={(e) => {
+                    touchStartXRef.current = e.touches[0].clientX;
+                    touchStartIdRef.current = msg.id;
+                  }}
+                  onTouchMove={(e) => {
+                    if (touchStartIdRef.current !== msg.id) return;
+                    const dx = Math.max(0, Math.min(90, e.touches[0].clientX - touchStartXRef.current));
+                    setSwipe({ id: msg.id, dx });
+                  }}
+                  onTouchEnd={() => {
+                    if (swipe?.id === msg.id && swipe.dx > 55) startReply(msg);
+                    setSwipe(null);
+                    touchStartIdRef.current = null;
+                  }}
                 >
+                  {msg.replyTo && (
+                    <div className={`mb-2 pl-2 border-l-2 ${msg.role === 'user' ? 'border-white/50' : 'border-indigo-400/60'} rounded-sm`}>
+                      <p className={`text-[10px] leading-tight ${msg.role === 'user' ? 'text-white/70' : 'text-gray-400'}`}>
+                        <span className="font-semibold">{msg.replyTo.role === 'user' ? 'You' : 'AI'}</span>
+                        <span className="ml-1 opacity-70">{msg.replyTo.snippet}</span>
+                      </p>
+                    </div>
+                  )}
                   <div className="whitespace-pre-wrap">{msg.content}</div>
                   <AiChartRenderer content={msg.content} />
                   {msg.pendingAction && (
@@ -736,9 +804,31 @@ const SuperAdminAI: React.FC = () => {
                       ✓ Confirm: {msg.pendingAction.description}
                     </button>
                   )}
+                  {msg.content.length > 0 && !msg.isSystemNotice && (
+                    <div className="flex justify-end mt-1">
+                      <button
+                        type="button"
+                        onClick={(e) => { e.stopPropagation(); void copyMessage(msg.id, msg.content); }}
+                        className={`p-1 rounded transition-colors ${msg.role === 'user' ? 'text-white/50 hover:text-white/90' : 'text-gray-500 hover:text-gray-200'}`}
+                        title="Copy message"
+                        aria-label="Copy message"
+                      >
+                        {copiedMsgId === msg.id ? (
+                          <svg className="w-3.5 h-3.5 text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
+                          </svg>
+                        ) : (
+                          <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                          </svg>
+                        )}
+                      </button>
+                    </div>
+                  )}
                 </div>
               </div>
-            ))}
+              );
+            })}
             {loading && (
               <div className="flex justify-start">
                 <div className="w-6 h-6 rounded-full bg-indigo-500 flex items-center justify-center mr-2 mt-1 flex-shrink-0">
@@ -775,6 +865,24 @@ const SuperAdminAI: React.FC = () => {
 
           {/* Input */}
           <div className="border-t border-gray-700 p-3 bg-gray-800/50">
+            {replyTo && (
+              <div className="mb-2 flex items-start gap-2 px-2 py-1.5 rounded-lg bg-gray-700 border border-gray-600">
+                <div className="flex-1 min-w-0">
+                  <p className="text-[11px] font-semibold text-indigo-300">Replying to <span>{replyTo.role === 'user' ? 'You' : 'AI'}</span></p>
+                  <p className="text-xs text-gray-400 truncate mt-0.5">{replyTo.snippet}</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setReplyTo(null)}
+                  className="p-1 rounded text-gray-500 hover:text-gray-200 transition-colors"
+                  aria-label="Cancel reply"
+                >
+                  <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+            )}
             {imagePreviews.length > 0 && (
               <div className="flex gap-2 mb-2 flex-wrap">
                 {imagePreviews.map((img, i) => (

@@ -39,6 +39,7 @@ interface Message extends AiChatMessage {
   pendingAction?: PendingAction;
   actionData?: AiActionData;
   isError?: boolean;
+  replyTo?: { id: string; role: 'user' | 'assistant'; snippet: string };
 }
 
 const SUGGESTED_QUESTIONS = [
@@ -68,6 +69,39 @@ const AIAssistantPage: React.FC = () => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [selectedImages, setSelectedImages] = useState<File[]>([]);
   const [imagePreviews, setImagePreviews] = useState<string[]>([]);
+  const [copiedMsgId, setCopiedMsgId] = useState<string | null>(null);
+  const [replyTo, setReplyTo] = useState<{ id: string; role: 'user' | 'assistant'; snippet: string } | null>(null);
+  const [swipe, setSwipe] = useState<{ id: string; dx: number } | null>(null);
+  const touchStartXRef = useRef(0);
+  const touchStartIdRef = useRef<string | null>(null);
+
+  const copyMessage = async (id: string, content: string) => {
+    try {
+      if (navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(content);
+      } else {
+        // Fallback for insecure (non-HTTPS) contexts where Clipboard API is unavailable.
+        const ta = document.createElement('textarea');
+        ta.value = content;
+        ta.style.position = 'fixed';
+        ta.style.opacity = '0';
+        document.body.appendChild(ta);
+        ta.focus();
+        ta.select();
+        document.execCommand('copy');
+        ta.remove();
+      }
+      setCopiedMsgId(id);
+      setTimeout(() => setCopiedMsgId((cur) => (cur === id ? null : cur)), 1500);
+    } catch {
+      // Clipboard blocked — silently ignore; the text stays selectable for manual copy.
+    }
+  };
+
+  const startReply = (msg: Message) => {
+    const text = msg.content.trim();
+    setReplyTo({ id: msg.id, role: msg.role, snippet: text.length > 120 ? `${text.slice(0, 120)}…` : text });
+  };
 
   const handleImageSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []);
@@ -231,15 +265,18 @@ const AIAssistantPage: React.FC = () => {
   const submitQuery = async (text: string) => {
     if (!text.trim() && selectedImages.length === 0) return;
 
+    const activeReply = replyTo;
     const userMessage: Message = {
       id: crypto.randomUUID(),
       role: 'user',
       content: text.trim() || 'What is in this image?',
       userImages: imagePreviews.length > 0 ? [...imagePreviews] : undefined,
       timestamp: new Date(),
+      replyTo: activeReply ?? undefined,
     };
     setMessages((prev) => [...prev, userMessage]);
     setInput('');
+    setReplyTo(null);
     setLoading(true);
 
     try {
@@ -430,13 +467,25 @@ const AIAssistantPage: React.FC = () => {
             </div>
           )}
 
-          {messages.map((msg) => (
+          {messages.map((msg) => {
+            const dragX = swipe?.id === msg.id ? swipe.dx : 0;
+            return (
             <div
               key={msg.id}
-              className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
+              className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'} relative items-center`}
             >
+              {/* Reply arrow — revealed as user drags right */}
               <div
-                className={`max-w-[80%] rounded-2xl px-5 py-3.5 ${
+                className="absolute left-0 flex items-center justify-center w-8 h-8 rounded-full bg-surface-elevated border border-line text-ink-muted transition-opacity"
+                style={{ opacity: Math.min(dragX / 55, 1) }}
+                aria-hidden="true"
+              >
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6" />
+                </svg>
+              </div>
+              <div
+                className={`max-w-[80%] rounded-2xl px-5 py-3.5 select-text ${
                   msg.role === 'user'
                     ? 'bg-gradient-to-r from-indigo-600 to-indigo-700 text-white shadow-lg shadow-indigo-500/20'
                     : msg.isError
@@ -445,7 +494,30 @@ const AIAssistantPage: React.FC = () => {
                         ? 'bg-indigo-950/50 border border-indigo-500/40 text-indigo-300'
                         : 'bg-surface-muted border border-line text-ink'
                 }`}
+                style={{ transform: `translateX(${dragX}px)`, transition: dragX === 0 ? 'transform 0.2s ease' : 'none' }}
+                onTouchStart={(e) => {
+                  touchStartXRef.current = e.touches[0].clientX;
+                  touchStartIdRef.current = msg.id;
+                }}
+                onTouchMove={(e) => {
+                  if (touchStartIdRef.current !== msg.id) return;
+                  const dx = Math.max(0, Math.min(90, e.touches[0].clientX - touchStartXRef.current));
+                  setSwipe({ id: msg.id, dx });
+                }}
+                onTouchEnd={() => {
+                  if (swipe?.id === msg.id && swipe.dx > 55) startReply(msg);
+                  setSwipe(null);
+                  touchStartIdRef.current = null;
+                }}
               >
+                {msg.replyTo && (
+                  <div className={`mb-2 pl-2 border-l-2 ${msg.role === 'user' ? 'border-white/50' : 'border-indigo-400/60'} rounded-sm`}>
+                    <p className={`text-[10px] leading-tight ${msg.role === 'user' ? 'text-white/70' : 'text-ink-muted'}`}>
+                      <span className="font-semibold">{msg.replyTo.role === 'user' ? 'You' : 'AI'}</span>
+                      <span className="ml-1 opacity-70">{msg.replyTo.snippet}</span>
+                    </p>
+                  </div>
+                )}
                 {msg.role === 'assistant' ? (
                   <AiMessageContent content={msg.content} className="whitespace-pre-wrap text-sm" />
                 ) : (
@@ -477,16 +549,34 @@ const AIAssistantPage: React.FC = () => {
                     {msg.actionData.download.label}
                   </button>
                 )}
-                <p
-                  className={`text-xs mt-2 ${
-                    msg.role === 'user' ? 'text-indigo-200/70' : 'text-ink-subtle'
-                  }`}
-                >
-                  {msg.timestamp.toLocaleTimeString()}
-                </p>
+                <div className="flex items-center justify-between mt-2">
+                  <p className={`text-xs ${msg.role === 'user' ? 'text-indigo-200/70' : 'text-ink-subtle'}`}>
+                    {msg.timestamp.toLocaleTimeString()}
+                  </p>
+                  {msg.content.length > 0 && !msg.isSystemNotice && (
+                    <button
+                      type="button"
+                      onClick={(e) => { e.stopPropagation(); void copyMessage(msg.id, msg.content); }}
+                      className={`ml-2 p-1 rounded transition-colors ${msg.role === 'user' ? 'text-white/50 hover:text-white/90' : 'text-ink-subtle hover:text-ink'}`}
+                      title="Copy message"
+                      aria-label="Copy message"
+                    >
+                      {copiedMsgId === msg.id ? (
+                        <svg className="w-3.5 h-3.5 text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
+                        </svg>
+                      ) : (
+                        <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                        </svg>
+                      )}
+                    </button>
+                  )}
+                </div>
               </div>
             </div>
-          ))}
+            );
+          })}
 
           {loading && (
             <div className="flex justify-start">
@@ -525,6 +615,24 @@ const AIAssistantPage: React.FC = () => {
                   </button>
                 </div>
               ))}
+            </div>
+          )}
+          {replyTo && (
+            <div className="mb-2 flex items-start gap-2 px-3 py-2 rounded-lg bg-surface-elevated border border-line">
+              <div className="flex-1 min-w-0">
+                <p className="text-[11px] font-semibold text-brand">Replying to <span>{replyTo.role === 'user' ? 'You' : 'AI'}</span></p>
+                <p className="text-xs text-ink-muted truncate mt-0.5">{replyTo.snippet}</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setReplyTo(null)}
+                className="p-1 rounded text-ink-subtle hover:text-ink hover:bg-surface-muted transition-colors"
+                aria-label="Cancel reply"
+              >
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
             </div>
           )}
           <form onSubmit={handleSubmit} className="flex gap-3">
