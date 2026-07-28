@@ -220,8 +220,9 @@ const RegistrationLinksPage: React.FC = () => {
     // HOD creating student link needs a class
     if (isHOD && targetRole === 'STUDENT' && hodClasses.length === 0) return true;
     if (isHOD && targetRole === 'STUDENT' && !selectedClass) return true;
-    // Admin creating any link needs a department
-    if (!isHOD && !isTeacher && targetRole !== 'SCHOOL_ADMIN' && !selectedDept) return true;
+    // Admin creating any link needs a department — except GUARDIAN links,
+    // which have no department/class scope (parents self-link via child's admission number)
+    if (!isHOD && !isTeacher && targetRole !== 'SCHOOL_ADMIN' && targetRole !== 'GUARDIAN' && !selectedDept) return true;
     // Student links need a class too (teacher links don't — teacher teaches multiple classes)
     if (!isHOD && !isTeacher && targetRole === 'STUDENT' && !selectedClass) return true;
     return false;
