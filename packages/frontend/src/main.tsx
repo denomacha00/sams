@@ -29,6 +29,7 @@ import ProfilePage from './pages/ProfilePage';
 import NotificationsPage from './pages/NotificationsPage';
 import TimetableViewPage from './pages/TimetableViewPage';
 import LinkAttendancePage from './pages/LinkAttendancePage';
+import TermsPage from './pages/TermsPage';
 
 // HOD pages
 import DepartmentManagementPage from './pages/hod/DepartmentManagementPage';
@@ -68,6 +69,7 @@ ReactDOM.createRoot(document.getElementById('root') as HTMLElement).render(
         <Route path="/activate" element={<ActivationPage />} />
         <Route path="/register/:token" element={<RegisterPage />} />
         <Route path="/attend/:token" element={<LinkAttendancePage />} />
+        <Route path="/terms" element={<TermsPage />} />
 
         {/* Protected routes — wrapped with sidebar + topbar layout */}
         <Route element={<AuthGuard />}>

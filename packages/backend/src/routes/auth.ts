@@ -550,7 +550,7 @@ authRouter.post('/forgot-password-otp', otpResendRateLimiter, async (req: Reques
  * POST /api/v1/auth/reset-password-otp
  * Reset password using OTP code instead of email link.
  */
-authRouter.post('/reset-password-otp', async (req: Request, res: Response): Promise<void> => {
+authRouter.post('/reset-password-otp', otpResendRateLimiter, async (req: Request, res: Response): Promise<void> => {
   const parsed = resetPasswordOtpSchema.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({
@@ -688,7 +688,7 @@ authRouter.post('/logout', authenticate, async (req: Request, res: Response): Pr
  * POST /api/v1/auth/forgot-password
  * Generate a reset token and send a reset link via email/SMS.
  */
-authRouter.post('/forgot-password', async (req: Request, res: Response): Promise<void> => {
+authRouter.post('/forgot-password', otpResendRateLimiter, async (req: Request, res: Response): Promise<void> => {
   const parsed = forgotPasswordSchema.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({
@@ -812,7 +812,7 @@ authRouter.post('/forgot-password', async (req: Request, res: Response): Promise
  * POST /api/v1/auth/reset-password
  * Validate reset token and set a new password.
  */
-authRouter.post('/reset-password', async (req: Request, res: Response): Promise<void> => {
+authRouter.post('/reset-password', otpResendRateLimiter, async (req: Request, res: Response): Promise<void> => {
   const parsed = resetPasswordSchema.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({
