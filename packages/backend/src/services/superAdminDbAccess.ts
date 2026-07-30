@@ -24,10 +24,13 @@ const DANGEROUS_PATTERNS = [
   /;\s*(DELETE|DROP|TRUNCATE|ALTER|UPDATE|INSERT|CREATE)\b/i,
   /\bpg_sleep\b/i,
   /\bCOPY\b/i,
+  // Server-side file & large-object access can read arbitrary files / exfiltrate data.
+  /\b(pg_read_file|pg_read_binary_file|pg_ls_dir|pg_stat_file|lo_import|lo_export|dblink)\b/i,
   /\/\*/i,  // block comments (can hide malicious SQL)
+  /--/,     // line comments (can hide SQL or spoof a fake WHERE clause)
 ];
 
-function isReadOnlyQuery(sql: string): boolean {
+export function isReadOnlyQuery(sql: string): boolean {
   const trimmed = sql.trim();
   if (!READ_ONLY_SQL_RE.test(trimmed)) return false;
   return !DANGEROUS_PATTERNS.some((p) => p.test(trimmed));
@@ -49,6 +52,7 @@ const CATASTROPHIC_PATTERNS: Array<{ re: RegExp; reason: string }> = [
   { re: /^\s*(UPDATE|DELETE)\b(?![\s\S]*\bWHERE\b)/i, reason: 'UPDATE/DELETE without a WHERE clause affects every row' },
   { re: /;\s*\S/, reason: 'multiple statements in one query are not allowed' },
   { re: /\/\*/, reason: 'block comments can hide malicious SQL' },
+  { re: /--/, reason: 'line comments can hide SQL or spoof a fake WHERE clause' },
 ];
 
 export function isSqlWriteEnabled(): boolean {

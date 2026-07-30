@@ -548,6 +548,13 @@ const RegisterPage: React.FC = () => {
             >
               {loading ? 'Registering...' : 'Register'}
             </button>
+
+            <p className="text-center text-xs text-ink-subtle mt-3">
+              By registering you agree to the{' '}
+              <a href="/terms" target="_blank" rel="noopener noreferrer" className="text-brand hover:text-brand-hover">
+                Terms &amp; Conditions
+              </a>.
+            </p>
           </form>
         )}
 

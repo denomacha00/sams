@@ -2,7 +2,7 @@ import express, { type Request, type Response, type NextFunction } from 'express
 import type { Server as HttpServer } from 'http';
 import { Server as SocketIOServer } from 'socket.io';
 import { createAdapter } from '@socket.io/redis-adapter';
-import { UPLOADS_ROOT } from './config/uploads';
+import { AVATARS_DIR } from './config/uploads';
 import { getAfricasTalkingConfig, getAtSmsMode, isSmsConfigured } from './config/africasTalking';
 import { getSmtpConfig, isEmailConfigured } from './config/email';
 import { prisma } from './lib/prisma';
@@ -150,7 +150,10 @@ function setupSocketRedisAdapter(socketServer: SocketIOServer): void {
 /** Mount routes, sockets, and full /health after HTTP listen (heavy imports stay out of index.ts). */
 export function registerApplication(app: express.Express, httpServer: HttpServer): void {
   applyGlobalMiddleware(app);
-  app.use('/uploads', express.static(UPLOADS_ROOT));
+  // Only avatars are public; notification attachments are served via the
+  // authenticated /api/v1/notifications/attachments/:id endpoint so they are
+  // not exposed to anyone who can guess a path under the uploads root.
+  app.use('/uploads/avatars', express.static(AVATARS_DIR));
 
   app.use('/api/v1', (req: Request, res: Response, next: NextFunction) => {
     if (isPublicPath(req.baseUrl + req.path, req.method)) {
@@ -189,10 +192,23 @@ export function registerApplication(app: express.Express, httpServer: HttpServer
   app.use('/api/v1/schemes', schemeOfWorkRouter);
   app.use('/api/v1/school-calendar', schoolCalendarRouter);
 
+  // Socket.IO CORS — mirror the HTTP policy. Never fall back to '*' in production.
+  const socketCorsRaw = process.env.CORS_ORIGIN;
+  let socketOrigin: boolean | string | string[];
+  if (socketCorsRaw && socketCorsRaw !== '*') {
+    const allowed = socketCorsRaw.split(',').map((s) => s.trim()).filter(Boolean);
+    socketOrigin = allowed.length === 1 ? allowed[0] : allowed;
+  } else if (process.env.NODE_ENV === 'production') {
+    socketOrigin = false;
+  } else {
+    socketOrigin = true;
+  }
+
   io = new SocketIOServer(httpServer, {
     cors: {
-      origin: process.env.CORS_ORIGIN ?? '*',
+      origin: socketOrigin,
       methods: ['GET', 'POST'],
+      credentials: true,
     },
   });
 

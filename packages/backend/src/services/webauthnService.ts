@@ -149,6 +149,15 @@ export class WebAuthnService {
     // Store the credential
     const publicKeyBuffer = Buffer.from(publicKey, 'base64');
 
+    // Reject any key we won't be able to verify signatures against later. The
+    // browser's getPublicKey() returns SPKI DER; anything else (e.g. a raw
+    // attestationObject) is refused so we never store an unverifiable credential.
+    try {
+      crypto.createPublicKey({ key: publicKeyBuffer, format: 'der', type: 'spki' });
+    } catch {
+      throw new AppError(400, 'INVALID_PUBLIC_KEY', 'Unsupported public key format; please use a device that supports WebAuthn getPublicKey()');
+    }
+
     await prisma.webAuthnCredential.create({
       data: {
         userId,
@@ -249,10 +258,40 @@ export class WebAuthnService {
       throw new AppError(401, 'REPLAY_DETECTED', 'Possible credential cloning detected');
     }
 
-    // Verify the signature using the stored public key
-    // For simplicity, we trust the browser's assertion verification
-    // In production, you'd verify the signature against the public key
-    // The critical security is: credential exists in DB + challenge matches + counter increments
+    // Cryptographically verify the assertion signature against the stored public
+    // key. The signed data is authenticatorData || SHA-256(clientDataJSON), per
+    // the WebAuthn spec. Without this check, anyone who knows a (non-secret)
+    // credentialId and a valid challenge could forge a login. The public key was
+    // stored at registration as SPKI DER (from the browser's getPublicKey()).
+    const clientDataHash = crypto.createHash('sha256').update(Buffer.from(clientDataJSON, 'base64')).digest();
+    const signedData = Buffer.concat([authDataBuffer, clientDataHash]);
+    const signatureBuffer = Buffer.from(signature, 'base64');
+    const publicKeyDer = Buffer.isBuffer(credential.publicKey)
+      ? credential.publicKey
+      : Buffer.from(credential.publicKey as unknown as Uint8Array);
+
+    let signatureValid = false;
+    try {
+      const keyObject = crypto.createPublicKey({ key: publicKeyDer, format: 'der', type: 'spki' });
+      const keyType = keyObject.asymmetricKeyType;
+      if (keyType === 'ec') {
+        // ES256 (P-256 + SHA-256). WebAuthn signatures are ASN.1 DER-encoded,
+        // which is what Node's verifier expects for EC keys.
+        signatureValid = crypto.verify('sha256', signedData, keyObject, signatureBuffer);
+      } else if (keyType === 'rsa') {
+        // RS256 (RSASSA-PKCS1-v1_5 + SHA-256).
+        signatureValid = crypto.verify('sha256', signedData, keyObject, signatureBuffer);
+      } else {
+        throw new AppError(400, 'UNSUPPORTED_KEY', `Unsupported WebAuthn key type: ${keyType}`);
+      }
+    } catch (err) {
+      if (err instanceof AppError) throw err;
+      throw new AppError(401, 'SIGNATURE_INVALID', 'WebAuthn signature verification failed');
+    }
+
+    if (!signatureValid) {
+      throw new AppError(401, 'SIGNATURE_INVALID', 'WebAuthn signature verification failed');
+    }
 
     // Update counter and lastUsedAt
     await prisma.webAuthnCredential.update({

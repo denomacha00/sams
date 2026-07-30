@@ -78,19 +78,24 @@ export function applyGlobalMiddleware(app: Express): void {
   // 1. Security headers
   app.use(helmet());
 
-  // 2. CORS — origin controlled via environment variable
-  // NOTE: When credentials:true, origin MUST be an explicit domain (not '*').
-  // In production set CORS_ORIGIN to your frontend domain, e.g. https://app.smart-managment.com
+  // 2. CORS — origin controlled via CORS_ORIGIN env var.
+  // credentials:true requires an explicit origin, never '*'.
+  // Production: set CORS_ORIGIN=https://app.smart-managment.com,https://super.smart-managment.com
   const corsOrigin = process.env.CORS_ORIGIN;
+  const isProd = process.env.NODE_ENV === 'production';
+  let originOption: boolean | string | string[];
+  if (corsOrigin && corsOrigin !== '*') {
+    const allowed = corsOrigin.split(',').map((s) => s.trim()).filter(Boolean);
+    originOption = allowed.length === 1 ? allowed[0] : allowed;
+  } else if (isProd) {
+    console.warn('[CORS] CORS_ORIGIN not set in production — blocking all cross-origin requests');
+    originOption = false;
+  } else {
+    originOption = true; // dev: allow all
+  }
   app.use(
     cors({
-      origin: corsOrigin && corsOrigin !== '*'
-        ? corsOrigin
-        : (origin, callback) => {
-            // In development allow all origins; in production this path should not be hit
-            // because CORS_ORIGIN should be set to the real domain.
-            callback(null, origin || '*');
-          },
+      origin: originOption,
       methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
       allowedHeaders: ['Content-Type', 'Authorization', 'X-Request-Id'],
       credentials: true,

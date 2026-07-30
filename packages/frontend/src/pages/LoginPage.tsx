@@ -435,6 +435,9 @@ const LoginPage: React.FC = () => {
           <div className="text-center mt-6">
             <p className="text-xs text-ink-subtle">© 2025 SAMS · Smart Attendance Management System</p>
             <p className="text-xs text-ink-subtle mt-1">
+              <Link to="/terms" className="text-brand hover:text-brand-hover">Terms &amp; Conditions</Link>
+            </p>
+            <p className="text-xs text-ink-subtle mt-1">
               Developed by <span className="text-brand font-medium">Denis Macharia</span> · <a href="tel:+254703285246" className="text-brand hover:text-brand-hover">+254 703 285 246</a>
             </p>
           </div>
